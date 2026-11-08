@@ -71,7 +71,7 @@ describe('buildSections', () => {
       id: 'q1',
       name: 'New Query',
       titleIsCustom: false,
-      definition: { structures: [{ id: 'note' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: [], groupBy: null },
+      definition: { types: [{ id: 'note' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: [], groupBy: null },
     })
     const titleCtx = { types: [{ id: 'note', pluralName: 'Notes' }], tagIdsToTitles: {} }
     const [s] = buildSections(NOTE, views(['query:q1']), { ...ctx({ queries: [q] }), titleCtx })
@@ -104,7 +104,7 @@ describe('buildSections', () => {
   })
 
   test('full-view sections become header tabs; dashboard-only ones do not', () => {
-    const q = query({ id: 'q1', name: 'Open', definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'note' }] } })
+    const q = query({ id: 'q1', name: 'Open', definition: { ...query({ id: 'x' }).definition, types: [{ id: 'note' }] } })
     const c = collection({ id: 'c1', name: 'Reading', typeIds: ['note'] })
     const all = buildSections(NOTE, views([...OLD, 'query:q1']), ctx({ collections: [c], queries: [q] }))
     expect(tabSections(all).map((s) => s.key)).toEqual(['inNoCollection', 'notTagged', 'query:q1', 'collection:c1'])
@@ -164,15 +164,15 @@ describe('section edits', () => {
 
   test('appendSection adds a query section at the end and un-removes it', () => {
     const v = views(DEFAULTS, ['query:q1'])
-    const q = query({ id: 'q1', name: 'Open', definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'note' }] } })
+    const q = query({ id: 'q1', name: 'Open', definition: { ...query({ id: 'x' }).definition, types: [{ id: 'note' }] } })
     const next = appendSection(v, buildSections(NOTE, v, ctx({ queries: [q] })), 'query:q1')
     expect(next.dashboard.sections.at(-1)).toEqual({ key: 'query:q1', collapsed: false })
     expect(next.dashboard.removedSections).toEqual([])
   })
 
   test('addableSections offers removed built-ins, collections and the queries of the type', () => {
-    const q1 = query({ id: 'q1', name: 'Mine', definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'note' }] } })
-    const q2 = query({ id: 'q2', name: 'Theirs', definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'plain' }] } })
+    const q1 = query({ id: 'q1', name: 'Mine', definition: { ...query({ id: 'x' }).definition, types: [{ id: 'note' }] } })
+    const q2 = query({ id: 'q2', name: 'Theirs', definition: { ...query({ id: 'x' }).definition, types: [{ id: 'plain' }] } })
     const c = collection({ id: 'c1', name: 'Reading', typeIds: ['note'] })
     const v = views(['inNoCollection'], ['collections'])
     const c2 = ctx({ collections: [c], queries: [q1, q2] })

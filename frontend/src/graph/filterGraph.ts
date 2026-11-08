@@ -169,8 +169,8 @@ export function excludedEntirely(data: GraphData, custom: GraphCustomization, i:
 /** True when a filter reduces node `i` (type filter, exclude, "Hide dates"). */
 export function reducedByFilters(data: GraphData, custom: GraphCustomization, i: number): boolean {
   const node = data.nodes[i]
-  const filter = custom.filterStructureIds ?? []
-  const exclude = custom.excludeStructureIds ?? []
+  const filter = custom.filterTypeIds ?? []
+  const exclude = custom.excludeTypeIds ?? []
   if (custom.hideDates && node.daily) return true
   if (exclude.includes(node.type)) return true
   if (filter.length > 0 && !filter.includes(node.type)) return true

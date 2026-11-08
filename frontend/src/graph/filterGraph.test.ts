@@ -48,17 +48,17 @@ describe('filterGraph', () => {
       [[0, 1], [1, 2]],
     )
     expect(filterGraph(data, {}, G)).toEqual({ nodes: [0, 1, 2], links: [[0, 1], [1, 2]], reduced: [], tagLinks: [] })
-    const ex = filterGraph(data, { excludeStructureIds: ['person'] }, G)
+    const ex = filterGraph(data, { excludeTypeIds: ['person'] }, G)
     expect(ex.nodes).toEqual([0, 1, 2])
     expect(ex.reduced).toEqual([1])
     expect(ex.links).toEqual([[0, 1], [1, 2]])
     // c is filtered out and has one neighbour: pruned.
-    const filtered = filterGraph(data, { filterStructureIds: ['page', 'person'] }, G)
+    const filtered = filterGraph(data, { filterTypeIds: ['page', 'person'] }, G)
     expect(filtered.nodes).toEqual([0, 1])
     expect(filtered.reduced).toEqual([])
     expect(filtered.links).toEqual([[0, 1]])
     // Listed in both: still excluded (reduced, then pruned with only a left as its neighbour).
-    const both = filterGraph(data, { filterStructureIds: ['page', 'person'], excludeStructureIds: ['person'] }, G)
+    const both = filterGraph(data, { filterTypeIds: ['page', 'person'], excludeTypeIds: ['person'] }, G)
     expect(both.nodes).toEqual([0])
     expect(both.links).toEqual([])
   })
@@ -66,12 +66,12 @@ describe('filterGraph', () => {
   test('edges between two reduced nodes are dropped, and pruning repeats', () => {
     // a — x — y — b with x, y hidden: the x–y edge goes, so x and y each keep one neighbour: pruned.
     const chain = graph([node('a'), node('x', { type: 'hidden' }), node('y', { type: 'hidden' }), node('b')], [[0, 1], [1, 2], [2, 3]])
-    const v = filterGraph(chain, { excludeStructureIds: ['hidden'] }, G)
+    const v = filterGraph(chain, { excludeTypeIds: ['hidden'] }, G)
     expect(v.nodes).toEqual([0, 3])
     expect(v.links).toEqual([])
     // A reduced node between two shown ones stays; a dangling reduced leaf of it is pruned first.
     const tree = graph([node('a'), node('x', { type: 'hidden' }), node('b'), node('leaf', { type: 'hidden' })], [[0, 1], [1, 2], [1, 3]])
-    expect(filterGraph(tree, { excludeStructureIds: ['hidden'] }, G)).toEqual({
+    expect(filterGraph(tree, { excludeTypeIds: ['hidden'] }, G)).toEqual({
       nodes: [0, 1, 2],
       links: [[0, 1], [1, 2]],
       reduced: [1],
@@ -81,12 +81,12 @@ describe('filterGraph', () => {
 
   test('hide indirect links removes every reduced node and its edges; no synthesized edges or neighbour cap', () => {
     const small = graph([node('a'), node('x', { type: 'hidden' }), node('b')], [[0, 1], [1, 2]])
-    const off = filterGraph(small, { excludeStructureIds: ['hidden'], hideIndirectLinks: true }, G)
+    const off = filterGraph(small, { excludeTypeIds: ['hidden'], hideIndirectLinks: true }, G)
     expect(off).toEqual({ nodes: [0, 2], links: [], reduced: [], tagLinks: [] })
     // A reduced hub with many shown neighbours stays, and only real edges are drawn.
     const k = 30
     const hub = star(k, { type: 'hidden' })
-    const v = filterGraph(hub, { excludeStructureIds: ['hidden'] }, G)
+    const v = filterGraph(hub, { excludeTypeIds: ['hidden'] }, G)
     expect(v.reduced).toEqual([0])
     expect(v.nodes).toHaveLength(k + 1)
     expect(v.links).toHaveLength(k)
@@ -177,7 +177,7 @@ describe('filterGraph', () => {
       [[0, 2], [0, 3], [1, 3], [1, 4]],
     )
     expect(filterGraph(data, {}, G).tagLinks).toEqual([])
-    const v = filterGraph(data, { showSpaceTagsNetwork: true, filterStructureIds: ['page'] }, G)
+    const v = filterGraph(data, { showSpaceTagsNetwork: true, filterTypeIds: ['page'] }, G)
     expect(v.nodes).toEqual([0, 1, 2, 3, 4])
     expect(v.reduced).toEqual([])
     expect(v.tagLinks).toEqual([[2, 3], [3, 4]])
@@ -189,7 +189,7 @@ describe('filterGraph', () => {
     expect(data.links).toHaveLength(100000)
     const slack = Number(process.env.OBJECT_PERF_SLACK ?? '1') || 1
     filterGraph(data, {}, G) // warm the adjacency cache and the JIT
-    const custom = { excludeStructureIds: ['person'], hideLargeNodes: true }
+    const custom = { excludeTypeIds: ['person'], hideLargeNodes: true }
     const t0 = performance.now()
     const v = filterGraph(data, custom, G)
     const ms = performance.now() - t0

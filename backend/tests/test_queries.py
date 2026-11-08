@@ -55,7 +55,7 @@ def test_create_query_writes_one_file_and_event(space_dir: Path):
     space, c, published = _client(space_dir)
     before = _files(space_dir)
     definition = {
-        "structures": [{"id": "task"}],
+        "types": [{"id": "task"}],
         "filterGroup": {"type": "filterGroup", "operator": "and", "elements": []},
         "sorts": [],
         "groupBy": None,
@@ -87,7 +87,7 @@ def test_create_query_defaults(space_dir: Path):
     assert first["name"] == "New Query" and first["titleIsCustom"] is False
     assert first["id"] == "new-query" and second["id"] == "new-query-2"
     assert first["definition"] == {
-        "structures": [],
+        "types": [],
         "filterGroup": {"type": "filterGroup", "operator": "and", "elements": []},
         "sorts": [],
         "groupBy": None,
@@ -100,17 +100,17 @@ def test_query_validation_422(space_dir: Path):
     before = _files(space_dir)
 
     def bad(**definition):
-        return _create(c, "Bad", definition={"structures": [], **definition})
+        return _create(c, "Bad", definition={"types": [], **definition})
 
     with c:
-        unknown = bad(structures=[{"id": "nope"}])
-        unknown_excl = bad(excludeStructureIds=["nope"])
+        unknown = bad(types=[{"id": "nope"}])
+        unknown_excl = bad(excludeTypeIds=["nope"])
         zero = bad(limit={"size": 0})
         seven = bad(limit={"size": 7})
         six_terms = bad(search={"searchTerms": [{"text": f"term{i}"} for i in range(6)], "searchMode": "auto"})
-        ok_limit = _create(c, "Fine", definition={"structures": [], "limit": {"size": 25}})
+        ok_limit = _create(c, "Fine", definition={"types": [], "limit": {"size": 25}})
         ok_terms = _create(
-            c, "Five", definition={"structures": [], "search": {"searchTerms": [{"text": "ab"}] * 5, "searchMode": "auto"}}
+            c, "Five", definition={"types": [], "search": {"searchTerms": [{"text": "ab"}] * 5, "searchMode": "auto"}}
         )
     for r in (unknown, unknown_excl, zero, seven, six_terms):
         assert r.status_code == 422, r.text
@@ -145,14 +145,14 @@ def test_save_unknown_type_kept_new_unknown_422(space_dir: Path):
     """A stored type id that no longer exists saves unchanged; a new unknown one is refused."""
     qdir = space_dir / ".object" / "queries"
     qdir.mkdir(parents=True)
-    stored = {"id": "old", "name": "Old", "definition": {"structures": [{"id": "gone"}], "excludeStructureIds": ["gone2"]}}
+    stored = {"id": "old", "name": "Old", "definition": {"types": [{"id": "gone"}], "excludeTypeIds": ["gone2"]}}
     (qdir / "old.json").write_text(json.dumps(stored), encoding="utf-8")
     _space, c, _pub = _client(space_dir)
     with c:
         q = c.get("/api/queries").json()[0]
         same = c.put("/api/queries/old", json={"query": q, "baseRevision": q["revision"]})
         q2 = same.json()["query"]
-        q2["definition"]["structures"].append({"id": "another"})
+        q2["definition"]["types"].append({"id": "another"})
         more = c.put("/api/queries/old", json={"query": q2, "baseRevision": q2["revision"]})
     assert same.status_code == 200, same.text
     assert more.status_code == 422
@@ -177,7 +177,7 @@ def test_delete_query_restorable(space_dir: Path):
     space, c, published = _client(space_dir)
     live = space_dir / ".object" / "queries" / "open-tasks.json"
     with c:
-        made = _create(c, definition={"structures": [{"id": "task"}]}).json()
+        made = _create(c, definition={"types": [{"id": "task"}]}).json()
         original = live.read_bytes()
         published.clear()
         r = c.delete("/api/queries/open-tasks")
@@ -248,7 +248,7 @@ def test_title_is_custom_inferred_on_load(space_dir: Path):
     assert listed["mine"]["titleIsCustom"] is True
     assert listed["blank"]["titleIsCustom"] is False
     assert listed["explicit"]["titleIsCustom"] is False
-    assert listed["mine"]["definition"]["structures"] == []
+    assert listed["mine"]["definition"]["types"] == []
     assert listed["mine"]["view"] == {"viewDefinition": {"dataViewLayout": "list"}}
 
 
@@ -259,7 +259,7 @@ def test_view_filter_keys_kept_but_never_read(space_dir: Path):
         "id": "v",
         "name": "V",
         "view": {"viewDefinition": {"dataViewLayout": "grid"}, "sorts": [{"propertyId": "x"}], "showDataViewDetails": True},
-        "definition": {"structures": [], "sorts": []},
+        "definition": {"types": [], "sorts": []},
     }
     (qdir / "v.json").write_text(json.dumps(stored), encoding="utf-8")
     _space, c, _pub = _client(space_dir)
@@ -313,7 +313,7 @@ def test_queries_not_in_objects(space_dir: Path):
         rows = c.post("/api/rows", json={}).json()["rows"]
         types = c.get("/api/space").json()["types"]
         _create(c, "One")
-        _create(c, "Two", definition={"structures": [{"id": "task"}]})
+        _create(c, "Two", definition={"types": [{"id": "task"}]})
         assert c.get("/api/objects").json() == objects
         assert c.post("/api/rows", json={}).json()["rows"] == rows
         assert c.get("/api/space").json()["types"] == types

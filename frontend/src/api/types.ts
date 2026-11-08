@@ -290,7 +290,7 @@ export interface TypeDef {
   cropCoverImage: boolean
   templates: { ids: string[]; defaultTemplateId: string | null }
   /** Per-view card settings (store-only in M3 other than the small card). */
-  structureViews?: Record<string, unknown>
+  typeViews?: Record<string, unknown>
   defaultViewType?: 'inline' | 'smallCard' | 'wideCard' | 'embed'
   smallCardViewConfig?: SmallCardViewConfig
   /** M4: absent = offered in the calendar's quick-create chips; `createOnce` = once per day. */
@@ -437,7 +437,7 @@ export interface DeviceSettings {
   /** `@` at the start of an empty block makes an inline link, not an object block. */
   alwaysCreateInlineLinks: boolean
   /** Hide the type-settings and property-editing entry points outside Settings. */
-  hideStructureSettings: boolean
+  hideTypeSettings: boolean
   /** How highlight blocks show (none exist in Object yet; stored only). */
   highlightStyle: 'default' | 'minimal'
   // ---- M10 (AI assistant) ----
@@ -775,7 +775,7 @@ export interface Filter {
   option: string
   referenceValue?: FilterReference
   /** A type id: the filter applies to rows of that type only. */
-  structureId?: string
+  typeId?: string
 }
 
 export interface FilterGroup {
@@ -789,7 +789,7 @@ export type SortOption = 'ascending' | 'descending' | 'ascendingExists' | 'desce
 export interface Sort {
   propertyId: string
   option: SortOption
-  structureId?: string
+  typeId?: string
 }
 
 export type GroupSortOption =
@@ -806,7 +806,7 @@ export type GroupSortOption =
 export interface GroupByEntry {
   propertyId: string
   option: string
-  structureId?: string
+  typeId?: string
   numberRangeConfig?: { min?: number; max?: number; step?: number }
 }
 
@@ -847,7 +847,7 @@ export interface DataViewDefinition {
     hideByDefault?: boolean
     hideEmptyGroups?: boolean
   }
-  calculations?: { propertyId: string; structureId: string; kind: CalcKind }[]
+  calculations?: { propertyId: string; typeId: string; kind: CalcKind }[]
   smallCardViewConfigs?: Record<string, SmallCardViewConfig>
   /** M13 */
   calendarConfig?: CalendarViewConfig
@@ -917,14 +917,14 @@ export interface Collection {
 }
 
 export interface QueryDefinition {
-  structures: {
+  types: {
     id: string
     collectionIds?: string[]
     excludeCollectionIds?: string[]
     inAnyCollection?: boolean
     inNoCollection?: boolean
   }[]
-  excludeStructureIds?: string[]
+  excludeTypeIds?: string[]
   tags?: { ids: string[]; operator: 'or' | 'and' }
   excludeTags?: { ids: string[] }
   search?: { searchTerms: { text: string }[]; searchMode: 'auto' | 'fullText' | 'semantic' | 'title' }
@@ -1276,8 +1276,8 @@ export interface GraphData {
 
 /** The graph's filters, keys as stored in `ui.json`. */
 export interface GraphCustomization {
-  filterStructureIds?: string[]
-  excludeStructureIds?: string[]
+  filterTypeIds?: string[]
+  excludeTypeIds?: string[]
   showCompletedTasks?: boolean
   showMinimalNodes?: boolean
   hideLargeNodes?: boolean

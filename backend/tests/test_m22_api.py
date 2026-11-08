@@ -304,7 +304,7 @@ def _test_add_work_fields_route(env: Env) -> None:
     assert SCANNER not in {i["path"] for i in e.c.get("/api/work/items").json()["items"]}
     tickets = next(q for q in e.c.get("/api/queries").json() if q["id"] == "work-tickets")
     assert tickets["builtIn"] == "tickets"
-    assert [s["id"] for s in tickets["definition"]["structures"]] == ["task"]
+    assert [s["id"] for s in tickets["definition"]["types"]] == ["task"]
 
     stale = e.c.post("/api/types/project/work-fields", json={"baseRevision": "nope"})
     assert stale.status_code == 409
@@ -341,7 +341,7 @@ def _test_add_work_fields_route(env: Env) -> None:
     assert missing.status_code == 404
 
     tickets = next(q for q in e.c.get("/api/queries").json() if q["id"] == "work-tickets")
-    assert sorted(s["id"] for s in tickets["definition"]["structures"]) == ["project", "task"]
+    assert sorted(s["id"] for s in tickets["definition"]["types"]) == ["project", "task"]
     scanner = next(i for i in e.c.get("/api/work/items").json()["items"] if i["path"] == SCANNER)
     assert scanner["turn"] == "approve"
 

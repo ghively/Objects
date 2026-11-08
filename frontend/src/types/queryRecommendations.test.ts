@@ -31,12 +31,12 @@ describe('queryRecommendations', () => {
     ])
     const kanban = r[0]
     expect(kanban.layout).toBe('kanban')
-    expect(kanban.definition.structures).toEqual([{ id: 'task' }])
-    expect(kanban.definition.groupBy?.groups[0]).toMatchObject({ propertyId: 'status', structureId: 'task' })
+    expect(kanban.definition.types).toEqual([{ id: 'task' }])
+    expect(kanban.definition.groupBy?.groups[0]).toMatchObject({ propertyId: 'status', typeId: 'task' })
 
     const todo = r[2]
     expect(todo.definition.filterGroup.elements).toEqual([
-      { type: 'filter', propertyId: 'status', option: 'contains', referenceValue: ['o1'], structureId: 'task' },
+      { type: 'filter', propertyId: 'status', option: 'contains', referenceValue: ['o1'], typeId: 'task' },
     ])
     expect(r[1].definition.filterGroup.elements[0]).toMatchObject({ option: 'isEmpty', propertyId: 'status' })
     expect(r[4].definition.filterGroup.elements[0]).toMatchObject({ option: 'isChecked', propertyId: 'done' })

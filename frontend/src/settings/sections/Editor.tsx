@@ -89,8 +89,8 @@ export const EDITOR_TEXT = {
   inlineLinks: 'Insert links inline by default',
   inlineLinksDescription:
     'Linking to an object always makes an inline link, even at the start of an empty block.',
-  hideStructure: 'Keep type settings inside Settings only',
-  hideStructureDescription:
+  hideType: 'Keep type settings inside Settings only',
+  hideTypeDescription:
     'Removes the controls for editing properties and type settings from pages. Settings is still where you change them.',
   highlightStyle: 'Highlight Style',
   highlightStyleDescription:
@@ -112,7 +112,7 @@ export const EDITOR_SEARCH: string[] = [
   T.spellCheckLang,
   T.fullPage,
   T.inlineLinks,
-  T.hideStructure,
+  T.hideType,
   T.highlightStyle,
   ...Object.values(T.highlightStyles).map((s) => s.name),
   T.inlineIcons,
@@ -366,10 +366,10 @@ export function EditorSection() {
         onChange={(v) => set({ hideEntityIconsOnInlineLinks: !v })}
       />
       <SwitchRow
-        title={T.hideStructure}
-        help={T.hideStructureDescription}
-        checked={!!settings.hideStructureSettings}
-        onChange={(v) => set({ hideStructureSettings: v })}
+        title={T.hideType}
+        help={T.hideTypeDescription}
+        checked={!!settings.hideTypeSettings}
+        onChange={(v) => set({ hideTypeSettings: v })}
       />
       <SwitchRow title={T.outliner} help={T.outlinerDescription} checked={settings.hideOutlinerLines} onChange={(v) => set({ hideOutlinerLines: v })} />
       <SettingGroup title={T.openOnStart} help={T.openOnStartDescription}>

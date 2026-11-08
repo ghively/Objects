@@ -27,7 +27,7 @@ export interface CustomizeMenuProps {
   layouts?: readonly Layout[]
   extraPages?: CustomizePage[]
   /** The type id calculations apply to when the view spans one type. */
-  structureId?: string
+  typeId?: string
   /** A reduced menu: only Calculations (the Calendar sections'). */
   only?: 'calcs'
 }
@@ -46,7 +46,7 @@ function Item({ icon, children, onClick, trailing }: { icon?: string; children: 
   )
 }
 
-export function CustomizeMenu({ state, onState, choices, groups, hidden, layouts, extraPages = [], structureId, only }: CustomizeMenuProps) {
+export function CustomizeMenu({ state, onState, choices, groups, hidden, layouts, extraPages = [], typeId, only }: CustomizeMenuProps) {
   const [page, setPage] = useState<string | null>(null)
   const def = state.viewDefinition
   const setDef = (patch: Partial<DataViewDefinition>) => onState({ ...state, viewDefinition: { ...def, ...patch } })
@@ -131,7 +131,7 @@ export function CustomizeMenu({ state, onState, choices, groups, hidden, layouts
 
   if (page === 'calcs') {
     const calcs = def.calculations ?? []
-    return <Calculations back={back('Calculations')} calcs={calcs} choices={choices} structureId={structureId} onChange={(c) => setDef({ calculations: c })} />
+    return <Calculations back={back('Calculations')} calcs={calcs} choices={choices} typeId={typeId} onChange={(c) => setDef({ calculations: c })} />
   }
 
   if (only === 'calcs') {
@@ -187,13 +187,13 @@ function Calculations({
   back,
   calcs,
   choices,
-  structureId,
+  typeId,
   onChange,
 }: {
   back: ReactNode
   calcs: NonNullable<DataViewDefinition['calculations']>
   choices: PropChoice[]
-  structureId?: string
+  typeId?: string
   onChange(next: NonNullable<DataViewDefinition['calculations']>): void
 }) {
   const [adding, setAdding] = useState(false)
@@ -204,7 +204,7 @@ function Calculations({
     <div className="flex w-64 flex-col p-1">
       {back}
       {calcs.map((c) => (
-        <div key={`${c.structureId}-${c.propertyId}`} className="flex h-8 items-center gap-2 px-2 text-[14px]">
+        <div key={`${c.typeId}-${c.propertyId}`} className="flex h-8 items-center gap-2 px-2 text-[14px]">
           <span className="min-w-0 flex-1 truncate">
             {choiceFor(choices, c.propertyId)?.name ?? c.propertyId}: {CALC_LABELS.full[c.kind] ?? c.kind}
           </span>
@@ -237,7 +237,7 @@ function Calculations({
               onChange={(e) => {
                 if (!e.target.value) return
                 const rest = calcs.filter((c) => c.propertyId !== choice.key)
-                onChange([...rest, { propertyId: choice.key, structureId: choice.structureId ?? structureId ?? '', kind: e.target.value }])
+                onChange([...rest, { propertyId: choice.key, typeId: choice.typeId ?? typeId ?? '', kind: e.target.value }])
                 setAdding(false)
                 setKey('')
               }}

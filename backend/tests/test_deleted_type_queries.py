@@ -16,15 +16,15 @@ from objectapp.server import create_app
 from objectapp.space import ConfirmRequired, Space
 
 
-def _definition(structures, exclude=None):
+def _definition(entries, exclude=None):
     d = {
-        "structures": structures,
+        "types": entries,
         "filterGroup": {"type": "filterGroup", "operator": "and", "elements": []},
         "sorts": [],
         "groupBy": None,
     }
     if exclude is not None:
-        d["excludeStructureIds"] = exclude
+        d["excludeTypeIds"] = exclude
     return d
 
 
@@ -38,7 +38,7 @@ def _live(space: Space) -> dict[str, dict]:
 
 def _scope_paths(space: Space, definition: dict) -> list[str]:
     """The paths the query's type scope fetches (the front end's `queryScope` with no search)."""
-    ids = [s["id"] for s in definition["structures"]]
+    ids = [s["id"] for s in definition["types"]]
     return [r.summary.path for r in space.rows(ids or None)]
 
 
@@ -54,7 +54,7 @@ def test_only_type_query_goes_to_the_trash_and_comes_back(space_dir: Path):
     restored = space.restore(item.id)
     assert restored["queryIds"] == [q.id]
     assert _query_file(space_dir, q.id).read_bytes() == before
-    assert _live(space)[q.id]["structures"] == [{"id": "server"}]
+    assert _live(space)[q.id]["types"] == [{"id": "server"}]
 
 
 def test_a_new_type_reusing_the_id_is_not_picked_up_by_the_old_query(space_dir: Path):
@@ -68,20 +68,20 @@ def test_a_new_type_reusing_the_id_is_not_picked_up_by_the_old_query(space_dir: 
     space.create_object("server", "Beta")
 
     assert q.id not in _live(space)
-    assert all(qd["structures"] != [{"id": "server"}] for qd in _live(space).values())
+    assert all(qd["types"] != [{"id": "server"}] for qd in _live(space).values())
 
 
 def test_multi_type_query_drops_the_id_and_restore_puts_it_back(space_dir: Path):
     space = Space(space_dir)
-    structures = [{"id": "server", "collectionIds": []}, {"id": "person"}]
-    q = space.create_query("Servers and people", _definition(structures))
+    entries = [{"id": "server", "collectionIds": []}, {"id": "person"}]
+    q = space.create_query("Servers and people", _definition(entries))
     before = _query_file(space_dir, q.id).read_bytes()
     people_before = _scope_paths(space, _live(space)[q.id])
 
     item = space.delete_type("server", confirm=True)
 
     after = _live(space)[q.id]
-    assert after["structures"] == [{"id": "person"}]
+    assert after["types"] == [{"id": "person"}]
     # Same results as before for what is left: the people; the servers are in the Trash.
     assert _scope_paths(space, after) == [
         p for p in people_before if not p.startswith("Servers/")
@@ -100,8 +100,8 @@ def test_excluded_type_is_dropped_and_restored(space_dir: Path):
     before = _query_file(space_dir, q.id).read_bytes()
 
     item = space.delete_type("server", confirm=True)
-    assert _live(space)[q.id]["excludeStructureIds"] == ["person"]
-    assert _live(space)[q.id]["structures"] == []  # it named no type before either
+    assert _live(space)[q.id]["excludeTypeIds"] == ["person"]
+    assert _live(space)[q.id]["types"] == []  # it named no type before either
 
     space.restore(item.id)
     assert _query_file(space_dir, q.id).read_bytes() == before
@@ -124,9 +124,9 @@ def test_unreadable_query_file_is_left_alone(space_dir: Path):
     space = Space(space_dir)
     path = _query_file(space_dir, "broken")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(b'{"definition": {"structures": [{"id": "server"}]')
+    path.write_bytes(b'{"definition": {"types": [{"id": "server"}]')
     space.delete_type("server", confirm=True)
-    assert path.read_bytes() == b'{"definition": {"structures": [{"id": "server"}]'
+    assert path.read_bytes() == b'{"definition": {"types": [{"id": "server"}]'
 
 
 def test_restore_under_a_new_id_when_the_old_one_is_taken(space_dir: Path):
@@ -144,7 +144,7 @@ def test_restore_under_a_new_id_when_the_old_one_is_taken(space_dir: Path):
     (new_id,) = restored["queryIds"]
     assert new_id != q.id
     assert json.loads(taken.read_text(encoding="utf-8"))["name"] == "Other"
-    assert _live(space)[new_id]["structures"] == [{"id": "server"}]
+    assert _live(space)[new_id]["types"] == [{"id": "server"}]
 
 
 def test_new_query_ids_avoid_ones_held_in_a_type_trash_entry(space_dir: Path):
@@ -178,12 +178,12 @@ def test_starter_template_query_follows_its_type(space_dir: Path):
     space = Space(space_dir)
     t = space.create_type("", "", template="area")
     (q,) = [
-        x for x in space.list_queries() if x.definition["structures"] == [{"id": t.id}]
+        x for x in space.list_queries() if x.definition["types"] == [{"id": t.id}]
     ]
     item = space.delete_type(t.id, confirm=True)
     assert q.id not in _live(space)
     space.restore(item.id)
-    assert _live(space)[q.id]["structures"] == [{"id": t.id}]
+    assert _live(space)[q.id]["types"] == [{"id": t.id}]
 
 
 def test_confirm_text_counts_the_queries(space_dir: Path):

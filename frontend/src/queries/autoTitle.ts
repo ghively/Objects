@@ -12,7 +12,7 @@ export interface TitleCtx {
 
 /** "Tasks, Pages tagged work not tagged old "term"": plural names, or "All notes" with no types. */
 export function autoTitle(def: QueryDefinition, ctx: TitleCtx): string {
-  const names = def.structures.map((s) => ctx.types.find((t) => t.id === s.id)?.pluralName).filter((n): n is string => !!n)
+  const names = def.types.map((s) => ctx.types.find((t) => t.id === s.id)?.pluralName).filter((n): n is string => !!n)
   let out = names.length > 0 ? names.join(', ') : ALL_NOTES_TITLE
   const tagNames = (ids: string[] | undefined) => (ids ?? []).map((id) => ctx.tagIdsToTitles[id]).filter((n): n is string => !!n)
   const tagged = tagNames(def.tags?.ids)

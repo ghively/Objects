@@ -50,7 +50,7 @@ export function newFilter(choice: PropChoice): Filter {
     type: 'filter',
     propertyId: choice.key,
     option: first?.key ?? 'isEmpty',
-    ...(choice.structureId ? { structureId: choice.structureId } : {}),
+    ...(choice.typeId ? { typeId: choice.typeId } : {}),
   }
 }
 

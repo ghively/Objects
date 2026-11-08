@@ -433,7 +433,7 @@ export function TypePage({ type }: { type: TypeDef }) {
     const a = views.all
     const q = await api.createQuery({
       definition: {
-        structures: [{ id: type.id }],
+        types: [{ id: type.id }],
         filterGroup: a.filterGroup,
         sorts: a.sorts,
         groupBy: a.groupBy,
@@ -507,7 +507,7 @@ export function TypePage({ type }: { type: TypeDef }) {
                 Save as query
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem data-structure-setting="" onClick={() => useTabs.getState().open({ kind: 'typeSettings', typeId: type.id })}>
+            <DropdownMenuItem data-type-setting="" onClick={() => useTabs.getState().open({ kind: 'typeSettings', typeId: type.id })}>
               <Icon name="ph-gear" size={14} />
               Object Type Settings
             </DropdownMenuItem>

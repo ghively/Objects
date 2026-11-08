@@ -125,15 +125,15 @@ export function GraphCustomization({ custom, onPatch, types, tagsNetworkKey }: G
       <PopoverContent align="end" className="flex w-72 flex-col gap-3 p-2" aria-label={t.customize}>
         <TypeList
           label={t.filterObjectTypes}
-          selected={custom.filterStructureIds ?? []}
+          selected={custom.filterTypeIds ?? []}
           types={types}
-          onChange={(next) => onPatch({ filterStructureIds: next })}
+          onChange={(next) => onPatch({ filterTypeIds: next })}
         />
         <TypeList
           label={t.excludeObjectTypes}
-          selected={custom.excludeStructureIds ?? []}
+          selected={custom.excludeTypeIds ?? []}
           types={types}
-          onChange={(next) => onPatch({ excludeStructureIds: next })}
+          onChange={(next) => onPatch({ excludeTypeIds: next })}
         />
         <div className="flex flex-col border-t border-line pt-2">
           {switches.map((s) => (

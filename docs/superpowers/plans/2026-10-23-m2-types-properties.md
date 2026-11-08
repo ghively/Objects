@@ -19,7 +19,7 @@
 **Spec:** `docs/superpowers/specs/2026-10-23-object-design.md` §3–§4.
 - Reference for behaviour and names: the behaviour catalog (`docs/behavior-catalog.md`) and the design spec.
 - **en-US UI strings:** the quoted strings below are the app's labels; take any others from the behaviour catalog.
-- Behaviour not in the strings (the Add property menu, the number-format menu, the progress ring, the basic structures and the number formatter) and layout sizes: as specified in the tasks below and the design spec.
+- Behaviour not in the strings (the Add property menu, the number-format menu, the progress ring, the basic types and the number formatter) and layout sizes: as specified in the tasks below and the design spec.
 
 ## Roadmap (one plan per milestone, written when the previous one is accepted)
 
@@ -84,7 +84,7 @@
   - **Basic types:** Page, Tag, Task and DailyNote, plus the media types when the space has objects of them (`Weblink`, `File`, `Image`, `PDF`, `Audio`, `Video`, `Tweet`, matched by name case-insensitively). Their media fields become system definitions (read-only cells) and their media behaviour comes in M7.
   - **On a basic type**, adding, removing or re-kinding a property, changing its key or `isArray`, renaming the type and deleting it are refused (422, "Built-in types keep their properties fixed."). Allowed: label options (add, rename, recolour, re-icon, reorder, delete), property name, icon, description and visibility, number format, date constraints, type icon, colour and description, templates, and the layout settings.
   - Page and Tag always exist. Tag: folder `Tags` (the folder is created by the first tag, never on open), icon `ph-tag`, no templates.
-  - **Status mode** exists only on Task's built-in `status` label (`isStatus: true`), part of the basic Task structure. Users cannot turn other labels into status labels.
+  - **Status mode** exists only on Task's built-in `status` label (`isStatus: true`), part of the basic Task type. Users cannot turn other labels into status labels.
   - An object finds its type through `type: '<Name>'`: matched against the type's name, then its id, then its `formerNames` (case-insensitively). Renaming a type rewrites the `type:` lines and keeps the old name in `formerNames`, so a skipped file still resolves.
   - `folder` is fixed when the type is created (from `pluralName`). Renaming the type or its plural never moves files or templates.
 - **File names.**
@@ -104,7 +104,7 @@
   - Names are capitalised, except sky = "Light blue".
   - New label options and tags get a random colour.
   - Numbers format as `en-US` by default; the per-property "Separators" (`isGroupingThousands`, default on; `isRadixComma`, which swaps `,` and `.`) are part of M2.
-- **Store-only fields.** Kept and round-tripped, with no UI and no effect in M2: the type's `structureViews`, `defaultViewType`, `defaultViewIds`, `defaultPageViewId`, `smallCardViewConfig` (M3/M7), `createInCalendarOption`, `hideFromCalendarSidebar` (M4), and the property's `hideCalendarEvents`, `supportsReminders` (M4) and `isNotSearchable` (M5). Collections likewise until M3.
+- **Store-only fields.** Kept and round-tripped, with no UI and no effect in M2: the type's `typeViews`, `defaultViewType`, `defaultViewIds`, `defaultPageViewId`, `smallCardViewConfig` (M3/M7), `createInCalendarOption`, `hideFromCalendarSidebar` (M4), and the property's `hideCalendarEvents`, `supportsReminders` (M4) and `isNotSearchable` (M5). Collections likewise until M3.
 
 ## API contract (M2): shared by both tracks
 

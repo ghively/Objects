@@ -330,15 +330,15 @@ def template_query(key: str, t: TypeDefinition) -> tuple[str, dict[str, Any], di
             f["referenceValue"] = [oid]
         elif ref is not None:
             f["referenceValue"] = ref
-        f["structureId"] = t.id
+        f["typeId"] = t.id
         elements.append(f)
     sorts = []
     for prop_key, order in spec.sorts:
         if t.prop(prop_key) is None:
             raise KeyError(prop_key)
-        sorts.append({"propertyId": prop_key, "option": order, "structureId": t.id})
+        sorts.append({"propertyId": prop_key, "option": order, "typeId": t.id})
     definition = {
-        "structures": [{"id": t.id}],
+        "types": [{"id": t.id}],
         "filterGroup": {"type": "filterGroup", "operator": "and", "elements": elements},
         "sorts": sorts,
         "groupBy": None,

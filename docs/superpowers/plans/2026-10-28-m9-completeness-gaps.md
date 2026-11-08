@@ -613,7 +613,7 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 - Warning heading "Use this with caution", text ("…A large table creates a large number of objects at once.").
 - A size note ("…up to {rowLimit} rows"); `rowLimit` is **1000** (our choice).
 - `.errors.readingError`.
-- "Add {entriesLength} new {structurePlural} to"; heading "Property Mappings"; description "When several columns map to one property, the first one wins."
+- "Add {entriesLength} new {typePlural} to"; heading "Property Mappings"; description "When several columns map to one property, the first one wins."
 
 **Files:**
 - Create `frontend/src/lib/csvParse.ts` (RFC 4180: quotes, doubled quotes, CRLF, a BOM; the inverse of `editor/table/csv.ts` `toCsv`), `frontend/src/lib/csvParse.test.ts`, `frontend/src/types/ImportCsvDialog.tsx` and `frontend/src/types/ImportCsvDialog.test.tsx`.
@@ -635,7 +635,7 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 **Target behaviour:**
 - Release button tooltip: "Make this a stand-alone query without the type limit. It opens as its own page and leaves this type's tabs."
-- The constraint is computed, not stored: a query in `structures` mode with exactly one type. A query has no constraint field.
+- The constraint is computed, not stored: a query in `types` mode with exactly one type. A query has no constraint field.
 
 **Files:**
 - Modify `frontend/src/queries/QueryBuilder.tsx`: when shown as a tab on a type dashboard for a single-type query, the type picker is locked to that type, with a release button carrying the tooltip.

@@ -289,7 +289,7 @@ def test_types_collections_queries_round_trip(env: Env) -> None:
     assert book in gone["paths"] and not (env.root / book).exists()
     assert any(i["kind"] == "type" and i["type"] == tid for i in env.call("trash")["items"])
 
-    q = env.call("create_query", name="Books", definition={"structures": [{"id": "page"}]})
+    q = env.call("create_query", name="Books", definition={"types": [{"id": "page"}]})
     got = env.call("saved_query", query_id=q["id"])
     assert got["revision"]
     edited = env.call("edit_query", query_id=q["id"], revision=got["revision"], query={**got, "name": "Books 2"})

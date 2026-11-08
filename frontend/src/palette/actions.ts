@@ -6,7 +6,7 @@ import { nameMatches } from './searchOptions'
 
 /** The action rows' labels. */
 export const ACTION_TEXT = {
-  createNewEntity: (structureName: string) => `Create ${structureName}`,
+  createNewEntity: (typeName: string) => `Create ${typeName}`,
   openCalendar: 'Open calendar',
   openToday: 'Open today',
   openGlobalGraph: 'Open global graph',

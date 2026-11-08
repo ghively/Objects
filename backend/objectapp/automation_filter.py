@@ -3,7 +3,7 @@
 A port of ``frontend/src/views/filter.ts`` (``matchGroup`` / ``matchFilter`` and the operator
 table ``FILTER_OPTIONS`` / ``filterOptionsFor``), so a rule's conditions mean what the same
 filter group means in a view. Nested AND/OR groups; an empty group passes; an invalid filter
-(an unknown property or operator, a ``structureId`` naming no type) is ignored, and a group
+(an unknown property or operator, a ``typeId`` naming no type) is ignored, and a group
 with nothing effective left passes.
 
 Everything works on the API's JSON shapes: a row is ``{summary, values, links}`` as
@@ -196,7 +196,7 @@ def filter_is_valid(
     f: Mapping[str, Any], by_id: Mapping[str, Mapping[str, Any]], view_type_ids: list[str] | None
 ) -> bool:
     """Whether the filter names a property and an operator that still exist."""
-    sid = f.get("structureId")
+    sid = f.get("typeId")
     if sid and sid not in by_id:
         return False
     pid = f.get("propertyId")
@@ -629,7 +629,7 @@ def _compile_filter(
     if not filter_is_valid(f, by_id, ctx.view_type_ids):
         return None
     pid = f["propertyId"]
-    sid = f.get("structureId") or None
+    sid = f.get("typeId") or None
     fallback = _find_def(ctx.types, pid, sid, ctx.view_type_ids)
     owns: dict[str, dict[str, Any] | None] = {}
     rng: list[tuple[str, str] | None] = []

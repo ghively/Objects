@@ -26,7 +26,7 @@ const mk = (path: string, title: string) => row({ summary: objectSummary({ path,
 const ROWS: Row[] = [mk('Servers/Alpha.md', 'Alpha'), mk('Servers/Beta.md', 'Beta')]
 
 const def = (over: Partial<QueryDefinition> = {}): QueryDefinition => ({
-  structures: [{ id: 'server' }],
+  types: [{ id: 'server' }],
   filterGroup: { type: 'filterGroup', operator: 'and', elements: [] },
   sorts: [],
   groupBy: null,

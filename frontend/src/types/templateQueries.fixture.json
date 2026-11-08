@@ -21,7 +21,7 @@
     "query": {
       "name": "This week's meetings",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "meeting"
           }
@@ -37,7 +37,7 @@
               "referenceValue": {
                 "relative": "thisWeek"
               },
-              "structureId": "meeting"
+              "typeId": "meeting"
             }
           ]
         },
@@ -45,7 +45,7 @@
           {
             "propertyId": "date",
             "option": "ascending",
-            "structureId": "meeting"
+            "typeId": "meeting"
           }
         ],
         "groupBy": null
@@ -145,7 +145,7 @@
     "query": {
       "name": "Colleagues",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "person"
           }
@@ -161,7 +161,7 @@
               "referenceValue": [
                 "colleague"
               ],
-              "structureId": "person"
+              "typeId": "person"
             }
           ]
         },
@@ -169,7 +169,7 @@
           {
             "propertyId": "title",
             "option": "ascending",
-            "structureId": "person"
+            "typeId": "person"
           }
         ],
         "groupBy": null
@@ -233,7 +233,7 @@
     "query": {
       "name": "Active projects",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "project"
           }
@@ -249,7 +249,7 @@
               "referenceValue": [
                 "in-progress"
               ],
-              "structureId": "project"
+              "typeId": "project"
             }
           ]
         },
@@ -257,7 +257,7 @@
           {
             "propertyId": "lastUpdated",
             "option": "descending",
-            "structureId": "project"
+            "typeId": "project"
           }
         ],
         "groupBy": null
@@ -287,7 +287,7 @@
     "query": {
       "name": "Recently updated notes",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "atomicNote"
           }
@@ -301,7 +301,7 @@
           {
             "propertyId": "lastUpdated",
             "option": "descending",
-            "structureId": "atomicNote"
+            "typeId": "atomicNote"
           }
         ],
         "groupBy": null
@@ -325,7 +325,7 @@
     "query": {
       "name": "All definitions A-Z",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "definition"
           }
@@ -339,7 +339,7 @@
           {
             "propertyId": "title",
             "option": "ascending",
-            "structureId": "definition"
+            "typeId": "definition"
           }
         ],
         "groupBy": null
@@ -374,7 +374,7 @@
     "query": {
       "name": "Currently reading",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "book"
           }
@@ -387,13 +387,13 @@
               "type": "filter",
               "propertyId": "readingTimeline",
               "option": "startIsNotEmpty",
-              "structureId": "book"
+              "typeId": "book"
             },
             {
               "type": "filter",
               "propertyId": "readingTimeline",
               "option": "endIsEmpty",
-              "structureId": "book"
+              "typeId": "book"
             }
           ]
         },
@@ -401,7 +401,7 @@
           {
             "propertyId": "readingTimeline",
             "option": "descending",
-            "structureId": "book"
+            "typeId": "book"
           }
         ],
         "groupBy": null
@@ -441,7 +441,7 @@
     "query": {
       "name": "Top rated films",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "film"
           }
@@ -455,7 +455,7 @@
               "propertyId": "rating",
               "option": "greaterEqual",
               "referenceValue": 4,
-              "structureId": "film"
+              "typeId": "film"
             }
           ]
         },
@@ -463,7 +463,7 @@
           {
             "propertyId": "rating",
             "option": "descending",
-            "structureId": "film"
+            "typeId": "film"
           }
         ],
         "groupBy": null
@@ -497,7 +497,7 @@
     "query": {
       "name": "Watched this year",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "tvSeries"
           }
@@ -513,7 +513,7 @@
               "referenceValue": {
                 "relative": "thisYear"
               },
-              "structureId": "tvSeries"
+              "typeId": "tvSeries"
             }
           ]
         },
@@ -521,7 +521,7 @@
           {
             "propertyId": "watchedOn",
             "option": "descending",
-            "structureId": "tvSeries"
+            "typeId": "tvSeries"
           }
         ],
         "groupBy": null
@@ -555,7 +555,7 @@
     "query": {
       "name": "Listened this month",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "podcast"
           }
@@ -571,7 +571,7 @@
               "referenceValue": {
                 "relative": "thisMonth"
               },
-              "structureId": "podcast"
+              "typeId": "podcast"
             }
           ]
         },
@@ -579,7 +579,7 @@
           {
             "propertyId": "listenedOn",
             "option": "descending",
-            "structureId": "podcast"
+            "typeId": "podcast"
           }
         ],
         "groupBy": null
@@ -613,7 +613,7 @@
     "query": {
       "name": "This week's days",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "day"
           }
@@ -629,7 +629,7 @@
               "referenceValue": {
                 "relative": "thisWeek"
               },
-              "structureId": "day"
+              "typeId": "day"
             }
           ]
         },
@@ -637,7 +637,7 @@
           {
             "propertyId": "day",
             "option": "ascending",
-            "structureId": "day"
+            "typeId": "day"
           }
         ],
         "groupBy": null
@@ -672,7 +672,7 @@
     "query": {
       "name": "This month's weeks",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "week"
           }
@@ -688,7 +688,7 @@
               "referenceValue": {
                 "relative": "thisMonth"
               },
-              "structureId": "week"
+              "typeId": "week"
             }
           ]
         },
@@ -696,7 +696,7 @@
           {
             "propertyId": "period",
             "option": "ascending",
-            "structureId": "week"
+            "typeId": "week"
           }
         ],
         "groupBy": null
@@ -731,7 +731,7 @@
     "query": {
       "name": "This year's months",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "month"
           }
@@ -747,7 +747,7 @@
               "referenceValue": {
                 "relative": "thisYear"
               },
-              "structureId": "month"
+              "typeId": "month"
             }
           ]
         },
@@ -755,7 +755,7 @@
           {
             "propertyId": "period",
             "option": "ascending",
-            "structureId": "month"
+            "typeId": "month"
           }
         ],
         "groupBy": null
@@ -825,7 +825,7 @@
     "query": {
       "name": "Companies",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "organization"
           }
@@ -841,7 +841,7 @@
               "referenceValue": [
                 "company"
               ],
-              "structureId": "organization"
+              "typeId": "organization"
             }
           ]
         },
@@ -849,7 +849,7 @@
           {
             "propertyId": "title",
             "option": "ascending",
-            "structureId": "organization"
+            "typeId": "organization"
           }
         ],
         "groupBy": null
@@ -873,7 +873,7 @@
     "query": {
       "name": "All areas A-Z",
       "definition": {
-        "structures": [
+        "types": [
           {
             "id": "area"
           }
@@ -887,7 +887,7 @@
           {
             "propertyId": "title",
             "option": "ascending",
-            "structureId": "area"
+            "typeId": "area"
           }
         ],
         "groupBy": null

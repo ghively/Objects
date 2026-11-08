@@ -23,7 +23,7 @@ export function kanbanGroupBy(groupBy: GroupBy | null, props: Pick<LayoutProps, 
   if (groupBy?.groups?.length) return groupBy
   const choices = propertyChoices(props.viewTypes)
   const label = choices.find((c) => c.kind === 'label')
-  return label ? { groups: [{ propertyId: label.key, option: 'default', structureId: label.structureId }] } : null
+  return label ? { groups: [{ propertyId: label.key, option: 'default', typeId: label.typeId }] } : null
 }
 
 function Card({ props, row, hide, groupId }: { props: LayoutProps; row: Row; hide: string[]; groupId: string }) {
@@ -117,7 +117,7 @@ export function KanbanLayout(props: LayoutProps) {
   const groupBy = useMemo(() => kanbanGroupBy(state.groupBy, { viewTypes }), [state.groupBy, viewTypes])
   const entry = groupBy?.groups[0]
   // The definition the columns follow: the grouping's type's, as `groupRows` resolves it.
-  const groupDef = entry ? findDef(ctx.types, entry.propertyId, entry.structureId, ctx.viewTypeIds) : undefined
+  const groupDef = entry ? findDef(ctx.types, entry.propertyId, entry.typeId, ctx.viewTypeIds) : undefined
   const { groups } = useMemo(
     () => groupRows(flat, groupBy, state.viewDefinition.groupByConfig, ctx),
     [flat, groupBy, state.viewDefinition.groupByConfig, ctx],

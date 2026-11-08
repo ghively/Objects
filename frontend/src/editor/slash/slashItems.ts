@@ -31,7 +31,7 @@ import { AI_ICON, AI_TEXT, openBlocksAi } from '../aiEntries'
 
 export type SlashView = 'icon' | 'bookmark' | 'button'
 
-export type SectionId = 'blocks' | 'structure' | 'dates' | 'reuse'
+export type SectionId = 'blocks' | 'types' | 'dates' | 'reuse'
 
 export interface SlashItem {
   id: string
@@ -57,16 +57,16 @@ export interface SlashSection {
 
 export const SLASH_TEXT = {
   blocks: 'Create a block',
-  structure: 'Create an object',
+  types: 'Create an object',
   dates: 'Link to a date',
   reuse: 'Reuse any content',
   noResults: 'No results',
   pasteUrl: 'Paste URL',
   /** M14 (our string): insert a button block without an automation yet. */
   buttonLater: 'Choose the automation later',
-  withEmptyTitle: (structureTitle: string) => `Create ${structureTitle}`,
-  withPotentialTitle: (structureTitle: string, potentialTitle: string) =>
-    `Create ${structureTitle} with title "${potentialTitle}"`,
+  withEmptyTitle: (typeTitle: string) => `Create ${typeTitle}`,
+  withPotentialTitle: (typeTitle: string, potentialTitle: string) =>
+    `Create ${typeTitle} with title "${potentialTitle}"`,
 }
 
 export interface SlashContext {
@@ -296,10 +296,10 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
       ],
     },
     {
-      id: 'structure',
-      label: SLASH_TEXT.structure,
+      id: 'types',
+      label: SLASH_TEXT.types,
       items: creatableTypes(ctx.types).map((t) => ({
-        id: `structure:${t.id}`,
+        id: `type:${t.id}`,
         name: title ? SLASH_TEXT.withPotentialTitle(t.name, title) : SLASH_TEXT.withEmptyTitle(t.name),
         icon: t.icon?.type === 'iconify' ? t.icon.val : 'ph-file-plus',
         run: (e: Editor) => createAndLink(e, t, title),
@@ -373,7 +373,7 @@ export function filterSections(sections: SlashSection[], query: string): SlashSe
   if (!q) return sections
   return sections
     .map((s) => {
-      if (s.id === 'structure') return s
+      if (s.id === 'types') return s
       const pinned = s.items.filter((item) => item.pinned)
       const scored = s.items
         .filter((item) => !item.pinned)
@@ -389,5 +389,5 @@ export function filterSections(sections: SlashSection[], query: string): SlashSe
 export function hasRealMatch(sections: SlashSection[], query: string, now: Date = new Date()): boolean {
   // M8: a phrase that is (or may still become) a date keeps the menu open.
   if (couldBeDate(query, dailyNoteTitle(now))) return true
-  return filterSections(sections, query).some((s) => s.id !== 'structure' && s.items.length > 0)
+  return filterSections(sections, query).some((s) => s.id !== 'types' && s.items.length > 0)
 }

@@ -48,7 +48,7 @@ export function matchingValues(
   const type = types.find((t) => t.id === typeId)
   if (!type) return out
   for (const f of required(filterGroup)) {
-    if (f.structureId && f.structureId !== typeId) continue
+    if (f.typeId && f.typeId !== typeId) continue
     const key = keyOf(f)
     const def = type.propertyDefinitions.find((d) => d.key === key)
     const kind = def?.type ?? (key === 'collections' ? 'entity_collections' : null)

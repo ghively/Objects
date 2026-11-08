@@ -287,7 +287,7 @@ body,
 }
 
 /* "Keep type settings inside Settings only" (`settings/DeviceSettingsFollower.tsx`). */
-html[data-hide-structure-settings] [data-structure-setting] {
+html[data-hide-type-settings] [data-type-setting] {
   display: none !important;
 }
 

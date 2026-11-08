@@ -1180,7 +1180,7 @@ export function ObjectView({
               {isTag ? OBJECT_M8_TEXT.mergeTag : OBJECT_M8_TEXT.mergeObject}
             </DropdownMenuItem>
             {type && (
-              <DropdownMenuItem data-structure-setting="" onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
+              <DropdownMenuItem data-type-setting="" onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
                 <Icon name="ph-gear-six" size={14} />
                 Object Type Settings
               </DropdownMenuItem>

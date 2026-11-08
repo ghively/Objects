@@ -6,7 +6,7 @@
   "icon": null,
   "description": "",
   "definition": {
-    "structures": [
+    "types": [
       {
         "id": "task"
       }

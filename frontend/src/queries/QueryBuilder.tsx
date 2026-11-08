@@ -54,7 +54,7 @@ export const BUILDER_TEXT = {
  * changed there until it is released.
  */
 export function isSingleTypeQuery(def: QueryDefinition, typeId: string): boolean {
-  return def.structures.length === 1 && def.structures[0].id === typeId
+  return def.types.length === 1 && def.types[0].id === typeId
 }
 
 /** The lock of a constrained query: its type, and what "release" does (the type page's). */
@@ -121,19 +121,19 @@ function Chip({ children, onRemove, label }: { children: ReactNode; onRemove?():
 
 // ---- Types ----
 
-type Structure = QueryDefinition['structures'][number]
+type TypeEntry = QueryDefinition['types'][number]
 
-/** The collection filter of one structure, as the label the chip shows. */
-export function collectionFilterLabel(s: Structure): string {
+/** The collection filter of one type entry, as the label the chip shows. */
+export function collectionFilterLabel(s: TypeEntry): string {
   if (s.inNoCollection) return BUILDER_TEXT.inNoCollection
   if (s.inAnyCollection) return BUILDER_TEXT.inAnyCollection
   if (s.collectionIds?.length) return BUILDER_TEXT.collectionsSelected(s.collectionIds.length)
   return BUILDER_TEXT.collectionAll
 }
 
-function CollectionFilter({ s, type, collections, edit }: { s: Structure; type: TypeDef; collections: Collection[]; edit(next: Structure): void }) {
+function CollectionFilter({ s, type, collections, edit }: { s: TypeEntry; type: TypeDef; collections: Collection[]; edit(next: TypeEntry): void }) {
   const mine = collections.filter((c) => c.typeIds.includes(type.id))
-  const clean: Structure = { id: s.id }
+  const clean: TypeEntry = { id: s.id }
   const mode = s.inNoCollection ? 'none' : s.inAnyCollection ? 'any' : s.collectionIds?.length ? 'some' : 'all'
   return (
     <Popover>
@@ -173,7 +173,7 @@ function CollectionFilter({ s, type, collections, edit }: { s: Structure; type: 
 }
 
 function ConstrainedTypes({ def, constraint, collections, onChange }: { def: QueryDefinition; constraint: QueryConstraint; collections: Collection[]; onChange(e: Edit): void }) {
-  const s = def.structures[0] ?? { id: constraint.type.id }
+  const s = def.types[0] ?? { id: constraint.type.id }
   return (
     <Section title={BUILDER_TEXT.types}>
       <div data-testid="query-type-lock" className="flex flex-wrap items-center gap-1.5">
@@ -185,7 +185,7 @@ function ConstrainedTypes({ def, constraint, collections, onChange }: { def: Que
             s={s}
             type={constraint.type}
             collections={collections}
-            edit={(next) => onChange((d) => ({ ...d, structures: [next] }))}
+            edit={(next) => onChange((d) => ({ ...d, types: [next] }))}
           />
         </Chip>
         <button
@@ -203,13 +203,13 @@ function ConstrainedTypes({ def, constraint, collections, onChange }: { def: Que
 }
 
 function TypesSection({ def, types, collections, onChange }: { def: QueryDefinition; types: TypeDef[]; collections: Collection[]; onChange(e: Edit): void }) {
-  const selected = def.structures
-  const excluded = def.excludeStructureIds ?? []
+  const selected = def.types
+  const excluded = def.excludeTypeIds ?? []
   const [showAll, setShowAll] = useState(false)
   const canExclude = isSearching(def) || (def.tags?.ids.length ?? 0) > 0
   const shown = showAll ? selected : selected.slice(0, VISIBLE_TYPES)
   const inactive = selected.length > 0
-  const setExcluded = (ids: string[]) => onChange((d) => ({ ...d, excludeStructureIds: ids.length > 0 ? ids : undefined }))
+  const setExcluded = (ids: string[]) => onChange((d) => ({ ...d, excludeTypeIds: ids.length > 0 ? ids : undefined }))
 
   return (
     <Section title={BUILDER_TEXT.types} hint={BUILDER_TEXT.allOfHint}>
@@ -218,7 +218,7 @@ function TypesSection({ def, types, collections, onChange }: { def: QueryDefinit
           type="button"
           title={BUILDER_TEXT.allTypesTooltip}
           aria-pressed={selected.length === 0}
-          onClick={() => onChange((d) => ({ ...d, structures: [] }))}
+          onClick={() => onChange((d) => ({ ...d, types: [] }))}
           className={cn(BTN, selected.length === 0 && 'bg-hover')}
         >
           {BUILDER_TEXT.allTypes}
@@ -229,7 +229,7 @@ function TypesSection({ def, types, collections, onChange }: { def: QueryDefinit
             <Chip
               key={s.id}
               label={t?.name ?? s.id}
-              onRemove={() => onChange((d) => ({ ...d, structures: d.structures.filter((x) => x.id !== s.id) }))}
+              onRemove={() => onChange((d) => ({ ...d, types: d.types.filter((x) => x.id !== s.id) }))}
             >
               {t ? <TypeChip type={t} size={18} /> : <Icon name="ph-warning" size={14} />}
               <span>{t?.name ?? 'Invalid'}</span>
@@ -238,7 +238,7 @@ function TypesSection({ def, types, collections, onChange }: { def: QueryDefinit
                   s={s}
                   type={t}
                   collections={collections}
-                  edit={(next) => onChange((d) => ({ ...d, structures: d.structures.map((x) => (x.id === s.id ? next : x)) }))}
+                  edit={(next) => onChange((d) => ({ ...d, types: d.types.map((x) => (x.id === s.id ? next : x)) }))}
                 />
               )}
             </Chip>
@@ -260,7 +260,7 @@ function TypesSection({ def, types, collections, onChange }: { def: QueryDefinit
             {types
               .filter((t) => !selected.some((s) => s.id === t.id))
               .map((t) => (
-                <Check key={t.id} checked={false} onClick={() => onChange((d) => ({ ...d, structures: [...d.structures, { id: t.id }] }))}>
+                <Check key={t.id} checked={false} onClick={() => onChange((d) => ({ ...d, types: [...d.types, { id: t.id }] }))}>
                   <TypeChip type={t} size={18} />
                   {t.name}
                 </Check>

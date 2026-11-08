@@ -44,7 +44,7 @@ export function GroupEditor({ groupBy, onChange, choices }: GroupEditorProps) {
                 {
                   propertyId: c.key,
                   option: GROUP_OPTIONS(c.kind, c.def)[0]?.key ?? 'default',
-                  ...(c.structureId ? { structureId: c.structureId } : {}),
+                  ...(c.typeId ? { typeId: c.typeId } : {}),
                 },
               ],
             })

@@ -87,7 +87,7 @@ describe('GraphPage', () => {
     // Filters hide everything.
     resetGraphData()
     mocked.graph.mockImplementation(async () => DATA)
-    setUi({ excludeStructureIds: ['page', 'task'] })
+    setUi({ excludeTypeIds: ['page', 'task'] })
     render(<GraphPage onOpenTarget={vi.fn()} />)
     expect(await screen.findByText('Your filters hide every node in this graph.')).toBeInTheDocument()
     expect(screen.getByText('Nothing to show')).toBeInTheDocument()

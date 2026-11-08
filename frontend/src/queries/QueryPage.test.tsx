@@ -26,14 +26,14 @@ const mk = (path: string, title: string, over: Partial<Row['summary']> = {}) =>
 const ROWS = [mk('Servers/Alpha.md', 'Alpha'), mk('Servers/Beta.md', 'Beta')]
 
 const emptyDef = (over: Partial<QueryDefinition> = {}): QueryDefinition => ({
-  structures: [],
+  types: [],
   filterGroup: { type: 'filterGroup', operator: 'and', elements: [] },
   sorts: [],
   groupBy: null,
   ...over,
 })
 const Q = (over: Partial<Query> = {}) =>
-  query({ id: 'q1', name: 'Open servers', revision: 'q1r', definition: emptyDef({ structures: [{ id: 'server' }] }), ...over })
+  query({ id: 'q1', name: 'Open servers', revision: 'q1r', definition: emptyDef({ types: [{ id: 'server' }] }), ...over })
 
 function setup(q: Query = Q(), rows: Row[] = ROWS) {
   mocked.queries.mockResolvedValue([q])
@@ -120,7 +120,7 @@ describe('QueryPage', () => {
 
   test('with a type selected the exclude control says it has no effect', async () => {
     const user = userEvent.setup()
-    setup(Q({ definition: emptyDef({ structures: [{ id: 'server' }], search: { searchTerms: [{ text: 'alp' }], searchMode: 'auto' } }) }))
+    setup(Q({ definition: emptyDef({ types: [{ id: 'server' }], search: { searchTerms: [{ text: 'alp' }], searchMode: 'auto' } }) }))
     render(<QueryPage id="q1" />)
     await user.click(await screen.findByRole('button', { name: 'Edit query' }))
     expect(screen.getByText('Ignored while particular types are picked.')).toBeInTheDocument()
@@ -129,20 +129,20 @@ describe('QueryPage', () => {
     expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('title', 'Sorting and property filters are off during a search.')
   })
 
-  test('test builder All clears structures; Exclude object types writes excludeStructureIds', async () => {
+  test('test builder All clears types; Exclude object types writes excludeTypeIds', async () => {
     const user = userEvent.setup()
-    setup(Q({ definition: emptyDef({ structures: [{ id: 'server' }], search: { searchTerms: [{ text: 'alp' }], searchMode: 'auto' } }) }))
+    setup(Q({ definition: emptyDef({ types: [{ id: 'server' }], search: { searchTerms: [{ text: 'alp' }], searchMode: 'auto' } }) }))
     render(<QueryPage id="q1" />)
     await user.click(await screen.findByRole('button', { name: 'Edit query' }))
     await user.click(screen.getByRole('button', { name: 'All' }))
     await waitFor(() => expect(mocked.saveQuery).toHaveBeenCalled(), { timeout: 2000 })
-    expect(lastSaved()![0].definition.structures).toEqual([])
+    expect(lastSaved()![0].definition.types).toEqual([])
 
     mocked.saveQuery.mockClear()
     await user.click(screen.getByRole('button', { name: /Exclude object types/ }))
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Page' }))
     await waitFor(() => expect(mocked.saveQuery).toHaveBeenCalled(), { timeout: 2000 })
-    expect(lastSaved()![0].definition.excludeStructureIds).toEqual(['page'])
+    expect(lastSaved()![0].definition.excludeTypeIds).toEqual(['page'])
   })
 
   test('the builder adds a search term, a mode and a limit', async () => {

@@ -36,7 +36,7 @@ def _empty_filter_group() -> dict[str, Any]:
 
 
 def default_definition() -> dict[str, Any]:
-    return {"structures": [], "filterGroup": _empty_filter_group(), "sorts": [], "groupBy": None}
+    return {"types": [], "filterGroup": _empty_filter_group(), "sorts": [], "groupBy": None}
 
 
 def default_view() -> dict[str, Any]:
@@ -59,12 +59,12 @@ def _view(value: Any) -> dict[str, Any]:
 
 
 def query_type_ids(definition: dict[str, Any]) -> set[str]:
-    """Every type id a definition names (``structures[].id`` and ``excludeStructureIds``)."""
+    """Every type id a definition names (``types[].id`` and ``excludeTypeIds``)."""
     found: set[str] = set()
-    for s in definition.get("structures") or []:
+    for s in definition.get("types") or []:
         if isinstance(s, dict) and isinstance(s.get("id"), str):
             found.add(s["id"])
-    for tid in definition.get("excludeStructureIds") or []:
+    for tid in definition.get("excludeTypeIds") or []:
         if isinstance(tid, str):
             found.add(tid)
     return found

@@ -155,7 +155,7 @@ function DefinitionCard({
 /** "Create query": a query on this type, opened at once. */
 export async function createQueryFor(type: TypeDef): Promise<void> {
   const q = await api.createQuery({
-    definition: { structures: [{ id: type.id }], filterGroup: emptyFilterGroup(), sorts: [], groupBy: null },
+    definition: { types: [{ id: type.id }], filterGroup: emptyFilterGroup(), sorts: [], groupBy: null },
     view: { viewDefinition: { dataViewLayout: 'list' } },
   })
   useTabs.getState().open({ kind: 'query', id: q.id })
@@ -259,7 +259,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
       )
     }
     case 'queries': {
-      const mine = queries.filter((q) => q.definition.structures.some((s) => s.id === type.id))
+      const mine = queries.filter((q) => q.definition.types.some((s) => s.id === type.id))
       return (
         <div className="flex flex-col gap-2">
           {heading}
@@ -314,7 +314,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
       if (section.key.startsWith('query:')) {
         const q = queryOf()
         if (!q) return <p className="py-4 text-[14px] text-fg-muted">{SECTION_TEXT.sectionEmpty}</p>
-        const ids = q.definition.structures.map((s) => s.id)
+        const ids = q.definition.types.map((s) => s.id)
         return (
           <RowsSection
             // An edit of the query (its tab's "Edit query") starts the section over from it.

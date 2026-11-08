@@ -124,7 +124,7 @@ describe('LocalGraphPanel', () => {
 
   test('centre stays visible under filters that would hide it', async () => {
     // Done.md is a completed task (hidden by default) and its type is excluded too.
-    setUi({ excludeStructureIds: ['task'] })
+    setUi({ excludeTypeIds: ['task'] })
     render(<LocalGraphPanel path="Done.md" />)
     const sigma = await sigmaReady()
     await waitFor(() => expect(latestPaths().sort()).toEqual(['Ada.md', 'Done.md']))

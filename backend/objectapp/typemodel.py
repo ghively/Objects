@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .keycompat import upgrade_keys
 from .textfile import atomic_write, decode
 from .typedefs import slug
 
@@ -610,6 +611,7 @@ class TypeDefinition:
     def from_json(cls, data: dict[str, Any], fallback_id: str | None = None) -> TypeDefinition:
         """Read v1 (no ``schemaVersion``) or v2 type JSON. Never raises on unknown keys."""
         data = copy.deepcopy(data)
+        upgrade_keys(data)  # older key names (`keycompat`)
         v1 = "schemaVersion" not in data
         name = data.get("name")
         tid = data.get("id")

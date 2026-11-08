@@ -660,7 +660,7 @@ export function DataView(props: DataViewProps) {
       hidden={result.hidden ?? []}
       pausedHint={props.pausedHint}
       extraPages={customizePages}
-      structureId={viewTypes.length === 1 ? viewTypes[0].id : undefined}
+      typeId={viewTypes.length === 1 ? viewTypes[0].id : undefined}
       end={props.toolbarEnd}
     />
   )

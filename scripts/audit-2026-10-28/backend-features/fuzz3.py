@@ -17,7 +17,7 @@ for w in W:
     hit("PUT","/api/space",json={"patch":{"name":w,"icon":w,"description":w}})
     hit("PUT","/api/settings",json={"patch":{"openOnStart":w}})
     hit("POST","/api/collections",json={"name":w if isinstance(w,str) else "c","icon":w})
-    hit("POST","/api/queries",json={"name":"q","definition":{"structures":w,"filterGroup":w,"sorts":w},"view":{"viewDefinition":w}})
+    hit("POST","/api/queries",json={"name":"q","definition":{"types":w,"filterGroup":w,"sorts":w},"view":{"viewDefinition":w}})
     for t in types[:3]:
         hit("PUT",f"/api/views/{t}",json={"views":{"activeTab":w,"all":w}})
         hit("PUT",f"/api/types/{t}",json={"type":{"name":"N","pluralName":"Ns","propertyDefinitions":w if isinstance(w,(list,dict,type(None))) else []}})

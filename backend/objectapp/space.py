@@ -70,6 +70,7 @@ from .collections import CollectionDef, SaveCollectionResult
 from . import fmcache
 from .dailynotes import FILE_NAME_TAKEN, DailyNoteExists, build_index, day_of, parse_day
 from .jsonstore import DefinitionUnreadable, JsonStore
+from .keycompat import upgrade_list_name
 from .localtime import SystemTz, from_local, to_local
 from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
 from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
@@ -91,7 +92,7 @@ from .taskhook import TaskResult, on_status_change
 from .workfields import topup_work_fields, work_type_ids
 from .workhook import STEPS_GATED, on_work_write
 from .workview import BUILT_IN as TICKETS_BUILT_IN
-from .workview import TICKETS_ID, apply_structures, for_storage, tickets_default
+from .workview import TICKETS_ID, apply_types, for_storage, tickets_default
 from .linkindex import LinkIndex
 from .relink import (
     code_ranges,
@@ -1673,7 +1674,7 @@ class Space:
 
         M22: when the space has a work type, the built-in Tickets view (`workview.TICKETS_ID`)
         is listed too: its stored file when there is one, else the default; either way its
-        ``structures`` are every work type, set here. Without a work type it isn't listed.
+        ``types`` are every work type, set here. Without a work type it isn't listed.
         """
         with self._lock:
             found = [
@@ -1692,15 +1693,15 @@ class Space:
         q = next((x for x in found if x.id == TICKETS_ID), None)
         if q is None:
             q = QueryDef.from_json(tickets_default(), fallback_id=TICKETS_ID)
-        return apply_structures(q, work_types)
+        return apply_types(q, work_types)
 
     def query_revision(self, query_id: str) -> str:
         return self.store("queries").revision(query_id)
 
     def _check_query_definition(self, definition: dict[str, Any], stored_type_ids: set[str]) -> None:
         """Raise `InvalidValue` for an unknown new type id, a bad result limit or too many search terms."""
-        if not isinstance(definition.get("structures"), list):
-            raise InvalidValue("A query's structures must be a list.")
+        if not isinstance(definition.get("types"), list):
+            raise InvalidValue("A query's types must be a list.")
         known = {t.id for t in self.types} | stored_type_ids
         for tid in sorted(query_type_ids(definition)):
             if tid not in known:
@@ -1766,7 +1767,7 @@ class Space:
     ) -> tuple[QueryDef, str]:
         """Save the Tickets view (M22): base ``""`` creates its file the first time.
 
-        The file holds ``structures: []`` (the live ones are set at read) and no ``builtIn``.
+        The file holds ``types: []`` (the live ones are set at read) and no ``builtIn``.
         Raises `KeyError` when the space has no work type (the view isn't listed then).
         """
         work_types = work_type_ids(self.types)
@@ -1776,7 +1777,7 @@ class Space:
         self._check_query_definition(out.definition, set())
         out.readOnlyReason = None
         revision = self.store("queries").write(out.id, out.to_json(), base_revision)
-        return apply_structures(out, work_types), revision
+        return apply_types(out, work_types), revision
 
     def delete_query(self, query_id: str) -> str:
         """Move a query's file to ``trash/queries/<ulid>.json`` unchanged; return the trash id.
@@ -1935,7 +1936,7 @@ class Space:
     # the id (the dropped entries are kept in the entry's manifest). A restore undoes both,
     # so no live query points at a missing type and no types list empties (= every type).
 
-    _QUERY_TYPE_LISTS = ("structures", "excludeStructureIds")
+    _QUERY_TYPE_LISTS = ("types", "excludeTypeIds")
 
     @staticmethod
     def _query_type_list(data: dict, key: str) -> list | None:
@@ -1945,20 +1946,20 @@ class Space:
 
     @staticmethod
     def _query_entry_id(entry: Any) -> Any:
-        """A ``structures`` entry's type id, or an ``excludeStructureIds`` item itself."""
+        """A ``types`` entry's type id, or an ``excludeTypeIds`` item itself."""
         return entry.get("id") if isinstance(entry, dict) else entry
 
     def _queries_of_type(self, type_id: str) -> tuple[list[str], list[tuple[str, dict, str]]]:
         """(ids of the readable queries of only `type_id`, (id, data, revision) of the others
-        naming it in ``structures`` or ``excludeStructureIds``)."""
+        naming it in ``types`` or ``excludeTypeIds``)."""
         only: list[str] = []
         others: list[tuple[str, dict, str]] = []
         for qid, data, rev, err in self.store("queries").list():
             if data is None or err is not None:
                 continue  # an unreadable file is never rewritten or moved
-            structures = self._query_type_list(data, "structures") or []
-            excluded = self._query_type_list(data, "excludeStructureIds") or []
-            ids = [self._query_entry_id(s) for s in structures]
+            entries = self._query_type_list(data, "types") or []
+            excluded = self._query_type_list(data, "excludeTypeIds") or []
+            ids = [self._query_entry_id(s) for s in entries]
             if ids and all(i == type_id for i in ids):
                 only.append(qid)
             elif type_id in ids or type_id in excluded:
@@ -2042,7 +2043,7 @@ class Space:
         # grouped per query and list, and the "added back by hand" check runs once per list.
         grouped: dict[str, dict[str, list[dict[str, Any]]]] = {}
         for ref in manifest.get("queryRefs") or []:
-            qid, key = ref.get("queryId"), ref.get("list")
+            qid, key = ref.get("queryId"), upgrade_list_name(ref.get("list"))
             if not isinstance(qid, str) or key not in self._QUERY_TYPE_LISTS or "entry" not in ref:
                 continue
             grouped.setdefault(qid, {}).setdefault(key, []).append(ref)

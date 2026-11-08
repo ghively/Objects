@@ -32,7 +32,7 @@ function CalcCell({ col, def, result, state, onState, typeId }: CellProps) {
     const rest = calcs.filter((c) => c.propertyId !== col.id)
     onState({
       ...state,
-      viewDefinition: { ...state.viewDefinition, calculations: kind ? [...rest, { propertyId: col.id, structureId: typeId, kind }] : rest },
+      viewDefinition: { ...state.viewDefinition, calculations: kind ? [...rest, { propertyId: col.id, typeId, kind }] : rest },
     })
     setOpen(false)
   }
@@ -76,7 +76,7 @@ export function CalcFooter({ columns, defs, widths, sticky, rows, ctx, gutter, .
   // One pass over the rows per column with a calculation, redone only when they or the rows change.
   const results = useMemo(() => {
     const out: Record<string, CalcResult> = {}
-    for (const c of calcs ?? []) if (defs[c.propertyId]) out[c.propertyId] = calculate(rows, c.propertyId, c.kind, ctx, c.structureId)
+    for (const c of calcs ?? []) if (defs[c.propertyId]) out[c.propertyId] = calculate(rows, c.propertyId, c.kind, ctx, c.typeId)
     return out
   }, [rows, calcs, defs, ctx])
   return (

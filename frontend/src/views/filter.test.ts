@@ -40,12 +40,12 @@ const ctx = (extra: Partial<FilterCtx> = {}, collections: Collection[] = []): Fi
 const R = (path: string, values: Row['values'] = {}, summary: Partial<Row['summary']> = {}, type = 'page'): Row =>
   row({ summary: objectSummary({ path, type, ...summary }), values })
 
-const f = (propertyId: string, option: string, referenceValue?: Filter['referenceValue'], structureId?: string): Filter => ({
+const f = (propertyId: string, option: string, referenceValue?: Filter['referenceValue'], typeId?: string): Filter => ({
   type: 'filter',
   propertyId,
   option,
   ...(referenceValue !== undefined ? { referenceValue } : {}),
-  ...(structureId ? { structureId } : {}),
+  ...(typeId ? { typeId } : {}),
 })
 const group = (operator: 'and' | 'or', ...elements: FilterGroup['elements']): FilterGroup => ({
   type: 'filterGroup',
@@ -197,7 +197,7 @@ describe('filter engine', () => {
     }
   })
 
-  test('structureId scopes filter to one type', () => {
+  test('typeId scopes filter to one type', () => {
     const rows = [R('a', { qty: 1 }), R('t1', { prio: 1 }, {}, 'task'), R('t2', { prio: 5 }, {}, 'task')]
     const g = group('and', f('prio', 'greater', 3, 'task'))
     expect(paths(applyFilters(rows, g, ctx()))).toEqual(['a', 't2'])

@@ -39,7 +39,7 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   zoom: 1,
   spellCheckLang: null,
   alwaysCreateInlineLinks: false,
-  hideStructureSettings: false,
+  hideTypeSettings: false,
   highlightStyle: 'default',
   // M10
   aiHidden: false,

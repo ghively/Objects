@@ -108,7 +108,7 @@ describe('TypePage', () => {
   })
 
   test('test full-view sections become header tabs', async () => {
-    const q = query({ id: 'q1', name: 'Open tasks', definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'task' }] } })
+    const q = query({ id: 'q1', name: 'Open tasks', definition: { ...query({ id: 'x' }).definition, types: [{ id: 'task' }] } })
     const c = collection({ id: 'c1', name: 'Reading', typeIds: ['task'] })
     mocked.queries.mockResolvedValue([q])
     mocked.collections.mockResolvedValue([c])
@@ -218,7 +218,7 @@ describe('TypePage', () => {
 
   test('Add a section lists the queries of the type under "Queries & Views"', async () => {
     const user = userEvent.setup()
-    const q = query({ id: 'q1', name: 'Open tasks', definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'task' }] } })
+    const q = query({ id: 'q1', name: 'Open tasks', definition: { ...query({ id: 'x' }).definition, types: [{ id: 'task' }] } })
     mocked.queries.mockResolvedValue([q])
     load(views({ activeTab: 'overview' }))
     render(<TypePage type={TASK} />)
@@ -258,7 +258,7 @@ describe('TypePage', () => {
       id: 'q1',
       name: 'New Query',
       titleIsCustom: false,
-      definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'task' }] },
+      definition: { ...query({ id: 'x' }).definition, types: [{ id: 'task' }] },
     })
     mocked.queries.mockResolvedValue([q])
     load(views({ activeTab: 'overview' }, ['queries', 'query:q1']))
@@ -287,7 +287,7 @@ describe('TypePage', () => {
     await waitFor(() => expect(mocked.createQuery).toHaveBeenCalled())
     expect(mocked.createQuery.mock.calls[0][0]).toMatchObject({
       name: 'Task · Done · Checked',
-      definition: { structures: [{ id: 'task' }] },
+      definition: { types: [{ id: 'task' }] },
     })
     await waitFor(() => expect(lastSaved()[1].dashboard.sections.at(-1)).toEqual({ key: 'query:new-query', collapsed: false }))
   })
@@ -309,7 +309,7 @@ describe('TypePage', () => {
       filterGroup: {
         type: 'filterGroup',
         operator: 'and',
-        elements: [{ type: 'filter', propertyId: 'done', option: 'isChecked', structureId: 'task' }],
+        elements: [{ type: 'filter', propertyId: 'done', option: 'isChecked', typeId: 'task' }],
       },
     }
     load(v)
@@ -325,7 +325,7 @@ describe('TypePage', () => {
     const filterGroup = {
       type: 'filterGroup' as const,
       operator: 'and' as const,
-      elements: [{ type: 'filter' as const, propertyId: 'done', option: 'isChecked', structureId: 'task' }],
+      elements: [{ type: 'filter' as const, propertyId: 'done', option: 'isChecked', typeId: 'task' }],
     }
     v.all = { ...v.all, filterGroup, sorts: [{ propertyId: 'title', option: 'ascending' }] }
     load(v)
@@ -336,7 +336,7 @@ describe('TypePage', () => {
     await waitFor(() => expect(mocked.createQuery).toHaveBeenCalled())
     expect(mocked.createQuery.mock.calls[0][0]).toMatchObject({
       definition: {
-        structures: [{ id: 'task' }],
+        types: [{ id: 'task' }],
         filterGroup,
         sorts: [{ propertyId: 'title', option: 'ascending' }],
         groupBy: null,

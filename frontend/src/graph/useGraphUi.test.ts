@@ -35,17 +35,17 @@ describe('useGraphUi', () => {
 
     act(() => {
       result.current.patch({ showCompletedTasks: true })
-      result.current.patch({ excludeStructureIds: ['person'] })
+      result.current.patch({ excludeTypeIds: ['person'] })
     })
     // Optimistic at once, saved once after the pause, as the whole merged value.
-    expect(result.current.custom).toEqual({ hideDates: true, showCompletedTasks: true, excludeStructureIds: ['person'] })
+    expect(result.current.custom).toEqual({ hideDates: true, showCompletedTasks: true, excludeTypeIds: ['person'] })
     expect(mocked.patchUi).not.toHaveBeenCalled()
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SAVE_DELAY_MS)
     })
     expect(mocked.patchUi).toHaveBeenCalledTimes(1)
     expect(mocked.patchUi).toHaveBeenCalledWith(
-      { graph: { hideDates: true, showCompletedTasks: true, excludeStructureIds: ['person'] } },
+      { graph: { hideDates: true, showCompletedTasks: true, excludeTypeIds: ['person'] } },
       { baseRevision: 'r0' },
     )
     expect(useUiStore.getState().revision).toBe('r1')

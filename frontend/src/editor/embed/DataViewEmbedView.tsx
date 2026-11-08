@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, typ
 import type { Collection, Layout, Query, QueryDefinition, TypeDef, ViewState } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
+import { upgradeKeys } from '@/lib/keyCompat'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTabs } from '@/nav/tabs'
 import { queryTitle } from '@/queries/autoTitle'
@@ -73,12 +74,15 @@ export function localViewText(options: readonly Option[] | null | undefined): st
   return typeof value === 'string' ? value : null
 }
 
-/** The saved view, parsed; null when absent or unreadable (the embed then shows the source's view). */
+/**
+ * The saved view, parsed (older key names read as today's, `keyCompat`); null when absent or
+ * unreadable (the embed then shows the source's view).
+ */
 export function parseLocalView(text: string | null): Partial<LocalViewInfo> | null {
   if (!text) return null
   try {
     const v: unknown = JSON.parse(text)
-    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Partial<LocalViewInfo>) : null
+    return v && typeof v === 'object' && !Array.isArray(v) ? upgradeKeys(v as Partial<LocalViewInfo>) : null
   } catch {
     return null
   }
@@ -203,7 +207,7 @@ function QueryEmbed({ query: q, details, onDetails, savedView, onSaveView, headi
       ),
     [def],
   )
-  const fit = fitLayout(state, def.structures.length !== 1)
+  const fit = fitLayout(state, def.types.length !== 1)
   return (
     <DataView
       rows={ready ? rows : []}

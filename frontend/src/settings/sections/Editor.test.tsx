@@ -163,7 +163,7 @@ describe('EditorSection', () => {
     render(<EditorSection />)
     for (const [label, key] of [
       ['Insert links inline by default', 'alwaysCreateInlineLinks'],
-      ['Keep type settings inside Settings only', 'hideStructureSettings'],
+      ['Keep type settings inside Settings only', 'hideTypeSettings'],
     ] as const) {
       const sw = screen.getByRole('switch', { name: label })
       expect(sw).toHaveAttribute('aria-checked', 'false')

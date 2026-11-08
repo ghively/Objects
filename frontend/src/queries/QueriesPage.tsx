@@ -51,7 +51,7 @@ export function QueriesPage() {
           q,
           title: queryTitle(q, ctx),
           subtitle: titleIsCustom(q) ? autoTitle(q.definition, ctx) : '',
-          typeNames: q.definition.structures.map((s) => types.find((t) => t.id === s.id)?.pluralName).filter((n): n is string => !!n),
+          typeNames: q.definition.types.map((s) => types.find((t) => t.id === s.id)?.pluralName).filter((n): n is string => !!n),
         }))
         .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })),
     [queries, ctx, types],

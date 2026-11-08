@@ -32,7 +32,7 @@ Every feature is simply available; nothing is gated behind a paid tier.
 
 | Concept | Must support |
 |---|---|
-| **Object type** (Structure) | name, plural name, icon, colour, description; ordered property definitions; layout `profile` / `indexCard` / `encyclopedia`, wide mode, cover crop; how objects of the type render elsewhere (inline, small card, wide card, embed, page) with per-view settings; default view; templates; calendar options |
+| **Object type** | name, plural name, icon, colour, description; ordered property definitions; layout `profile` / `indexCard` / `encyclopedia`, wide mode, cover crop; how objects of the type render elsewhere (inline, small card, wide card, embed, page) with per-view settings; default view; templates; calendar options |
 | **Property kinds** | text, rich text block, simple table, number (formats: number, currency, percentage, progress; decimals, thousands separator), checkbox, URL, date and date+time (with ranges, `time`/`day` resolution, constraints), relation to objects (single or multiple, limited to chosen types, fixed set, property syncing), label (single or multiple, options with colour and icon, can act as **status** with categories not-started / in-progress / blocked / done), blocks. Per property: icon, description, visibility (always / hide when empty / hidden), searchable |
 | **System properties** | title, icon, description, aliases, tags, type, collections, created, last updated, backlinks |
 | **Collections** (Databases) | named sets of objects of one or more types, an object can be in several; their own views, pinned items, templates, dashboard sections |

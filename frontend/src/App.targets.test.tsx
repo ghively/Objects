@@ -26,7 +26,7 @@ beforeEach(() => {
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
   mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE] } satisfies SpaceInfo)
   mocked.collections.mockResolvedValue([collection({ id: 'reading', name: 'Reading list', typeIds: ['page'], icon: { type: 'iconify', val: 'ph-books' } })])
-  mocked.queries.mockResolvedValue([query({ id: 'open', name: 'Open pages' }), query({ id: 'auto', name: 'New Query', titleIsCustom: false, definition: { structures: [{ id: 'page' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: [], groupBy: null } })])
+  mocked.queries.mockResolvedValue([query({ id: 'open', name: 'Open pages' }), query({ id: 'auto', name: 'New Query', titleIsCustom: false, definition: { types: [{ id: 'page' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: [], groupBy: null } })])
   mocked.onChange.mockReturnValue(() => undefined)
 })
 

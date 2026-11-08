@@ -181,7 +181,7 @@ describe('TableLayout', () => {
   })
 
   test('calc footer shows Sum with number format', () => {
-    render(<Harness init={base({ calculations: [{ propertyId: 'amount', structureId: 'page', kind: 'sum' }] })} />)
+    render(<Harness init={base({ calculations: [{ propertyId: 'amount', typeId: 'page', kind: 'sum' }] })} />)
     const cell = screen.getByTestId('calc-amount')
     expect(within(cell).getByText('Sum')).toBeInTheDocument()
     expect(within(cell).getByText('4,200')).toBeInTheDocument()
@@ -194,7 +194,7 @@ describe('TableLayout', () => {
     await user.click(screen.getByTestId('calc-amount'))
     await user.click(screen.getByRole('button', { name: 'Average' }))
     expect(onState.mock.calls.at(-1)?.[0].viewDefinition.calculations).toEqual([
-      { propertyId: 'amount', structureId: 'page', kind: 'average' },
+      { propertyId: 'amount', typeId: 'page', kind: 'average' },
     ])
   })
 

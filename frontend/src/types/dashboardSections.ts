@@ -245,7 +245,7 @@ export function addableSections(type: TypeDef, all: RenderedSection[], ctx: Sect
   offer('notTagged')
   offer('noBacklinks')
   for (const c of ctx.collections) if (c.typeIds.includes(type.id)) offer(`collection:${c.id}`)
-  for (const q of ctx.queries) if (q.definition.structures.some((st) => st.id === type.id)) offer(`query:${q.id}`)
+  for (const q of ctx.queries) if (q.definition.types.some((st) => st.id === type.id)) offer(`query:${q.id}`)
   return out
 }
 

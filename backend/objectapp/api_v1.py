@@ -390,10 +390,10 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         if q is None:
             return _error(404, f"No query {query_id!r}")
         d = q.definition or {}
-        structures = [s for s in d.get("structures") or [] if isinstance(s, dict)]
-        type_ids = [s["id"] for s in structures if isinstance(s.get("id"), str)] or None
+        type_entries = [s for s in d.get("types") or [] if isinstance(s, dict)]
+        type_ids = [s["id"] for s in type_entries if isinstance(s.get("id"), str)] or None
         collection_ids = sorted(
-            {c for s in structures for c in s.get("collectionIds") or [] if isinstance(c, str)}
+            {c for s in type_entries for c in s.get("collectionIds") or [] if isinstance(c, str)}
         ) or None
         sorts = [s for s in d.get("sorts") or [] if isinstance(s, dict)]
         sort = (
@@ -413,10 +413,10 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             for key, present in (
                 ("search", bool((d.get("search") or {}).get("searchTerms"))),
                 ("tags", bool((d.get("tags") or {}).get("ids"))),
-                ("excludeStructureIds", bool(d.get("excludeStructureIds"))),
-                ("structureCollectionRules", any(
+                ("excludeTypeIds", bool(d.get("excludeTypeIds"))),
+                ("typeCollectionRules", any(
                     s.get("inNoCollection") or s.get("inAnyCollection") or s.get("excludeCollectionIds")
-                    for s in structures
+                    for s in type_entries
                 )),
             )
             if present

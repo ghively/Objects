@@ -1,5 +1,5 @@
 // Query evaluation: the scope the rows are fetched with, and the client-side steps that follow
-// (structure collection constraints, tags, excluded tags, filters and sorts, limit, grouping).
+// (per-type collection constraints, tags, excluded tags, filters and sorts, limit, grouping).
 import type { Collection, DataViewDefinition, Filter, FilterGroup, QueryDefinition, Row, RowsScope } from '@/api/types'
 import { applyFilters, matchFilter, matchGroup } from '@/views/filter'
 import { groupRows, type Group, type GroupCtx } from '@/views/group'
@@ -22,20 +22,20 @@ const hasTags = (def: QueryDefinition): boolean => (def.tags?.ids.length ?? 0) >
 
 /** A query returns something only with a search term, a tag or a type. */
 export const isQueryReady = (def: QueryDefinition): boolean =>
-  isSearching(def) || hasTags(def) || def.structures.length > 0
+  isSearching(def) || hasTags(def) || def.types.length > 0
 
 /** Whether the "exclude" controls count: only with a search term or an included tag. */
 const exclusionApplies = (def: QueryDefinition): boolean => isSearching(def) || hasTags(def)
 
 /**
- * What `POST /api/rows` is asked for: the structure type ids when any are set; otherwise every
+ * What `POST /api/rows` is asked for: the query type ids when any are set; otherwise every
  * type but the excluded ones (exclusion needs a search term or tag, and `allTypeIds`), else all.
  */
 export function queryScope(def: QueryDefinition, allTypeIds: string[] = []): RowsScope {
   const scope: RowsScope = {}
-  if (def.structures.length > 0) scope.typeIds = def.structures.map((s) => s.id)
-  else if ((def.excludeStructureIds?.length ?? 0) > 0 && exclusionApplies(def) && allTypeIds.length > 0) {
-    const out = new Set(def.excludeStructureIds)
+  if (def.types.length > 0) scope.typeIds = def.types.map((s) => s.id)
+  else if ((def.excludeTypeIds?.length ?? 0) > 0 && exclusionApplies(def) && allTypeIds.length > 0) {
+    const out = new Set(def.excludeTypeIds)
     scope.typeIds = allTypeIds.filter((id) => !out.has(id))
   }
   const terms = searchTermsOf(def)
@@ -56,9 +56,9 @@ export function rowCollectionIds(row: Row, collections: Collection[]): string[] 
   return [...out]
 }
 
-type Structure = QueryDefinition['structures'][number]
+type TypeEntry = QueryDefinition['types'][number]
 
-function passesStructure(row: Row, s: Structure, collections: Collection[]): boolean {
+function passesType(row: Row, s: TypeEntry, collections: Collection[]): boolean {
   const have = rowCollectionIds(row, collections)
   if (s.inNoCollection && have.length > 0) return false
   if (s.inAnyCollection && have.length === 0) return false
@@ -93,15 +93,15 @@ export function runQuery(
   const tagged = hasTags(def)
   let kept = rows
 
-  // 1. Per structure: its collection constraints. With no structure, the excluded types go.
-  if (def.structures.length > 0) {
-    const by = new Map(def.structures.map((s) => [s.id, s]))
+  // 1. Per type entry: its collection constraints. With no type entry, the excluded types go.
+  if (def.types.length > 0) {
+    const by = new Map(def.types.map((s) => [s.id, s]))
     kept = kept.filter((r) => {
       const s = by.get(r.summary.type)
-      return !!s && passesStructure(r, s, ctx.collections)
+      return !!s && passesType(r, s, ctx.collections)
     })
-  } else if ((def.excludeStructureIds?.length ?? 0) > 0 && exclusionApplies(def)) {
-    const out = new Set(def.excludeStructureIds)
+  } else if ((def.excludeTypeIds?.length ?? 0) > 0 && exclusionApplies(def)) {
+    const out = new Set(def.excludeTypeIds)
     kept = kept.filter((r) => !out.has(r.summary.type))
   }
 

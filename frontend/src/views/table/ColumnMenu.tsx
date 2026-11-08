@@ -80,7 +80,7 @@ export function ColumnMenu({ def, typeId, state, onState, config, onConfig, onCl
                 ...state,
                 viewDefinition: {
                   ...state.viewDefinition,
-                  calculations: [...calcs.filter((c) => c.propertyId !== def.key), { propertyId: def.key, structureId: typeId, kind: k }],
+                  calculations: [...calcs.filter((c) => c.propertyId !== def.key), { propertyId: def.key, typeId, kind: k }],
                 },
               })
             }
@@ -102,7 +102,7 @@ export function ColumnMenu({ def, typeId, state, onState, config, onConfig, onCl
             const first = sortOptions[0].key
             const second = sortOptions[1]?.key ?? first
             const option = at?.option === first ? second : first
-            done({ ...state, sorts: [{ propertyId: def.key, option, structureId: typeId }, ...state.sorts.filter((s) => s.propertyId !== def.key)] })
+            done({ ...state, sorts: [{ propertyId: def.key, option, typeId }, ...state.sorts.filter((s) => s.propertyId !== def.key)] })
           }}
         >
           Sort

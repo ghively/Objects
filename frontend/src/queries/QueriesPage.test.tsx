@@ -20,7 +20,7 @@ const mocked = vi.mocked(api)
 const TITLE = propertyDef({ id: 'title', key: 'title', name: 'Title', type: 'entity_title' })
 const SERVER = typeDef({ id: 'server', name: 'Server', pluralName: 'Servers', revision: 'r1', propertyDefinitions: [TITLE] })
 const QUERIES = [
-  query({ id: 'zed', name: 'Zed list', revision: 'a', definition: { structures: [{ id: 'server' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: [], groupBy: null } }),
+  query({ id: 'zed', name: 'Zed list', revision: 'a', definition: { types: [{ id: 'server' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: [], groupBy: null } }),
   query({ id: 'abc', name: 'Another', revision: 'b' }),
 ]
 

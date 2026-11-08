@@ -57,12 +57,12 @@ describe('matchingValues', () => {
     })
   })
 
-  test('other filters, nested groups and filters of another structure contribute nothing', () => {
+  test('other filters, nested groups and filters of another type contribute nothing', () => {
     const group = g(
       'and',
       f('done', 'isNotChecked'),
       g('and', f('done', 'isChecked')),
-      { ...f('note', 'is', 'x' as never), structureId: 'page' },
+      { ...f('note', 'is', 'x' as never), typeId: 'page' },
     )
     expect(matchingValues(group, [task], 'task')).toEqual({})
   })

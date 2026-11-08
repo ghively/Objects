@@ -28,7 +28,7 @@ READING.views.all = { ...READING.views.all, sorts: SORTED }
 const BOOKS = query({
   id: 'q1',
   name: 'All books',
-  definition: { structures: [{ id: 'book' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: SORTED, groupBy: null },
+  definition: { types: [{ id: 'book' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: SORTED, groupBy: null },
 })
 
 beforeEach(() => {

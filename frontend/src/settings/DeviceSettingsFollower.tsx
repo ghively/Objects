@@ -3,8 +3,8 @@
  * never overwrite what `index.html` painted first):
  * - the text size (`--app-zoom`, `zoom.ts`);
  * - the spellcheck language (`lang`, `spellcheck.ts`; the browser's spellchecker follows it);
- * - "Keep type settings inside Settings only" (`data-hide-structure-settings`: `index.css`
- *   hides every `[data-structure-setting]` entry point while it is set);
+ * - "Keep type settings inside Settings only" (`data-hide-type-settings`: `index.css`
+ *   hides every `[data-type-setting]` entry point while it is set);
  * - the highlight style (`data-highlight-style`; Object has no highlight blocks yet, so nothing
  *   reads it so far).
  * Mounted once by `shell/GlobalOverlays.tsx`.
@@ -18,15 +18,15 @@ export function DeviceSettingsFollower() {
   const settings = useSettings((s) => s.settings)
   const loaded = useSettings((s) => s.loaded)
   const ready = loaded || settings !== settingsDefaults
-  const { zoom, spellCheckLang, hideStructureSettings, highlightStyle } = settings
+  const { zoom, spellCheckLang, hideTypeSettings, highlightStyle } = settings
   useEffect(() => {
     if (ready) applyZoom(zoom)
   }, [ready, zoom])
   useEffect(() => {
     const root = document.documentElement
     root.setAttribute('lang', documentLang(spellCheckLang))
-    root.toggleAttribute('data-hide-structure-settings', !!hideStructureSettings)
+    root.toggleAttribute('data-hide-type-settings', !!hideTypeSettings)
     root.setAttribute('data-highlight-style', highlightStyle === 'minimal' ? 'minimal' : 'default')
-  }, [spellCheckLang, hideStructureSettings, highlightStyle])
+  }, [spellCheckLang, hideTypeSettings, highlightStyle])
   return null
 }

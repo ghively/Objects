@@ -39,17 +39,17 @@ describe('GraphCustomization', () => {
     const user = userEvent.setup()
     const onPatch = vi.fn()
     const { unmount } = render(
-      <GraphCustomization custom={{ excludeStructureIds: ['person'] }} onPatch={onPatch} types={TYPES} tagsNetworkKey="showSpaceTagsNetwork" />,
+      <GraphCustomization custom={{ excludeTypeIds: ['person'] }} onPatch={onPatch} types={TYPES} tagsNetworkKey="showSpaceTagsNetwork" />,
     )
     await user.click(screen.getByRole('button', { name: 'Customize' }))
     const pop = await screen.findByRole('dialog')
     const filter = within(pop).getByRole('region', { name: 'Filter object types' })
     await user.click(within(filter).getByRole('menuitemcheckbox', { name: /People/ }))
-    expect(onPatch).toHaveBeenLastCalledWith({ filterStructureIds: ['person'] })
+    expect(onPatch).toHaveBeenLastCalledWith({ filterTypeIds: ['person'] })
     const exclude = within(pop).getByRole('region', { name: 'Exclude object types' })
     expect(within(exclude).getByRole('menuitemcheckbox', { name: /People/ })).toHaveAttribute('aria-checked', 'true')
     await user.click(within(exclude).getByRole('button', { name: 'Deselect all' }))
-    expect(onPatch).toHaveBeenLastCalledWith({ excludeStructureIds: [] })
+    expect(onPatch).toHaveBeenLastCalledWith({ excludeTypeIds: [] })
     await user.click(within(pop).getByRole('switch', { name: 'Show completed tasks' }))
     expect(onPatch).toHaveBeenLastCalledWith({ showCompletedTasks: true })
     await user.click(within(pop).getByRole('switch', { name: 'Show tags network' }))

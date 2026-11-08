@@ -25,7 +25,7 @@ const BOOK = typeDef({ id: 'book', name: 'Book', pluralName: 'Books', revision: 
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', revision: 'r1', propertyDefinitions: [TITLE] })
 
 const def = (ids: string[]): QueryDefinition => ({
-  structures: ids.map((id) => ({ id })),
+  types: ids.map((id) => ({ id })),
   filterGroup: { type: 'filterGroup', operator: 'and', elements: [] },
   sorts: [],
   groupBy: null,
@@ -113,7 +113,7 @@ describe('type-constrained query tabs', () => {
     render(<TypePage type={BOOK} />)
     await user.click(await screen.findByRole('button', { name: 'Edit query' }))
     await user.click(await screen.findByRole('button', { name: 'Remove Page' }))
-    await waitFor(() => expect(useDefs.getState().queries[0].definition.structures).toEqual([{ id: 'book' }]))
+    await waitFor(() => expect(useDefs.getState().queries[0].definition.types).toEqual([{ id: 'book' }]))
     // Now single-type: locked.
     expect(await screen.findByTestId('query-type-lock')).toBeInTheDocument()
   })

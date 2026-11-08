@@ -1,4 +1,4 @@
-// "Keep type settings inside Settings only" (`DeviceSettings.hideStructureSettings`).
+// "Keep type settings inside Settings only" (`DeviceSettings.hideTypeSettings`).
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { objectSummary, propertyDef, typeDef } from '@/test/mockApi'
@@ -33,11 +33,11 @@ function panel() {
 
 describe('PropertyPanel with type settings hidden', () => {
   test('test property labels lose their menu and Add Property is marked', () => {
-    useSettings.setState({ settings: { ...settingsDefaults, hideStructureSettings: true } })
+    useSettings.setState({ settings: { ...settingsDefaults, hideTypeSettings: true } })
     panel()
     expect(screen.queryByRole('button', { name: 'Note property menu' })).not.toBeInTheDocument()
     expect(screen.getByText('Note')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add Property' })).toHaveAttribute('data-structure-setting')
+    expect(screen.getByRole('button', { name: 'Add Property' })).toHaveAttribute('data-type-setting')
   })
 
   test('test property labels keep their menu by default', () => {

@@ -276,7 +276,7 @@ function Row({
   children: ReactNode
 }) {
   // "Keep type settings inside Settings only": the label stays, its menu goes.
-  const hideMenu = useSettings((s) => s.settings.hideStructureSettings)
+  const hideMenu = useSettings((s) => s.settings.hideTypeSettings)
   const heading = (
     <>
       <IconOrEmoji icon={icon} size={15} fallback="ph-note-blank" />
@@ -564,7 +564,7 @@ export function PropertyPanel({
         <PopoverTrigger asChild>
           <button
             type="button"
-            data-structure-setting=""
+            data-type-setting=""
             disabled={!canEditType || !!type?.basic}
             title={type?.basic ? BASIC_TYPE_INFO : undefined}
             className="mt-5 flex items-center gap-2 px-1 text-[15px] text-fg-muted opacity-15 transition-opacity group-hover/panel:opacity-100 hover:text-fg disabled:hover:text-fg-muted"

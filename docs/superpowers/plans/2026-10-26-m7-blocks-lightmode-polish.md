@@ -669,7 +669,7 @@ The space (all content invented):
 - Produces:
   - **Slash menu** (`/` anywhere in a text block; the query is the text typed after it; Escape or a space with no match closes): the filter is `fuzzyScore` over each item's name and description. Sections and items, in order:
     - "Create a block": "Text", "Heading 1"–"Heading 4", "Small", "Bullet list", "Numbered list", "Alphabetical list", "Roman list", "To-do", "Toggle", "Quote block", "Group", "Icon", "Text" and "Background" colour items opening the colour lists (each with its description as the row's second line), "Two Columns", "Horizontal line", "Code", "Math", "Table", "Insert image", "Insert PDF", "Insert audio", "Insert video", "Insert file", "Create bookmark".
-    - "Create an object": one item per type, "Create {structureTitle}" or, with a query, `Create {structureTitle} with title "{potentialTitle}"`; it creates the object with `api.createObject(typeId, {title})` and inserts `[[Title]]` at the cursor.
+    - "Create an object": one item per type, "Create {typeTitle}" or, with a query, `Create {typeTitle} with title "{potentialTitle}"`; it creates the object with `api.createObject(typeId, {title})` and inserts `[[Title]]` at the cursor.
     - "Link to a date": "Today", "Tomorrow", "Yesterday" (inserting `[[YYYY-MM-DD]]`, the daily note's title), "Today - date link" (`token_date`, the same link inline), "Now – timestamp" (`token_time`, inserting the local time as text, `HH:mm` with `twentyFourHourTime`, else `h:mm AM/PM`).
     - "Reuse any content": opens `pickObjectEmbed()`.
     The footer hint is `press "/" to search`; no match shows "No results".

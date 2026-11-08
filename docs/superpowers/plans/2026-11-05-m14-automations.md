@@ -57,7 +57,7 @@ Unknown top-level keys are kept on every save (as other definition files keep th
 
 ### Conditions
 
-`conditions` is the view `FilterGroup` (nested `and`/`or`, `Filter {type, propertyId, option, referenceValue?, structureId?}`), so the rule editor reuses `views/FilterEditor.tsx`. It is evaluated on the triggering object as it is after the triggering write. An empty group passes. Nesting is at most 3 groups deep (the top group counts). A schedule rule's conditions must be empty (422).
+`conditions` is the view `FilterGroup` (nested `and`/`or`, `Filter {type, propertyId, option, referenceValue?, typeId?}`), so the rule editor reuses `views/FilterEditor.tsx`. It is evaluated on the triggering object as it is after the triggering write. An empty group passes. Nesting is at most 3 groups deep (the top group counts). A schedule rule's conditions must be empty (422).
 
 The back end gets a port of `views/filter.ts`'s `matchGroup`/`matchFilter` (Lane B, `backend/objectapp/automation_filter.py`) with the same operators, the same handling of invalid filters (ignored), relative dates resolved against the run instant in `space.tz` with weeks running Monday to Sunday as `views/dates.ts` has them, whatever the space's week start (our choice, review fix: a rule's "this week" is the one views show), tag references as Tag object ids, entity references as object ids. **Parity is tested**: one table of cases in `frontend/src/views/__fixtures__/filter-cases.json` (rows, filters, expected matches) is run by a vitest file and by a pytest file; both must pass.
 

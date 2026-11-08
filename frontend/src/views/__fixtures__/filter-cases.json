@@ -468,13 +468,13 @@
       ]
     },
     {
-      "name": "structureId lets other types through",
+      "name": "typeId lets other types through",
       "filter": {
         "type": "filter",
         "propertyId": "estimate",
         "option": "equal",
         "referenceValue": 3,
-        "structureId": "task"
+        "typeId": "task"
       },
       "matches": [
         "Tasks/Alpha.md",
@@ -1112,13 +1112,13 @@
       ]
     },
     {
-      "name": "an unknown structure is ignored",
+      "name": "an unknown type is ignored",
       "filter": {
         "type": "filter",
         "propertyId": "estimate",
         "option": "equal",
         "referenceValue": 3,
-        "structureId": "ghost"
+        "typeId": "ghost"
       },
       "matches": [
         "Tasks/Alpha.md",

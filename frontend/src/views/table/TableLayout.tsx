@@ -1,4 +1,4 @@
-// The table layout: one structure, resizable and reorderable columns, a pinned (sticky) prefix,
+// The table layout: one type, resizable and reorderable columns, a pinned (sticky) prefix,
 // hidden and wrapped columns, a calculation footer and inline cell editing with the M2 cells.
 // Rows are memoized on their row, columns, widths and selection, so one cell edit re-renders one row.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'

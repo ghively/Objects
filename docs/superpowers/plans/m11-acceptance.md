@@ -18,7 +18,7 @@ Plan: `2026-11-04-notion-anytype-features-plan.md`, M11 (built first, before M10
 1. The token routes the window uses (`/api/integrations/tokens`) need no token; the app's local-only guard (loopback host, same-origin writes) protects them, as it does every other route.
 2. "Edited by" in version history is not added: the change event's origin and the activity log carry who wrote what. Adding a field to history files would change their format.
 3. `neighbours` from the plan is not a separate tool: `peek` returns outgoing links and `backlinks` the incoming ones.
-4. `run_saved_query` applies the query's types, its structures' collections, the filter group and the first sort. Search terms, tag filters, excluded types and the in-no/any-collection rules are not applied yet and are listed in `unsupported`.
+4. `run_saved_query` applies the query's types, each type entry's collections, the filter group and the first sort. Search terms, tag filters, excluded types and the in-no/any-collection rules are not applied yet and are listed in `unsupported`.
 5. `create_object` with a `body` appends it after the template's body, if the type's template gives one.
 6. A space without the Task type answers 404 to `create_task`; `create_object` works there.
 7. The MCP server keeps the write tools when it can't reach the app at start-up, so starting the assistant before Object still works; each call then reports what the app says.

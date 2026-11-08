@@ -167,12 +167,12 @@ describe('KanbanLayout', () => {
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/T1.md', { status: ['Done'] }, 'v7'))
   })
 
-  test("the group definition follows the grouping's structureId", async () => {
+  test("the group definition follows the grouping's typeId", async () => {
     // Two types with `stage` labels: the grouping names the second type, so its options are the columns.
     const A = typeDef({ id: 'a', name: 'A', pluralName: 'As', propertyDefinitions: [propertyDef({ id: 'stage', type: 'label', name: 'Stage', options: { set: [{ id: 'x', text: 'X', color: null, icon: null }] } })] })
     const B = typeDef({ id: 'b', name: 'B', pluralName: 'Bs', propertyDefinitions: [propertyDef({ id: 'stage', type: 'label', name: 'Stage', options: { set: [{ id: 'y', text: 'Y', color: null, icon: null }] } })] })
     const rows = [row({ summary: objectSummary({ path: 'Bs/B1.md', type: 'b' }), values: { stage: [] }, version: 'v3' })]
-    const state = kanban({ groupBy: { groups: [{ propertyId: 'stage', option: 'default', structureId: 'b' }] } })
+    const state = kanban({ groupBy: { groups: [{ propertyId: 'stage', option: 'default', typeId: 'b' }] } })
     render(<DataView rows={rows} types={[A, B]} scope={{ typeIds: ['a', 'b'] }} state={state} onState={vi.fn()} layouts={['kanban']} />)
     expect(columns().map((c) => c.getAttribute('data-group'))).toEqual(['y', 'other'])
     dragEnd?.({ active: { id: 'Bs/B1.md' }, over: { id: 'col:y' } })

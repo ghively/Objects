@@ -25,9 +25,9 @@ export const PALETTE_TEXT = {
   clearFilter: 'Clear filter',
   inNewTab: 'in new tab',
   inSidePanel: 'in side panel',
-  createNewWithTitle: (structureTitle: string, title: string) => `Create new ${structureTitle} with title "${title}"`,
-  structureFilter: (structureName: string) => `Only search for type "${structureName}"`,
-  structureFilterExclude: (structureName: string) => `Exclude type "${structureName}"`,
+  createNewWithTitle: (typeTitle: string, title: string) => `Create new ${typeTitle} with title "${title}"`,
+  typeFilter: (typeName: string) => `Only search for type "${typeName}"`,
+  typeFilterExclude: (typeName: string) => `Exclude type "${typeName}"`,
   tagFilter: (tagName: string) => `Limit results to the tag "${tagName}"`,
   /** The dialog's accessible title. */
   searchTitle: 'Search this space',
@@ -128,8 +128,8 @@ export function buildSearchOptions(
     if (taken.has(t.id)) continue
     const rest = typeMatch(title, t)
     if (rest === null) continue
-    out.push({ kind: 'includeType', typeId: t.id, rest, label: PALETTE_TEXT.structureFilter(t.name) })
-    out.push({ kind: 'excludeType', typeId: t.id, rest, label: PALETTE_TEXT.structureFilterExclude(t.name) })
+    out.push({ kind: 'includeType', typeId: t.id, rest, label: PALETTE_TEXT.typeFilter(t.name) })
+    out.push({ kind: 'excludeType', typeId: t.id, rest, label: PALETTE_TEXT.typeFilterExclude(t.name) })
   }
   if (filters.tag === null) {
     const seen = new Set<string>()

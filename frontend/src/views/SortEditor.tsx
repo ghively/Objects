@@ -21,7 +21,7 @@ export function SortEditor({ sorts, onChange, choices }: SortEditorProps) {
     if (!c) return
     onChange([
       ...sorts,
-      { propertyId: c.key, option: SORT_OPTIONS(c.kind)[0].key, ...(c.structureId ? { structureId: c.structureId } : {}) },
+      { propertyId: c.key, option: SORT_OPTIONS(c.kind)[0].key, ...(c.typeId ? { typeId: c.typeId } : {}) },
     ])
   }
   return (
@@ -41,7 +41,7 @@ export function SortEditor({ sorts, onChange, choices }: SortEditorProps) {
                   setAt(i, {
                     propertyId: n.key,
                     option: SORT_OPTIONS(n.kind)[0].key,
-                    ...(n.structureId ? { structureId: n.structureId } : {}),
+                    ...(n.typeId ? { typeId: n.typeId } : {}),
                   })
               }}
               options={propertyOptions(usable.filter((u) => u.key === s.propertyId || free.includes(u)))}

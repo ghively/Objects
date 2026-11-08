@@ -67,12 +67,12 @@ export function searchDefinition(
   textOnly: boolean,
   filters: SearchFilters,
   tagIdOf: (name: string) => string | null,
-): Partial<QueryDefinition> & Pick<QueryDefinition, 'structures'> {
-  const def: Partial<QueryDefinition> & Pick<QueryDefinition, 'structures'> = {
-    structures: filters.types.map((id) => ({ id })),
+): Partial<QueryDefinition> & Pick<QueryDefinition, 'types'> {
+  const def: Partial<QueryDefinition> & Pick<QueryDefinition, 'types'> = {
+    types: filters.types.map((id) => ({ id })),
     search: { searchTerms: [{ text: q.trim() }], searchMode: textOnly ? 'fullText' : 'auto' },
   }
-  if (filters.excludeTypes.length > 0) def.excludeStructureIds = [...filters.excludeTypes]
+  if (filters.excludeTypes.length > 0) def.excludeTypeIds = [...filters.excludeTypes]
   const tagId = filters.tag !== null ? tagIdOf(filters.tag) : null
   if (tagId) def.tags = { ids: [tagId], operator: 'or' }
   return def

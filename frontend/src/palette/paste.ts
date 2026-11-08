@@ -6,7 +6,7 @@
  *   note, creating it; "Sent to the daily note") and "Make a new page from the clipboard";
  * - Markdown with a heading: also "Create page", titled with the first heading (which then leaves
  *   the body; our choice);
- * - a URL: also "Create {structureName}" for Page: a page titled with the URL's host and path
+ * - a URL: also "Create {typeName}" for Page: a page titled with the URL's host and path
  *   holding one bookmark block. The URL is **never fetched** (our choice: no network at runtime);
  * - files or an image: "Upload" (copied to `Attachments/`; no image object is created, as media
  *   are attachments in our model; our choice).
@@ -31,7 +31,7 @@ export const PASTE_TEXT = {
   blocks: (count: number) => (count === 1 ? '1 block' : `${count} blocks`),
   addedToDailyNote: 'Sent to the daily note',
   upload: 'Upload',
-  createHttpLinkEntity: (structureName: string) => `Create ${structureName}`,
+  createHttpLinkEntity: (typeName: string) => `Create ${typeName}`,
   createPageFromMd: 'Create page',
   createPageWithBlocks: 'Make a new page from the clipboard',
   denied: 'Clipboard access was denied.', // our string

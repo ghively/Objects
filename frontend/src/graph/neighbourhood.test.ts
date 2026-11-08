@@ -31,7 +31,7 @@ describe('neighbourhood', () => {
     expect(filterGraph(DATA, { showSpaceTagsNetwork: true }, { kind: 'local', center: 4, hops: 1 }).nodes).toEqual([4])
 
     // The centre stays even when a filter would hide it; its hidden neighbours don't.
-    const hidden = filterGraph(DATA, { excludeStructureIds: ['page'] }, { kind: 'local', center: 1, hops: 1 })
+    const hidden = filterGraph(DATA, { excludeTypeIds: ['page'] }, { kind: 'local', center: 1, hops: 1 })
     expect(hidden.nodes).toEqual([1])
   })
 
