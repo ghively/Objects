@@ -119,6 +119,12 @@ def test_depth_limit():
         parse("(" * 999 + ")" * 999)
 
 
+def test_value_errors_are_formula_errors():
+    """Bug audit 2026-11-07, 28: `floor(NaN)` and a 4,300+-digit number are errors, not crashes."""
+    assert err('floor(prop("x"))', x=float("nan")) == "The result is out of range"
+    assert err('format(prop("x"))', x=10**5000) == "The result is out of range"
+
+
 # -- operators and precedence ------------------------------------------------------------------
 
 

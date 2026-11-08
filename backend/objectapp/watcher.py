@@ -221,6 +221,8 @@ class SpaceWatcher:
         if rel.suffix.lower() != ".md":
             # A whiteboard sidecar is reported under its own path (see `_refresh_sidecar`).
             return rel.as_posix() if sidecar_owner(rel.as_posix()) else None
+        if os.path.islink(path):
+            return None  # not an object, as `iter_object_paths` skips it on open
         return rel.as_posix()
 
     def _definition_rel(self, path: str) -> str | None:

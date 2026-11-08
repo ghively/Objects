@@ -314,3 +314,59 @@ def test_a_write_rescans_from_what_it_wrote_without_reading_the_file_again(space
     same_as_disk(bare)
     assert s.get(bare).id and s.get(bare).lastUpdated
     assert parse_fm(s._raw[bare].of.frontmatter_src)["id"] == s.get(bare).id
+
+
+# -- bug audit 2026-11-07, finding 26: lone-CR line endings ---------------------------
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        b"---\rtitle: Old Mac\rstatus: open\r---\rbody line\rsecond\r",
+        b"Old Mac body\rsecond line\rthird\r",
+        b"---\rtitle: Fence only\n---\nbody\n",
+    ],
+    ids=["cr-frontmatter", "cr-body", "cr-fence"],
+)
+def test_lone_cr_file_is_read_only_and_never_gets_a_second_frontmatter(tmp_path, data):
+    from objectapp.space import ReadOnly
+
+    (tmp_path / "Old.md").write_bytes(data)
+    s = Space(tmp_path)
+    summary = s.get("Old.md")
+    assert summary.readOnly and "CR" in (summary.readOnlyReason or "")
+    with pytest.raises(ReadOnly):
+        s.update_properties("Old.md", {"description": "d"}, version_of(data))
+    with pytest.raises(ReadOnly):
+        s.save_body("Old.md", "new\n", version_of(data))
+    assert (tmp_path / "Old.md").read_bytes() == data
+
+
+def test_a_stray_lone_cr_in_the_body_stays_editable(tmp_path):
+    data = b"---\ntitle: Cr value\nstatus: open\n---\nbody a\rb\nmore\n"
+    (tmp_path / "Cr value.md").write_bytes(data)
+    s = Space(tmp_path)
+    assert not s.get("Cr value.md").readOnly
+    s.update_properties("Cr value.md", {"description": "d"}, version_of(data))
+    assert (tmp_path / "Cr value.md").read_bytes().count(b"---\n") == 2
+
+
+# -- bug audit 2026-11-07, finding 27: a symlinked .md is not an object -----------------
+
+
+def test_symlinked_md_is_not_listed_or_searched(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "Secret.md").write_text("---\ntitle: Secret\n---\nzebracorn words\n", "utf-8")
+    root = tmp_path / "space"
+    root.mkdir()
+    (root / "Real.md").write_text("---\ntitle: Real\n---\nbody\n", "utf-8")
+    try:
+        (root / "Link.md").symlink_to(outside / "Secret.md")
+        (root / "Alias.md").symlink_to(root / "Real.md")
+    except OSError:
+        pytest.skip("symlinks are not available here")
+    assert list(iter_object_paths(root)) == ["Real.md"]
+    s = Space(root)
+    assert [o.path for o in s.list()] == ["Real.md"]
+    assert not any("zebracorn" in (o.of.body or "") for o in s._raw.values())
