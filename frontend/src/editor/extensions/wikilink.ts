@@ -17,17 +17,18 @@ export function isWikilinkTarget(title: string): boolean {
 }
 
 /**
- * `target` as a wikilink can hold it. A title with `[`, `]`, `|`, `#` or a line
- * break cannot be a target (the back end links such objects by their path,
- * `space.py` `_link_text`, which the pickers should pass instead); written as
- * is it would be an ambiguous link to another object, so those characters are
- * dropped, as `safe_filename` drops them from the file stem (`|` and a line
- * break end the stem, so the text is cut there).
+ * `target` as a wikilink can hold it. Only what `WIKILINK_RE` cannot read is
+ * removed: `[`, `]`, `|` and a line break (`|` and a line break end the text,
+ * as they end the file stem in `safe_filename`). A `#` stays: a loaded
+ * `[[Page#Heading]]` or `[[Page#^id]]` is a link to `Page` with an anchor
+ * (`resolver.py` `link_candidates`, `linkindex.py`) and must save as it was.
+ * A title with `#` is still no target (`isWikilinkTarget`): the pickers link
+ * such an object by its path (`wikilinkTargetFor`, as `space.py` `_link_text`).
  */
 export function wikilinkTarget(target: string): string {
   if (isWikilinkTarget(target)) return target
   const cut = target.split(/[|\n]/, 1)[0]
-  return cut.replace(/[[\]#]/g, '').replace(/\s+/g, ' ').trim()
+  return cut.replace(/[[\]]/g, '').replace(/\s+/g, ' ').trim()
 }
 
 /**
