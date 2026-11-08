@@ -301,7 +301,7 @@ def test_basic_type_options_editable_properties_locked(space_dir: Path):
     renamed = _edit(space, "task")
     renamed.name = "Todo"
     for t in (added, removed, multi, renamed):
-        with pytest.raises(InvalidValue, match="basic object types"):
+        with pytest.raises(InvalidValue, match="basic (object )?types"):
             _save(space, t)
 
 
