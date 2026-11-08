@@ -346,11 +346,16 @@ function matchNumber(value: unknown, f: Filter): boolean {
   return true
 }
 
-/** Includes (any of the reference) / does not include (none); an empty reference passes. */
-function matchSet(have: string[], want: string[], f: Filter): boolean {
+/**
+ * Includes (any of the reference) / does not include (none). A filter with no configured values
+ * (`configured` 0) is inactive and passes; one whose values all resolve to nothing (an option,
+ * tag or object that no longer exists) matches nothing for includes and everything for does not
+ * include, as its values are gone.
+ */
+function matchSet(have: string[], want: string[], f: Filter, configured: number = want.length): boolean {
   if (f.option === 'isEmpty') return have.length === 0
   if (f.option === 'isNotEmpty') return have.length > 0
-  if (want.length === 0) return true
+  if (configured === 0) return true
   const hit = want.some((w) => have.includes(w))
   return f.option === 'notContains' ? !hit : hit
 }
@@ -576,26 +581,23 @@ function matchKind(row: Row, f: Filter, def: DefLike, has: boolean, ctx: FilterC
     case 'label': {
       const set = def.options.set ?? []
       const have = Array.isArray(value) ? (value as string[]) : []
-      const want = refIds(f)
-        .map((id) => set.find((s) => s.id === id)?.text)
-        .filter((t): t is string => !!t)
-      return matchSet(have, want, f)
+      const ids = refIds(f)
+      const want = ids.map((id) => set.find((s) => s.id === id)?.text).filter((t): t is string => !!t)
+      return matchSet(have, want, f, ids.length)
     }
     case 'entity':
     case 'entity_backlinks': {
       if (f.option === 'isEmpty') return !has || entityCount(row, f.propertyId) === 0
       if (f.option === 'isNotEmpty') return has && entityCount(row, f.propertyId) > 0
       const paths = has ? entityPaths(row, f.propertyId) : []
-      const want = refIds(f)
-        .map((id) => ctx.pathsById?.[id])
-        .filter((p): p is string => !!p)
-      return matchSet(paths, want, f)
+      const ids = refIds(f)
+      const want = ids.map((id) => ctx.pathsById?.[id]).filter((p): p is string => !!p)
+      return matchSet(paths, want, f, ids.length)
     }
     case 'entity_tags': {
-      const want = refIds(f)
-        .map((id) => ctx.tagIdsToTitles[id])
-        .filter((t): t is string => !!t)
-      return matchSet(row.summary.tags ?? [], want, f)
+      const ids = refIds(f)
+      const want = ids.map((id) => ctx.tagIdsToTitles[id]).filter((t): t is string => !!t)
+      return matchSet(row.summary.tags ?? [], want, f, ids.length)
     }
     case 'entity_collections':
       return matchSet(collectionIds(row, ctx.collections), refIds(f), f)
