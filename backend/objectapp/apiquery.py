@@ -370,15 +370,22 @@ def sort_rows(rows: list[Any], key: str | None, descending: bool) -> list[Any]:
 
 
 def parse_since(text: str | None) -> str | None:
-    """An ISO instant or day as a comparable ``YYYY-MM-DDTHH:MM:SS`` prefix, else None."""
+    """An ISO instant or day as a comparable UTC ``YYYY-MM-DDTHH:MM:SS`` prefix, else None.
+
+    The stored stamps are UTC, so an instant with an offset is moved to UTC first; a naive
+    one is read as UTC.
+    """
     if not text:
         return None
     try:
         if len(text) == 10:
             return date.fromisoformat(text).isoformat()
-        return datetime.fromisoformat(text.replace("Z", "+00:00")).strftime("%Y-%m-%dT%H:%M:%S")
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
         return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(UTC)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S")
 
 
 # -- sections ------------------------------------------------------------------------

@@ -135,6 +135,22 @@ def test_parse_since() -> None:
     assert parse_since("2026-11-05T10:00:00Z") == "2026-11-05T10:00:00"
     assert parse_since("nope") is None
     assert parse_since(None) is None
+    # An offset is an offset: the instant is compared in UTC, like the stored stamps.
+    assert parse_since("2026-11-05T15:17:00+05:00") == "2026-11-05T10:17:00"
+    assert parse_since("2026-11-05T05:00:00-05:00") == "2026-11-05T10:00:00"
+    assert parse_since("2026-11-05T10:00:00") == "2026-11-05T10:00:00"  # naive means UTC
+
+
+def test_changes_since_with_an_offset_is_the_same_instant(api) -> None:
+    _space, client, _ = api
+    hdr = _token(client, "read")
+    # Fix printer: lastUpdated 2026-03-05T09:30:00Z. 08:00Z, spelt in +05:00, is 13:00+05:00.
+    as_utc = client.get("/api/v1/changes", headers=hdr, params={"since": "2026-03-05T08:00:00Z"}).json()
+    with_offset = client.get(
+        "/api/v1/changes", headers=hdr, params={"since": "2026-03-05T13:00:00+05:00"}
+    ).json()
+    assert "Tasks/Fix printer.md" in [o["path"] for o in as_utc["objects"]]
+    assert with_offset["objects"] == as_utc["objects"]
 
 
 BODY = "Intro\n\n## Plan\n\nStep one\n\n### Detail\n\nMore\n\n## Notes\n\n```\n## not a heading\n```\n"
