@@ -26,7 +26,9 @@ with commas or spaces needs no quoting.
 ``claudeMdExcludes``, the user ``CLAUDE.md`` and every ancestor folder's instruction files, since
 ``--setting-sources`` alone lets them through on CLI 2.1.317. The working folder is the agent
 folder's resolved (long) path, and the run's environment drops the variables a parent Claude
-Code session sets (`RUN_ENV_DROP`).
+Code session sets (`RUN_ENV_DROP`) but keeps how the user signs in to Claude Code
+(``CLAUDE_CONFIG_DIR``, `RUN_ENV_KEEP`; audit 20). A ``CLAUDE_CONFIG_DIR``'s ``CLAUDE.md`` and
+rules are excluded and its files fenced, as ``~/.claude``'s are.
 
 No network client here: this module only builds a command and writes temp files.
 """
@@ -59,6 +61,7 @@ __all__ = [
     "OBJECT_GUIDANCE",
     "PROPOSAL_GUIDANCE",
     "RUN_ENV_DROP",
+    "RUN_ENV_KEEP",
     "RUN_SETTINGS_BASE",
     "SECRET_LOOKUP",
     "Contributor",
@@ -75,6 +78,7 @@ __all__ = [
     "fill_refs",
     "nesting_problem",
     "rule_path",
+    "run_base_env",
 ]
 
 CLI_FLAGS = (
@@ -100,7 +104,6 @@ RUN_SETTINGS_BASE: dict[str, Any] = {"autoMemoryEnabled": False}
 """In every ``run-settings.json`` (spike)."""
 
 RUN_ENV_DROP: tuple[str, ...] = (
-    "CLAUDE_CONFIG_DIR",
     "CLAUDECODE",
     "CLAUDE_CODE_",
     "CLAUDE_AGENT_SDK_",
@@ -110,7 +113,39 @@ RUN_ENV_DROP: tuple[str, ...] = (
     "CLAUDE_PREVIEW_",
     "AI_AGENT",
 )
-"""Names or name prefixes dropped from a run's environment (spike)."""
+"""Names or name prefixes dropped from a run's environment (spike): what a parent Claude Code
+session sets, so Object started from a Claude Code terminal runs agents as it would on its own."""
+
+RUN_ENV_KEEP: tuple[str, ...] = (
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "CLAUDE_CODE_USE_FOUNDRY",
+    "CLAUDE_CODE_SKIP_BEDROCK_AUTH",
+    "CLAUDE_CODE_SKIP_VERTEX_AUTH",
+    "CLAUDE_CODE_SKIP_FOUNDRY_AUTH",
+)
+"""Names `RUN_ENV_DROP`'s prefixes would drop that say how the user signs in (audit 20)."""
+
+
+def run_base_env() -> dict[str, str]:
+    """This process's environment as every ``claude`` run gets it (a turn, and ``--version`` in
+    `ai.status`): minus `RUN_ENV_DROP` (but `RUN_ENV_KEEP`) and minus ``OBJECT_API_TOKEN``."""
+    return {
+        k: v for k, v in os.environ.items()
+        if (k.upper() in RUN_ENV_KEEP or not k.upper().startswith(RUN_ENV_DROP)) and k != "OBJECT_API_TOKEN"
+    }
+
+
+def _claude_config_dir() -> Path | None:
+    """The user's ``CLAUDE_CONFIG_DIR`` (resolved), when set: their Claude Code files live there."""
+    value = os.environ.get("CLAUDE_CONFIG_DIR", "").strip()
+    if not value:
+        return None
+    try:
+        return Path(os.path.expanduser(value)).resolve()
+    except (OSError, ValueError):
+        return None
 
 NESTED_MESSAGE = "An agent folder can't be inside a space folder or hold one."
 NESTED_AGENT = "An agent folder can't be inside another agent's folder or hold one."  # our string
@@ -458,7 +493,12 @@ def _fence(scope: RunScope, parts: RunParts) -> None:
     cache = os.environ.get("OBJECT_CACHE_DIR")
     if cache:  # spaces' search index and frontmatter cache live here, outside the space folders
         folders = _dedupe([*folders, *_both_forms(Path(cache))])
-    for rule in fence_rules(folders, own, scope.state, Path.home()):
+    rules = fence_rules(folders, own, scope.state, Path.home())
+    config = _claude_config_dir()
+    if config is not None:  # as ~/.claude's: the login and the user's Claude Code files
+        c = rule_path(config)
+        rules += [f"Read({c}/.credentials.json)", f"Edit({c}/**)"]
+    for rule in rules:
         if rule not in parts.deny_rules:
             parts.deny_rules.append(rule)
 
@@ -496,6 +536,10 @@ def _run_settings(own: Path, parts: RunParts) -> dict[str, Any]:
     in; ``claudeMdExcludes`` and ``permissions.deny`` are extended, never replaced."""
     out: dict[str, Any] = dict(RUN_SETTINGS_BASE)
     out["claudeMdExcludes"] = claude_md_excludes(own, Path.home())
+    config = _claude_config_dir()
+    if config is not None:  # the user CLAUDE.md lives there instead of ~/.claude
+        form = str(config).replace("\\", "/")
+        _extend(out["claudeMdExcludes"], [form + "/CLAUDE.md", form + "/rules/**"])
     out["permissions"] = {"deny": list(parts.deny_rules)}
     for key, value in parts.settings.items():
         if key == "claudeMdExcludes":
@@ -513,8 +557,7 @@ def _run_settings(own: Path, parts: RunParts) -> dict[str, Any]:
 
 
 def _run_env(scope: RunScope, parts: RunParts) -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items() if not k.upper().startswith(RUN_ENV_DROP)}
-    env.pop("OBJECT_API_TOKEN", None)  # only Object's own servers get the token (their env blocks)
+    env = run_base_env()  # no OBJECT_API_TOKEN: only Object's own servers get it (their env blocks)
     env["OBJECT_API_URL"] = scope.api_url
     env.update(parts.env)
     return env
