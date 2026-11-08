@@ -98,12 +98,56 @@ def test_blank_scan_path_is_not_the_working_directory(
     monkeypatch.chdir(cwd)
     r = client.post("/api/import/scan", json={"path": blank})
     assert r.status_code == 404, r.text
-    assert r.json() == {"error": "No such file or folder"}
+    assert r.json() == {"detail": NO_SOURCE}
     for scope in ("read", "read-write"):
         h = _bearer(space_dir, scope)
         r = client.post("/api/v1/import/scan", json={"path": blank}, headers=h)
         assert r.status_code in (403, 404), r.text  # 403: a read token may not scan (#24)
         assert "creds.txt" not in r.text
+    assert not (space_dir / ".object" / "imports").exists()
+
+
+NO_SOURCE = "There is no file or folder at this path."
+
+
+@pytest.mark.parametrize(
+    "relative", [".", "./", "relative.txt", "sub", "~", "~/", "x" * 300, "/" + "x" * 300]
+)
+def test_relative_scan_paths_are_not_the_working_or_home_folder(
+    client: TestClient, space_dir: Path, tmp_path: Path, monkeypatch, relative: str
+):
+    """Sweep 2026-11-08: a relative path, ``~`` (the whole home folder) and a path too long
+    for the OS answer 404 on every scan route, scan nothing and leave no draft batch."""
+    cwd = tmp_path / "cwd"
+    (cwd / "sub").mkdir(parents=True)
+    (cwd / "sub" / "creds.txt").write_text("password = hunter2\n")
+    (cwd / "relative.txt").write_text("password = hunter2\n")
+    monkeypatch.chdir(cwd)
+    monkeypatch.setenv("HOME", str(cwd))
+    monkeypatch.setenv("USERPROFILE", str(cwd))
+    r = client.post("/api/import/scan", json={"path": relative})
+    assert r.status_code == 404, r.text
+    assert r.json() == {"detail": NO_SOURCE}
+    r = client.post("/api/import/batches", json={"path": relative})
+    assert r.status_code == 404, r.text
+    assert r.json() == {"detail": NO_SOURCE}
+    for scope in ("read", "read-write"):
+        h = _bearer(space_dir, scope)
+        r = client.post("/api/v1/import/scan", json={"path": relative}, headers=h)
+        assert r.status_code in (403, 404), r.text
+        assert "creds" not in r.text and "relative.txt" not in r.text
+    assert not (space_dir / ".object" / "imports").exists()
+
+
+def test_post_draft_refuses_a_blank_path(client: TestClient, space_dir: Path, tmp_path: Path, monkeypatch):
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    (cwd / "creds.txt").write_text("password = hunter2\n")
+    monkeypatch.chdir(cwd)
+    for blank in ("", "   ", '""'):
+        r = client.post("/api/import/batches", json={"path": blank})
+        assert r.status_code == 404, r.text
+        assert "creds" not in r.text
     assert not (space_dir / ".object" / "imports").exists()
 
 
@@ -319,3 +363,119 @@ def test_activity_trim_needs_no_fixed_temp_name(tmp_path: Path, monkeypatch):
     for i in range(7):
         log.add(_activity_record(), "edit", f"{i}.md")
     assert [e["path"] for e in log.since(None)] == ["4.md", "5.md", "6.md"]
+
+
+# -- sweep 2026-11-08: a visible search hit behind more than 200 hidden ones ----------------
+
+
+def test_v1_search_finds_a_visible_match_behind_many_hidden_ones(
+    space_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _env(tmp_path, monkeypatch)
+    for i in range(205):
+        (space_dir / "Pages" / f"Hidden quokka {i}.md").write_text(
+            f"---\ntype: Page\ntitle: Hidden quokka {i}\nexcludeFromAI: true\n"
+            "lastUpdated: 2026-11-06T10:00:00.000Z\n---\nA quokka that stays out of the API.\n",
+            encoding="utf-8",
+        )
+    (space_dir / "Pages" / "Visible quokka.md").write_text(
+        "---\ntype: Page\ntitle: Visible quokka\nlastUpdated: 2026-11-06T10:00:00.000Z\n---\n"
+        "The one quokka the API may show.\n",
+        encoding="utf-8",
+    )
+    with TestClient(
+        create_app(Space(space_dir), watch=False), raise_server_exceptions=False
+    ) as c:
+        deadline = time.monotonic() + 30
+        while c.get("/api/search", params={"q": "zzz"}).json().get("partial"):
+            assert time.monotonic() < deadline, "the search index did not finish its sync"
+            time.sleep(0.05)
+        h = _bearer(space_dir, "read")
+        for mode in ("auto", "title", "fullText"):
+            r = c.get("/api/v1/search", params={"q": "quokka", "limit": 5, "mode": mode}, headers=h)
+            assert r.status_code == 200, r.text
+            assert [x["path"] for x in r.json()["results"]] == ["Pages/Visible quokka.md"], mode
+
+
+# -- sweep 2026-11-08: a saved query's label, tag and relation filters hold ids -------------
+
+
+def test_saved_query_filters_resolve_ids_like_the_app(client: TestClient, space_dir: Path):
+    c = client
+    h = _bearer(space_dir, "read-write")
+    wt = c.post("/api/types", json={"name": "Widget", "pluralName": "Widgets"}).json()
+    wt["propertyDefinitions"] = wt.get("propertyDefinitions", []) + [
+        {
+            "id": "status",
+            "key": "status",
+            "name": "Status",
+            "type": "label",
+            "options": {"set": [{"id": "o1", "text": "Todo"}, {"id": "o2", "text": "Done"}]},
+        },
+        {"id": "owner", "key": "owner", "name": "Owner", "type": "entity", "options": {}},
+    ]
+    r = c.put(f"/api/types/{wt['id']}", json={"type": wt, "baseRevision": wt.get("revision", "")})
+    assert r.status_code == 200, r.text
+    w1 = c.post("/api/objects", json={"typeId": wt["id"], "title": "W1", "values": {"status": "Todo"}})
+    w2 = c.post("/api/objects", json={"typeId": wt["id"], "title": "W2", "values": {"status": "Done"}})
+    assert w1.status_code == 201 and w2.status_code == 201, (w1.text, w2.text)
+    a, b = w1.json()["path"], w2.json()["path"]
+
+    def run(name: str, element: dict) -> dict:
+        group = {
+            "type": "filterGroup",
+            "operator": "and",
+            "elements": [{"type": "filter", "typeId": wt["id"], **element}],
+        }
+        q = c.post(
+            "/api/queries", json={"name": name, "definition": {"types": [{"id": wt["id"]}], "filterGroup": group}}
+        )
+        assert q.status_code == 201, q.text
+        res = c.post(f"/api/v1/queries/{q.json()['id']}/run", json={}, headers=h)
+        assert res.status_code == 200, res.text
+        out = res.json()
+        return {"titles": [x["title"] for x in out["rows"]], "unsupported": out["unsupported"]}
+
+    # A label filter stores the option id; the row carries the option text.
+    assert run("Done widgets", {"propertyId": "status", "option": "is", "referenceValue": "o2"}) == {
+        "titles": ["W2"],
+        "unsupported": [],
+    }
+    assert run("Done too", {"propertyId": "status", "option": "contains", "referenceValue": ["o2"]}) == {
+        "titles": ["W2"],
+        "unsupported": [],
+    }
+    assert run("Not done", {"propertyId": "status", "option": "notContains", "referenceValue": ["o2"]}) == {
+        "titles": ["W1"],
+        "unsupported": [],
+    }
+    # A tag filter stores the Tag object's id; the row carries the tag's title.
+    tag = c.post("/api/tags/ensure", json={"name": "Urgent"}).json()["path"]
+    tag_id = c.get("/api/object", params={"path": tag}).json()["frontmatter"]["id"]
+    ver = c.get("/api/object", params={"path": a}).json()["version"]
+    r = c.put("/api/object/properties", json={"path": a, "updates": {"tags": ["[[Urgent]]"]}, "baseVersion": ver})
+    assert r.status_code == 200, r.text
+    assert run("Urgent widgets", {"propertyId": "tags", "option": "contains", "referenceValue": [tag_id]}) == {
+        "titles": ["W1"],
+        "unsupported": [],
+    }
+    # A relation filter stores the target object's id; the row carries the link.
+    w1_id = c.get("/api/object", params={"path": a}).json()["frontmatter"]["id"]
+    ver = c.get("/api/object", params={"path": b}).json()["version"]
+    r = c.put("/api/object/properties", json={"path": b, "updates": {"owner": ["[[W1]]"]}, "baseVersion": ver})
+    assert r.status_code == 200, r.text
+    assert run("Owned by W1", {"propertyId": "owner", "option": "contains", "referenceValue": [w1_id]}) == {
+        "titles": ["W2"],
+        "unsupported": [],
+    }
+    # An id that names nothing is reported, not silently matched against nothing.
+    assert run("Mystery", {"propertyId": "status", "option": "is", "referenceValue": "o9"}) == {
+        "titles": [],
+        "unsupported": ["status is o9"],
+    }
+    # The app's relative-date names are known.
+    for rel in ("inOneWeek", "inOneMonth"):
+        out = run(f"Before {rel}", {"propertyId": "createdAt", "option": "isBefore", "referenceValue": {"relative": rel}})
+        assert out == {"titles": ["W1", "W2"], "unsupported": []}, (rel, out)
+    out = run("After a month ago", {"propertyId": "createdAt", "option": "isAfter", "referenceValue": {"relative": "oneMonthAgo"}})
+    assert out == {"titles": ["W1", "W2"], "unsupported": []}

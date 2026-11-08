@@ -263,7 +263,7 @@ from .space import (
 )
 from .spaceconfig import SpaceConfigProblem, space_fields
 from .spaceconfig import patch as patch_space_config
-from .spaces import Registry, SpaceNameProblem, create_space, normalize
+from .spaces import Registry, SpaceNameProblem, create_space, is_full_path, normalize
 from .typedefs import has_undecodable
 from .typemodel import (
     DATA_VIEW_LAYOUTS,
@@ -1081,7 +1081,8 @@ def create_app(
 
     @api.post("/spaces", status_code=201)
     def post_space(req: CreateSpaceRequest):
-        if not req.location.strip():
+        # Blank, or relative (it would be read against the server's working folder).
+        if not is_full_path(req.location):
             return _error(404, "Choose a folder for the new space.")
         try:
             path = create_space(req.name, req.location, setup=req.setup)
@@ -1096,9 +1097,13 @@ def create_app(
         registry().register(path, touch=False)
         return JSONResponse({"path": str(path)}, status_code=201)
 
-    def _folder(raw: str) -> Path | None:
+    def _folder(raw: str) -> Path | None | JSONResponse:
+        """The folder `raw` names, None when there is none, or the 404 for a path that
+        is not a full one (it would be read against the server's working folder)."""
         if not raw.strip():
             return None
+        if not is_full_path(raw):
+            return _error(404, "Choose a folder by its full path.")
         try:
             path = normalize(raw)
             return path if path.is_dir() else None
@@ -1108,6 +1113,8 @@ def create_app(
     @api.post("/spaces/open")
     def open_space(req: SpacePathRequest):
         path = _folder(req.path)
+        if isinstance(path, JSONResponse):
+            return path
         if path is None:
             return _error(404, f"Not a folder: {req.path}")
         registry().register(path, touch=False)
@@ -1131,6 +1138,8 @@ def create_app(
         if on_switch is None:
             return _error(503, "Switching spaces needs the Object launcher.")
         path = _folder(req.path)
+        if isinstance(path, JSONResponse):
+            return path
         if path is None:
             return _error(404, f"Not a folder: {req.path}")
         return JSONResponse(

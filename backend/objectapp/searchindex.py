@@ -24,6 +24,7 @@ import sqlite3
 import threading
 import time
 from collections import Counter
+from collections.abc import Collection
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -713,6 +714,7 @@ class SearchIndex:
         tag: str | None = None,
         limit: int = 50,
         mode: str = "auto",
+        exclude_paths: Collection[str] = (),
     ) -> dict[str, Any]:
         """Search titles, aliases and (unless ``mode == 'title'``) the full text.
 
@@ -720,6 +722,8 @@ class SearchIndex:
         ``bm25``; an object found both ways keeps its title rank and gains its
         snippets. ``mode == 'fullText'`` ("Text matches only", M8) skips the title
         and alias ranking and matches the body (blocks content) column only.
+        ``exclude_paths`` are left out before ranking, so `limit` counts the results
+        the caller may show (the local API's "Exclude from AI" objects).
         ``partial`` is true until the start-up sync has finished.
         """
         partial = not self.ready.is_set()
@@ -729,6 +733,7 @@ class SearchIndex:
         limit = max(1, min(int(limit), MAX_LIMIT))
         type_set = set(types)
         exclude_set = set(exclude_types)
+        excluded_paths = exclude_paths if isinstance(exclude_paths, (set, frozenset)) else set(exclude_paths)
         tag_key = tag.strip().casefold() if tag and tag.strip() else None
         sp = self.space
 
@@ -738,7 +743,7 @@ class SearchIndex:
         def allowed(s) -> bool:
             if type_set and s.type not in type_set:
                 return False
-            if s.type in exclude_set:
+            if s.type in exclude_set or s.path in excluded_paths:
                 return False
             return tag_key is None or tag_key in {x.casefold() for x in s.tags}
 
@@ -788,7 +793,12 @@ class SearchIndex:
     def _fts_rank(
         self, match: str, candidates: dict[str, Any], type_set: set[str], limit: int
     ) -> list[tuple[str, float]]:
-        """Full-text hits among ``candidates``, best ``bm25`` first."""
+        """Full-text hits among ``candidates``, best ``bm25`` first.
+
+        Hits are read a page at a time until `limit` of them are candidates or the hits
+        run out, so a long run of filtered-out objects (a tag, an excluded type, the
+        local API's hidden objects) never buries a candidate (sweep 2026-11-08).
+        """
         where = "fts MATCH ?"
         params: list[Any] = [match]
         if type_set:
@@ -796,25 +806,32 @@ class SearchIndex:
             params.extend(sorted(type_set))
         # Over-fetch: the tag and exclude filters apply afterwards, and title hits may repeat.
         fetch = min(limit * 4 + 50, 1000)
-        # Rowids only: selecting ``path`` here would read it from the content table for
-        # every hit before the sort (audit 2026-11-01 B9); `meta` names the kept ones.
-        with self._db_lock:
-            rows = self._query(
-                f"SELECT rowid, {_BM25} AS r FROM fts WHERE {where} ORDER BY r LIMIT ?",
-                [*params, fetch],
-            )
-            names = {
-                rowid: _path(p)
-                for rowid, p in self._query(
-                    f"SELECT rowid, path FROM meta WHERE rowid IN ({', '.join('?' for _ in rows)})",
-                    [rowid for rowid, _r in rows],
+        out: list[tuple[str, float]] = []
+        offset = 0
+        while len(out) < limit:
+            # Rowids only: selecting ``path`` here would read it from the content table for
+            # every hit before the sort (audit 2026-11-01 B9); `meta` names the kept ones.
+            with self._db_lock:
+                rows = self._query(
+                    f"SELECT rowid, {_BM25} AS r FROM fts WHERE {where} ORDER BY r LIMIT ? OFFSET ?",
+                    [*params, fetch, offset],
                 )
-            } if rows else {}
-        return [
-            (p, round(-float(r), 4))
-            for rowid, r in rows
-            if (p := names.get(rowid)) is not None and p in candidates
-        ]
+                names = {
+                    rowid: _path(p)
+                    for rowid, p in self._query(
+                        f"SELECT rowid, path FROM meta WHERE rowid IN ({', '.join('?' for _ in rows)})",
+                        [rowid for rowid, _r in rows],
+                    )
+                } if rows else {}
+            out.extend(
+                (p, round(-float(r), 4))
+                for rowid, r in rows
+                if (p := names.get(rowid)) is not None and p in candidates
+            )
+            if len(rows) < fetch:
+                break
+            offset += fetch
+        return out
 
     def _snippets(
         self, match: str, paths: list[str]

@@ -12,6 +12,13 @@ A key is renamed only when its value has the shape the named field has (a type i
 string, a list, a flag, an object), and only when today's key isn't there too (today's
 key wins). The shape check keeps a map keyed by type ids (``tableConfigs``,
 ``smallCardViewConfigs``) intact when a type's id happens to be one of these words.
+
+A request body's property values are the user's own: a property named "Structure ID"
+or "Structures" has the key ``structureId`` or ``structures`` (`space.camel_key`), and a
+value map keyed by property keys (``updates``, ``values``, ``set``...) must keep them.
+`upgrade_body` and the in-process tool calls never look under those keys (`VALUE_KEYS`);
+definition JSON (queries, views, collections, types, ``ui``) holds no such map, so the
+walk over a loaded file stays complete.
 """
 
 from __future__ import annotations
@@ -22,6 +29,7 @@ from typing import Any
 
 __all__ = [
     "OLD_KEYS",
+    "VALUE_KEYS",
     "KeyCompatMiddleware",
     "upgrade_body",
     "upgrade_keys",
@@ -40,6 +48,23 @@ OLD_KEYS: dict[str, tuple[str, tuple[type, ...]]] = {
     "hideStructureSettings": ("hideTypeSettings", (bool,)),
     "structureViews": ("typeViews", (dict,)),
 }
+
+# Request-body keys whose value is the user's own (a map keyed by property keys, or
+# text): `upgrade_body` leaves everything under them exactly as it was sent.
+VALUE_KEYS: frozenset[str] = frozenset(
+    {
+        "updates",  # PUT /api/object/properties
+        "values",  # POST /api/objects, POST /v1/objects, desk sync
+        "set",  # POST /v1/object/properties
+        "add",
+        "subtract",
+        "remove",
+        "mapping",  # change-type and import column maps: property key -> property key
+        "frontmatter",
+        "properties",
+        "body",
+    }
+)
 
 # A deleted type's trash manifest names the query list it was dropped from
 # (``queryRefs[].list``): the older names of those lists.
@@ -68,15 +93,18 @@ def _rename(d: dict[str, Any]) -> bool:
     return changed
 
 
-def upgrade_keys(value: Any) -> bool:
-    """Rename older keys to today's, in place, at every depth; True when anything changed."""
+def upgrade_keys(value: Any, *, skip: frozenset[str] = frozenset()) -> bool:
+    """Rename older keys to today's, in place, at every depth; True when anything changed.
+
+    Nothing under a key in `skip` is looked at (a request body's value maps, `VALUE_KEYS`).
+    """
     changed = False
     stack = [value]
     while stack:
         v = stack.pop()
         if isinstance(v, dict):
             changed = _rename(v) or changed
-            stack.extend(v.values())
+            stack.extend(x for k, x in v.items() if k not in skip)
         elif isinstance(v, list):
             stack.extend(v)
     return changed
@@ -96,9 +124,12 @@ def upgrade_body(raw: bytes) -> bytes:
         data = json.loads(raw.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
         return raw
-    if not upgrade_keys(data):
+    if not upgrade_keys(data, skip=VALUE_KEYS):
         return raw
-    return json.dumps(data, ensure_ascii=False).encode("utf-8")
+    try:
+        return json.dumps(data, ensure_ascii=False).encode("utf-8")
+    except UnicodeEncodeError:  # a lone surrogate (`\ud800`): the route answers it itself
+        return raw
 
 
 Scope = MutableMapping[str, Any]
