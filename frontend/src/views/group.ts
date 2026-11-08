@@ -25,7 +25,7 @@ import {
 import { formatDate, formatNumber } from '@/properties/format'
 import { STATUS_CATEGORIES, optionCategory } from '@/tasks/statusCategory'
 import { wallClock } from '@/lib/zonedTime'
-import { wallStart } from './dates'
+import { wallStart, weekStartOf, type WeekStart } from './dates'
 import { defIn, displayTitle, findDef, rowValue, typeMap, type FilterCtx } from './filter'
 
 export interface GroupOption {
@@ -178,7 +178,8 @@ const DAY_MS = 86400000
 // On wall-clock carriers (`lib/zonedTime` `wallClock`): the time-zone setting's days.
 const localDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
 const daysBetween = (a: Date, b: Date) => Math.round((localDay(b).getTime() - localDay(a).getTime()) / DAY_MS)
-const mondayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7))
+// Whole weeks from `now`'s week to `at`'s, on the "Start of the week" setting's weeks.
+const weeksBetween = (now: Date, at: Date, ws: WeekStart) => Math.round((weekStartOf(at, ws).getTime() - weekStartOf(now, ws).getTime()) / (7 * DAY_MS))
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const SHORT_MONTHS = MONTHS.map((m) => m.slice(0, 3))
@@ -190,7 +191,7 @@ interface Bucket {
   sort: number | string
 }
 
-function dateBucket(at: Date, option: string, now: Date): Bucket {
+function dateBucket(at: Date, option: string, now: Date, weekStart: WeekStart): Bucket {
   switch (option) {
     case 'hour': {
       const id = `${dayId(at)}T${pad(at.getHours())}`
@@ -199,7 +200,7 @@ function dateBucket(at: Date, option: string, now: Date): Bucket {
       return { id, label: `${SHORT_MONTHS[at.getMonth()]} ${at.getDate()}, ${at.getFullYear()}, ${period}`, sort: id }
     }
     case 'week': {
-      const m = mondayOf(at)
+      const m = weekStartOf(at, weekStart)
       const e = new Date(m.getFullYear(), m.getMonth(), m.getDate() + 6)
       const label = `${SHORT_MONTHS[m.getMonth()]} ${m.getDate()} – ${SHORT_MONTHS[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`
       return { id: dayId(m), label, sort: dayId(m) }
@@ -219,7 +220,7 @@ function dateBucket(at: Date, option: string, now: Date): Bucket {
       else if (d === -2) key = 'theDayBeforeYesterday'
       else if (d === 2) key = 'theDayAfterTomorrow'
       else {
-        const w = Math.round((mondayOf(at).getTime() - mondayOf(now).getTime()) / (7 * DAY_MS))
+        const w = weeksBetween(now, at, weekStart)
         key = w === 0 ? 'thisWeek' : w === -1 ? 'lastWeek' : w === 1 ? 'nextWeek' : w < 0 ? 'earlier' : 'later'
       }
       return { id: key, label: DATE_LABELS[key], sort: RELATIVE_ORDER.indexOf(key) }
@@ -231,7 +232,7 @@ function dateBucket(at: Date, option: string, now: Date): Bucket {
       else if (d === 0) key = 'today'
       else if (d === 1) key = 'tomorrow'
       else {
-        const w = Math.round((mondayOf(at).getTime() - mondayOf(now).getTime()) / (7 * DAY_MS))
+        const w = weeksBetween(now, at, weekStart)
         key = w === 0 ? 'thisWeek' : w === 1 ? 'nextWeek' : 'later'
       }
       return { id: key, label: DATE_LABELS[key], sort: SCHEDULED_ORDER.indexOf(key) }
@@ -269,6 +270,8 @@ interface Scratch {
   tagsByTitle: Map<string, string>
   /** `ctx.now` as a wall-clock carrier (the relative and scheduled buckets). */
   nowWall: Date
+  /** The "Start of the week" setting (`ctx.weekStart`; Monday when not given): the week, relative and scheduled buckets. */
+  weekStart: WeekStart
   /** A date value's start as a carrier, remembered per start text (`wallStart` reads the zone once per instant). */
   wallOf(v: DateValue | null): Date | null
 }
@@ -287,7 +290,7 @@ function scratchFor(ctx: GroupCtx): Scratch {
     }
     return at
   }
-  return { tagsByTitle, nowWall: wallClock(ctx.now), wallOf }
+  return { tagsByTitle, nowWall: wallClock(ctx.now), weekStart: ctx.weekStart ?? 'monday', wallOf }
 }
 
 /** The groups a row belongs to for one entry; none means "Other". */
@@ -370,7 +373,7 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
     case 'entity_createdAt':
     case 'entity_lastUpdated': {
       const at = scratch.wallOf(dateOf(row, entry.propertyId))
-      return at ? [dateBucket(at, entry.option, scratch.nowWall)] : []
+      return at ? [dateBucket(at, entry.option, scratch.nowWall, scratch.weekStart)] : []
     }
     case 'entity_title':
       return textBucket(displayTitle(row))

@@ -378,6 +378,38 @@ describe('task groupings (M4)', () => {
     const { groups } = groupRows(rows, { groups: [{ propertyId: 'date', option: 'scheduled' }] }, undefined, { ...tctx(), now: sunday })
     expect(labels(groups)).toEqual(['Tomorrow', 'Next week'])
   })
+
+  test('scheduled on a Sunday with the week starting on Sunday: the Saturday after is this week', () => {
+    const sunday = new Date(2026, 9, 25, 9, 0)
+    const d = (s: string) => ({ start: s, resolution: 'day' })
+    const by2 = { groups: [{ propertyId: 'date', option: 'scheduled' }] }
+    const rows = [T('tue', { date: d('2026-10-27') }), T('sat', { date: d('2026-10-31') }), T('nextSun', { date: d('2026-11-01') })]
+    const sun = groupRows(rows, by2, undefined, { ...tctx(), now: sunday, weekStart: 'sunday' }).groups
+    expect(labels(sun)).toEqual(['This week', 'Next week'])
+    expect(paths(sun[0].rows)).toEqual(['tue', 'sat'])
+    expect(paths(sun[1].rows)).toEqual(['nextSun'])
+    // Monday weeks (the default) put every one of them in next week.
+    const mon = groupRows(rows, by2, undefined, { ...tctx(), now: sunday, weekStart: 'monday' }).groups
+    expect(labels(mon)).toEqual(['Next week'])
+    expect(labels(groupRows(rows, by2, undefined, { ...tctx(), now: sunday }).groups)).toEqual(['Next week'])
+  })
+
+  test('By Week and Relative buckets follow the week start', () => {
+    const d = (s: string) => ({ start: s, resolution: 'day' })
+    const rows = [T('sun', { date: d('2026-10-25') }), T('sat', { date: d('2026-10-31') })]
+    const week = { groups: [{ propertyId: 'date', option: 'week' }] }
+    const sun = groupRows(rows, week, undefined, { ...tctx(), weekStart: 'sunday' }).groups
+    expect(ids(sun)).toEqual(['2026-10-25'])
+    expect(labels(sun)).toEqual(['Oct 25 – Oct 31, 2026'])
+    const mon = groupRows(rows, week, undefined, tctx()).groups
+    expect(ids(mon)).toEqual(['2026-10-19', '2026-10-26'])
+    // Relative, seen from Thursday 22 Oct: Sunday 25 Oct is this week on Monday weeks, next week on Sunday weeks.
+    const thursday = new Date(2026, 9, 22, 12, 0)
+    const rel = { groups: [{ propertyId: 'date', option: 'relative' }] }
+    const sunRow = [T('sun', { date: d('2026-10-25') })]
+    expect(ids(groupRows(sunRow, rel, undefined, { ...tctx(), now: thursday }).groups)).toEqual(['thisWeek'])
+    expect(ids(groupRows(sunRow, rel, undefined, { ...tctx(), now: thursday, weekStart: 'sunday' }).groups)).toEqual(['nextWeek'])
+  })
 })
 
 describe('group by backlinks (M5)', () => {

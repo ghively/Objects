@@ -1,6 +1,8 @@
 // Date helpers for filters and sorts: relative ranges against an injected `now`, and the
-// day-level interval of a date value. Pure functions; weeks run Monday to Sunday.
+// day-level interval of a date value. Pure functions; weeks start on the "Start of the week"
+// setting's day (`WeekStart`, passed in by the caller; Monday when not given).
 import type { DateRelative, DateValue } from '@/api/types'
+import type { WeekStart } from '@/calendar/dates'
 import { fromWallClock, wallClock, zonedInstant, zonedParts, zonedStartOfDay } from '@/lib/zonedTime'
 
 /** The relative options in menu order, with their labels ("Specific date" is the exact-date pick). */
@@ -32,6 +34,14 @@ export const endOfDay = (d: Date) => {
 // On carriers: a day `n` days on, at midnight.
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
 
+export type { WeekStart }
+
+/** The first day of `d`'s week on wall-clock carriers: the Sunday or Monday on or before it, as the setting says. */
+export function weekStartOf(d: Date, weekStart: WeekStart = 'monday'): Date {
+  const back = weekStart === 'sunday' ? d.getDay() : (d.getDay() + 6) % 7
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - back)
+}
+
 /** Calendar-month arithmetic that clamps the day (Mar 31 minus one month is Feb 28). */
 function addMonths(d: Date, n: number): Date {
   const first = new Date(d.getFullYear(), d.getMonth() + n, 1)
@@ -45,8 +55,11 @@ export function parseDay(s: string): Date | null {
   return m ? zonedInstant(+m[1], +m[2], +m[3]) : null
 }
 
-/** An inclusive range of the time-zone setting's days. `overdue` starts at the earliest representable date. */
-export function resolveRelative(rel: DateRelative, now: Date): { start: Date; end: Date } {
+/**
+ * An inclusive range of the time-zone setting's days. `overdue` starts at the earliest
+ * representable date; `thisWeek` starts on the "Start of the week" setting's day (Monday by default).
+ */
+export function resolveRelative(rel: DateRelative, now: Date, weekStart: WeekStart = 'monday'): { start: Date; end: Date } {
   const w = wallClock(now)
   // Carrier days in, instants out.
   const startOfDay = (c: Date) => fromWallClock(new Date(c.getFullYear(), c.getMonth(), c.getDate()))
@@ -63,8 +76,8 @@ export function resolveRelative(rel: DateRelative, now: Date): { start: Date; en
     case 'tomorrow':
       return day(addDays(today, 1))
     case 'thisWeek': {
-      const monday = addDays(today, -((today.getDay() + 6) % 7))
-      return { start: startOfDay(monday), end: endOfDay(addDays(monday, 6)) }
+      const first = weekStartOf(today, weekStart)
+      return { start: startOfDay(first), end: endOfDay(addDays(first, 6)) }
     }
     case 'thisMonth':
       return {
