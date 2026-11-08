@@ -190,7 +190,36 @@ describe('TrialStep', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Server not reachable')
     expect(await screen.findByRole('button', { name: T.startTrial })).toBeEnabled()
     expect(screen.queryByRole('alert')).toBeNull()
+    // The next try starts only after the last one failed, and none follows the answer: exactly 3.
     expect(m.filingStatus).toHaveBeenCalledTimes(3)
+  })
+
+  // Fix-pass L1: a retry never starts while the last try is still waiting for its answer.
+  test('a retry of the first load never overlaps a pending request', async () => {
+    let answer: (s: FilingStatus) => void = () => {}
+    m.filingStatus
+      .mockRejectedValueOnce(new Error('Server not reachable'))
+      .mockImplementationOnce(() => new Promise<FilingStatus>((resolve) => (answer = resolve)))
+    render(<TrialStep batch="b1" onDone={vi.fn()} />)
+    await waitFor(() => expect(m.filingStatus).toHaveBeenCalledTimes(2))
+    // Many poll periods pass while the second try waits: no third request starts.
+    await new Promise((r) => setTimeout(r, agentTiming.pollMs * 8))
+    expect(m.filingStatus).toHaveBeenCalledTimes(2)
+    answer(trialStatus({ state: 'idle', trial: { items: [], rightShare: null } }))
+    expect(await screen.findByRole('button', { name: T.startTrial })).toBeEnabled()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  // Fix-pass L1: a failed status load's error goes once a later load answers.
+  test('a failed poll error goes once a later poll answers', async () => {
+    const running = trialStatus({ state: 'running', trial: { items: [], rightShare: null } })
+    m.filingStatus
+      .mockResolvedValueOnce(running)
+      .mockRejectedValueOnce(new Error('Server not reachable'))
+      .mockResolvedValue(running)
+    render(<TrialStep batch="b1" onDone={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Server not reachable')
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
   })
 })
 

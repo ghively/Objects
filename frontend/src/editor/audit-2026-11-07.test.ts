@@ -124,23 +124,42 @@ describe('#5 a nested list the editor would mis-nest', () => {
 })
 
 describe('#18 a GFM task item in an ordered list', () => {
+  // The editor has no ordered to-do: it would show `[ ] a` as text and save it
+  // escaped (`1. \[ \] aZ`), which drops the box for every other reader. Such a
+  // list loads raw (fix-pass L2), so an edit never rewrites a file's to-dos as text.
   const body = '1. [ ] a\n2. [x] b\n'
 
-  test('keeps its box when the item text is edited', () => {
+  test('keeps its boxes when the list is edited: the list loads raw', () => {
+    expect(topTypes(headless(body))).toEqual(['rawBlock'])
     expect(serializeBody(headless(body))).toBe(body)
-    expect(editAt(body, 0)).toBe('1. [ ] aZ\n2. [x] b\n')
-    expect(editAt(body, 1)).toBe('1. [ ] a\n2. [x] bZ\n')
     expectEveryEditLocal(body)
+    const around = 'para\n\n1. [ ] a\n2. [X] b\n'
+    expect(editAt(around, 0)).toBe('paraZ\n\n1. [ ] a\n2. [X] b\n')
   })
 
-  test('still loads as an editable ordered list', () => {
-    expect(topTypes(headless(body))).toEqual(['orderedList'])
+  test('a box in a nested ordered list loads the whole list raw', () => {
+    for (const nested of ['- a\n  1. [ ] b\n', '1. a\n   1. [x] b\n']) {
+      expect(topTypes(headless(nested))).toEqual(['rawBlock'])
+      expectEveryEditLocal(nested)
+    }
   })
 
-  test('an escaped box stays escaped: such a list loads raw', () => {
-    const escaped = '1. \\[ ] a\n2. b\n'
-    expect(topTypes(headless(escaped))).toEqual(['rawBlock'])
+  test('an escaped box (as the editor saves it) is text: the list stays editable', () => {
+    const escaped = '1. \\[ \\] a\n2. b\n'
+    expect(topTypes(headless(escaped))).toEqual(['orderedList'])
+    expect(editAt(escaped, 0)).toBe('1. \\[ \\] aZ\n2. b\n')
     expectEveryEditLocal(escaped)
+  })
+
+  test('`[ ] x` typed at the start of an ordered item stays text', () => {
+    const editor = headless('1. a\n2. b\n')
+    const tb = textblocks(editor)[0]
+    editor.view.dispatch(editor.state.tr.insertText('[ ] x', tb.pos + 1, tb.pos + tb.node.nodeSize - 1))
+    const saved = serializeBody(editor)
+    expect(saved).toBe('1. \\[ \\] x\n2. b\n')
+    const back = headless(saved)
+    expect(topTypes(back)).toEqual(['orderedList'])
+    expect(textblocks(back)[0].node.textContent).toBe('[ ] x')
   })
 
   test('a bullet item typed as `[ ] a` text stays text', () => {
@@ -149,6 +168,35 @@ describe('#18 a GFM task item in an ordered list', () => {
     editor.view.dispatch(editor.state.tr.insertText('[ ] a', tb.pos + 1, tb.pos + tb.node.nodeSize - 1))
     expect(serializeBody(editor)).toBe('- \\[ \\] a\n')
   })
+})
+
+describe('fix-pass P1: a nested list with its own delimiter or bullet', () => {
+  for (const body of ['1) a\n   1. b\n   2. c\n2) d\n', '- a\n  * b\n  * c\n- d\n', '1. a\n   - b\n   - c\n2. d\n   + e\n']) {
+    test(`an edit keeps each depth's markers: ${JSON.stringify(body)}`, () => {
+      expect(topTypes(headless(body))).not.toContain('rawBlock')
+      expectEveryEditLocal(body)
+    })
+  }
+
+  test('editing the inner item keeps the inner delimiter (the repro)', () => {
+    expect(editWhere('1) a\n   1. b\n   2. c\n2) d\n', 'b')).toBe('1) a\n   1. bZ\n   2. c\n2) d\n')
+  })
+})
+
+describe('fix-pass P2: two blank lines inside a list', () => {
+  test('stay two on an edit anywhere in the list (the repro)', () => {
+    expectEveryEditLocal('1. a0\n   1. b1\n\n   2. c3\n\n\n2. d8\n')
+  })
+
+  // The editor reads the extra blank line of a bullet item as an empty paragraph (typing there
+  // adds text to the item); an edit of the item's text keeps both blank lines as they were.
+  for (const body of ['- a\n\n\n- b\n\n- c\n', '- a\n\n\n\n  para\n- b\n']) {
+    test(`stay as many when an item's text is edited: ${JSON.stringify(body)}`, () => {
+      for (const word of ['a', 'b', 'c', 'para'].filter((w) => body.includes(`${w}\n`))) {
+        expect(editWhere(body, word)).toBe(body.replace(`${word}\n`, `${word}Z\n`))
+      }
+    })
+  }
 })
 
 describe('#17 an indented code block inside a list item', () => {
@@ -204,6 +252,15 @@ describe('#37 shortcut reference links and footnote definitions', () => {
     const body = 'see [Foo  Bar] and ![foo bar]\n\n[foo bar]: /x\n'
     expect(editWhere(body, 'see')).toBe('see [Foo  Bar] and ![foo bar]Z\n\n[foo bar]: /x\n')
   })
+
+  // Fix-pass L5: a definition inside a quote or a list item defines the label for the whole note.
+  for (const def of ['> [foo]: /x', '>[foo]: /x', '> > [foo]: /x', '- [foo]: /x', '> - [foo]: /x', '- > [foo]: /x', '10. a\n\n    [foo]: /x']) {
+    test(`a label defined in a quote or a list item keeps its brackets: ${JSON.stringify(def)}`, () => {
+      const body = `${def}\n\nsee [foo]\n`
+      expect(editWhere(body, 'see')).toBe(`${def}\n\nsee [foo]Z\n`)
+      expect(html(body)).toContain('<a href="/x">foo</a>')
+    })
+  }
 
   test('brackets the body defines no label for stay escaped text', () => {
     expect(editWhere('see [foo]\n', 'see')).toBe('see \\[foo\\]Z\n')
