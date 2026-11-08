@@ -83,7 +83,8 @@ describe('TrashView', () => {
     expect(within(list).getByRole('listitem', { name: 'Open' })).toHaveTextContent(/^OpenQuery · /)
     await user.click(screen.getByRole('button', { name: 'Empty Trash' }))
     const dialog = await screen.findByRole('alertdialog')
-    expect(dialog).toHaveTextContent('all 4 object(s)')
+    expect(dialog).toHaveTextContent('Delete all 4 entries in the Trash for good?')
+    expect(dialog).not.toHaveTextContent('(s)')
   })
 
   test('lists objects and types (a type with its object count), with the 30-day info', async () => {
@@ -140,16 +141,15 @@ describe('TrashView', () => {
     render(<TrashView />)
     const row = await screen.findByRole('listitem', { name: 'Note' })
     await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
-    const dialog = await screen.findByRole('alertdialog', { name: 'Permanently delete' })
-    expect(dialog).toHaveTextContent(
-      "Delete 1 object(s) for good? You won't be able to get them back.",
-    )
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete permanently?' })
+    expect(dialog).toHaveTextContent("Delete 1 object for good? You won't be able to get it back.")
+    expect(dialog).not.toHaveTextContent('(s)')
     expect(mocked.purge).not.toHaveBeenCalled()
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     expect(mocked.purge).not.toHaveBeenCalled()
 
     await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
-    const again = await screen.findByRole('alertdialog', { name: 'Permanently delete' })
+    const again = await screen.findByRole('alertdialog', { name: 'Delete permanently?' })
     await user.click(within(again).getByRole('button', { name: 'Delete permanently' }))
     await waitFor(() => expect(mocked.purge).toHaveBeenCalledWith('o1'))
   })
@@ -159,8 +159,21 @@ describe('TrashView', () => {
     render(<TrashView />)
     const row = await screen.findByRole('listitem', { name: 'Book' })
     await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
-    const dialog = await screen.findByRole('alertdialog', { name: 'Permanently delete' })
-    expect(dialog).toHaveTextContent('Delete 4 object(s) for good?')
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete permanently?' })
+    expect(dialog).toHaveTextContent('Delete this object type and its 3 objects for good?')
+  })
+
+  test('purging a query names the query, not "object(s)"', async () => {
+    entries = [
+      { id: 'q1', kind: 'query', originalPath: '.object/queries/open.json', title: 'Open', type: '', deletedAt: NOTE.deletedAt, queryId: 'open', name: 'Open' },
+    ]
+    const user = userEvent.setup()
+    render(<TrashView />)
+    const row = await screen.findByRole('listitem', { name: 'Open' })
+    await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete permanently?' })
+    expect(dialog).toHaveTextContent('Delete this query for good?')
+    expect(dialog).not.toHaveTextContent('(s)')
   })
 })
 
