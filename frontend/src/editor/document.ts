@@ -327,16 +327,23 @@ function nodeListShape(node: JSONContent, depth = 0, kind = '', out: string[] = 
   return out
 }
 
-/** The same for the lexed source. */
-function tokenListShape(tokens: Token[], depth = 0, out: string[] = []): string[] {
+/**
+ * The same for the lexed source; `null` when the source holds an indented code
+ * block inside a list item or a quote, which the editor cannot write back in
+ * place (audit 2026-11-07 #17: it would come back fenced at the wrong column).
+ */
+function tokenListShape(tokens: Token[], depth = 0, nested = false, out: string[] = []): string[] | null {
   for (const t of tokens) {
+    if (t.type === 'code' && nested && (t as { codeBlockStyle?: string }).codeBlockStyle === 'indented') return null
     if (t.type === 'list') {
       const ordered = (t as { ordered?: boolean }).ordered
       for (const item of (t as { items: { task?: boolean; tokens?: Token[] }[] }).items) {
         out.push(depth + (ordered ? (item.task ? 'ot' : 'o') : 'b'))
-        tokenListShape(item.tokens ?? [], depth + 1, out)
+        if (!tokenListShape(item.tokens ?? [], depth + 1, true, out)) return null
       }
-    } else if (t.type === 'blockquote' && 'tokens' in t && t.tokens) tokenListShape(t.tokens, depth, out)
+    } else if (t.type === 'blockquote' && 'tokens' in t && t.tokens) {
+      if (!tokenListShape(t.tokens, depth, true, out)) return null
+    }
   }
   return out
 }
@@ -353,7 +360,7 @@ function sameListShape(node: JSONContent, block: SourceBlock): boolean {
   const parsed = nodeListShape(node)
   if (parsed.length === 0 && !LIST_LINE.test(block.raw)) return true
   const source = tokenListShape(gfmLexer.lexer(block.raw.replace(/\r\n?/g, '\n')))
-  return source.join(' ') === parsed.join(' ')
+  return source !== null && source.join(' ') === parsed.join(' ')
 }
 
 /**
