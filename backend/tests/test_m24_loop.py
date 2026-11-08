@@ -610,3 +610,35 @@ def test_a_run_whose_cli_errs_after_completing_the_step_is_done() -> None:
         "failed", None, "CLI exited 1")
     assert outcome(entry, died, [note("complete"), note("fail", text="no")], False, timed_out=False,
                    withdrawn=False)[0] == "failed"
+
+
+def test_an_approved_step_is_queued_again_when_its_item_is_reopened_by_status(
+    env: Env, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sweep 2026-11-08 (work-import 3): closing the item withdrew the approved step's entry; reopening
+    it the only way the UI offers (the status set back in the property editor) is a plain property
+    write, which raised no work notice, so the step stayed "Approved step: withdrawn" and never ran."""
+    actions(monkeypatch, {"approve": [step_call("complete", "Change review: PASS. Done.")]})
+    env.setting(workAutoRun=False)
+    env.step(P, STEP, "approve")
+    assert [x["state"] for x in env.entries()] == ["pending"]
+    space = env.loop.space
+    env.service.close(P, space.read(P)[2], GENE)
+    assert [(x["state"], x["reason"]) for x in env.entries()] == [("withdrawn", WITHDRAWN_REDECIDED)]
+    assert env.service.item(P)["done"]
+    space.update_properties(P, {"status": ["In Progress"]}, space.read(P)[2])
+    assert not env.service.item(P)["done"]
+    env.wait_for(lambda: [x for x in env.entries() if x["state"] == "pending"])
+    approve = [x for x in env.entries() if x["kind"] == "approve"]
+    assert [x["state"] for x in approve] == ["withdrawn", "pending"]
+    assert approve[1]["stepId"] == STEP and approve[1]["by"] == "Gene" and approve[1]["path"] == P
+    # and it runs once the agent acts
+    env.acts()
+    env.idle()
+    assert [x["state"] for x in env.entries() if x["kind"] == "approve"] == ["withdrawn", "done"]
+    assert next(s for s in env.service.item(P)["steps"] if s["id"] == STEP)["state"] == "done"
+    assert len(env.runs()) == 1
+    # a property write on an item with nothing withdrawn queues nothing
+    space.update_properties(P, {"priority": ["Low"]}, space.read(P)[2])
+    env.idle()
+    assert len([x for x in env.entries() if x["kind"] == "approve"]) == 2

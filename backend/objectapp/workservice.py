@@ -81,9 +81,18 @@ __all__ = [
     "WorkNotice",
     "WorkService",
     "add_work_listener",
+    "in_work_write",
 ]
 
 log = logging.getLogger(__name__)
+
+_writing = threading.local()
+
+
+def in_work_write() -> bool:
+    """True while this thread is inside a `WorkService` write (a `Space.add_listener` listener
+    can tell the service's writes, which a `WorkNotice` follows, from any other write)."""
+    return bool(getattr(_writing, "depth", 0))
 
 NOTE_NEEDS_TEXT = "A note needs text."
 ALREADY_DONE = "This item is already done."
@@ -292,14 +301,18 @@ class WorkService:
             return text if out is None else out
 
         attempts = _RETRIES if base_version is None else 1
-        for attempt in range(attempts):
-            try:
-                return self.space.write_work(
-                    rel, base_version, updates=updates, remove=remove, raw=raw, body=body_fn
-                )
-            except Conflict:
-                if attempt + 1 >= attempts:
-                    raise
+        _writing.depth = getattr(_writing, "depth", 0) + 1
+        try:
+            for attempt in range(attempts):
+                try:
+                    return self.space.write_work(
+                        rel, base_version, updates=updates, remove=remove, raw=raw, body=body_fn
+                    )
+                except Conflict:
+                    if attempt + 1 >= attempts:
+                        raise
+        finally:
+            _writing.depth -= 1
         raise AssertionError("unreachable")
 
     def _append(self, text: str, lines: _Lines, event: WorkEvent, now: datetime,
