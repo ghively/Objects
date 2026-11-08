@@ -111,4 +111,11 @@ describe('DateTimeSection', () => {
     expect(screen.queryByText('Your time zone in Object does not match the time zone of your device.')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Set to local time zone' })).toBeNull()
   })
+
+  test('test the rows follow the catalog order: Time zone, Date formatting, Time format, Start of the week', () => {
+    const { container } = render(<DateTimeSection />)
+    const rows = Array.from(container.querySelectorAll('section')).map((s) => s.getAttribute('aria-label'))
+    expect(rows).toEqual(['Time zone', 'Date formatting', '24-hour time', 'Start of the week'])
+  })
+
 })

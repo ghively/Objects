@@ -82,4 +82,12 @@ describe('SpaceSettingsSection: delete space (M8)', () => {
     expect(button).toBeDisabled()
     expect(mocked.deleteSpace).not.toHaveBeenCalled()
   })
+
+  test('test the rows follow the catalog order: Icon, Name, Description, Delete space', async () => {
+    const { container } = render(<SpaceSettingsSection />)
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Lab'))
+    const rows = Array.from(container.querySelectorAll('section')).map((s) => s.getAttribute('aria-label'))
+    expect(rows).toEqual(['Icon', 'Name', 'Description', 'Delete space'])
+  })
+
 })

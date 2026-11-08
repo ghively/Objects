@@ -12,18 +12,18 @@ export const APPEARANCE_TEXT = {
   heading: 'Appearance',
   description: 'Themes, fonts and colors.',
   theme: 'Theme',
-  themeDescription: 'Define the theme you want to use for Object', // our string
+  themeDescription: 'Define the theme you want to use for Object.', // our string
   modeLight: 'Light',
   modeDark: 'Dark',
   lightTheme: 'Light theme',
   lightThemeDescription: 'The theme used in light mode.',
   darkTheme: 'Dark theme',
-  darkThemeDescription: 'Pick a dark mode theme.',
+  darkThemeDescription: 'The theme used in dark mode.',
   themes: {
-    light: { name: 'Light', description: 'The standard light look.' },
-    lightDimmed: { name: 'Light Dimmed', description: 'Light, with softer contrast' },
-    dark: { name: 'Dark', description: 'The default dark theme' },
-    darkDimmed: { name: 'Dark Dimmed', description: 'Dark, with softer contrast' },
+    light: { name: 'Light', description: 'The standard light theme.' },
+    lightDimmed: { name: 'Light Dimmed', description: 'Light, with softer contrast.' },
+    dark: { name: 'Dark', description: 'The standard dark theme.' },
+    darkDimmed: { name: 'Dark Dimmed', description: 'Dark, with softer contrast.' },
   },
   font: 'Font',
   fontDescription: 'Pick a global font for the app.', // our string

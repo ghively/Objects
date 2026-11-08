@@ -156,21 +156,17 @@ export function DateTimeSection() {
   return (
     <div>
       <SectionHeader icon="ph-calendar-blank" heading={T.heading} description={T.description} />
-      <SettingGroup title={T.startOfWeek} help={T.startOfWeekDescription}>
-        <OptionCards
-          label={T.startOfWeek}
-          value={weekStart}
-          options={[
-            { value: 'monday', label: T.monday },
-            { value: 'sunday', label: T.sunday },
-          ]}
-          onChange={(v) => {
-            setError(null)
-            saveCalendarUi({ weekStart: v }).catch((e: unknown) => setError(errorText(e)))
-          }}
-        />
+      <SettingGroup title={T.timeZone} help={T.timeZoneDescription}>
+        <TimeZoneSelect value={zone} onSelect={(z) => set({ timeZone: z === device ? null : z })} />
+        {mismatch && (
+          <div className="flex flex-col gap-2">
+            <p role="status" className="text-[13px] text-fg-muted">
+              {T.timeZoneMismatch}
+            </p>
+            <SecondaryButton onClick={() => set({ timeZone: null })}>{T.timeZoneReset}</SecondaryButton>
+          </div>
+        )}
       </SettingGroup>
-      <SwitchRow title={T.twentyFour} help={T.twentyFourDescription} checked={settings.twentyFourHourTime} onChange={(v) => set({ twentyFourHourTime: v })} />
       <SettingGroup title={T.dateFormatting} help={T.dateFormattingDescription}>
         <OptionCards
           label={T.dateFormatting}
@@ -184,16 +180,20 @@ export function DateTimeSection() {
           {formatDate({ start: new Date().toISOString(), resolution: 'time' })}
         </p>
       </SettingGroup>
-      <SettingGroup title={T.timeZone} help={T.timeZoneDescription}>
-        <TimeZoneSelect value={zone} onSelect={(z) => set({ timeZone: z === device ? null : z })} />
-        {mismatch && (
-          <div className="flex flex-col gap-2">
-            <p role="status" className="text-[13px] text-fg-muted">
-              {T.timeZoneMismatch}
-            </p>
-            <SecondaryButton onClick={() => set({ timeZone: null })}>{T.timeZoneReset}</SecondaryButton>
-          </div>
-        )}
+      <SwitchRow title={T.twentyFour} help={T.twentyFourDescription} checked={settings.twentyFourHourTime} onChange={(v) => set({ twentyFourHourTime: v })} />
+      <SettingGroup title={T.startOfWeek} help={T.startOfWeekDescription}>
+        <OptionCards
+          label={T.startOfWeek}
+          value={weekStart}
+          options={[
+            { value: 'monday', label: T.monday },
+            { value: 'sunday', label: T.sunday },
+          ]}
+          onChange={(v) => {
+            setError(null)
+            saveCalendarUi({ weekStart: v }).catch((e: unknown) => setError(errorText(e)))
+          }}
+        />
       </SettingGroup>
       <SaveError error={error} />
     </div>
