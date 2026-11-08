@@ -189,7 +189,8 @@ def test_run_env_drops_parent_session_vars(env, monkeypatch) -> None:
     for name in sign_in:  # audit 20: how the user signs in to Claude Code reaches every turn
         assert cmd.env[name] == "1", name
     assert not any(k.upper().startswith(RUN_ENV_DROP) for k in cmd.env if k not in agentrun.RUN_ENV_KEEP)
-    assert agentrun.run_base_env().items() <= cmd.env.items()
+    different = {k for k, v in agentrun.run_base_env().items() if cmd.env.get(k) != v}
+    assert different <= {"OBJECT_API_URL", "MCP_TOOL_TIMEOUT"}, different  # set by the run itself
     assert "PATH" in {k.upper() for k in cmd.env}
     assert cmd.env["OBJECT_API_URL"] == "http://127.0.0.1:8765"
     # Audit 7: every stdio server inherits the CLI's environment, so the token isn't in it.
