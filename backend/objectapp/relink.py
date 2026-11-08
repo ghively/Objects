@@ -32,28 +32,50 @@ __all__ = [
 _LINK_RE = re.compile(r"\[\[([^\[\]|#\n]+)((?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?)\]\]")
 _FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 _TICKS_RE = re.compile(r"`+")
+# An indented code line: four spaces, or a tab after up to three spaces.
+_INDENT_RE = re.compile(r"^(?: {4}| {0,3}\t)")
+# A list item line: a bullet or a number with `.` or `)`, then a space (or nothing).
+_ITEM_RE = re.compile(r"^ {0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]|$)")
 
 
 def _segments(text: str) -> Iterator[tuple[int, int, bool]]:
     """``(start, end, is_code)`` spans covering ``text`` in order.
 
     Code is a fenced block (from its opening fence line to the closing one, or
-    to the end) or an inline code span (a run of backticks up to the next run
-    of the same length on the same line). Plain text between them is one span,
-    however many lines it covers; a text with no backtick and no ``~~~`` is one
-    plain span (the common case, answered without looking at its lines).
+    to the end), an indented block (lines indented four spaces or a tab after
+    a blank line or the start, outside a list item, up to the next line that
+    is neither indented nor blank) or an inline code span (a run of backticks
+    up to the next run of the same length on the same line). Plain text
+    between them is one span, however many lines it covers; a text with no
+    backtick, no ``~~~`` and no indented line is one plain span (the common
+    case, answered without looking at its lines).
     """
-    if "`" not in text and "~~~" not in text:
+    if (
+        "`" not in text
+        and "~~~" not in text
+        and "\n    " not in text
+        and "\t" not in text
+        and not text.startswith("    ")
+    ):
         if text:
             yield 0, len(text), False
         return
     pos = 0
     fence: str | None = None
+    indented = False
     code_start = 0
     plain_start: int | None = None
+    blank_before = True  # the start of the text counts as a blank line
+    in_list = False  # the last block was a list item: an indented line continues it
     for line in text.splitlines(keepends=True):
         start, end = pos, pos + len(line)
         pos = end
+        blank = not line.strip()
+        if indented:
+            if blank or _INDENT_RE.match(line):
+                continue
+            yield code_start, start, True
+            indented = False
         # A fence line holds three backticks or tildes: the regex only runs for those.
         m = _FENCE_RE.match(line) if ("```" in line or "~~~" in line) else None
         if fence is not None:
@@ -62,11 +84,25 @@ def _segments(text: str) -> Iterator[tuple[int, int, bool]]:
                 yield code_start, end, True
                 fence = None
             continue
+        if not blank:
+            if _ITEM_RE.match(line):
+                in_list = True
+            elif blank_before and line[0] not in " \t":
+                in_list = False
+        was_blank, blank_before = blank_before, blank
         if m and not (m.group(1)[0] == "`" and "`" in line[m.end() :]):
             if plain_start is not None:
                 yield plain_start, start, False
                 plain_start = None
             fence = m.group(1)
+            code_start = start
+            in_list = False
+            continue
+        if not blank and was_blank and not in_list and _INDENT_RE.match(line):
+            if plain_start is not None:
+                yield plain_start, start, False
+                plain_start = None
+            indented = True
             code_start = start
             continue
         if "`" not in line:
@@ -79,7 +115,7 @@ def _segments(text: str) -> Iterator[tuple[int, int, bool]]:
         yield from _inline_segments(line, start)
     if plain_start is not None:
         yield plain_start, pos, False
-    if fence is not None:
+    if fence is not None or indented:
         yield code_start, pos, True
 
 
