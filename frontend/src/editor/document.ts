@@ -33,7 +33,7 @@ import {
 } from './annotations'
 import { splitBlocks, type SourceBlock } from './blocks'
 import { buildTree, flattenTree, isOneLine, type TreeNode } from './blockTree'
-import { preserveBlock, serializeWithPreservation, type EditorBlock } from './preserve'
+import { eolOf, preserveBlock, serializeWithPreservation, type EditorBlock } from './preserve'
 import {
   BLOCK_SOURCE_META,
   BlockSource,
@@ -514,7 +514,8 @@ export function loadBody(editor: Editor, body: string): void {
   editor.view.dispatch(tr)
   takeSnapshots(editor, editor.state.doc)
   const final = /(?:\r\n|\n|\r)$/.exec(body)?.[0] ?? ''
-  edges.set(editor, { leading, trailing, eol: body.includes('\r\n') ? '\r\n' : '\n', final })
+  // A lone-CR body keeps CR for the lines an edit adds (audit 2026-11-07 #26: not mixed endings).
+  edges.set(editor, { leading, trailing, eol: eolOf(body), final })
 }
 
 // ---------------------------------------------------------------------------

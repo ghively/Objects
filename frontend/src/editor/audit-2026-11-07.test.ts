@@ -146,8 +146,30 @@ describe('#17 an indented code block inside a list item', () => {
     })
   }
 
-  test('a fenced code block in an item, and a top-level indented one, stay editable', () => {
+  test('a fenced code block in an item, and a top-level indented one, stay editable (#17)', () => {
     expect(topTypes(headless('- item\n\n  ```js\n  x\n  ```\n- next\n'))).toEqual(['bulletList'])
     expect(topTypes(headless('    code block\n    more\n'))).toEqual(['codeBlock'])
+  })
+})
+
+describe('#26 a body with lone-CR line endings', () => {
+  for (const body of ['a\rb\r', 'para one\r\rtwo\rlines\r\r- a\r- b\r', '# T\r\r1. x\r   - y\r']) {
+    test(`an edit keeps CR line endings: ${JSON.stringify(body)}`, () => {
+      expect(serializeBody(headless(body))).toBe(body)
+      const count = textblocks(headless(body)).length
+      for (let i = 0; i < count; i++) {
+        const saved = editAt(body, i)
+        expect(saved).not.toContain('\n')
+        expect(saved.replace('Z', '')).toBe(body)
+      }
+    })
+  }
+
+  test('a new block is written with CR too', () => {
+    const editor = headless('para one\r\rpara two\r')
+    const last = textblocks(editor)[1]
+    const end = last.pos + last.node.nodeSize
+    editor.view.dispatch(editor.state.tr.insert(end, editor.schema.nodes.paragraph.create(null, editor.schema.text('new'))))
+    expect(serializeBody(editor)).toBe('para one\r\rpara two\r\rnew\r')
   })
 })

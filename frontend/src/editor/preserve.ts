@@ -28,8 +28,9 @@ export type EditorBlock = {
 
 // ---------------------------------------------------------------- helpers
 
-function eolOf(s: string): string {
-  return s.includes('\r\n') ? '\r\n' : '\n'
+/** CRLF when `s` has one, else LF, else a lone CR (an old Mac file: no mixed endings on save). */
+export function eolOf(s: string): string {
+  return s.includes('\r\n') ? '\r\n' : s.includes('\n') || !s.includes('\r') ? '\n' : '\r'
 }
 
 function toLF(s: string): string {
