@@ -102,7 +102,10 @@ export function ScanStep({
       )}
       {report && (
         <div role="status" aria-live="polite" className="flex flex-col gap-2">
-          <p className="text-[13px]">{T.summary(report.counts.scanned, report.counts.flagged, report.counts.leftOut)}</p>
+          <p className="text-[13px]">
+            {T.summary(report.counts.scanned, report.counts.flagged, report.counts.leftOut, report.counts.unscanned)}
+          </p>
+          {report.counts.unscanned > 0 && <p className="text-[13px] text-fg-muted">{T.uncheckedNote}</p>}
           {flagged.length === 0 ? (
             <p className="text-[13px] text-fg-muted">{T.noFindings}</p>
           ) : (
