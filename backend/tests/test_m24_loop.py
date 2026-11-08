@@ -587,3 +587,26 @@ def test_auto_run_whose_write_failed_is_tried_again(env: Env, monkeypatch: pytes
     assert not [e for e in env.entries() if e["kind"] == "run"]
     assert env.loop.scan_auto_runs() == 1  # not given up on
     assert [e["auto"] for e in env.entries() if e["kind"] == "run"] == [True]
+
+
+def test_a_run_whose_cli_errs_after_completing_the_step_is_done() -> None:
+    """Audit 35: the agent completed the step through the tools, then the CLI died: the entry was
+    failed and retryable, and Retry answered 409."""
+    from objectapp.headless import HeadlessResult
+    from objectapp.workloop import outcome
+    from objectapp.workservice import WorkNotice
+
+    def note(event: str, step: str = STEP, text: str = "Spooler restarted.") -> WorkNotice:
+        return WorkNotice(path=P, object_id="o1", event=event, step_id=step, n=2, kind="approve",
+                          step_text="Restart", before="approved", after="done", by=Actor("agent", "Work"),
+                          text=text, not_before=None, at=NOW, version="v")
+
+    entry = {"kind": "approve", "stepId": STEP}
+    died = HeadlessResult(chat_id="c", state="error", text="", session_id=None, model=None, error="CLI exited 1")
+    assert outcome(entry, died, [note("complete")], False, timed_out=False, withdrawn=False) == (
+        "done", "Spooler restarted.", None)
+    # no complete notice for this step: still failed with the CLI's error
+    assert outcome(entry, died, [note("complete", step="other")], False, timed_out=False, withdrawn=False) == (
+        "failed", None, "CLI exited 1")
+    assert outcome(entry, died, [note("complete"), note("fail", text="no")], False, timed_out=False,
+                   withdrawn=False)[0] == "failed"
