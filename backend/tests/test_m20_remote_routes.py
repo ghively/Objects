@@ -379,6 +379,31 @@ def test_add_and_refresh_carry_the_warnings(api, fake: FakeA2A) -> None:
     assert res.json()["warnings"] == ["This agent's card sends messages to localhost, not 127.0.0.1."]
 
 
+def test_refresh_drops_the_secret_when_the_endpoint_loses_https(api, fake: FakeA2A, monkeypatch) -> None:
+    """Audit 21: https -> http on the same host is treated like a host change."""
+    from objectapp import agents as agents_mod
+    from objectapp import remotesecrets
+
+    client = api["client"]
+    agent = _add(client, fake.base_url)
+    # As if the stored endpoint had been https on the same host and port.
+    rec = agents_mod.AgentRegistry().get(agent["id"])
+    data = dict(rec.data)
+    data["endpoint"] = {**data["endpoint"], "url": data["endpoint"]["url"].replace("http://", "https://", 1)}
+    agents_mod.agentfiles.write_agent_file(rec.folder, data)
+    assert remotesecrets.is_set(agent["id"])
+    res = client.post(f"/api/remote-agents/{agent['id']}/refresh", json={})
+    assert res.status_code == 200, res.text
+    assert res.json()["remote"]["auth"]["set"] is False
+    assert not remotesecrets.is_set(agent["id"])
+    # http -> http (no change) keeps a secret set again.
+    res = client.put(f"/api/remote-agents/{agent['id']}", json={
+        "name": "Fake Planner", "auth": _bearer(), "baseRevision": res.json()["revision"]})
+    assert res.status_code == 200, res.text
+    res = client.post(f"/api/remote-agents/{agent['id']}/refresh", json={})
+    assert res.json()["remote"]["auth"]["set"] is True
+
+
 def test_refresh_errors(api, fake: FakeA2A) -> None:
     client = api["client"]
     agent = _add(client, fake.base_url)
