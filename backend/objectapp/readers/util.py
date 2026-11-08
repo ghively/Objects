@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,29 @@ def check_unpacked_size(path: Path) -> None:
         return
     if total > MAX_OFFICE_UNPACKED_BYTES:
         raise TooLarge(path.name)
+
+
+_URL_NOISE = re.compile(r"[\x00-\x20\x7f]")
+_SCHEME = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):")
+
+
+def link_kind(url: str | None) -> str | None:
+    """``"remote"`` for an http(s) URL, ``"local"`` for a mailto or a relative link, None for
+    anything else (``javascript:``, ``file:``, ``data:``, a protocol-relative ``//host``), which an
+    imported page never keeps: Object promises no network access and no script from note content.
+    Spaces and control characters are ignored the way a browser ignores them."""
+    if not url:
+        return None
+    bare = _URL_NOISE.sub("", url)
+    if bare.startswith(("//", "\\\\", "/\\", "\\/")):
+        return None
+    m = _SCHEME.match(bare)
+    if m is None:
+        return "local"
+    scheme = m.group(1).lower()
+    if scheme in ("http", "https"):
+        return "remote"
+    return "local" if scheme == "mailto" else None
 
 
 def iso(value: object) -> str | None:

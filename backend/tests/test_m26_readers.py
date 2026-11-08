@@ -245,3 +245,55 @@ def test_xlsx_is_read_streaming(tmp_path, monkeypatch):
     assert seen and all(k.get("read_only") for k in seen)
     assert "Sheet 'Gap' has 300 rows x 2 columns" in r.markdown and "| 100 |" not in r.markdown
     assert "## Merged" in r.markdown and "Merged cells flattened" in r.notes
+
+
+def test_html_drops_unsafe_links_and_never_keeps_a_remote_image(tmp_path):
+    """Audit 31: only http(s), mailto and relative links are kept; a javascript:, file: or data:
+    link becomes its text. A remote image becomes a plain link (its alt text, or "Image"), so the
+    page never fetches it; a data: or file: image keeps only its alt text."""
+    p = tmp_path / "x.html"
+    p.write_text(
+        "<html><body>"
+        "<p><a href='javascript:alert(1)'>js</a> <a href=' JaVa\tScript:alert(1)'>js2</a> "
+        "<a href='file:///etc/passwd'>pw</a> <a href='data:text/html,hi'>dt</a> "
+        "<a href='https://ok.example/a'>web</a> <a href='mailto:a@b.example'>mail</a> "
+        "<a href='other.html'>rel</a> <a href='//cdn.example/x'>proto</a></p>"
+        "<p><img src='https://evil.example/pixel.png?u=1' alt='Chart'> <img src='http://evil.example/b.png'> "
+        "<img src='data:image/png;base64,AAAA' alt='Inline'> <img src='file:///c/x.png'> "
+        "<img src='pics/local.png' alt='Local'></p>"
+        "</body></html>",
+        encoding="utf-8",
+    )
+    md = readers.read_file(p).markdown
+    for bad in ("javascript", "JaVa", "file:", "data:", "//cdn.example", "![Chart]", "![](http"):
+        assert bad not in md, (bad, md)
+    for text in ("js", "js2", "pw", "dt", "proto", "Inline"):
+        assert text in md
+    assert "[web](https://ok.example/a)" in md and "[mail](mailto:a@b.example)" in md and "[rel](other.html)" in md
+    assert "[Chart](https://evil.example/pixel.png?u=1)" in md and "[Image](http://evil.example/b.png)" in md
+    assert "![Local](pics/local.png)" in md
+
+
+def test_docx_drops_unsafe_hyperlinks(tmp_path):
+    """Audit 31: a docx hyperlink to javascript: or file: keeps only its text."""
+    from docx.opc.constants import RELATIONSHIP_TYPE as RT
+    from docx.oxml.ns import qn
+    from docx.oxml.parser import OxmlElement
+
+    p = tmp_path / "links.docx"
+    d = Document()
+    para = d.add_paragraph("See ")
+    for url, text in (("javascript:alert(1)", "js"), ("file:///etc/passwd", "pw"), ("https://ok.example/", "web")):
+        rid = d.part.relate_to(url, RT.HYPERLINK, is_external=True)
+        h = OxmlElement("w:hyperlink")
+        h.set(qn("r:id"), rid)
+        r = OxmlElement("w:r")
+        t = OxmlElement("w:t")
+        t.text = text
+        r.append(t)
+        h.append(r)
+        para._p.append(h)
+    d.save(p)
+    md = readers.read_file(p).markdown
+    assert "javascript" not in md and "file:" not in md
+    assert "js" in md and "pw" in md and "[web](https://ok.example/)" in md
