@@ -214,7 +214,6 @@ def main(argv: list[str] | None = None) -> int:
         allowed, disallowed = set(cli.get("allowed") or []), set(cli.get("disallowed") or [])
         run.report({"Bash", "PowerShell"} <= disallowed and "mcp__object__write_body" in allowed,
                    "Bash/PowerShell disallowed, mcp__object__write_body allowed")
-        config_text = json.dumps(cli.get("mcpConfig") or {})
         servers_cfg = (cli.get("mcpConfig") or {}).get("mcpServers") or {}
         others = json.dumps({k: v for k, v in servers_cfg.items() if k not in ("object", "object-agent")})
         run.report(cli.get("env", {}).get("CLAUDE_CONFIG_DIR") is False
