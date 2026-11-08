@@ -120,6 +120,29 @@ def test_unreadable_file_is_kept_aside(state: Path) -> None:
     assert store.get("var:GH_TOKEN") == "s3cret-new"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX file modes")
+def test_unreadable_copy_is_0600_from_the_start(state: Path, monkeypatch) -> None:
+    """Audit 2026-11-07 #25: the aside copy was world-readable until the chmod after it."""
+    state.mkdir(parents=True)
+    (state / "secrets.json").write_bytes(b'{"secrets": {"var:A": "s3cret-old"')
+    (state / "secrets.json").chmod(0o644)
+    modes: dict[str, int] = {}
+
+    def record(path: Path) -> None:  # the mode a reader could see before `_private` ran
+        modes[path.name] = os.stat(path).st_mode & 0o777
+
+    monkeypatch.setattr(secretstore, "_private", record)
+    old = os.umask(0o022)
+    try:
+        SecretStore(state).set("var:GH_TOKEN", "s3cret-new")
+    finally:
+        os.umask(old)
+    aside = [n for n in modes if n.startswith("secrets.unreadable-")]
+    assert len(aside) == 1
+    assert modes[aside[0]] == 0o600
+    assert (state / aside[0]).read_bytes() == b'{"secrets": {"var:A": "s3cret-old"'
+
+
 @pytest.mark.parametrize("write", ["set", "delete", "delete_prefix"])
 def test_a_passing_read_failure_never_drops_secrets(state: Path, monkeypatch, write: str) -> None:
     store = SecretStore(state)
