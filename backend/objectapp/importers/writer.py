@@ -727,17 +727,28 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
     out = join_object(new_of).encode("utf-8")
 
     if ex_raw is not None and ex_block is not None:
+        from ..space import Conflict
+
         rel = w.existing
-        cur = (space.root / rel).read_bytes()
-        if _edited_since_import(space, rel, state, ex_block):
+
+        def changed_in_both() -> None:
             name = f"{len(state.pending) + 1}.md"
             state.pending[name] = out
             state.conflicts.append({"path": rel, "title": w.obj.title, "sourcePath": sp})
             state.written[sp] = rel
             _record(state, w, system, ident_, "conflict", path=rel, contentHash=chash, pending=f"pending/{name}")
+
+        cur = (space.root / rel).read_bytes()
+        if _edited_since_import(space, rel, state, ex_block):
+            changed_in_both()
             return
         batches.snapshot(space, rel, cur)
-        space._write(rel, None, lambda _of, _fm, o2=new_of: o2, stamp=False, history=False)
+        try:
+            # at the version checked: a save made since is never overwritten
+            space._write(rel, version_of(cur), lambda _of, _fm, o2=new_of: o2, stamp=False, history=False)
+        except Conflict:
+            changed_in_both()
+            return
         state.updated += 1
         state.written[sp] = rel
         _record(state, w, system, ident_, "updated", path=rel, contentHash=chash,
