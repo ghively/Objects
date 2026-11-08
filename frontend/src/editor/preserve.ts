@@ -66,9 +66,10 @@ function exactNorm(s: string): string {
 type RowStyle = { indent: string; lead: boolean; trail: boolean; pad: string }
 
 /**
- * The cells of a row: split at every `|` that is neither escaped nor inside a
- * code span (the serializer writes such a pipe `\|`, as GFM asks; a file may
- * hold it bare, and the parser reads both as one cell).
+ * The cells of a row, as GFM splits them: at every `|` that is not escaped.
+ * A code span does not protect a bare pipe (GFM splits the cell there; the
+ * serializer writes such a pipe `\|`). A table whose source holds one loads as
+ * a raw block (`hasPipeInCodeSpan`), since the editor's parser reads one cell.
  */
 function splitCellsRaw(line: string): string[] {
   let s = line.trim()
@@ -80,13 +81,7 @@ function splitCellsRaw(line: string): string[] {
   while (i < s.length) {
     const ch = s[i]
     if (ch === '\\') i += 2
-    else if (ch === '`') {
-      // A code span runs to the next backtick run of the same length (or the line end).
-      let n = 1
-      while (s[i + n] === '`') n++
-      const close = s.indexOf('`'.repeat(n), i + n)
-      i = close < 0 ? s.length : close + n
-    } else if (ch === '|') {
+    else if (ch === '|') {
       cells.push(s.slice(start, i))
       start = ++i
     } else i++
@@ -95,12 +90,38 @@ function splitCellsRaw(line: string): string[] {
   return cells
 }
 
+/**
+ * True when a table row holds a bare `|` inside a code span (`` `a|b` ``):
+ * GFM splits the cell there, while the editor's table parser reads one cell
+ * with the pipe in its code, so an edit would move the row's cells (audit
+ * 2026-11-07 #38). Such a table loads as a raw block.
+ */
+export function hasPipeInCodeSpan(line: string): boolean {
+  let i = 0
+  while (i < line.length) {
+    const ch = line[i]
+    if (ch === '\\') i += 2
+    else if (ch === '`') {
+      // A code span runs to the next backtick run of the same length; an unclosed run is text.
+      let n = 1
+      while (line[i + n] === '`') n++
+      const close = line.indexOf('`'.repeat(n), i + n)
+      if (close < 0) i += n
+      else {
+        if (/(?<!\\)\|/.test(line.slice(i + n, close))) return true
+        i = close + n
+      }
+    } else i++
+  }
+  return false
+}
+
 function isSeparatorCell(c: string): boolean {
   return /^:?-+:?$/.test(c.trim())
 }
 
 function tableKey(line: string): string {
-  // `\|` and a bare pipe inside a code span are the same cell text.
+  // An escaped pipe is the cell's text `|`.
   const cells = splitCellsRaw(line).map((c) => c.trim().replace(/\\\|/g, '|'))
   if (cells.length > 0 && cells.every(isSeparatorCell)) {
     return (

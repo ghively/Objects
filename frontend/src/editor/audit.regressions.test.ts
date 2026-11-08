@@ -562,10 +562,13 @@ describe('minor drift on edited lines', () => {
   })
 
   test('a table row with a pipe in a code span is kept when another row is edited (audit 2026-11-01)', () => {
-    const body = '| a | b |\n|---|---|\n| [[x]] | `c|d` |\n| 1 | 2 |\n'
+    // GFM splits the cell at that pipe, so the table loads raw (audit 2026-11-07 #38) and is kept as written.
+    const body = '| a | b |\n|---|---|\n| [[x]] | `c\\|d` |\n| 1 | 2 |\n'
     const editor = headless(body)
     append(editor, '1', 'Z')
-    expect(serializeBody(editor)).toBe('| a | b |\n|---|---|\n| [[x]] | `c|d` |\n| 1Z | 2 |\n')
+    expect(serializeBody(editor)).toBe('| a | b |\n|---|---|\n| [[x]] | `c\\|d` |\n| 1Z | 2 |\n')
+    const raw = '| a | b |\n|---|---|\n| [[x]] | `c|d` |\n| 1 | 2 |\n'
+    expect(shape(headless(raw)).map(([t]) => t)).toEqual(['rawBlock'])
   })
 
   test('an edited blockquote line keeps its marker', () => {

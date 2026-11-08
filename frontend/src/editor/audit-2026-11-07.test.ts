@@ -216,3 +216,30 @@ describe('#37 shortcut reference links and footnote definitions', () => {
     expect(serializeBody(editor)).toBe('Text[^1] here.\n\n\\[^1\\]: word\n')
   })
 })
+
+describe('#38 a table cell with a bare pipe in a code span', () => {
+  const cases = [
+    '| a | b |\n|---|---|\n| `x|y` | 2 |\n',
+    '| a | b |\n|---|---|\n| 1 | 2 |\n| x\\|y | `p|q` |\n',
+    'a | b\n--|--\n``c|d`` | e\n',
+  ]
+  for (const body of cases) {
+    test(`loads raw and keeps every byte on edit: ${JSON.stringify(body)}`, () => {
+      expect(topTypes(headless(body))).toEqual(['rawBlock'])
+      expect(serializeBody(headless(body))).toBe(body)
+      expectEveryEditLocal(body)
+    })
+  }
+
+  test('an escaped pipe in a code span, and a pipe outside one, keep the table editable', () => {
+    const body = '| a | b |\n|---|---|\n| `x\\|y` | 2 |\n| x\\|y | `p` |\n'
+    expect(topTypes(headless(body))).toEqual(['table'])
+    expect(editWhere(body, '2')).toBe('| a | b |\n|---|---|\n| `x\\|y` | 2Z |\n| x\\|y | `p` |\n')
+    expectEveryEditLocal(body)
+  })
+
+  test('an unclosed backtick does not make a code span', () => {
+    const body = '| a | b |\n|---|---|\n| `x | y |\n'
+    expect(topTypes(headless(body))).toEqual(['table'])
+  })
+})
