@@ -199,7 +199,8 @@ function indentWidth(ws: string): number {
  * Parse list lines, giving each item a nesting depth as CommonMark does: an
  * item is nested in the previous one when its indent reaches that item's
  * content column (indent, marker and gap; a tab is four columns), so `   - b`
- * and `\t- c` are siblings.
+ * and `\t- c` are siblings. A marker four or more columns past the column it
+ * would start an item at is not an item but text (a continuation line).
  */
 function parseList(lines: string[]): (ListLine | null)[] {
   const columns: number[] = [] // content column of the open item at each depth
@@ -207,8 +208,10 @@ function parseList(lines: string[]): (ListLine | null)[] {
     const m = LIST_ITEM.exec(line)
     if (!m) return null
     const w = indentWidth(m[1])
-    while (columns.length && w < columns[columns.length - 1]) columns.pop()
-    const depth = columns.length
+    let depth = columns.length
+    while (depth && w < columns[depth - 1]) depth--
+    if (w - (depth ? columns[depth - 1] : 0) >= 4) return null
+    columns.length = depth
     columns.push(indentWidth(m[1] + m[2] + (m[3] || ' ')))
     return { indent: m[1], marker: m[2], gap: m[3], content: m[4], depth }
   })
@@ -216,7 +219,8 @@ function parseList(lines: string[]): (ListLine | null)[] {
 
 function listKey(line: string, parsed: ListLine | null): string {
   // A continuation line (a later paragraph's, too) ends in a hard break written either way.
-  if (!parsed) return 'C\0' + line.trim().replace(/\\$/, '').trimEnd()
+  // It may start with a marker the serializer escapes (`\- e`, `1\. e`): the same text.
+  if (!parsed) return 'C\0' + line.trim().replace(/^(\d{0,9})\\(?=[-+*.)])/, '$1').replace(/\\$/, '').trimEnd()
   const ordered = /\d/.test(parsed.marker) ? 'o' : 'b'
   // A hard break may be written `\` or as trailing blanks, and a done box `[x]` or `[X]`: the same line.
   const content = parsed.content.replace(/^\[X\](?=[ \t]|$)/, '[x]')
@@ -297,7 +301,11 @@ function preserveList(origLines: string[], regenInput: string[]): string[] {
   const restyle = (line: string, i: number): string => {
     const p = regenParsed[i]
     if (!p) return continuation(line, i)
-    const indent = indentByDepth.get(p.depth) ?? unit.repeat(p.depth)
+    // An edited item keeps the indent of the item line it replaces (a sibling may sit a column
+    // or two in, `- a` then ` - b`): the depth's usual indent could nest the next item in it.
+    const replaced = replacedOriginal(i)
+    const same = replaced !== null ? origParsed[replaced] : null
+    const indent = same && same.depth === p.depth ? same.indent : indentByDepth.get(p.depth) ?? unit.repeat(p.depth)
     const ordered = /\d/.test(p.marker)
     let marker = p.marker
     if (ordered && delimiter) marker = (repeated ?? p.marker.slice(0, -1)) + delimiter
