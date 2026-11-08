@@ -22,6 +22,7 @@ import { TableKit } from '@tiptap/extension-table'
 import { Markdown } from '@tiptap/markdown'
 import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import StarterKit from '@tiptap/starter-kit'
+import { Marked, type Token } from 'marked'
 import {
   classifyEmbedLine,
   formatAnnotation,
@@ -294,10 +295,53 @@ function parseSourceBlock(editor: Editor, block: SourceBlock): JSONContent {
     const plain = plainTextOf(node)
     const regenerated = plain ?? md.serialize({ type: 'doc', content: [node] })
     if (contentKey(regenerated) !== contentKey(block.raw)) return rawNode(block.raw)
+    if (!sameListShape(node, block)) return rawNode(block.raw)
     return node
   } catch {
     return rawNode(block.raw)
   }
+}
+
+/** A plain GFM lexer: how other Markdown readers nest a block's lists (audit 2026-11-07 #5). */
+const gfmLexer = new Marked({ gfm: true })
+
+const LIST_ITEMS = new Set(['listItem', 'taskItem'])
+
+/** Each list item's depth and list kind (`o` ordered, `b` bullet), in document order. */
+function nodeListShape(node: JSONContent, depth = 0, kind = '', out: string[] = []): string[] {
+  const isItem = LIST_ITEMS.has(node.type ?? '')
+  if (isItem) out.push(depth + kind)
+  const childKind = node.type === 'orderedList' ? 'o' : node.type === 'bulletList' || node.type === 'taskList' ? 'b' : kind
+  for (const child of node.content ?? []) nodeListShape(child, isItem ? depth + 1 : depth, childKind, out)
+  return out
+}
+
+/** The same for the lexed source. */
+function tokenListShape(tokens: Token[], depth = 0, out: string[] = []): string[] {
+  for (const t of tokens) {
+    if (t.type === 'list') {
+      for (const item of (t as { items: { tokens?: Token[] }[] }).items) {
+        out.push(depth + ((t as { ordered?: boolean }).ordered ? 'o' : 'b'))
+        tokenListShape(item.tokens ?? [], depth + 1, out)
+      }
+    } else if (t.type === 'blockquote' && 'tokens' in t && t.tokens) tokenListShape(t.tokens, depth, out)
+  }
+  return out
+}
+
+const LIST_LINE = /^[ \t>]*(?:[*+-]|\d{1,9}[.)])(?:[ \t]|$)/m
+
+/**
+ * Did the parse keep the block's list structure? `@tiptap/markdown`'s list
+ * tokenizer mis-nests some lists (an ordered list in a bullet in an ordered
+ * list comes out a sibling of its parent), which `contentKey` cannot see; an
+ * edit would then save the wrong nesting. Such a block loads raw.
+ */
+function sameListShape(node: JSONContent, block: SourceBlock): boolean {
+  const parsed = nodeListShape(node)
+  if (parsed.length === 0 && !LIST_LINE.test(block.raw)) return true
+  const source = tokenListShape(gfmLexer.lexer(block.raw.replace(/\r\n?/g, '\n')))
+  return source.join(' ') === parsed.join(' ')
 }
 
 /**
