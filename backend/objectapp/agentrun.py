@@ -9,11 +9,14 @@ work); each registers its own order (the plan's registry of contributor orders).
 
 `build_run` runs the contributors and writes the run's files into a new temp folder outside
 every space and agent folder (``mcp.json``, ``run-settings.json``, ``append.md``); the caller
-removes that folder after the run (``mkdtemp``: readable by the user only). Secrets never go into
+removes that folder after the run (``mkdtemp``: readable by the user only). The run's file tools
+are fenced off that folder, and a run removes such folders left behind more than a day ago (when
+Object stopped mid-run). Secrets never go into
 the CLI's own environment, since the CLI hands its whole environment to every stdio MCP server:
 each server gets only its own secrets, filled into its own entry in ``mcp.json`` (`fill_refs`).
 The turn's token is in the ``env`` blocks of Object's two servers (``object``, ``object-agent``)
-only (audit 7).
+only (audit 7). Every other stdio server's ``env`` sets the sign-in names (`SERVER_ENV_BLANK`)
+empty, unless its own config sets them, so it doesn't inherit how the user signs in.
 
 The fence: every run denies the file tools on every registered space folder, every other
 agent's folder and the agent trash (``Read(...)`` covers Read, Glob and Grep; ``Edit(...)``
@@ -27,8 +30,9 @@ with commas or spaces needs no quoting.
 ``--setting-sources`` alone lets them through on CLI 2.1.317. The working folder is the agent
 folder's resolved (long) path, and the run's environment drops the variables a parent Claude
 Code session sets (`RUN_ENV_DROP`) but keeps how the user signs in to Claude Code
-(``CLAUDE_CONFIG_DIR``, `RUN_ENV_KEEP`; audit 20). A ``CLAUDE_CONFIG_DIR``'s ``CLAUDE.md`` and
-rules are excluded and its files fenced, as ``~/.claude``'s are.
+(``CLAUDE_CONFIG_DIR``, `RUN_ENV_KEEP`; audit 20). A ``CLAUDE_CONFIG_DIR`` is passed to the run
+made absolute, and its ``CLAUDE.md`` and rules are excluded and its files fenced (by its given and
+its resolved path), as ``~/.claude``'s are.
 
 No network client here: this module only builds a command and writes temp files.
 """
@@ -40,6 +44,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -127,6 +132,10 @@ RUN_ENV_KEEP: tuple[str, ...] = (
 )
 """Names `RUN_ENV_DROP`'s prefixes would drop that say how the user signs in (audit 20)."""
 
+SERVER_ENV_BLANK: tuple[str, ...] = (*RUN_ENV_KEEP, "ANTHROPIC_API_KEY")
+"""Set empty in every outside stdio MCP server's ``env`` (unless its config sets the name): the
+CLI hands its whole environment, with how the user signs in, to each stdio server it starts."""
+
 
 def run_base_env() -> dict[str, str]:
     """This process's environment as every ``claude`` run gets it (a turn, and ``--version`` in
@@ -138,12 +147,14 @@ def run_base_env() -> dict[str, str]:
 
 
 def _claude_config_dir() -> Path | None:
-    """The user's ``CLAUDE_CONFIG_DIR`` (resolved), when set: their Claude Code files live there."""
+    """The user's ``CLAUDE_CONFIG_DIR`` made absolute against Object's own working folder (links
+    kept), when set: their Claude Code files live there. A run gets this absolute form, since its
+    CLI's working folder is the agent folder."""
     value = os.environ.get("CLAUDE_CONFIG_DIR", "").strip()
     if not value:
         return None
     try:
-        return Path(os.path.expanduser(value)).resolve()
+        return Path(os.path.abspath(os.path.expanduser(value)))
     except (OSError, ValueError):
         return None
 
@@ -227,6 +238,7 @@ def contributors() -> list[tuple[int, str, Contributor]]:
 
 
 SECRET_LOOKUP: Callable[[str], str | None] = lambda name: None  # noqa: E731 - M19 replaces it
+"""A ``${VAR}``'s value for a folder ``.mcp.json`` server, or None (M19 supplies secrets)."""
 
 _REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
@@ -250,7 +262,6 @@ def fill_refs(value: Any, values: dict[str, str]) -> Any:
     if isinstance(value, dict):
         return {k: fill_refs(v, values) for k, v in value.items()}
     return value
-"""A ``${VAR}``'s value for a folder ``.mcp.json`` server, or None (M19 supplies secrets)."""
 
 
 # -- paths and the fence -----------------------------------------------------------------------
@@ -496,8 +507,9 @@ def _fence(scope: RunScope, parts: RunParts) -> None:
     rules = fence_rules(folders, own, scope.state, Path.home())
     config = _claude_config_dir()
     if config is not None:  # as ~/.claude's: the login and the user's Claude Code files
-        c = rule_path(config)
-        rules += [f"Read({c}/.credentials.json)", f"Edit({c}/**)"]
+        for form in _both_forms(config):
+            c = rule_path(form)
+            rules += [f"Read({c}/.credentials.json)", f"Edit({c}/**)"]
     for rule in rules:
         if rule not in parts.deny_rules:
             parts.deny_rules.append(rule)
@@ -538,8 +550,9 @@ def _run_settings(own: Path, parts: RunParts) -> dict[str, Any]:
     out["claudeMdExcludes"] = claude_md_excludes(own, Path.home())
     config = _claude_config_dir()
     if config is not None:  # the user CLAUDE.md lives there instead of ~/.claude
-        form = str(config).replace("\\", "/")
-        _extend(out["claudeMdExcludes"], [form + "/CLAUDE.md", form + "/rules/**"])
+        for p in reversed(_both_forms(config)):  # resolved first, as the other excludes are
+            form = str(p).replace("\\", "/")
+            _extend(out["claudeMdExcludes"], [form + "/CLAUDE.md", form + "/rules/**"])
     out["permissions"] = {"deny": list(parts.deny_rules)}
     for key, value in parts.settings.items():
         if key == "claudeMdExcludes":
@@ -559,8 +572,52 @@ def _run_settings(own: Path, parts: RunParts) -> dict[str, Any]:
 def _run_env(scope: RunScope, parts: RunParts) -> dict[str, str]:
     env = run_base_env()  # no OBJECT_API_TOKEN: only Object's own servers get it (their env blocks)
     env["OBJECT_API_URL"] = scope.api_url
+    config = _claude_config_dir()
+    if config is not None:  # the folder the fence covers, not one relative to the agent folder
+        env["CLAUDE_CONFIG_DIR"] = str(config)
     env.update(parts.env)
     return env
+
+
+def _without_sign_in(name: str, server: Any) -> Any:
+    """`server` with each `SERVER_ENV_BLANK` name its ``env`` doesn't set added as ``""``, when it
+    is an outside stdio server (Object's own two get nothing; a remote one inherits no env)."""
+    if name in _RESERVED_SERVERS or not isinstance(server, dict) or "command" not in server:
+        return server
+    if server.get("type", "stdio") != "stdio":
+        return server
+    raw = server.get("env")
+    env = dict(raw) if isinstance(raw, dict) else {}
+    have = {str(k).upper() for k in env}
+    env.update({n: "" for n in SERVER_ENV_BLANK if n not in have})
+    return {**server, "env": env}
+
+
+RUN_TMP_PREFIX = "object-agent-run-"
+_STALE_RUN_SECONDS = 86400
+
+
+def _sweep_stale_run_folders() -> None:
+    """Remove ``object-agent-run-*`` folders in the temp folder older than a day and owned by
+    this user: a run's folder (with its servers' secrets) left behind when Object stopped mid-run.
+    Only folders (not links or files) with that prefix; a failure is ignored."""
+    cutoff = time.time() - _STALE_RUN_SECONDS
+    uid = os.getuid() if hasattr(os, "getuid") else None
+    try:
+        entries = list(os.scandir(tempfile.gettempdir()))
+    except OSError:
+        return
+    for e in entries:
+        if not e.name.startswith(RUN_TMP_PREFIX):
+            continue
+        try:
+            st = e.stat(follow_symlinks=False)
+            if (not e.is_dir(follow_symlinks=False) or st.st_mtime >= cutoff
+                    or (uid is not None and st.st_uid != uid)):
+                continue
+        except OSError:
+            continue
+        shutil.rmtree(e.path, ignore_errors=True)
 
 
 def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | None) -> RunCommand:
@@ -573,11 +630,16 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
     for _order, _name, fn in contributors():
         fn(scope, parts)
     own = Path(scope.agent.folder).resolve()
-    mcp = {"mcpServers": parts.mcp_servers}
-    settings = _run_settings(own, parts)
+    mcp = {"mcpServers": {n: _without_sign_in(n, s) for n, s in parts.mcp_servers.items()}}
     append = "\n\n".join(p for p in parts.append_prompt if p)
-    tmp = Path(tempfile.mkdtemp(prefix="object-agent-run-"))
+    _sweep_stale_run_folders()
+    tmp = Path(tempfile.mkdtemp(prefix=RUN_TMP_PREFIX))
     try:
+        # The run's own folder holds the servers' secrets (mcp.json): fenced like a space.
+        for f in _both_forms(tmp):
+            rp = rule_path(f)
+            _extend(parts.deny_rules, [f"Read({rp}/**)", f"Edit({rp}/**)"])
+        settings = _run_settings(own, parts)
         (tmp / "mcp.json").write_bytes(dump_json(mcp))
         (tmp / "run-settings.json").write_bytes(dump_json(settings))
         (tmp / "append.md").write_bytes(append.encode("utf-8"))
