@@ -67,7 +67,7 @@ import { Highlight, TextColor } from './nodes/textStyle'
 import { blockRefMarkdown } from './blocks'
 import { M8Keys } from './shortcuts'
 import { withTextEscapes } from './textEscapes'
-import { NbspEntity, withLinkForms } from './extensions/linkForms'
+import { NbspEntity, referencesIn, withLinkForms, withReferences } from './extensions/linkForms'
 import { RecordAudio } from './media/recordAudio'
 import { LazyTable } from './table/LazyTable'
 
@@ -694,8 +694,18 @@ function containerText(editor: Editor, node: PMNode, eol: string): string {
   return out + (close ?? formatAnnotation({ type: 'close', name: node.type.name as 'toggle', options: [] }))
 }
 
-/** Serialize the document, re-emitting every unedited block's original source. */
+/**
+ * Serialize the document, re-emitting every unedited block's original source.
+ * An edited paragraph keeps the brackets of a shortcut reference the body
+ * defines, and of a footnote definition the body refers to (`withReferences`).
+ */
 export function serializeBody(editor: Editor): string {
+  const { doc } = editor.state
+  const text = doc.textBetween(0, doc.content.size, '\n', '\n')
+  return withReferences(referencesIn(text), () => serializeDoc(editor))
+}
+
+function serializeDoc(editor: Editor): string {
   const loaded = edges.get(editor)
   const { leading, trailing, eol, final } = loaded ?? { leading: '', trailing: '', eol: '\n', final: '' }
   const blocks: EditorBlock[] = []

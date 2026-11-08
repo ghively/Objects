@@ -44,6 +44,13 @@ function editAt(body: string, i: number): string {
   return serializeBody(editor)
 }
 
+/** `body` saved after typing `Z` at the end of the first textblock whose text contains `needle`. */
+function editWhere(body: string, needle: string): string {
+  const i = textblocks(headless(body)).findIndex((tb) => tb.node.textContent.includes(needle))
+  expect(i).toBeGreaterThanOrEqual(0)
+  return editAt(body, i)
+}
+
 const gfm = new Marked({ gfm: true })
 const html = (s: string) => (gfm.parse(s) as string).replace(/\s+/g, ' ').trim()
 
@@ -171,5 +178,41 @@ describe('#26 a body with lone-CR line endings', () => {
     const end = last.pos + last.node.nodeSize
     editor.view.dispatch(editor.state.tr.insert(end, editor.schema.nodes.paragraph.create(null, editor.schema.text('new'))))
     expect(serializeBody(editor)).toBe('para one\r\rpara two\r\rnew\r')
+  })
+})
+
+describe('#37 shortcut reference links and footnote definitions', () => {
+  test('a shortcut reference whose label the body defines keeps its brackets', () => {
+    const body = '[foo]: https://e.com\n\nsee [foo]\n'
+    expect(editWhere(body, 'see')).toBe('[foo]: https://e.com\n\nsee [foo]Z\n')
+    expectEveryEditLocal(body)
+  })
+
+  test('the label matches case-insensitively, blanks collapsed', () => {
+    const body = 'see [Foo  Bar] and ![foo bar]\n\n[foo bar]: /x\n'
+    expect(editWhere(body, 'see')).toBe('see [Foo  Bar] and ![foo bar]Z\n\n[foo bar]: /x\n')
+  })
+
+  test('brackets the body defines no label for stay escaped text', () => {
+    expect(editWhere('see [foo]\n', 'see')).toBe('see \\[foo\\]Z\n')
+    expect(editWhere('[bar]: /x\n\nsee [foo]\n', 'see')).toBe('[bar]: /x\n\nsee \\[foo\\]Z\n')
+  })
+
+  test('a footnote definition the body refers to is not escaped', () => {
+    const body = 'Text[^1] here.\n\n[^1]: The note.\n'
+    expect(editWhere(body, 'The note')).toBe('Text[^1] here.\n\n[^1]: The note.Z\n')
+    expect(editWhere(body, 'Text')).toBe('Text[^1] here.Z\n\n[^1]: The note.\n')
+  })
+
+  test('a footnote definition nothing refers to stays escaped', () => {
+    expect(editWhere('[^2]: lonely note\n', 'lonely')).toBe('\\[^2\\]: lonely noteZ\n')
+  })
+
+  test('a footnote definition that would read as a link definition stays escaped', () => {
+    // `[^1]: oneword` is a link definition to Markdown, which would hide the text.
+    const editor = headless('Text[^1] here.\n\n[^1]: The note.\n')
+    const tb = textblocks(editor)[1]
+    editor.view.dispatch(editor.state.tr.insertText('[^1]: word', tb.pos + 1, tb.pos + tb.node.nodeSize - 1))
+    expect(serializeBody(editor)).toBe('Text[^1] here.\n\n\\[^1\\]: word\n')
   })
 })
