@@ -612,6 +612,38 @@ def test_a_run_whose_cli_errs_after_completing_the_step_is_done() -> None:
                    withdrawn=False)[0] == "failed"
 
 
+def test_a_run_that_completed_its_step_and_then_timed_out_or_was_stopped_is_done() -> None:
+    """Sweep 2026-11-08 (work-import 5): the same gap for a run that completed the step and then
+    idled past the limit, or was stopped: the entry was failed and retryable, and Retry answered 409."""
+    from objectapp.headless import HeadlessResult
+    from objectapp.workloop import outcome
+    from objectapp.workservice import WorkNotice
+
+    def note(event: str, step: str = STEP, text: str = "Spooler restarted.") -> WorkNotice:
+        return WorkNotice(path=P, object_id="o1", event=event, step_id=step, n=2, kind="approve",
+                          step_text="Restart", before="approved", after="done", by=Actor("agent", "Work"),
+                          text=text, not_before=None, at=NOW, version="v")
+
+    stopped = HeadlessResult(chat_id="c", state="stopped", text="", session_id=None, model=None, error=None)
+    for kind in ("approve", "run"):
+        entry = {"kind": kind, "stepId": STEP}
+        assert outcome(entry, stopped, [note("complete")], False, timed_out=True, withdrawn=False) == (
+            "done", "Spooler restarted.", None)
+        assert outcome(entry, stopped, [note("done")], False, timed_out=False, withdrawn=False) == (
+            "done", "Spooler restarted.", None)
+        # nothing completed for this step: still failed with the time-out or the stop
+        assert outcome(entry, stopped, [note("complete", step="other")], False, timed_out=True,
+                       withdrawn=False) == ("failed", None, TIMED_OUT)
+        assert outcome(entry, stopped, [], False, timed_out=False, withdrawn=False) == ("failed", None, STOPPED)
+        assert outcome(entry, stopped, [note("complete"), note("fail", text="no")], False, timed_out=True,
+                       withdrawn=False) == ("failed", None, TIMED_OUT)
+    # a withdrawn run stays withdrawn, and a stopped filing run stays failed
+    assert outcome({"kind": "approve", "stepId": STEP}, stopped, [note("complete")], False, timed_out=True,
+                   withdrawn=True)[0] == "withdrawn"
+    assert outcome({"kind": "capture"}, stopped, [], False, timed_out=True, withdrawn=False) == (
+        "failed", None, TIMED_OUT)
+
+
 def test_an_approved_step_is_queued_again_when_its_item_is_reopened_by_status(
     env: Env, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
