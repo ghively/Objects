@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { deleteObjectsLabel } from '@/lib/deleteText'
 import { TypeChip } from '@/shell/Sidebar'
 
 export const SELECTION_TEXT = {
@@ -34,10 +35,8 @@ export const SELECTION_TEXT = {
   clear: 'Clear selection',
 }
 
-/** "Delete {count} object | Delete {count} objects". */
-export function deleteCountLabel(count: number): string {
-  return count === 1 ? 'Delete 1 object' : `Delete ${count} objects`
-}
+/** "Delete {count} object | Delete {count} objects": the shared wording. */
+export const deleteCountLabel = deleteObjectsLabel
 
 export interface SelectionBarProps {
   /** The selected rows, in view order. */

@@ -112,7 +112,7 @@ describe('DailyNoteSlot', () => {
       expect(await screen.findByRole('menuitem', { name: new RegExp(name) })).toBeInTheDocument()
     }
     await user.click(screen.getByRole('menuitem', { name: /^Delete/ }))
-    await user.click(await screen.findByRole('button', { name: 'Delete object' }))
+    await user.click(await screen.findByRole('button', { name: 'Delete 1 object' }))
     await waitFor(() => expect(mocked.deleteObject).toHaveBeenCalledWith(path, { baseVersion: 'v1' }))
     // The calendar is told, so it can show "+ Daily Note" for the day again.
     await waitFor(() => expect(onChanged).toHaveBeenCalled())

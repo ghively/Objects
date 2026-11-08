@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { deleteObjectsLabel } from '@/lib/deleteText'
 import { invalidateLinkIndex } from '@/links/linkIndex'
 
 export const COLLECTION_DIALOG_TEXT = {
@@ -35,10 +36,8 @@ export function skippedMessage(n: number): string {
   return `${n} ${n === 1 ? 'object' : 'objects'} couldn't be updated and still list this collection.`
 }
 
-/** "Delete {count} object(s)". */
-export function deleteObjectsLabel(count: number): string {
-  return `Delete ${count} ${count === 1 ? 'object' : 'objects'}`
-}
+/** "Delete {count} object(s)": the shared wording. */
+export { deleteObjectsLabel }
 
 // ---------------------------------------------------------------------------------------------
 

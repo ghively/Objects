@@ -75,7 +75,7 @@ describe('TypePage row menu (Task 17)', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Delete object' }))
     const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getByText('Delete this object?')).toBeInTheDocument()
-    await user.click(within(dialog).getByRole('button', { name: 'Delete object' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete 1 object' }))
     await waitFor(() => expect(mocked.deleteObject).toHaveBeenCalledWith('Books/Beta.md', { baseVersion: 'v-Beta' }))
   })
 
