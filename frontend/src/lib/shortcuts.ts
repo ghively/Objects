@@ -597,7 +597,10 @@ export const AI_SHORTCUTS: ShortcutDef[] = [
  * holds `Mod-=` (shown Ctrl+Plus) and the editor's key map answers the shifted `+` too. The
  * whiteboard's zoom keys are the same chords in their own scope. `mergeTextBlocks` (Block
  * editing, Ctrl+Shift+G; Ctrl+G stays `groupBlocks`) is bound by `editor/shortcuts.ts` through
- * `editor/extensions/mergeTextBlocks.ts`.
+ * `editor/extensions/mergeTextBlocks.ts`. `removeBlockStyles` (Block editing, Ctrl+Shift+X) is
+ * bound by `editor/shortcuts.ts` through `editor/extensions/removeBlockStyles.ts`. The catalog's
+ * "Open block styling" (Ctrl+Shift+E) is not bound: the block menu opens from the drag handle's
+ * React state (`editor/handles/BlockHandles.tsx`), which the editor has no hook into yet.
  */
 export const SWEEP_SHORTCUTS: ShortcutDef[] = [
   def('createNewTask', 'global', 'Create new task', ['Mod-Shift-t'], 'global', V, true),
@@ -607,6 +610,7 @@ export const SWEEP_SHORTCUTS: ShortcutDef[] = [
   def('increaseTextHierarchy', 'block', 'Increase text hierarchy', ['Mod-='], 'editor', V, true),
   def('decreaseTextHierarchy', 'block', 'Decrease text hierarchy', ['Mod--'], 'editor', V, true),
   def('mergeTextBlocks', 'block', 'Merge the selected text blocks', ['Mod-Shift-g'], 'editor', V, true),
+  def('removeBlockStyles', 'block', 'Remove block styles', ['Mod-Shift-x'], 'editor', V, true),
 ]
 
 registerShortcuts(EXISTING_SHORTCUTS)

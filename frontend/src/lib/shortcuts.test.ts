@@ -287,6 +287,18 @@ describe('sweep 2026-11-08: catalogued keys', () => {
     expect(formatKeys('Mod-Shift-g', false)).toBe('Ctrl+Shift+G')
   })
 
+  test('Ctrl+Shift+X is "Remove block styles" under Block editing, bound in the editor', () => {
+    const d = byId().get('removeBlockStyles')
+    expect(d).toBeTruthy()
+    expect(d?.category).toBe('block')
+    expect(d?.scope).toBe('editor')
+    expect(d?.name).toBe('Remove block styles')
+    expect(d?.provisional).toBe(false)
+    expect(d?.bound).toBe(true)
+    expect(keysFor('removeBlockStyles')).toEqual(['Mod-Shift-x'])
+    expect(formatKeys('Mod-Shift-x', false)).toBe('Ctrl+Shift+X')
+  })
+
   test('no two registered ids in one scope share a key, except the declared pairs', () => {
     for (const mac of [false, true]) {
       const seen = new Map<string, string>()
