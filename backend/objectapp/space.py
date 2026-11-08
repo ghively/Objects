@@ -23,6 +23,7 @@ import copy
 import hashlib
 import json
 import logging
+import math
 import os
 import random
 import re
@@ -890,6 +891,10 @@ def _str_list(value: object) -> list[str]:
 def _json_scalar(key: str, value: Any) -> Any:
     """A value for a key without a definition: a JSON scalar, or a list of them."""
     scalar = (str, int, float, bool, type(None))
+    items = value if isinstance(value, list) else [value]
+    if any(isinstance(v, float) and not math.isfinite(v) for v in items):
+        # `.nan`/`.inf` in the file would make the object unreadable as JSON.
+        raise InvalidValue(f"{key!r} must be a finite number")
     if isinstance(value, list) and all(isinstance(v, scalar) and v is not None for v in value):
         return FlowList(value) if value else None
     if not isinstance(value, scalar):

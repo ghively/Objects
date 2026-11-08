@@ -1102,7 +1102,8 @@ def evaluate(node: tuple, env: Env) -> Any:
         return _Evaluator(env).ev(node)
     except RecursionError as exc:
         raise FormulaError("The formula is nested too deeply") from exc
-    except (OverflowError, ArithmeticError) as exc:
+    except (OverflowError, ArithmeticError, ValueError) as exc:
+        # ValueError: `floor(NaN)`, or an integer over Python's 4,300-digit text limit.
         raise FormulaError("The result is out of range") from exc
 
 
