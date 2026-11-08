@@ -418,7 +418,9 @@ function preserveList(origLines: string[], regenInput: string[]): string[] {
   // regenerated ending (restyled), or the break would be saved as a soft one.
   const kept = origLines.slice()
   match.forEach((o, k) => {
-    if (o >= 0 && HARD_BREAK.test(regenLines[k]) && !HARD_BREAK.test(origLines[o])) kept[o] = restyle(regenLines[k], k)
+    // (A blank line is no break: the blanks of an empty line in an item are not one.)
+    if (o >= 0 && !isBlank(regenLines[k]) && HARD_BREAK.test(regenLines[k]) && !HARD_BREAK.test(origLines[o]))
+      kept[o] = restyle(regenLines[k], k)
   })
   return keepListStarts(weaveBlankLines(kept, regenLines, match, restyle), regenParsed)
 }
@@ -476,9 +478,19 @@ function weaveBlankLines(
 ): string[] {
   const out: string[] = []
   const last = () => out[out.length - 1]
-  const pushBlank = (line: string) => {
-    // No blank first line, and no stacked blanks where an item was removed.
-    if (out.length > 0 && !isBlank(last())) out.push(line)
+  // The original index of the blank line `out` ends with, when it ends with one pushed from it.
+  let lastBlank = -2
+  const push = (line: string) => {
+    out.push(line)
+    lastBlank = -2
+  }
+  const pushBlank = (i: number) => {
+    // No blank first line, and no stacked blanks where an item was removed; blank lines that
+    // follow each other in the original stay as many.
+    if (out.length > 0 && (!isBlank(last()) || lastBlank === i - 1)) {
+      out.push(origLines[i])
+      lastBlank = i
+    }
   }
   let prevOrig = -1
   let j = 0
@@ -490,14 +502,14 @@ function weaveBlankLines(
     const pending = regenLines.slice(j, k).map((line, n) => restyle(line, j + n))
     let p = 0
     for (let i = prevOrig + 1; i < nextOrig; i++) {
-      if (isBlank(origLines[i])) pushBlank(origLines[i])
-      else if (p < pending.length) out.push(pending[p++])
+      if (isBlank(origLines[i])) pushBlank(i)
+      else if (p < pending.length) push(pending[p++])
     }
-    while (p < pending.length) out.push(pending[p++])
+    while (p < pending.length) push(pending[p++])
     if (k >= regenLines.length) break
     const kept = origLines[match[k]]
-    if (isBlank(kept)) pushBlank(kept)
-    else out.push(kept)
+    if (isBlank(kept)) pushBlank(match[k])
+    else push(kept)
     prevOrig = match[k]
     j = k + 1
   }
