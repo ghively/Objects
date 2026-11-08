@@ -54,29 +54,29 @@ describe('slash items', () => {
     expect(sections.map((s) => s.label)).toEqual(['Create a block', 'Create an object', 'Link to a date', 'Reuse any content'])
     // The menu order (reference check 2026-10-28, 2d).
     expect(sections[0].items.map((i) => [i.name, i.description ?? null])).toEqual([
-      ['Standard', 'Turn block into a standard text block'],
-      ['Small', 'Turn block into a small text block'],
-      ['Heading 1', 'Block with a heading level 1'],
-      ['Heading 2', 'Block with a heading level 2'],
-      ['Heading 3', 'Block with a heading level 3'],
-      ['Heading 4', 'Block with a heading level 4'],
-      ['Bullet list', 'Add a bullet list to this block'],
-      ['Alphabetical list', 'Add an alphabetical list to this block'],
-      ['Numbered list', 'Add a numbered list to this block'],
-      ['Roman list', 'Add a roman list to this block'],
-      ['Quote block', 'Turn block into a quote block'],
-      ['To-do', 'Add a To-do box to this block'],
-      ['Toggle', 'Add a toggle to this block'],
-      ['Icon', 'Add an icon to this block'],
-      ['Group', 'A layout element to group multiple blocks into one container'],
+      ['Standard', 'Show this block as ordinary text'],
+      ['Small', 'Show this block in smaller type'],
+      ['Heading 1', 'Biggest heading'],
+      ['Heading 2', 'Large heading'],
+      ['Heading 3', 'Medium heading'],
+      ['Heading 4', 'Small heading'],
+      ['Bullet list', 'Turn this block into a bulleted item'],
+      ['Alphabetical list', 'Turn this block into a lettered item'],
+      ['Numbered list', 'Turn this block into a numbered item'],
+      ['Roman list', 'Turn this block into a roman-numeral item'],
+      ['Quote block', 'Show this block as a quotation'],
+      ['To-do', 'Turn this block into a checkbox item'],
+      ['Toggle', 'Make this block collapsible'],
+      ['Icon', 'Put an icon in front of this block'],
+      ['Group', 'Keep several blocks together in one box'],
       ['Ask AI about this block', null], // M10: the AI items, after the (search-only) colour items
-      ['Add tags to block using AI', null],
-      ['Record audio', 'Record audio and embed it at the cursor.'],
-      ['Math', 'A display style math block'],
+      ['Let AI suggest tags for this block', null],
+      ['Record audio', 'Record from the microphone and drop the clip here.'],
+      ['Math', 'An equation on its own line'],
       ['Code', 'A code block'],
-      ['Horizontal line', 'A horizontal line to separate different sections'],
-      ['Two Columns', 'Multiple blocks groups next to each other'],
-      ['Table', 'A simple block for tabular content'],
+      ['Horizontal line', 'A divider line between parts of the page'],
+      ['Two Columns', 'Lay groups of blocks out side by side'],
+      ['Table', 'Rows and columns of cells'],
       ['Create bookmark', null], // ours: Object's only way to insert a bookmark
       ['Button', 'A button that runs an automation on this object'], // M14 (ours)
     ])
@@ -98,13 +98,13 @@ describe('slash items', () => {
       'Create Person with title "Q3 plan"',
     ])
     expect(sections[2].items.map((i) => [i.name, i.description])).toEqual([
-      ['Today', "Add a link to today's daily note"],
-      ['Tomorrow', "Add a link to tomorrow's daily note"],
-      ['Yesterday', "Add a link to yesterday's daily note"],
+      ['Today', "Link today's daily note here"],
+      ['Tomorrow', "Link tomorrow's daily note here"],
+      ['Yesterday', "Link yesterday's daily note here"],
       ['In a week', 'Add a link to the daily note a week from today'],
       ['A week ago', 'Add a link to the daily note of a week ago'],
-      ['Today - date link', "Add a link to today's date."],
-      ['Now – timestamp', 'Add a timestamp with the current time'],
+      ['Today - date link', "Insert today's date as a link."],
+      ['Now – timestamp', 'Insert the time right now'],
     ])
     expect(sections[3].items.map((i) => i.name)).toEqual(['Reuse any content'])
   })
@@ -115,8 +115,8 @@ describe('slash items', () => {
     // Best match first: the name hits come before loose description hits.
     expect(names('head', []).slice(0, 4)).toEqual(['Heading 1', 'Heading 2', 'Heading 3', 'Heading 4'])
     expect(names('roman', [])[0]).toBe('Roman list')
-    // By description: "A horizontal line to separate different sections".
-    expect(names('separate', [])).toContain('Horizontal line')
+    // By description: "A divider line between parts of the page".
+    expect(names('between parts', [])).toContain('Horizontal line')
     expect(names('zzqx', [])).toEqual([])
     // The object items carry the query as the title, so they stay.
     expect(names('zzqx')).toEqual(['Create Page with title "zzqx"', 'Create Person with title "zzqx"'])
@@ -299,7 +299,7 @@ describe('m10 AI items', () => {
     const ids = (q: string, extra: Partial<SlashContext> = {}) => slashSections(ctx(q, extra))[0].items.map((i) => i.id)
     expect(AI_ITEMS.map((i) => [i.name, i.icon])).toEqual([
       ['Ask AI about this block', 'ph-sparkle'],
-      ['Add tags to block using AI', 'ph-sparkle'],
+      ['Let AI suggest tags for this block', 'ph-sparkle'],
     ])
     const plain = ids('')
     expect(plain.slice(plain.indexOf('group'), plain.indexOf('group') + 4)).toEqual(['group', 'ai:askBlock', 'ai:tagBlock', 'recordAudio'])

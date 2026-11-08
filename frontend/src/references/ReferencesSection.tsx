@@ -7,11 +7,11 @@
  * content in tab order, each under its label.
  *
  * M8 settings: a section set to "Hidden" loses its tab,
- * Related Content is dropped for the types in "Hide related content for object types", and with no
+ * Related Content is dropped for the types in "Types without related content", and with no
  * per-object state yet a "Closed" section's part of All starts collapsed (every shown section
  * "Closed": the whole section starts closed). Any change made on the object (tab, hide, a part's
  * heading) is remembered per object and wins over the defaults. Backlinks render in "Backlink
- * content view" and nested ones per "Default display of nested backlinks".
+ * content view" and nested ones per "How nested backlinks show at first".
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { ObjectSummary, References, ReferencesTab, TypeDef } from '@/api/types'

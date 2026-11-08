@@ -58,7 +58,7 @@ describe('Export dialog (polish item 23)', () => {
       expect(within(dialog).getByRole('switch', { name })).toBeInTheDocument()
     }
     expect(within(dialog).getByRole('switch', { name: 'Links as wikilinks' })).toHaveAttribute('aria-checked', 'true')
-    expect(within(dialog).getByText('Export links as [[title]] instead of [title](path).')).toBeInTheDocument()
+    expect(within(dialog).getByText('Writes links as [[title]] rather than [title](path).')).toBeInTheDocument()
   })
 
   test('plain Markdown keeps the short url; options travel as flags and zip the folder', async () => {
@@ -92,7 +92,7 @@ describe('Export dialog (polish item 23)', () => {
     await user.click(styles[2])
 
     expect(within(dialog).getByRole('switch', { name: 'Hide empty properties' })).toHaveAttribute('aria-checked', 'true')
-    expect(within(dialog).getByRole('switch', { name: 'Include embedded content' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('switch', { name: 'Include embeds' })).toBeInTheDocument()
     await user.click(within(dialog).getByRole('switch', { name: 'Include outline' }))
     await user.click(within(dialog).getByRole('switch', { name: 'Show type labels' }))
     await user.click(within(dialog).getByRole('radio', { name: 'Letter' }))
@@ -100,7 +100,7 @@ describe('Export dialog (polish item 23)', () => {
     // Properties: the empty one is hidden while "Hide empty properties" is on.
     expect(await within(dialog).findByText('Bio')).toBeInTheDocument()
     expect(within(dialog).queryByText('Manager')).toBeNull()
-    expect(within(dialog).getByText('Deselect properties to hide them from the export.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Untick a property to leave it out.')).toBeInTheDocument()
     await user.click(within(dialog).getByRole('checkbox', { name: 'Bio' }))
     expect(within(dialog).getByRole('checkbox', { name: 'All properties' })).toHaveAttribute('aria-checked', 'false')
 

@@ -3,7 +3,7 @@
  * never overwrite what `index.html` painted first):
  * - the text size (`--app-zoom`, `zoom.ts`);
  * - the spellcheck language (`lang`, `spellcheck.ts`; the browser's spellchecker follows it);
- * - "Hide object type settings outside of settings" (`data-hide-structure-settings`: `index.css`
+ * - "Keep type settings inside Settings only" (`data-hide-structure-settings`: `index.css`
  *   hides every `[data-structure-setting]` entry point while it is set);
  * - the highlight style (`data-highlight-style`; Object has no highlight blocks yet, so nothing
  *   reads it so far).

@@ -116,7 +116,7 @@ export async function uploadFiles(
       const res = await media.uploadAttachment(file)
       place(res.path, placed++)
     } catch (err) {
-      showToast(err instanceof Error && err.message ? err.message : 'The file could not be uploaded.')
+      showToast(err instanceof Error && err.message ? err.message : "The upload didn't go through.")
     }
   }
 }

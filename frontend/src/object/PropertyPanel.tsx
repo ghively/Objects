@@ -275,7 +275,7 @@ function Row({
   menu?: { open: boolean; onOpenChange(open: boolean): void; content: ReactNode }
   children: ReactNode
 }) {
-  // "Hide object type settings outside of settings": the label stays, its menu goes.
+  // "Keep type settings inside Settings only": the label stays, its menu goes.
   const hideMenu = useSettings((s) => s.settings.hideStructureSettings)
   const heading = (
     <>

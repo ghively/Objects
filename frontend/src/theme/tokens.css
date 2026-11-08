@@ -286,7 +286,7 @@ body,
   }
 }
 
-/* "Hide object type settings outside of settings" (`settings/DeviceSettingsFollower.tsx`). */
+/* "Keep type settings inside Settings only" (`settings/DeviceSettingsFollower.tsx`). */
 html[data-hide-structure-settings] [data-structure-setting] {
   display: none !important;
 }

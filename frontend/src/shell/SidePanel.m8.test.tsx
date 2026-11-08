@@ -66,7 +66,7 @@ describe('SidePanel (M8)', () => {
     // No object in the main view: not available.
     act(() => s().open({ kind: 'trash' } as Target))
     expect(await within(area(1)).findByText('Backlinks not available')).toBeInTheDocument()
-    expect(within(area(1)).getByText('This content type does not support backlinks.')).toBeInTheDocument()
+    expect(within(area(1)).getByText("Backlinks aren't shown for this kind of content.")).toBeInTheDocument()
   })
 
   test('a type without a references section says backlinks are not available', async () => {

@@ -59,7 +59,7 @@ describe('FormulaCell', () => {
     // An error shows its title, the message as the tooltip.
     const bad = cellOf(editor, 4, 1).querySelector<HTMLElement>('.formula-error')!
     expect(bad.textContent).toBe('Value')
-    expect(bad.title).toBe('The value returned from the formula is not finite.')
+    expect(bad.title).toBe("This formula's result is infinite or undefined.")
     // Ordinary cells are untouched.
     expect(cellOf(editor, 1, 1).classList.contains('formula-cell')).toBe(false)
 

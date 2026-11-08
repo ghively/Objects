@@ -862,7 +862,7 @@ export const RESIZE_STEP_LARGE = GRID * 5
 
 /**
  * "Resize selection": grows or shrinks each node from its right or bottom edge by `(dw, dh)`
- * ("Grows or shrinks from the right or bottom edge"), never below its kind's floor (an embedded
+ * ("The right and bottom edges move; the top-left corner stays put"), never below its kind's floor (an embedded
  * object stays at least `LINK_BLOCK_MIN_WIDTH` wide). Points and locked nodes stay. `measured` gives the rendered
  * size of nodes that still size themselves, so the first step starts from what is on screen.
  */

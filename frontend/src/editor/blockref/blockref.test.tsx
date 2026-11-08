@@ -115,7 +115,7 @@ describe('block references (M8 Task 27)', () => {
     await mount('![[Loop#^loop01]]\n')
     const msg = await screen.findByTestId('block-ref-recursive', {}, { timeout: 3000 })
     expect(msg).toHaveTextContent(
-      'This block reference seems to be referencing itself either directly or through another embedded object.',
+      'This block reference loops back to itself, directly or through something it embeds.',
     )
     expect(screen.getAllByTestId('block-ref')).toHaveLength(2)
   })

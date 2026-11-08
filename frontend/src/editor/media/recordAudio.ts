@@ -11,7 +11,7 @@
  *   below the block the cursor was in when recording started (the position is
  *   mapped through edits made meanwhile).
  * - Cancel: nothing is uploaded and the document is unchanged.
- * - A denied (or missing) microphone shows "Microphone access was denied."
+ * - A denied (or missing) microphone shows "No permission to use the microphone."
  * Strings are ours. One recording at a time: a second call while one runs
  * resolves at once.
  */

@@ -1,4 +1,4 @@
-// "Hide object type settings outside of settings" (`DeviceSettings.hideStructureSettings`).
+// "Keep type settings inside Settings only" (`DeviceSettings.hideStructureSettings`).
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { objectSummary, propertyDef, typeDef } from '@/test/mockApi'

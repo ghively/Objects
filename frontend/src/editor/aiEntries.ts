@@ -1,6 +1,6 @@
 /**
  * M10: the editor's entries into the AI assistant (the slash menu's "Ask AI about this block" and
- * "Add tags to block using AI", the block menu's "AI assistant...", the selection toolbar's and the
+ * "Let AI suggest tags for this block", the block menu's "AI assistant...", the selection toolbar's and the
  * block-selection bar's "AI"). Each builds an `AiSeed` for `openAiChat` (`@/ai/store`, the
  * contract): the block(s) or selected text, the edited object as context, and the two callbacks
  * the chat panel calls once the user accepts an answer:
@@ -39,7 +39,7 @@ import { editorObjectPath } from './nodes/blockRef'
 export const AI_TEXT = {
   /** Slash menu (catalog audit item 41, "Use the AI Assistant"). */
   askBlock: 'Ask AI about this block',
-  tagBlock: 'Add tags to block using AI',
+  tagBlock: 'Let AI suggest tags for this block',
   /** Block handle menu (catalog section 6). */
   assistant: 'AI assistant...',
   /** Selection toolbar's sparkle and the block-selection bar's button (catalog section 6). */

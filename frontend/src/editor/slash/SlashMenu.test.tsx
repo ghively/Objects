@@ -115,7 +115,7 @@ describe('<SlashMenu>', () => {
     const standard = within(menu).getAllByRole('option')[0]
     expect(standard).toHaveTextContent(/^Standard$/)
     const tip = standard.querySelector('.slash-menu-description')!
-    expect(tip.getAttribute('title')).toBe('Turn block into a standard text block')
+    expect(tip.getAttribute('title')).toBe('Show this block as ordinary text')
   })
 
   test('create bookmark asks for the URL and inserts a web link block', async () => {

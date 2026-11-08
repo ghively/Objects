@@ -4,9 +4,9 @@
  * "Merge into object" / "Merge into tag") opens it.
  *
  * Steps: pick the target ("Merge into"; "Loading…" while the list loads; a tag lists only other
- * tags, any other object only non-tags), confirm ("Are you sure you want to merge “{sourceName}”
+ * tags, any other object only non-tags), confirm ("Merge “{sourceName}”
  * into “{targetName}”?" with the description and "Merge"), merging ("Merging objects…" /
- * "Merging tags…"), then "Object successfully merged" / "Tag successfully merged" and the target
+ * "Merging tags…"), then "Objects merged" / "Tags merged" and the target
  * opens. Whiteboards and templates are not offered (our choice; the server refuses whiteboards).
  */
 import { useEffect, useMemo, useState } from 'react'
@@ -22,7 +22,7 @@ import { useTabs } from '@/nav/tabs'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 import { useMerge } from './useMerge'
 
-/** Merging is limited to this many references (the server's `MERGE_LIMIT`, our value). */
+/** A merge can move at most this many references (the server's `MERGE_LIMIT`, our value). */
 export const MERGE_LIMIT = 5000
 
 export interface MergeStrings {
@@ -43,31 +43,31 @@ export const MERGE_OBJECT: MergeStrings = {
   submenuTitle: 'Merge into',
   preparing: 'Loading…',
   nothingFound: 'No other objects found',
-  confirmTitle: (s, t) => `Are you sure you want to merge “${s}” into “${t}”?`,
+  confirmTitle: (s, t) => `Merge “${s}” into “${t}”?`,
   confirmDescription: (s, t) =>
-    `Single values already set on “${t}” stay. Lists are combined with “${s}”, and empty properties are filled from there. Content is added on.`,
+    `“${t}” keeps the single values it already has, picks up the list items from “${s}”, which also fills any properties that are blank. Its content goes at the end.`,
   confirmText: 'Merge',
   loading: 'Merging objects…',
-  success: 'Object successfully merged',
+  success: 'Objects merged',
   error: 'Could not merge objects',
-  errorTooLarge: 'This object is too large to merge',
+  errorTooLarge: 'Too many references to merge this object',
   errorTooLargeDescription: (limit) =>
-    `Merging is limited to ${limit} references. You can still merge a smaller object into this one, or remove some references first.`,
+    `A merge can move at most ${limit} references. Pick a smaller object to merge here, or drop some of its links before trying again.`,
 }
 
 export const MERGE_TAG: MergeStrings = {
   submenuTitle: 'Merge into',
   preparing: 'Loading…',
   nothingFound: 'No other tags found',
-  confirmTitle: (s, t) => `Are you sure you want to merge “${s}” into “${t}”?`,
-  confirmDescription: (_s, t) => `References to this tag will be merged into “${t}”.`,
+  confirmTitle: (s, t) => `Merge “${s}” into “${t}”?`,
+  confirmDescription: (_s, t) => `Anything tagged here moves to “${t}”.`,
   confirmText: 'Merge',
   loading: 'Merging tags…',
-  success: 'Tag successfully merged',
+  success: 'Tags merged',
   error: 'Could not merge tags',
-  errorTooLarge: 'This tag is too large to merge',
+  errorTooLarge: 'Too many references to merge this tag',
   errorTooLargeDescription: (limit) =>
-    `Merging is limited to ${limit} references. You can still merge a smaller tag into this one, or remove some uses of this tag first.`,
+    `A merge can move at most ${limit} references. Pick a smaller tag to merge here, or untag some objects before trying again.`,
 }
 
 /** Our string (the cancel button). */

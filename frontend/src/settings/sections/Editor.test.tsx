@@ -135,7 +135,7 @@ describe('EditorSection', () => {
     await user.click(within(view).getByRole('radio', { name: 'Small card' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ backlinkContentView: 'smallCard' }, expect.anything())
 
-    const hidden = screen.getByRole('group', { name: 'Hide related content for object types' })
+    const hidden = screen.getByRole('group', { name: 'Types without related content' })
     const clear = screen.getByRole('button', { name: 'Clear all' })
     expect(clear).toBeDisabled()
     await user.click(within(hidden).getByRole('checkbox', { name: 'Books' }))
@@ -150,10 +150,10 @@ describe('EditorSection', () => {
   test('test nested backlink mode saves', async () => {
     const user = userEvent.setup()
     render(<EditorSection />)
-    expect(screen.getByRole('heading', { name: 'Default display of nested backlinks' })).toBeInTheDocument()
-    const g = screen.getByRole('radiogroup', { name: 'Default display of nested backlinks' })
-    expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Only block with backlink', 'Full path above'])
-    expect(within(g).getByRole('radio', { name: 'Only block with backlink' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('heading', { name: 'How nested backlinks show at first' })).toBeInTheDocument()
+    const g = screen.getByRole('radiogroup', { name: 'How nested backlinks show at first' })
+    expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Just the linking block', 'Full path above'])
+    expect(within(g).getByRole('radio', { name: 'Just the linking block' })).toHaveAttribute('aria-checked', 'true')
     await user.click(within(g).getByRole('radio', { name: 'Full path above' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ nestedBacklinkView: 'showFullPathAbove' }, expect.anything())
   })
@@ -163,7 +163,7 @@ describe('EditorSection', () => {
     render(<EditorSection />)
     for (const [label, key] of [
       ['Insert links inline by default', 'alwaysCreateInlineLinks'],
-      ['Hide object type settings outside of settings', 'hideStructureSettings'],
+      ['Keep type settings inside Settings only', 'hideStructureSettings'],
     ] as const) {
       const sw = screen.getByRole('switch', { name: label })
       expect(sw).toHaveAttribute('aria-checked', 'false')

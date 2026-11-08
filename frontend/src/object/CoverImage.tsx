@@ -6,7 +6,7 @@
  * "Remove cover image".
  *
  * M9 reposition: the offset is a y percent, 0–100 (default 50), drawn as
- * `object-position: 0% <offset>%`. While repositioning, "Drag image to reposition" shows; a drag
+ * `object-position: 0% <offset>%`. While repositioning, "Drag to move the image" shows; a drag
  * sets offset = start − dy / rendered height × 100, clamped; "Save" (or a click outside) writes
  * it, "Cancel" restores. An unmoved save writes nothing (our choice); the offset is rounded to a
  * whole percent (our choice).
@@ -24,7 +24,7 @@ export const COVER_TEXT = {
   remove: 'Remove cover image',
   toggleWide: 'Toggle wide cover image',
   reposition: 'Reposition cover image',
-  dragHint: 'Drag image to reposition',
+  dragHint: 'Drag to move the image',
   save: 'Save',
   cancel: 'Cancel',
 } as const

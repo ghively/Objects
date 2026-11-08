@@ -35,25 +35,25 @@ describe('formulas', () => {
     // The formula statements.
     expect(FORMULA_STATEMENTS).toEqual([
       { name: 'ABS', description: 'Get absolute value' },
-      { name: 'AVG', description: 'Calculate average of values' },
-      { name: 'CEIL', description: 'Round up to nearest integer' },
+      { name: 'AVG', description: 'Mean of the values' },
+      { name: 'CEIL', description: 'Raise to the next whole number' },
       { name: 'COUNT', description: 'Count number of values' },
-      { name: 'E', description: "Mathematical constant Euler's number" },
-      { name: 'FLOOR', description: 'Round down to nearest integer' },
-      { name: 'LN', description: 'Calculate the natural logarithm' },
-      { name: 'LOG', description: 'Calculate the natural logarithm' },
+      { name: 'E', description: "The number e (about 2.718)" },
+      { name: 'FLOOR', description: 'Drop the fraction, rounding toward minus infinity' },
+      { name: 'LN', description: 'Logarithm to base e' },
+      { name: 'LOG', description: 'Logarithm to base e' },
       { name: 'MAX', description: 'Find maximum value' },
       { name: 'MEDIAN', description: 'Find median value' },
       { name: 'MIN', description: 'Find minimum value' },
-      { name: 'PHI', description: 'Mathematical constant Golden ratio' },
-      { name: 'PI', description: 'Mathematical constant Pi' },
-      { name: 'PRODUCT', description: 'Calculate product of values' },
-      { name: 'RAND', description: 'Generate a random number' },
-      { name: 'ROUND', description: 'Round to nearest integer' },
+      { name: 'PHI', description: 'The golden ratio φ (about 1.618)' },
+      { name: 'PI', description: 'The number π (about 3.14159)' },
+      { name: 'PRODUCT', description: 'Multiply the values together' },
+      { name: 'RAND', description: 'Random number between 0 and 1' },
+      { name: 'ROUND', description: 'Round to the closest whole number' },
       { name: 'SIGN', description: 'Get sign of value' },
       { name: 'SQRT', description: 'Calculate square root' },
       { name: 'SUM', description: 'Calculate sum of values' },
-      { name: 'TAU', description: 'Mathematical constant Tau' },
+      { name: 'TAU', description: 'The number τ, 2π (about 6.283)' },
     ])
     expect(FORMULA_ERROR_TITLES).toEqual({
       circular: 'Circular',
@@ -62,12 +62,12 @@ describe('formulas', () => {
       value: 'Value',
     })
     expect(FORMULA_ERROR_MESSAGES).toMatchObject({
-      circularReference: 'The formula contains a circular reference.',
-      expressionIsEmpty: 'The formula expression is empty.',
-      invalidCellReference: 'The formula contains a reference to an invalid cell.',
-      invalidRangeReference: 'The formula contains invalid range references.',
-      valueNotANumber: 'The value returned from the formula is not a number.',
-      valueNotFinite: 'The value returned from the formula is not finite.',
+      circularReference: 'This formula ends up depending on its own cell.',
+      expressionIsEmpty: "There's no formula to work out.",
+      invalidCellReference: "This formula points at a cell that doesn't exist.",
+      invalidRangeReference: "A cell range in this formula isn't valid.",
+      valueNotANumber: "This formula didn't give a number.",
+      valueNotFinite: "This formula's result is infinite or undefined.",
     })
     expect(FORMULA_PLACEHOLDER).toBe('Formula')
     expect(FORMULA_NO_OPTIONS).toBe('No options found')
@@ -134,7 +134,7 @@ describe('formulas', () => {
     for (const r of [results[0][0], results[0][1], results[0][2], results[1][0]]) {
       expect(r).toEqual({
         ok: false,
-        error: { kind: 'circular', title: 'Circular', message: 'The formula contains a circular reference.' },
+        error: { kind: 'circular', title: 'Circular', message: 'This formula ends up depending on its own cell.' },
       })
     }
     expect(results[1][2] && value(results[1][2])).toBe(1)
@@ -147,16 +147,16 @@ describe('formulas', () => {
       const r = evaluateFormula(expr, GRID)
       return r.ok ? null : [r.error.title, r.error.message]
     }
-    expect(err('=Z9')).toEqual(['Reference', 'The formula contains a reference to an invalid cell.'])
-    expect(err('=SUM(A1:Z9)')).toEqual(['Reference', 'The formula contains invalid range references.'])
-    expect(err('=SUM(A1:)')).toEqual(['Reference', 'The formula contains invalid range references.'])
-    expect(err('=B2:B3+1')).toEqual(['Reference', 'The formula contains invalid range references.'])
-    expect(err('=A2+1')).toEqual(['Value', 'The value returned from the formula is not a number.'])
-    expect(err('=SQRT(-1)')).toEqual(['Value', 'The value returned from the formula is not a number.'])
-    expect(err('=1/0')).toEqual(['Value', 'The value returned from the formula is not finite.'])
-    expect(err('=AVG(C4:C4)')).toEqual(['Value', 'The value returned from the formula is not a number.'])
-    expect(err('=')).toEqual(['Expression', 'The formula expression is empty.'])
-    expect(err('=   ')).toEqual(['Expression', 'The formula expression is empty.'])
+    expect(err('=Z9')).toEqual(['Reference', "This formula points at a cell that doesn't exist."])
+    expect(err('=SUM(A1:Z9)')).toEqual(['Reference', "A cell range in this formula isn't valid."])
+    expect(err('=SUM(A1:)')).toEqual(['Reference', "A cell range in this formula isn't valid."])
+    expect(err('=B2:B3+1')).toEqual(['Reference', "A cell range in this formula isn't valid."])
+    expect(err('=A2+1')).toEqual(['Value', "This formula didn't give a number."])
+    expect(err('=SQRT(-1)')).toEqual(['Value', "This formula didn't give a number."])
+    expect(err('=1/0')).toEqual(['Value', "This formula's result is infinite or undefined."])
+    expect(err('=AVG(C4:C4)')).toEqual(['Value', "This formula didn't give a number."])
+    expect(err('=')).toEqual(['Expression', "There's no formula to work out."])
+    expect(err('=   ')).toEqual(['Expression', "There's no formula to work out."])
     expect(err('=1+')).toEqual(['Expression', 'The formula expression is invalid.'])
     expect(err('=FOO(1)')).toEqual(['Expression', 'The formula expression is invalid.'])
     expect(err('=ABS(1, 2)')).toEqual(['Expression', 'The formula expression is invalid.'])

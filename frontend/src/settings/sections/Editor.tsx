@@ -67,15 +67,15 @@ export const EDITOR_TEXT = {
   tri: { open: 'Open', closed: 'Closed', hidden: 'Hidden' },
   backlinkContentView: 'Backlink content view',
   backlinkContentViewDescription: 'How backlink content shows at first. With nothing picked, it is embedded.',
-  hiddenTypes: 'Hide related content for object types',
+  hiddenTypes: 'Types without related content',
   hiddenTypesDescription: 'Pages of the types picked here leave out the related content section.',
   clearAll: 'Clear all',
   // M8
-  nestedBacklinks: 'Default display of nested backlinks',
+  nestedBacklinks: 'How nested backlinks show at first',
   nestedBacklinksDescription:
     'How a backlink inside nested blocks is shown by default: just the block that holds the link, which is shorter, or that block with every parent block above it, which gives more context.',
   nestedModes: {
-    showBlockContainingBacklink: 'Only block with backlink',
+    showBlockContainingBacklink: 'Just the linking block',
     showFullPathAbove: 'Full path above',
   },
   // Polish 2026-11-03
@@ -89,7 +89,7 @@ export const EDITOR_TEXT = {
   inlineLinks: 'Insert links inline by default',
   inlineLinksDescription:
     'Linking to an object always makes an inline link, even at the start of an empty block.',
-  hideStructure: 'Hide object type settings outside of settings',
+  hideStructure: 'Keep type settings inside Settings only',
   hideStructureDescription:
     'Removes the controls for editing properties and type settings from pages. Settings is still where you change them.',
   highlightStyle: 'Highlight Style',
@@ -135,7 +135,7 @@ const SECTION_KEYS = ['backlinks', 'relatedContent', 'unlinkedMentions'] as cons
 const TRIS: Tri[] = ['open', 'closed', 'hidden']
 const NESTED_MODES = ['showBlockContainingBacklink', 'showFullPathAbove'] as const
 
-/** "Hide related content for object types": a checkbox per type and "Clear all". */
+/** "Types without related content": a checkbox per type and "Clear all". */
 function HiddenTypes({ value, onChange }: { value: string[]; onChange(next: string[]): void }) {
   const types = useSettingsTypes()
   const hidden = new Set(value)

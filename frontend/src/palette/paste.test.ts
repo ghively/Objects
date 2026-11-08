@@ -126,7 +126,7 @@ describe('running the offers', () => {
     await addToDailyNote('Buy milk', '2026-10-27')
     expect(mocked.createDailyNote).toHaveBeenCalledWith('2026-10-27')
     expect(mocked.saveBody).toHaveBeenCalledWith('DailyNotes/2026-10-27.md', 'Buy milk\n', 'v1')
-    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Added content to daily note')
+    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Sent to the daily note')
 
     // The note exists: append after its body.
     mocked.saveBody.mockClear()

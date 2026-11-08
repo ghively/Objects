@@ -17,7 +17,7 @@ const FILES_TEXT = {
   open: 'Open file',
   drop: 'Drop files to attach',
   uploading: 'Uploading…',
-  uploadFailed: 'The file could not be uploaded.',
+  uploadFailed: "The upload didn't go through.",
   openFailed: 'The file could not be opened.',
 }
 

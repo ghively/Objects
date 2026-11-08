@@ -4,7 +4,7 @@
  *   board titled `title` with each editor block as a node, top to bottom in one column: an object
  *   embed (`![[Title]]`, with or without its `<!-- block: … -->` options) becomes an entity node,
  *   anything else a text node holding the block's Markdown. Resolves with the board's path; on a
- *   failure it throws `Could not create whiteboard`.
+ *   failure it throws `The whiteboard wasn't created`.
  * - `addObjectToWhiteboard` ("Add to whiteboard"): opens the dialog;
  *   resolves with the board the object was added to (rejects when the dialog is closed).
  * - `placeObjectOnBoard`: adds an entity node for an object right of a board's content and saves
@@ -19,7 +19,7 @@ import { useAddToWhiteboard } from './AddToWhiteboardDialog'
 import { wikilinkFor } from './linkText'
 import { DEFAULT_NODE_WIDTH, emptyBoard, GRID, LINK_BLOCK_MIN_WIDTH, nextContentZ } from './model'
 
-export const TURN_INTO_FAILED = 'Could not create whiteboard'
+export const TURN_INTO_FAILED = "The whiteboard wasn't created"
 
 /** Space between the nodes of a turned-into board (one grid cell; our choice). */
 export const COLUMN_GAP = GRID

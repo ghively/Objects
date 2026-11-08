@@ -88,7 +88,7 @@ describe('turn blocks into whiteboard', () => {
     expect(Object.keys(boardFromBlocks([]).nodes)).toHaveLength(0)
   })
 
-  test('a failure reads "Could not create whiteboard"', async () => {
+  test("a failure reads 'The whiteboard wasn't created'", async () => {
     const client = fakeClient()
     client.createWhiteboard.mockRejectedValueOnce(new Error('disk full'))
     await expect(turnBlocksIntoWhiteboard(['x'], 'T', client)).rejects.toThrow(TURN_INTO_FAILED)
@@ -158,7 +158,7 @@ describe('add to whiteboard', () => {
     expect(nodes).toHaveLength(1)
     expect(rightOfContent(emptyBoard())).toEqual({ x: 0, y: 0 })
 
-    // A failed create shows "Could not create whiteboard".
+    // A failed create shows "The whiteboard wasn't created".
     client.createWhiteboard.mockRejectedValueOnce(new Error('nope'))
     act(() => {
       outcome = addObjectToWhiteboard('Pages/Alpha.md')

@@ -347,7 +347,7 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
   def('toggleCalendarSidebar', 'global', 'Toggle calendar sidebar', ['Mod-Alt-s'], 'global', V),
   def('toggleDarkMode', 'global', 'Toggle dark mode', ['Mod-Shift-l'], 'global', V),
   def('openSettings', 'global', 'Open settings', ['Mod-,'], 'global', V),
-  def('toggleShortcutsMenu', 'global', 'Show/hide shortcuts menu', ['Mod-Shift-b'], 'global', V),
+  def('toggleShortcutsMenu', 'global', 'Toggle the shortcuts list', ['Mod-Shift-b'], 'global', V),
 ]
 
 /**
@@ -430,7 +430,7 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def('whiteboardFlipHorizontal', 'whiteboard', 'Flip horizontal', ['Shift-h'], 'whiteboard', false, false),
   def('whiteboardFlipVertical', 'whiteboard', 'Flip vertical', ['Shift-v'], 'whiteboard', false, false),
   def('whiteboardCycle', 'whiteboard', 'Cycle selected objects', ['Tab'], 'whiteboard', false, false),
-  def('whiteboardCycleBack', 'whiteboard', 'Cycle selected objects backward', ['Shift-Tab'], 'whiteboard', false, false),
+  def('whiteboardCycleBack', 'whiteboard', 'Select the previous item', ['Shift-Tab'], 'whiteboard', false, false),
   def('whiteboardPan', 'whiteboard', 'Pan', ['Space'], 'whiteboard', false, false),
   def('undo', 'whiteboard', 'Undo last change', ['Mod-z'], 'whiteboard', false, false),
   def('redo', 'whiteboard', 'Redo last change', ['Mod-Shift-z', 'Mod-y'], 'whiteboard', false, false),
@@ -470,7 +470,7 @@ export const M8_SHORTCUTS: ShortcutDef[] = [
   def(
     'whiteboardResizeLarge',
     'whiteboard',
-    'Resize selection farther',
+    'Resize the selection in bigger steps',
     ['Mod-Shift-ArrowUp', 'Mod-Shift-ArrowDown', 'Mod-Shift-ArrowLeft', 'Mod-Shift-ArrowRight'],
     'whiteboard',
     V,

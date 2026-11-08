@@ -2,7 +2,7 @@
  * "Add to whiteboard" (M8 Task 22): pick a board, or "New whiteboard",
  * and the object is placed on it as an entity node right of the
  * board's existing content (`placeObjectOnBoard`). Creating a board that fails shows
- * "Could not create whiteboard". A board can't be added to itself
+ * "The whiteboard wasn't created". A board can't be added to itself
  * (our choice: it isn't listed). Mounted once in `shell/GlobalOverlays.tsx`; `useAddToWhiteboard`
  * opens it (the object menu, and `addObjectToWhiteboard`, which waits for the outcome).
  */

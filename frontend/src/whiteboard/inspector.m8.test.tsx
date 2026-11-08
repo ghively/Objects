@@ -180,9 +180,9 @@ describe('floating inspector', () => {
   test('test outline and frames empty states', async () => {
     await renderPage(board([node({ id: 'a', blockId: 'b' })], [], { b: textBlock('plain') }))
     const panel = openInspector()
-    expect(within(panel).getByText('No headings in this page')).toBeInTheDocument()
+    expect(within(panel).getByText('This page has no headings')).toBeInTheDocument()
     fireEvent.click(within(panel).getByRole('tab', { name: 'Frames' }))
-    expect(within(panel).getByText('No frames on this whiteboard')).toBeInTheDocument()
+    expect(within(panel).getByText('This whiteboard has no frames')).toBeInTheDocument()
   })
 
   test('test frames reorder writes reading order', async () => {

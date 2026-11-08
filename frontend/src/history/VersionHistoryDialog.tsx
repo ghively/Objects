@@ -11,7 +11,7 @@
  * "Changed elsewhere. Reloaded." (M5's string).
  *
  * Our choices (listed for Gene): a successful restore closes the dialog after the
- * "Version restored successfully" toast; counts load in the background for object versions and
+ * "Version brought back" toast; counts load in the background for object versions and
  * are left out for whiteboard versions; times show in the Time zone setting with the Language's
  * formatting locale.
  */
@@ -42,26 +42,26 @@ export const VERSION_HISTORY = {
   title: 'Version History',
   backToList: 'All versions',
   versionLabel: (n: number) => `Version ${n}`,
-  empty: 'No version history available yet',
-  emptyDescription: 'Versions will appear here after this object is edited.',
-  fetchError: 'Failed to load version history',
-  fetchErrorDescription: "Could not get this object's versions. Please retry.",
-  previewError: "Couldn't load this version",
-  previewErrorDescription: "Could not get this version's content. Please retry.",
+  empty: 'No earlier versions',
+  emptyDescription: 'Edit this object and its versions start to show up here.',
+  fetchError: 'Version history unavailable',
+  fetchErrorDescription: "The list of versions didn't load. Try again.",
+  previewError: "Version unavailable",
+  previewErrorDescription: "This version didn't load. Try again.",
   selectTitle: 'Select a version',
-  selectDescription: 'Choose a version from the list to preview it here.',
+  selectDescription: 'Pick a version on the left to see it here.',
   restoreOnlyTitle: "Preview isn't available",
-  restoreOnlyDescription: "Select a version and restore it. Whiteboards don't show a preview.",
+  restoreOnlyDescription: "Pick a version to bring back. Whiteboard versions can't be previewed.",
   restore: 'Restore',
   restoreConfirmTitle: 'Restore this version?',
   restoreConfirmDescription: (n: number) =>
-    `This will restore your content to version ${n}. Your current state will be saved as a new version.`,
-  restoreKeepsFiles: 'Restores content and properties. Files stay as they are now.',
+    `Go back to version ${n}? What you have now is kept as its own version first.`,
+  restoreKeepsFiles: 'Brings back the text and property values. Attached files are left alone.',
   restoreConfirmCancel: 'Cancel',
   restoreConfirmConfirm: 'Restore',
-  restoreSuccess: 'Version restored successfully',
-  restoreError: 'Failed to restore this version',
-  restoreErrorDescription: 'Something went wrong while restoring. Please retry.',
+  restoreSuccess: 'Version brought back',
+  restoreError: "Restore didn't work",
+  restoreErrorDescription: "The version couldn't be brought back. Try again.",
   /** M5's string (`references/referencesUi.ts`). */
   changedElsewhere: 'Changed elsewhere. Reloaded.',
 } as const

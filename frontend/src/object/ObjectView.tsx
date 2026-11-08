@@ -186,7 +186,7 @@ export const OBJECT_MENU_TEXT = {
   copyReference: 'Copy object reference',
   referenceCopied: 'Link to object copied',
   copyAsMarkdown: 'Copy as Markdown',
-  markdownCopied: 'Markdown export written to clipboard',
+  markdownCopied: 'Markdown copied',
 } as const
 
 /** Write `text` to the clipboard, then toast `done`. */

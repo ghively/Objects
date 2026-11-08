@@ -136,8 +136,8 @@ describe('ReferencesSection (M8 settings)', () => {
     await renderSection()
     const block = part('backlinks').querySelector('[data-backlink-block]') as HTMLElement
     expect(block.querySelector('[data-backlink-ancestors]')).toBeNull()
-    const group = within(block).getByRole('group', { name: 'Default display of nested backlinks' })
-    expect(within(group).getByRole('button', { name: 'Only block with backlink' })).toHaveAttribute('aria-pressed', 'true')
+    const group = within(block).getByRole('group', { name: 'How nested backlinks show at first' })
+    expect(within(group).getByRole('button', { name: 'Just the linking block' })).toHaveAttribute('aria-pressed', 'true')
     await user.click(within(group).getByRole('button', { name: 'Full path above' }))
     const lines = [...block.querySelectorAll('[data-backlink-ancestor]')].map((el) => el.textContent)
     expect(lines).toEqual(['Project notes', 'Phase one'])
@@ -156,7 +156,7 @@ describe('ReferencesSection (M8 settings)', () => {
       'Project notes',
       'Phase one',
     ])
-    expect(within(top).queryByRole('group', { name: 'Default display of nested backlinks' })).toBeNull()
+    expect(within(top).queryByRole('group', { name: 'How nested backlinks show at first' })).toBeNull()
     // "Backlink content view" sets how the block renders.
     expect(top.querySelector('[data-backlink-context]')).toHaveAttribute('data-backlink-view', 'wideCard')
   })

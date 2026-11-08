@@ -19,7 +19,7 @@ export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 /** The upload limit message. */
 export const UPLOAD_LIMIT_MESSAGE =
-  'You can only upload files up to 100 MiB in size. If your file is bigger than that, it will fail.'
+  "Files over 100 MiB can't be uploaded."
 
 /** The `accept` list of the file input, per kind (`file` takes anything). */
 export const ACCEPT: Record<AttachmentKind, string> = {
@@ -131,7 +131,7 @@ export async function uploadFile(file: File): Promise<MediaAttrs | null> {
     invalidateAttachments()
     return mediaAttrsForUpload(res.path, res.kind ?? attachmentKind(res.path), file.name)
   } catch (err) {
-    showToast(err instanceof Error && err.message ? err.message : 'The file could not be uploaded.')
+    showToast(err instanceof Error && err.message ? err.message : "The upload didn't go through.")
     return null
   }
 }

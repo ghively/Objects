@@ -14,7 +14,7 @@ export const RECORD_TEXT = {
   resume: 'Resume',
   stop: 'Stop',
   cancel: 'Cancel',
-  denied: 'Microphone access was denied.',
+  denied: 'No permission to use the microphone.',
   failed: 'The recording could not be saved.',
 }
 

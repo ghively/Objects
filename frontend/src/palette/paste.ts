@@ -3,7 +3,7 @@
  *
  * What the clipboard holds decides the offers:
  * - text: "Paste into today's daily note" (preview "1 block | {count} blocks"; appends to today's
- *   note, creating it; "Added content to daily note") and "Make a new page from the clipboard";
+ *   note, creating it; "Sent to the daily note") and "Make a new page from the clipboard";
  * - Markdown with a heading: also "Create page", titled with the first heading (which then leaves
  *   the body; our choice);
  * - a URL: also "Create {structureName}" for Page: a page titled with the URL's host and path
@@ -29,7 +29,7 @@ import { invalidateLinkIndex } from '@/links/linkIndex'
 export const PASTE_TEXT = {
   addToDailyNote: "Paste into today's daily note",
   blocks: (count: number) => (count === 1 ? '1 block' : `${count} blocks`),
-  addedToDailyNote: 'Added content to daily note',
+  addedToDailyNote: 'Sent to the daily note',
   upload: 'Upload',
   createHttpLinkEntity: (structureName: string) => `Create ${structureName}`,
   createPageFromMd: 'Create page',

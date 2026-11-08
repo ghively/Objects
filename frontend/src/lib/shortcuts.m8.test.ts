@@ -33,7 +33,7 @@ const TABLE: Record<string, [string, string, string, string[]]> = {
   whiteboardResizeLarge: [
     'whiteboard',
     'whiteboard',
-    'Resize selection farther',
+    'Resize the selection in bigger steps',
     ['Mod-Shift-ArrowUp', 'Mod-Shift-ArrowDown', 'Mod-Shift-ArrowLeft', 'Mod-Shift-ArrowRight'],
   ],
 }
