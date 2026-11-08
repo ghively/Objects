@@ -15,7 +15,7 @@ export const WORK_AGENT_TEXT = {
   confirm: 'Create',
   acts: 'Agent acts on my approvals', // spec
   actsHelp: 'Off: entries wait in the Agent queue.',
-  autoRun: 'Auto-run read-only steps', // spec
+  autoRun: 'Agent runs by itself', // catalog §10b
   autoRunHelp: 'Agent steps run by themselves when they become current, once per step text.',
   readTools: 'Read tools',
   readToolsHelp: 'Read-only runs (Agent steps, brain dumps, Desk sync) can use only the tools you mark here.',
