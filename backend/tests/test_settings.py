@@ -144,7 +144,7 @@ def test_settings_bad_shape_422(state: Path, blocks_space_dir: Path, patch):
     with TestClient(create_app(Space(blocks_space_dir), None, watch=False)) as c:
         r = c.put("/api/settings", json={"patch": patch, "baseRevision": ""})
         assert r.status_code == 422, r.text
-        assert r.json()["detail"] == f"Cannot patch: {key}"
+        assert r.json()["detail"] == f"The setting \"{key}\" can't be saved."
     assert not (state / "settings.json").exists()
 
 

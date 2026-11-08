@@ -301,7 +301,7 @@ def test_basic_type_options_editable_properties_locked(space_dir: Path):
     renamed = _edit(space, "task")
     renamed.name = "Todo"
     for t in (added, removed, multi, renamed):
-        with pytest.raises(InvalidValue, match="basic (object )?types"):
+        with pytest.raises(InvalidValue, match="The properties of basic types are fixed."):
             _save(space, t)
 
 
@@ -982,7 +982,7 @@ def test_badly_shaped_property_options_are_422_not_500(space_dir: Path):
             json={"type": {**served, "propertyDefinitions": props}, "baseRevision": served["revision"]},
         )
         assert r.status_code == 422, (bad, r.text)
-        assert "Invalid options for Members" in r.json()["detail"]
+        assert "The options of Members are not valid" in r.json()["detail"]
 
 
 def test_badly_shaped_options_in_a_type_file_are_normalised_on_load(space_dir: Path):

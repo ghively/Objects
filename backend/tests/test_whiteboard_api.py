@@ -595,7 +595,7 @@ def test_whiteboard_ui_problem_shapes():
         whiteboard_ui_problem({k: True for k in whiteboardstore.WHITEBOARD_UI_KEYS})
         is None
     )
-    message = "whiteboard must be an object of true/false settings."
+    message = 'The key "whiteboard" must be an object of true/false settings.'
     assert whiteboard_ui_problem(None) == message
     assert whiteboard_ui_problem([]) == message
     assert whiteboard_ui_problem({"isShowingDots": "yes"}) == message

@@ -309,7 +309,7 @@ def test_startup_space_choice(tmp_path: Path, state: Path):
 def test_startup_main_refuses_missing_space(tmp_path: Path, state: Path, capsys):
     with pytest.raises(SystemExit):
         launcher.main(["--space", str(tmp_path / "nope")])
-    assert "Not a folder" in capsys.readouterr().err
+    assert "is not a folder." in capsys.readouterr().err
 
 
 def test_startup_parser_error_message(state: Path, capsys):

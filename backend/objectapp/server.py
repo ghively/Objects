@@ -743,20 +743,20 @@ class LocalOnlyMiddleware:
 def _views_problem(views: dict[str, Any]) -> str | None:
     """Why a PUT /api/views body is not a Views object, else None."""
     if "activeTab" in views and not isinstance(views["activeTab"], str):
-        return "activeTab must be a string."
+        return 'The key "activeTab" must be a string.'
     if "all" in views and not isinstance(views["all"], dict):
-        return "all must be an object."
+        return 'The key "all" must be an object.'
     if "dashboard" in views:
         dash = views["dashboard"]
         if not isinstance(dash, dict):
-            return "dashboard must be an object."
+            return 'The key "dashboard" must be an object.'
         sections = dash.get("sections", [])
         if not isinstance(sections, list) or not all(
             isinstance(x, dict) and isinstance(x.get("key"), str) for x in sections
         ):
-            return "dashboard.sections must be a list of sections with a key."
+            return 'The key "dashboard.sections" must be a list of sections with a key.'
         if not isinstance(dash.get("removedSections", []), list):
-            return "dashboard.removedSections must be a list."
+            return 'The key "dashboard.removedSections" must be a list.'
     return None
 
 
@@ -768,15 +768,15 @@ def _ui_problem(patch: dict[str, Any]) -> str | None:
             isinstance(p, dict) and isinstance(p.get("kind"), str) and isinstance(p.get("id"), str)
             for p in pinned
         ):
-            return "pinned must be a list of {kind, id}."
+            return 'The key "pinned" must be a list of {kind, id}.'
     if "sections" in patch:
         sections = patch["sections"]
         if not isinstance(sections, list) or not all(
             isinstance(x, dict) and isinstance(x.get("items", []), list) for x in sections
         ):
-            return "sections must be a list of sections with a list of items."
+            return 'The key "sections" must be a list of sections with a list of items.'
     if "allNotesLayout" in patch and not isinstance(patch["allNotesLayout"], str):
-        return "allNotesLayout must be a string."
+        return 'The key "allNotesLayout" must be a string.'
     if "calendar" in patch:
         problem = _calendar_ui_problem(patch["calendar"])
         if problem:
@@ -788,7 +788,7 @@ def _ui_problem(patch: dict[str, Any]) -> str | None:
     if "reminders" in patch:
         reminders = patch["reminders"]
         if not isinstance(reminders, dict) or not isinstance(reminders.get("enabled"), bool):
-            return "reminders must be {enabled: true|false}."
+            return 'The key "reminders" must be {enabled: true|false}.'
     if "graph" in patch:
         problem = _graph_ui_problem(patch["graph"])
         if problem:
@@ -800,83 +800,83 @@ def _ui_problem(patch: dict[str, Any]) -> str | None:
     if "workspaceOrder" in patch:
         order = patch["workspaceOrder"]
         if not isinstance(order, list) or not all(isinstance(x, str) for x in order):
-            return "workspaceOrder must be a list of section ids."
+            return 'The key "workspaceOrder" must be a list of section ids.'
         if len(set(order)) != len(order):
-            return "workspaceOrder lists a section twice."
+            return 'The key "workspaceOrder" lists a section twice.'
     # The Object Types sort (``ui.json`` ``objectsSectionSortOption``) and its manual order, kept
     # as the `objects` section's ids in ``ui.json`` ``workspace``.
     if "objectsSectionSortOption" in patch and patch["objectsSectionSortOption"] not in (
         "alphabetical",
         "manual",
     ):
-        return "objectsSectionSortOption must be 'alphabetical' or 'manual'."
+        return 'The key "objectsSectionSortOption" must be alphabetical or manual.'
     if "workspace" in patch:
         ws = patch["workspace"]
         if not isinstance(ws, dict):
-            return "workspace must be an object."
+            return 'The key "workspace" must be an object.'
         unknown = sorted(set(ws) - {"objects"})
         if unknown:
-            return f"Cannot patch: {', '.join(f'workspace.{k}' for k in unknown)}"
+            return f"The UI state has no key named {', '.join(f'workspace.{k}' for k in unknown)}."
         objects = ws.get("objects", {})
         ids = objects.get("ids", []) if isinstance(objects, dict) else None
         if not isinstance(ids, list) or not all(isinstance(x, str) for x in ids):
-            return "workspace.objects.ids must be a list of ids."
+            return 'The key "workspace.objects.ids" must be a list of ids.'
         if len(set(ids)) != len(ids):
-            return "workspace.objects.ids lists an id twice."
+            return 'The key "workspace.objects.ids" lists an id twice.'
     return None
 
 
 def _graph_ui_problem(graph: Any) -> str | None:
     """Why a ``graph`` ui patch is not a ``GraphViewCustomization``, else None."""
     if not isinstance(graph, dict):
-        return "graph must be an object."
+        return 'The key "graph" must be an object.'
     unknown = sorted(set(graph) - set(_GRAPH_LIST_KEYS) - set(_GRAPH_BOOL_KEYS))
     if unknown:
-        return f"Cannot patch: {', '.join(f'graph.{k}' for k in unknown)}"
+        return f"The UI state has no key named {', '.join(f'graph.{k}' for k in unknown)}."
     for key in _GRAPH_LIST_KEYS:
         if key in graph and not (
             isinstance(graph[key], list) and all(isinstance(x, str) for x in graph[key])
         ):
-            return f"graph.{key} must be a list of type ids."
+            return f'The key "graph.{key}" must be a list of type ids.'
     for key in _GRAPH_BOOL_KEYS:
         if key in graph and not isinstance(graph[key], bool):
-            return f"graph.{key} must be true or false."
+            return f'The key "graph.{key}" must be true or false.'
     return None
 
 
 def _calendar_ui_problem(cal: Any) -> str | None:
     """Why a ``calendar`` ui patch is not a ``CalendarUi``, else None."""
     if not isinstance(cal, dict):
-        return "calendar must be an object."
+        return 'The key "calendar" must be an object.'
     if "weekStart" in cal and cal["weekStart"] not in _WEEK_STARTS:
-        return "calendar.weekStart must be 'sunday' or 'monday'."
+        return 'The key "calendar.weekStart" must be sunday or monday.'
     if "hideCalendarSidebar" in cal and not isinstance(cal["hideCalendarSidebar"], bool):
-        return "calendar.hideCalendarSidebar must be true or false."
+        return 'The key "calendar.hideCalendarSidebar" must be true or false.'
     if "daily" in cal:
         daily = cal["daily"]
         if not isinstance(daily, dict):
-            return "calendar.daily must be an object."
+            return 'The key "calendar.daily" must be an object.'
         for key in _CALENDAR_HIDE_KEYS:
             if key in daily and not isinstance(daily[key], bool):
-                return f"calendar.daily.{key} must be true or false."
+                return f'The key "calendar.daily.{key}" must be true or false.'
         for key in _CALENDAR_VIEW_KEYS:
             if key in daily and not isinstance(daily[key], dict):
-                return f"calendar.daily.{key} must be a view state object."
+                return f'The key "calendar.daily.{key}" must be a view state object.'
     return None
 
 
 def _tasks_ui_problem(tasks: Any) -> str | None:
     """Why a ``tasks`` ui patch is not a ``TasksUi``, else None."""
     if not isinstance(tasks, dict):
-        return "tasks must be an object."
+        return 'The key "tasks" must be an object.'
     if "activeTab" in tasks and tasks["activeTab"] not in _TASK_SECTION_KEYS:
-        return "tasks.activeTab must be a task section key."
+        return 'The key "tasks.activeTab" must be a task section key.'
     if "views" in tasks:
         views = tasks["views"]
         if not isinstance(views, dict) or not all(
             k in _TASK_SECTION_KEYS and isinstance(v, dict) for k, v in views.items()
         ):
-            return "tasks.views must map task section keys to view state objects."
+            return 'The key "tasks.views" must map task section keys to view state objects.'
     return None
 
 
@@ -1088,7 +1088,7 @@ def create_app(
         except SpaceNameProblem as exc:
             return _error(422, exc.message)
         except (NotADirectoryError, FileNotFoundError):
-            return _error(404, f"Not a folder: {req.location}")
+            return _error(404, f'"{req.location}" is not a folder.')
         except FileExistsError:
             return _error(409, "A folder with that name already exists here.")
         except NotImplementedError as exc:  # M8 Task 2: `basic` until Task 8 fills it
@@ -1109,7 +1109,7 @@ def create_app(
     def open_space(req: SpacePathRequest):
         path = _folder(req.path)
         if path is None:
-            return _error(404, f"Not a folder: {req.path}")
+            return _error(404, f'"{req.path}" is not a folder.')
         registry().register(path, touch=False)
         return {"path": str(path)}
 
@@ -1120,7 +1120,7 @@ def create_app(
         try:
             target = normalize(path)
         except ValueError:
-            return _error(404, f"Not a folder: {path[:60]!r}")
+            return _error(404, f'"{path[:60]}" is not a folder.')
         if os.path.normcase(str(target)) == os.path.normcase(str(space.root)):
             return _error(409, "This space is open. Switch to another space first.")
         registry().remove(target)
@@ -1132,7 +1132,7 @@ def create_app(
             return _error(503, "Switching spaces needs the Object launcher.")
         path = _folder(req.path)
         if path is None:
-            return _error(404, f"Not a folder: {req.path}")
+            return _error(404, f'"{req.path}" is not a folder.')
         return JSONResponse(
             {"path": str(path)}, status_code=202, background=BackgroundTask(on_switch, path)
         )
@@ -1156,7 +1156,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         # A file that isn't valid UTF-8 opens read-only (see `read_raw`), so this
         # lossy display copy can never be saved back over the original bytes.
         return _display_safe(
@@ -1257,7 +1257,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         return {"version": version}
 
     def _norm(path: str) -> str:
@@ -1278,7 +1278,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         rel = _norm(req.path)
         if result.version != req.baseVersion:
             announce(ChangeEvent("changed", rel, result.version, origin=req.clientId))
@@ -1307,7 +1307,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         if version != before:
             announce(ChangeEvent("changed", _norm(req.path), version, origin=req.clientId))
         return {"id": object_id, "version": version}
@@ -1328,7 +1328,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         if type_id and type_revision(space.root, type_id) != rev_before:
             # M12: the copy's ID number moved the type's `nextNumber` on (no origin: the
             # duplicating window has no other way to learn the type's new revision).
@@ -1350,7 +1350,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
 
     @api.get("/object/export")
     def export(
@@ -1387,7 +1387,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         if opts.format == "html":
             # The PDF: a page the dialog prints in a frame. Shown, not downloaded; no scripts.
             return Response(
@@ -1423,7 +1423,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         rel = _norm(req.path)
         if result.path != rel:
             renamed = ChangeEvent(
@@ -1444,7 +1444,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {path!r} or no object type {typeId!r}")
+            return _error(404, f'There is no object at "{path}" or no object type "{typeId}".')
         return {"rows": [r.to_api() for r in rows]}
 
     @api.post("/object/change-type")
@@ -1460,7 +1460,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r} or no object type {req.typeId!r}")
+            return _error(404, f'There is no object at "{req.path}" or no object type "{req.typeId}".')
         rel = _norm(req.path)
         if result.typeWritten:
             announce(ChangeEvent("types", req.typeId, None, origin=req.clientId))
@@ -1496,7 +1496,7 @@ def create_app(
             announce_template_ids(templates_before, req.clientId)
             return _error(422, str(exc))
         except KeyError:
-            return _error(404, f"No object type {req.typeId!r}")
+            return _error(404, f'There is no object type "{req.typeId}".')
         type_ids = []
         rev_after = type_revision(space.root, req.typeId) if t is not None else ""
         if t is not None and rev_after and (not had_file or rev_after != rev_before):
@@ -1555,7 +1555,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         type_ids = []
         if before is not None and space.type_by_id(before.id) is not before:
             announce(ChangeEvent("types", before.id, None, origin=clientId))
@@ -1568,7 +1568,7 @@ def create_app(
         try:
             return _display_safe([asdict(s) for s in space.list_templates(type_id)])
         except KeyError:
-            return _error(404, f"No object type {type_id!r}")
+            return _error(404, f'There is no object type "{type_id}".')
 
     @api.post("/types/{type_id}/templates", status_code=201)
     def create_template(type_id: str, req: CreateTemplateRequest):
@@ -1579,7 +1579,7 @@ def create_app(
         except InvalidValue as exc:
             return _error(422, str(exc))
         except KeyError:
-            return _error(404, f"No object type {type_id!r}")
+            return _error(404, f'There is no object type "{type_id}".')
         announce(ChangeEvent("types", type_id, None, origin=req.clientId))
         announce(ChangeEvent("created", path, version, origin=req.clientId))
         return JSONResponse({"path": path, "version": version}, status_code=201)
@@ -1598,7 +1598,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         finally:
             announce_template_ids(templates_before, req.clientId)
         if version != req.baseVersion:
@@ -1618,7 +1618,7 @@ def create_app(
         except RestoreConflict as exc:
             return _error(409, exc.detail)
         except KeyError:
-            return _error(404, f"No trash entry {trash_id!r}")
+            return _error(404, f'There is no Trash entry "{trash_id}".')
         rewritten = result.setdefault("rewritten", [])
         for type_id in result["typeIds"]:
             announce(ChangeEvent("types", type_id, None, origin=clientId))
@@ -1642,7 +1642,7 @@ def create_app(
         try:
             return {"purged": space.purge(trash_id)}
         except KeyError:
-            return _error(404, f"No trash entry {trash_id!r}")
+            return _error(404, f'There is no Trash entry "{trash_id}".')
 
     @api.delete("/trash")
     def empty_trash(clientId: str | None = Query(default=None)):
@@ -1671,7 +1671,7 @@ def create_app(
     def get_views(type_id: str):
         t = space.type_by_id(type_id)
         if t is None:
-            return _error(404, f"No object type {type_id!r}")
+            return _error(404, f'There is no object type "{type_id}".')
         store = space.store("views")
         try:
             data, revision = store.read(type_id)
@@ -1690,7 +1690,7 @@ def create_app(
     @api.put("/views/{type_id}")
     def put_views(type_id: str, req: SaveViewsRequest):
         if space.type_by_id(type_id) is None:
-            return _error(404, f"No object type {type_id!r}")
+            return _error(404, f'There is no object type "{type_id}".')
         problem = _views_problem(req.views)
         if problem:
             return _error(422, problem)
@@ -1718,7 +1718,7 @@ def create_app(
     def put_ui(req: PatchUiRequest):
         unknown = sorted(set(req.patch) - _UI_PATCH_KEYS)
         if unknown:
-            return _error(422, f"Cannot patch: {', '.join(unknown)}")
+            return _error(422, f"The UI state has no key named {', '.join(unknown)}.")
         problem = _ui_problem(req.patch)
         if problem:
             return _error(422, problem)
@@ -1750,7 +1750,7 @@ def create_app(
     @api.put("/collections/{collection_id}")
     def save_collection(collection_id: str, req: SaveCollectionRequest):
         if collection_id not in space.collections:
-            return _error(404, f"No collection {collection_id!r}")
+            return _error(404, f'There is no collection "{collection_id}".')
         c = CollectionDef.from_json(req.collection, fallback_id=collection_id)
         c.id = collection_id
         try:
@@ -1762,7 +1762,7 @@ def create_app(
         except InvalidValue as exc:
             return _error(422, str(exc))
         except KeyError:
-            return _error(404, f"No collection {collection_id!r}")
+            return _error(404, f'There is no collection "{collection_id}".')
         announce(ChangeEvent("collections", collection_id, result.revision, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
@@ -1781,7 +1781,7 @@ def create_app(
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         except KeyError:
-            return _error(404, f"No collection {collection_id!r}")
+            return _error(404, f'There is no collection "{collection_id}".')
         announce(ChangeEvent("collections", collection_id, None, origin=clientId))
         for path in result.deleted:
             announce(ChangeEvent("deleted", path, None, origin=clientId))
@@ -1810,7 +1810,7 @@ def create_app(
     @api.put("/queries/{query_id}")
     def save_query(query_id: str, req: SaveQueryRequest):
         if _unusable_id(query_id):
-            return _error(404, f"No query {query_id[:60]!r}")
+            return _error(404, f'There is no query "{query_id[:60]}".')
         q = QueryDef.from_json(req.query, fallback_id=query_id)
         q.id = query_id
         try:
@@ -1822,14 +1822,14 @@ def create_app(
         except InvalidValue as exc:
             return _error(422, str(exc))
         except (KeyError, ValueError):
-            return _error(404, f"No query {query_id!r}")
+            return _error(404, f'There is no query "{query_id}".')
         announce(ChangeEvent("queries", query_id, revision, origin=req.clientId))
         return _display_safe({"query": {**q.to_api(revision), **query_api_extra(q)}})
 
     @api.delete("/queries/{query_id}")
     def delete_query(query_id: str, clientId: str | None = Query(default=None)):
         if _unusable_id(query_id):
-            return _error(404, f"No query {query_id[:60]!r}")
+            return _error(404, f'There is no query "{query_id[:60]}".')
         try:
             trash_id = space.delete_query(query_id)
         except ReadOnly as exc:
@@ -1837,7 +1837,7 @@ def create_app(
         except InvalidValue as exc:  # M22: the built-in Tickets view (before ValueError's 404)
             return _error(422, str(exc))
         except (KeyError, ValueError):
-            return _error(404, f"No query {query_id!r}")
+            return _error(404, f'There is no query "{query_id}".')
         announce(ChangeEvent("queries", query_id, None, origin=clientId))
         return {"trashId": trash_id}
 
@@ -1868,11 +1868,11 @@ def create_app(
         for field in ("name", "pluralName"):
             # `from_json` would fill these in; an edit that clears them is refused.
             if not isinstance(data.get(field), str) or not data[field].strip():
-                return _error(422, "An object type needs a name and a plural name")
+                return _error(422, "An object type needs a name and a plural name.")
         if data.get("propertyDefinitions") is not None and not isinstance(
             data["propertyDefinitions"], list
         ):
-            return _error(422, "propertyDefinitions must be a list")
+            return _error(422, 'The field "propertyDefinitions" must be a list.')
         if DEFAULT_LAYOUT_KEY in data:
             if data[DEFAULT_LAYOUT_KEY] is None:
                 # null unsets it: the file then has no line for it.
@@ -1884,13 +1884,13 @@ def create_app(
                 stored = current.extra.get(DEFAULT_LAYOUT_KEY) if current is not None else None
                 layout = data[DEFAULT_LAYOUT_KEY]
                 if layout != stored and layout not in DATA_VIEW_LAYOUTS:
-                    return _error(422, f"Unknown default list view {layout!r}")
+                    return _error(422, f'"{layout}" is not a list view layout.')
         for entry in data.get("propertyDefinitions") or []:
             if isinstance(entry, dict) and "options" in entry:
                 bad = option_shape_problems(entry["options"])
                 if bad:
                     name = entry.get("name") or entry.get("key") or "a property"
-                    return _error(422, f"Invalid options for {name}: {', '.join(bad)}")
+                    return _error(422, f"The options of {name} are not valid: {', '.join(bad)}.")
         try:
             t = TypeDefinition.from_json(data, fallback_id=type_id)
             result = space.save_type(t, req.baseRevision, confirm=req.confirm)
@@ -1903,7 +1903,7 @@ def create_app(
         except InvalidValue as exc:
             return _error(422, str(exc))
         except KeyError:
-            return _error(404, f"No object type {type_id!r}")
+            return _error(404, f'There is no object type "{type_id}".')
         announce(ChangeEvent("types", type_id, None, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
@@ -1920,7 +1920,7 @@ def create_app(
         except InvalidValue as exc:
             return _error(422, str(exc))
         except KeyError:
-            return _error(404, f"No property {pid!r} on object type {type_id!r}")
+            return _error(404, f'There is no property "{pid}" on object type "{type_id}".')
         announce(ChangeEvent("types", type_id, None, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
@@ -1937,7 +1937,7 @@ def create_app(
         except InvalidValue as exc:
             return _error(422, str(exc))
         except KeyError:
-            return _error(404, f"No property {pid!r} on object type {type_id!r}")
+            return _error(404, f'There is no property "{pid}" on object type "{type_id}".')
         announce(ChangeEvent("types", type_id, None, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
@@ -1948,7 +1948,7 @@ def create_app(
         """M12: parse (and with ``path``, evaluate) an expression. Writes nothing."""
         t = space.type_by_id(req.typeId)
         if t is None:
-            return _error(404, f"No object type {req.typeId!r}")
+            return _error(404, f'There is no object type "{req.typeId}".')
         try:
             parse_formula(req.expression) if req.expression.strip() else None
         except FormulaError as exc:
@@ -1970,7 +1970,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         value = Computer(space, types={t.id: t}).evaluate(Obj(summary.path, fm, summary, t), req.expression)
         return _display_safe(
             {"value": value, "error": value.get("error") if value["type"] == "error" else None}
@@ -1993,7 +1993,7 @@ def create_app(
         except InvalidValue as exc:
             return _error(422, str(exc))
         except KeyError:
-            return _error(404, f"No property {pid!r} on object type {type_id!r}")
+            return _error(404, f'There is no property "{pid}" on object type "{type_id}".')
         for t in result.types:
             announce(ChangeEvent("types", t.id, None, origin=req.clientId))
         for path in result.rewritten:
@@ -2012,7 +2012,7 @@ def create_app(
         except InvalidValue as exc:
             return _error(422, str(exc))
         except KeyError:
-            return _error(404, f"No object type {type_id!r}")
+            return _error(404, f'There is no object type "{type_id}".')
         if result.changed:
             announce(ChangeEvent("types", type_id, None, origin=req.clientId))
         return _display_safe(result.to_api())
@@ -2030,7 +2030,7 @@ def create_app(
         except InvalidValue as exc:
             return _error(422, str(exc))
         except KeyError:
-            return _error(404, f"No object type {type_id!r}")
+            return _error(404, f'There is no object type "{type_id}".')
         manifest = space.trash.manifest(item.id) or {}
         type_ids = [type_id]
         for ref in manifest.get("allowedTypesRefs") or []:
@@ -2094,7 +2094,7 @@ def create_app(
         try:
             path = await asyncio.to_thread(import_image, space.root, name, data)
         except NotAnImage:
-            return _error(415, "Only png, jpg, jpeg, gif, webp and svg images can be added")
+            return _error(415, "Only png, jpg, jpeg, gif, webp and svg images can be added.")
         except media.SidecarUpload:
             return _error(415, media.SIDECAR_UPLOAD_DETAIL)
         except TooLarge:
@@ -2132,7 +2132,7 @@ def create_app(
         except NotServed:
             return _error(415, "Objects are opened in Object, not with another app.")
         except (FileNotFoundError, OSError):
-            return _error(404, f"No file at {req.path!r}")
+            return _error(404, f'There is no file at "{req.path}".')
         try:
             open_with_system(full)
         except RefusedToOpen:
@@ -2146,7 +2146,7 @@ def create_app(
         except NotServed:
             return _error(415, "Objects are opened, not served.")
         except (FileNotFoundError, OSError):
-            return _error(404, f"No file at {path!r}")
+            return _error(404, f'There is no file at "{path}".')
         kind = kind_of(full.name)
         return FileResponse(
             full,
@@ -2158,7 +2158,7 @@ def create_app(
     def resolve(link: str, from_: str | None = Query(default=None, alias="from")):
         path = space.resolve(link, from_ or None)
         if path is None:
-            return _error(404, f"No object matches {link!r}")
+            return _error(404, f'No object matches "{link}".')
         return {"path": path}
 
     @api.post("/reveal")
@@ -2168,7 +2168,7 @@ def create_app(
         except ValueError as exc:
             return _error(400, str(exc))
         if not full.is_file():
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         reveal_in_file_manager(full)
         return {"ok": True}
 

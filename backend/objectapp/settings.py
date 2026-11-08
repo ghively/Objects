@@ -141,7 +141,7 @@ class SettingsProblem(ValueError):
     """A ``PUT /api/settings`` patch has an unknown key or a value of the wrong shape (422)."""
 
     def __init__(self, key: str, message: str | None = None) -> None:
-        text = message if message is not None else f"Cannot patch: {key}"
+        text = message if message is not None else f"The setting \"{key}\" can't be saved."
         super().__init__(text)
         self.key = key
         self.message = text
