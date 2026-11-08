@@ -95,7 +95,7 @@ describe('TokensMenu', () => {
       'To-do',
       'Link',
       'Code',
-      'Formula',
+      'TeX formula',
       'Highlight text',
       'Make a new object out of the selected text.',
       'Point the selected text at an object you already have.',
@@ -201,7 +201,7 @@ describe('TokensMenu', () => {
     expect(serializeBody(editor)).toBe('Sum **a+b** here\n')
     select(editor, 'a+b')
     fireEvent.click(within(bar()).getByRole('button', { name: 'Bold' }))
-    fireEvent.click(within(bar()).getByRole('button', { name: 'Formula' }))
+    fireEvent.click(within(bar()).getByRole('button', { name: 'TeX formula' }))
     expect(editor.state.doc.firstChild!.child(1).type.name).toBe('inlineMath')
   })
 

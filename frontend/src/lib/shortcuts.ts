@@ -290,7 +290,7 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
   def('underline', 'text', 'Underline', [], 'editor', V),
   def('strikethrough', 'text', 'Strikethrough', ['Mod-Shift-s'], 'editor', V),
   def('codeToken', 'text', 'Format as code', ['Mod-e'], 'editor', V),
-  def('mathToken', 'text', 'Format as TeX-formula', ['Mod-m'], 'editor', V),
+  def('mathToken', 'text', 'Format as TeX formula', ['Mod-m'], 'editor', V),
 
   def('heading1', 'block', 'Make the selected blocks heading 1', [], 'editor', V),
   def('heading2', 'block', 'Make the selected blocks heading 2', [], 'editor', V),
@@ -344,12 +344,12 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
   def('navigateBack', 'navigation', 'Navigate back', ['Mod-ArrowLeft', 'Mod-['], 'global', V),
   def('navigateForward', 'navigation', 'Navigate forward', ['Mod-ArrowRight', 'Mod-]'], 'global', V),
 
-  def('toggleSidepanel', 'global', 'Toggle right sidepanel', ['Mod-Shift-ArrowRight'], 'global', V),
+  def('toggleSidepanel', 'global', 'Toggle right side panel', ['Mod-Shift-ArrowRight'], 'global', V),
   def('toggleLeftSidebar', 'global', 'Toggle left sidebar', ['Mod-Shift-ArrowLeft'], 'global', V),
   def('toggleCalendarSidebar', 'global', 'Toggle calendar sidebar', ['Mod-Alt-s'], 'global', V),
   def('toggleDarkMode', 'global', 'Toggle dark mode', ['Mod-Shift-l'], 'global', V),
   def('openSettings', 'global', 'Open settings', ['Mod-,'], 'global', V),
-  def('toggleShortcutsMenu', 'global', 'Toggle the shortcuts list', ['Mod-Shift-b'], 'global', V),
+  def('toggleShortcutsMenu', 'global', 'Show or hide the shortcuts list', ['Mod-Shift-b'], 'global', V),
 ]
 
 /**
@@ -518,7 +518,8 @@ export const POLISH_SHORTCUTS: ShortcutDef[] = [
  */
 export const OBJECT_MENU_SHORTCUTS: ShortcutDef[] = [
   def('openExportMenu', 'page', 'Export this page', ['Mod-e'], 'global', V, false),
-  def('openImportMenu', 'page', 'Import into this page', ['Mod-i'], 'global', V, false),
+  // "Import": on a type page Ctrl+I opens the type's CSV import, not a page's.
+  def('openImportMenu', 'page', 'Import', ['Mod-i'], 'global', V, false),
   def('toggleFavorite', 'page', 'Favorite or unfavorite this page', ['Mod-Shift-*'], 'global', V, false),
 ]
 
