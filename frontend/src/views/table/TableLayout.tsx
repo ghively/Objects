@@ -22,6 +22,7 @@ import { buildRowTree, flattenTree, visibleTreeRows, type TreeRow } from '../sub
 import { CalcFooter } from './CalcFooter'
 import { ColumnMenu } from './ColumnMenu'
 import {
+  clampWidth,
   isWrapped,
   leftOffsets,
   moveColumn,
@@ -426,7 +427,8 @@ export function TableLayout(props: TableLayoutProps) {
     const startRem = col.colWidth
     let rem = startRem
     const move = (ev: MouseEvent) => {
-      rem = startRem + (ev.clientX - startX) / REM_PX
+      // Clamped live as well as on save, so the column never collapses or overshoots while dragging.
+      rem = clampWidth(startRem + (ev.clientX - startX) / REM_PX)
       setLive({ id: col.id, rem })
     }
     const detach = () => {
