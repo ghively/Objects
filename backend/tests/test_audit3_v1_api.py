@@ -73,3 +73,34 @@ def test_undecodable_name_does_not_break_search_or_v1_reads(undecodable):
     assert REPLACED in [x["path"] for x in r.json()["backlinks"]]
     r = c.get("/api/v1/references", params={"path": "Pages/Alpha.md"}, headers=h)
     assert r.status_code == 200, r.text
+
+
+# -- 12: an empty or blank import-scan path -----------------------------------------------
+
+
+@pytest.fixture
+def client(space_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    _env(tmp_path, monkeypatch)
+    with TestClient(
+        create_app(Space(space_dir), watch=False), raise_server_exceptions=False
+    ) as c:
+        yield c
+
+
+@pytest.mark.parametrize("blank", ["", "   ", '""', ' "" '])
+def test_blank_scan_path_is_not_the_working_directory(
+    client: TestClient, space_dir: Path, tmp_path: Path, monkeypatch, blank: str
+):
+    cwd = tmp_path / "cwd"
+    (cwd / "sub").mkdir(parents=True)
+    (cwd / "sub" / "creds.txt").write_text("password = hunter2\n")
+    monkeypatch.chdir(cwd)
+    r = client.post("/api/import/scan", json={"path": blank})
+    assert r.status_code == 404, r.text
+    assert r.json() == {"error": "No such file or folder"}
+    for scope in ("read", "read-write"):
+        h = _bearer(space_dir, scope)
+        r = client.post("/api/v1/import/scan", json={"path": blank}, headers=h)
+        assert r.status_code in (403, 404), r.text  # 403: a read token may not scan (#24)
+        assert "creds.txt" not in r.text
+    assert not (space_dir / ".object" / "imports").exists()
