@@ -343,6 +343,39 @@ def test_trash_batch_complete_is_stamped(client, tmp_path):
     assert batches.load_batch(client.space_root, result["batch"])[0]["trashedAt"]
 
 
+def test_trash_batch_leaves_another_batchs_object_at_the_recorded_path(client, tmp_path):
+    """Audit 9: batch A created Pages/a.md, Gene trashed it, a re-run (batch B) created it again;
+    moving batch A to the Trash must not trash B's object. An object with no provenance at a recorded
+    path is never trashed either."""
+    from test_m25_provenance import run as run_import
+
+    from objectapp.importers import batches
+
+    src = tmp_path / "S"
+    src.mkdir()
+    (src / "a.md").write_text("# a\n\ntext\n", encoding="utf-8")
+    (src / "b.md").write_text("# b\n\ntext\n", encoding="utf-8")
+    root = client.space_root
+    first = run_import(client, src, kind="obsidian")["result"]
+    _d, items = batches.load_batch(root, first["batch"])
+    path_of = {i["title"]: i["path"] for i in items}
+    assert client.delete("/api/object", params={"path": path_of["a"]}).status_code == 200
+    (src / "b.md").unlink()
+    second = run_import(client, src, kind="obsidian")["result"]
+    _d, items_b = batches.load_batch(root, second["batch"])
+    assert [i["path"] for i in items_b if i["action"] == "created"] == [path_of["a"]]
+    # b: Gene trashed it and wrote a page of his own (no provenance) at the same path
+    assert client.delete("/api/object", params={"path": path_of["b"]}).status_code == 200
+    (root / path_of["b"]).write_text("# b\n\nmine\n", encoding="utf-8")
+    client.app.state.space.rescan_file(path_of["b"])
+
+    out = client.post(f"/api/import/batches/{first['batch']}/trash").json()
+    assert out["trashed"] == 0 and out["alreadyTrashed"] == 2, out
+    assert (root / path_of["a"]).exists() and (root / path_of["b"]).exists()
+    _d, items_b = batches.load_batch(root, second["batch"])
+    assert [i["action"] for i in items_b if i["path"] == path_of["a"]] == ["created"]
+
+
 # -- 9. a re-run adds no duplicate originals, images or File objects ---------------------------------
 
 

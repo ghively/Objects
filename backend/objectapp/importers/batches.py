@@ -192,7 +192,10 @@ def trash_batch(space: Space, batch: str) -> dict[str, Any]:
         with space._lock:
             raw = space._raw.get(recorded)
         block = provenance.read_block(raw.fm) if raw is not None else None
-        if raw is not None and (block is None or (str(block["system"]), str(block["id"])) == key):
+        # Only the object this batch created: another batch's (a re-run that created it again) or
+        # one with no provenance (Gene's own) at the recorded path is never trashed.
+        if (block is not None and block.get("batch") == batch
+                and (str(block["system"]), str(block["id"])) == key):
             rel: str | None = recorded
         else:
             rel = by_id.get(key)  # moved: found by the source id and batch it carries
