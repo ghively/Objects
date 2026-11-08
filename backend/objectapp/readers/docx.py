@@ -10,7 +10,7 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 
 from .model import ExtractedImage, ReadResult
-from .util import cell_text, iso, table_md
+from .util import cell_text, check_unpacked_size, iso, table_md
 
 _EXT = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/bmp": "bmp", "image/tiff": "tif"}
 _A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
@@ -19,6 +19,7 @@ _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
 def read(path: Path) -> ReadResult:
+    check_unpacked_size(path)
     doc = Document(str(path))
     images: list[ExtractedImage] = []
     notes: list[str] = []

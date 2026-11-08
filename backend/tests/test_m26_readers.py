@@ -183,3 +183,65 @@ def test_supported_suffixes_and_no_write(tmp_path):
     before = (p.stat().st_mtime_ns, sorted(tmp_path.iterdir()))
     readers.read_file(p)
     assert before == (p.stat().st_mtime_ns, sorted(tmp_path.iterdir()))
+
+
+def test_office_files_over_the_unpacked_size_cap_are_not_parsed(tmp_path, monkeypatch):
+    """Audit 30: a small docx/pptx/xlsx can inflate to hundreds of MB; its parts' unpacked size is
+    checked before any parser opens it, and it is kept as Original only."""
+    import docx as docx_lib
+    import openpyxl
+    import pptx as pptx_lib
+
+    from objectapp.readers import docx as docx_reader
+    from objectapp.readers import pptx as pptx_reader
+    from objectapp.readers import util
+
+    d = tmp_path / "bomb.docx"
+    Document().save(d)
+    s = tmp_path / "bomb.pptx"
+    Presentation().save(s)
+    x = tmp_path / "bomb.xlsx"
+    Workbook().save(x)
+    sizes = {p: sum(i.file_size for i in zipfile.ZipFile(p).infolist()) for p in (d, s, x)}
+    monkeypatch.setattr(util, "MAX_OFFICE_UNPACKED_BYTES", min(sizes.values()) - 1)
+
+    def boom(*_a, **_k):
+        raise AssertionError("parsed a file over the cap")
+
+    monkeypatch.setattr(docx_reader, "Document", boom)
+    monkeypatch.setattr(pptx_reader, "Presentation", boom)
+    monkeypatch.setattr(openpyxl, "load_workbook", boom)
+    for p in (d, s, x):
+        r = readers.read_file(p)
+        assert r.original_only and r.markdown == "" and r.notes == ["Too large to read", "Original only"]
+    assert docx_lib and pptx_lib
+
+
+def test_xlsx_is_read_streaming(tmp_path, monkeypatch):
+    """Audit 30: xlsx is opened read-only (streamed) and keeps only the rows a table can show, while
+    a too-large sheet is still found past trailing blank rows and merged cells are still noted."""
+    import openpyxl
+
+    p = tmp_path / "s.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Gap"
+    for i in range(150):
+        ws.append([i, 1])
+    ws.cell(row=300, column=1, value="late")  # rows 151-299 blank: still 300 rows
+    m = wb.create_sheet("Merged")
+    m.append(["a", "b"])
+    m.merge_cells("A1:B1")
+    wb.save(p)
+    seen: list[dict] = []
+    real = openpyxl.load_workbook
+
+    def spy(*a, **k):
+        seen.append(k)
+        return real(*a, **k)
+
+    monkeypatch.setattr(openpyxl, "load_workbook", spy)
+    r = readers.read_file(p)
+    assert seen and all(k.get("read_only") for k in seen)
+    assert "Sheet 'Gap' has 300 rows x 2 columns" in r.markdown and "| 100 |" not in r.markdown
+    assert "## Merged" in r.markdown and "Merged cells flattened" in r.notes

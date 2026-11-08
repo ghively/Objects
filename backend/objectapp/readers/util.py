@@ -1,8 +1,31 @@
 from __future__ import annotations
 
+import zipfile
 from datetime import datetime, timezone
+from pathlib import Path
 
 from .model import TABLE_MAX_COLS, TABLE_MAX_ROWS
+
+
+MAX_OFFICE_UNPACKED_BYTES = 100 * 1024 * 1024
+"""The most a .docx, .pptx or .xlsx may unpack to (all its parts) before it is parsed; a larger one
+(a small file can inflate to hundreds of MB) is kept as Original only."""
+
+
+class TooLarge(Exception):
+    """The file unpacks to more than ``MAX_OFFICE_UNPACKED_BYTES``."""
+
+
+def check_unpacked_size(path: Path) -> None:
+    """Raise ``TooLarge`` when the Office file's parts unpack to more than the cap. A file that
+    isn't a zip is left to its reader, which reports it as before."""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            total = sum(info.file_size for info in zf.infolist())
+    except zipfile.BadZipFile:
+        return
+    if total > MAX_OFFICE_UNPACKED_BYTES:
+        raise TooLarge(path.name)
 
 
 def iso(value: object) -> str | None:
