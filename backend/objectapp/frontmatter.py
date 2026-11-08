@@ -129,9 +129,17 @@ def _discard_yaml(kind: str) -> None:
     setattr(_local, kind, None)
 
 
+def _plain_key(key: Any) -> Any:
+    # A sequence key (`? [a, b]`) loads as a tuple. No property can have it as a
+    # name and it isn't JSON, so the file is refused (read-only), never crashed on.
+    if isinstance(key, (list, tuple, dict)):
+        raise FrontmatterError("Frontmatter has a key that is a list or mapping")
+    return _plain(key)
+
+
 def _plain(value: Any) -> Any:
     if isinstance(value, dict):
-        return {_plain(k): _plain(v) for k, v in value.items()}
+        return {_plain_key(k): _plain(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [_plain(v) for v in value]
     if isinstance(value, bool) or value is None:
@@ -162,6 +170,11 @@ def parse_fm(src: str) -> dict:
         # not a crash of the whole space.
         _discard_yaml("plain")
         raise FrontmatterError("Frontmatter is nested too deeply") from exc
+    except (TypeError, ValueError) as exc:
+        # The constructor's own failures: an integer over Python's 4300-digit limit,
+        # an unhashable key inside a value (bug audit 2026-11-07, 1).
+        _discard_yaml("plain")
+        raise FrontmatterError(str(exc)) from exc
     if data is None:
         return {}
     if not isinstance(data, dict):
@@ -178,6 +191,9 @@ def _load_rt(src: str) -> CommentedMap | None:
     except RecursionError as exc:
         _discard_yaml("rt")
         raise FrontmatterError("Frontmatter is nested too deeply") from exc
+    except (TypeError, ValueError) as exc:
+        _discard_yaml("rt")
+        raise FrontmatterError(str(exc)) from exc
     if data is None:
         return None
     if not isinstance(data, CommentedMap):

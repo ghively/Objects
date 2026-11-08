@@ -179,8 +179,8 @@ class Trash:
         try:
             fm = read_raw(self.dir, f"{trash_id}.md", cache=False).fm  # no cache under the trash
             title = fm.get("title") if isinstance(fm.get("title"), str) else ""
-        except OSError:
-            pass
+        except (OSError, TypeError, ValueError, RecursionError):
+            pass  # unreadable frontmatter: named after its id
         title = title.strip() or trash_id
         return {
             "id": trash_id,

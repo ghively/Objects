@@ -338,3 +338,48 @@ def test_top_level_merge_key_is_a_frontmatter_error(tmp_path):
     nested = "base: &b\n  x: 1\nderived:\n  <<: *b\n  y: 2\ntitle: T\n"
     assert parse_fm(nested)["derived"] == {"x": 1, "y": 2}
     assert set_keys(nested, {"title": "U"}) == nested.replace("title: T", "title: U")
+
+
+# -- bug audit 2026-11-07, finding 1: any frontmatter parse failure is read-only ----------
+
+_SEQUENCE_KEY = "? [a, b]\n: 1\ntitle: Seq\n"
+_HUGE_INT = "title: Huge\nn: " + "1" * 4400 + "\n"
+
+
+@pytest.mark.parametrize(
+    "src", [_SEQUENCE_KEY, _HUGE_INT, "meta:\n  ? [a, b]\n  : 1\n"], ids=["seq-key", "huge-int", "nested-seq-key"]
+)
+def test_unparseable_scalars_and_keys_are_a_frontmatter_error(src):
+    with pytest.raises(FrontmatterError):
+        parse_fm(src)
+
+
+@pytest.mark.parametrize("src", [_SEQUENCE_KEY, _HUGE_INT], ids=["seq-key", "huge-int"])
+def test_space_with_unparseable_frontmatter_opens_read_only(tmp_path, src):
+    from objectapp.space import Space
+
+    (tmp_path / "Bad.md").write_text("---\n" + src + "---\nbody\n", encoding="utf-8")
+    (tmp_path / "Good.md").write_text("---\ntitle: Good\n---\nbody\n", encoding="utf-8")
+    before = (tmp_path / "Bad.md").read_bytes()
+    space = Space(tmp_path)
+    listed = {s.path: s for s in space.list()}
+    assert set(listed) == {"Bad.md", "Good.md"}
+    assert listed["Bad.md"].readOnly and "YAML" in (listed["Bad.md"].readOnlyReason or "")
+    assert not listed["Good.md"].readOnly
+    assert (tmp_path / "Bad.md").read_bytes() == before
+
+
+@pytest.mark.parametrize("src", [_SEQUENCE_KEY, _HUGE_INT], ids=["seq-key", "huge-int"])
+def test_trashed_md_without_sidecar_and_unparseable_frontmatter(tmp_path, src):
+    from objectapp.ids import new_ulid
+    from objectapp.space import Space
+
+    trash = tmp_path / ".object" / "trash"
+    trash.mkdir(parents=True)
+    tid = new_ulid()  # recent, so opening the space (which purges old entries) keeps it
+    (trash / f"{tid}.md").write_text("---\n" + src + "---\nbody\n", encoding="utf-8")
+    (tmp_path / "Good.md").write_text("---\ntitle: Good\n---\nbody\n", encoding="utf-8")
+    space = Space(tmp_path)
+    assert [s.path for s in space.list()] == ["Good.md"]
+    meta = space.trash.object_meta(tid)
+    assert meta is not None and meta["title"] == tid

@@ -180,7 +180,8 @@ def read_raw(root: Path, rel: str, cache: bool = True) -> RawObject:
         else:
             try:
                 fm = parse_fm(of.frontmatter_src)
-            except FrontmatterError as exc:
+            except (FrontmatterError, TypeError, ValueError, RecursionError) as exc:
+                # Any parse failure is a bad file, never a space that can't open.
                 fm = {}
                 read_only = True
                 reason = f"Frontmatter is not valid YAML: {exc}"
