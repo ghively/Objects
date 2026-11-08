@@ -224,6 +224,15 @@ describe('#37 shortcut reference links and footnote definitions', () => {
     expect(editWhere(body, 'see')).toBe('see [Foo  Bar] and ![foo bar]Z\n\n[foo bar]: /x\n')
   })
 
+  // Fix-pass L5: a definition inside a quote or a list item defines the label for the whole note.
+  for (const def of ['> [foo]: /x', '>[foo]: /x', '> > [foo]: /x', '- [foo]: /x', '> - [foo]: /x', '- > [foo]: /x', '10. a\n\n    [foo]: /x']) {
+    test(`a label defined in a quote or a list item keeps its brackets: ${JSON.stringify(def)}`, () => {
+      const body = `${def}\n\nsee [foo]\n`
+      expect(editWhere(body, 'see')).toBe(`${def}\n\nsee [foo]Z\n`)
+      expect(html(body)).toContain('<a href="/x">foo</a>')
+    })
+  }
+
   test('brackets the body defines no label for stay escaped text', () => {
     expect(editWhere('see [foo]\n', 'see')).toBe('see \\[foo\\]Z\n')
     expect(editWhere('[bar]: /x\n\nsee [foo]\n', 'see')).toBe('[bar]: /x\n\nsee \\[foo\\]Z\n')
