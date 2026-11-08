@@ -169,6 +169,44 @@ def test_agent_folder_inside_a_space_is_refused(reg: AgentRegistry, space: Path,
     assert e.value.message == NESTED
 
 
+def test_agent_folder_inside_another_agent_or_the_agents_folder_is_refused(
+    reg: AgentRegistry, state: Path, tmp_path: Path
+) -> None:
+    """Audit 13: an agent inside another agent's folder (or the agent trash, or as the agents
+    folder itself) would make every turn of both refuse to run; creating one is refused."""
+    from objectapp.agentrun import NESTED_AGENT, NESTED_AGENTS_DIR, NESTED_TRASH
+
+    outer = reg.create(AgentInput(name="Outer"), "x")
+    with pytest.raises(AgentInvalid) as e:
+        reg.create(AgentInput(name="Inner"), "x", location=outer.folder)
+    assert e.value.message == NESTED_AGENT == "An agent folder can't be inside another agent's folder or hold one."
+    assert not (outer.folder / "Inner").exists()
+    elsewhere = reg.create(AgentInput(name="Elsewhere"), "x", location=tmp_path)
+    with pytest.raises(AgentInvalid) as e:
+        reg.duplicate(elsewhere.id, AgentInput(name="Copy"), memory=False, skills=False, location=elsewhere.folder)
+    assert e.value.message == NESTED_AGENT
+    agents_dir = state / "agents"
+    trash = agents_dir / ".trash"
+    trash.mkdir(parents=True, exist_ok=True)
+    with pytest.raises(AgentInvalid) as e:
+        reg.create(AgentInput(name="Binned"), "x", location=trash)
+    assert e.value.message == NESTED_TRASH
+    assert not (trash / "Binned").exists()
+    # add_folder of an agents folder itself, and of a folder inside another agent's folder
+    for target, message in ((agents_dir, NESTED_AGENTS_DIR), (outer.folder / "nested", NESTED_AGENT)):
+        target.mkdir(exist_ok=True)
+        (target / ".object-agent").mkdir(exist_ok=True)
+        data = json.loads((outer.folder / ".object-agent" / "agent.json").read_text(encoding="utf-8"))
+        data["id"] = "01JC7ZK3T9Q4M2X8B5N6R1V0WE"
+        (target / ".object-agent" / "agent.json").write_bytes(dump_json(data))
+        with pytest.raises(AgentInvalid) as e:
+            reg.add_folder(target)
+        assert e.value.message == message, target
+    # The default location still picks a free name next to the others.
+    again = reg.create(AgentInput(name="Outer"), "x")
+    assert again.folder.name == "Outer (2)"
+
+
 def test_duplicate(reg: AgentRegistry, tmp_path: Path) -> None:
     src = reg.create(AgentInput(name="Researcher"), "Soul.\n")
     f = src.folder

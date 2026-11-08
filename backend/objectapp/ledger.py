@@ -11,6 +11,9 @@ before and after, so every change can be shown and undone.
   ordered).
 - An ``undo`` entry also keeps ``undoneLine``, the history line of the entry it undid, filled by
   `append`, so `line` can say ``Undid: …`` from the entry alone.
+- Reads keep the last parse of each ledger in memory, keyed by the file's ``(size, mtime_ns)``,
+  so an unchanged file isn't parsed again (audit 36); `entries` and `get` answer copies. The file
+  itself still grows without a cap.
 
 Called only by `agentmemory`, `agentskills`, `learnundo` and `curator`. No network client.
 """
@@ -31,6 +34,9 @@ __all__ = ["append", "entries", "get", "line", "summary"]
 
 _locks_guard = threading.Lock()
 _locks: dict[str, threading.Lock] = {}
+_cache_guard = threading.Lock()
+_cache: dict[str, tuple[tuple[int, int], list[dict[str, Any]]]] = {}
+"""Per ledger file: the ``(size, mtime_ns)`` it had when last parsed, and that parse."""
 
 _DEFAULTS: dict[str, Any] = {
     "skill": None, "file": None, "before": None, "after": None, "encoding": "text",
@@ -57,9 +63,24 @@ def _path(folder: Path) -> Path:
 
 
 def _parse(folder: Path) -> list[dict[str, Any]]:
-    """Every parsable entry, oldest first; a missing ledger is empty."""
+    """Every parsable entry, oldest first; a missing ledger is empty. The list and its entries are
+    shared with the cache: callers never change them (`entries` and `get` copy what they answer).
+    The file is stat'ed before it is read, so a parse is never kept under a newer key."""
+    path = _path(folder)
+    key = os.path.normcase(os.path.abspath(path))
     try:
-        data = _path(folder).read_bytes()
+        st = path.stat()
+    except FileNotFoundError:
+        with _cache_guard:
+            _cache.pop(key, None)
+        return []
+    stamp = (st.st_size, st.st_mtime_ns)
+    with _cache_guard:
+        hit = _cache.get(key)
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
+    try:
+        data = path.read_bytes()
     except FileNotFoundError:
         return []
     out: list[dict[str, Any]] = []
@@ -72,6 +93,8 @@ def _parse(folder: Path) -> list[dict[str, Any]]:
             continue
         if isinstance(obj, dict) and isinstance(obj.get("id"), str):
             out.append(obj)
+    with _cache_guard:
+        _cache[key] = (stamp, out)
     return out
 
 
@@ -127,7 +150,7 @@ def entries(folder: Path, *, target: str | None = None, skill: str | None = None
             source = e.get("source")
             if not isinstance(source, dict) or source.get("run") != run:
                 continue
-        out.append(e)
+        out.append(dict(e))
         if len(out) >= limit:
             break
     return out
@@ -137,7 +160,7 @@ def get(folder: Path, entry_id: str) -> dict[str, Any]:
     """The entry with `entry_id`; KeyError when there is none."""
     for e in _parse(folder):
         if e.get("id") == entry_id:
-            return e
+            return dict(e)
     raise KeyError(entry_id)
 
 
