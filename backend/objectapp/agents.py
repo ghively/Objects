@@ -219,6 +219,13 @@ def endpoint_host(url: str) -> str:
     return f"{host}:{port}" if host and port is not None else host
 
 
+def _scheme(url: str) -> str:
+    try:
+        return urlsplit(url or "").scheme.lower()
+    except ValueError:
+        return ""
+
+
 def _str(value: Any) -> str | None:
     return value if isinstance(value, str) else None
 
@@ -764,12 +771,13 @@ class AgentRegistry:
 
     def refresh_remote(self, agent_id: str, card: a2a.Card, card_raw: dict[str, Any], card_url: str) -> AgentRecord:
         """A card fetched again: ``card.json``, the endpoint, streaming and ``cardFetchedAt``. Gene's
-        name is kept. An endpoint whose host changed removes the secret, so a token never follows
-        a card to a new host."""
+        name is kept. An endpoint whose host changed, or that went from https to http, removes the
+        secret, so a token never follows a card to a new host or onto an unencrypted line."""
         with _lock:
             rec = self._writable_remote(agent_id)
             data = dict(rec.data)
-            old_host = endpoint_host(_str(_endpoint(data).get("url")) or "")
+            old_url = _str(_endpoint(data).get("url")) or ""
+            old_host = endpoint_host(old_url)
             now = _now()
             data["cardUrl"] = card_url
             data["endpoint"] = {"url": card.endpoint_url, "protocolVersion": card.protocol_version,
@@ -777,7 +785,8 @@ class AgentRegistry:
             data["streaming"] = card.streaming is True
             data["cardFetchedAt"] = now
             data["updatedAt"] = now
-            if endpoint_host(card.endpoint_url) != old_host:
+            lost_tls = _scheme(old_url) == "https" and _scheme(card.endpoint_url) != "https"
+            if endpoint_host(card.endpoint_url) != old_host or lost_tls:
                 remotesecrets.remove(agent_id)
             atomic_write(rec.folder / CARD_FILE, dump_json(card_raw))
             agentfiles.write_agent_file(rec.folder, data)
