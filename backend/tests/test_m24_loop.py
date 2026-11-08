@@ -509,3 +509,27 @@ def test_no_agent_set(env: Env) -> None:
     assert env.loop.settings_status()["problem"] is None
     env.idle()
     assert env.entries()[0]["state"] != "pending"
+
+
+def test_wait_idle_is_not_fooled_by_a_run_that_starts_between_its_checks() -> None:
+    """Audit 46: the worker woke between `wait_idle`'s two checks and claimed the only due entry, so
+    the first check saw it idle and the second saw nothing pending, while a run was in progress."""
+    import types
+    calls: list[int] = []
+
+    class Wake:
+        def set(self) -> None:  # the next poll comes after the run has finished
+            stub._busy = False
+
+    stub = types.SimpleNamespace(_busy=False, _passes=0, _wake=Wake())
+
+    def can_start() -> bool:
+        calls.append(1)
+        if len(calls) == 1:  # the worker wakes now and claims the entry: busy, nothing left pending
+            stub._busy = True
+            stub._passes += 1
+        return False
+
+    stub._can_start = can_start
+    assert WorkLoop.wait_idle(stub, 2)  # type: ignore[arg-type]
+    assert len(calls) >= 2
