@@ -75,6 +75,10 @@ TEST_TIMEOUT_ENV = "OBJECT_TEST_WORK_TIMEOUT"
 """Seconds; honoured only while OBJECT_FAKE_NOTIFY_FILE is set (M14's test-hook rule)."""
 CAPTURE_UNREADABLE = "This brain dump couldn't be read. Try again."
 CHANGED_409 = "This step changed. Look again."
+GONE_409 = "This item is gone or isn't a work item any more."
+_RETRY_409 = {ALREADY_FILED: ALREADY_FILED, GONE: GONE_409}
+"""What Retry answers for the pre-run check's reason: a brain dump filed meanwhile and a gone item
+say so; a changed step says `CHANGED_409`."""
 
 _loops: dict[str, WorkLoop] = {}
 _loops_lock = threading.Lock()
@@ -473,9 +477,9 @@ class WorkLoop:
             raise QueueRefused(422, NOT_RETRYABLE)
         item = self._item(e.get("path"))
         cap = self._capture(e.get("capturePath"))
-        verdict, _p, _r = precheck(e, item, cap, self.clock())
+        verdict, _p, reason = precheck(e, item, cap, self.clock())
         if verdict == "withdraw":
-            raise QueueRefused(409, CHANGED_409)
+            raise QueueRefused(409, _RETRY_409.get(reason or "", CHANGED_409))
         fields = {k: e.get(k) for k in (
             "kind", "path", "objectId", "title", "stepId", "stepN", "stepKind", "stepText", "text",
             "capturePath", "notBefore", "auto", "by")}

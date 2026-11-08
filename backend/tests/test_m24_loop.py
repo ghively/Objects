@@ -483,6 +483,22 @@ def test_unreadable_capture_fails_and_non_new_capture_withdraws(env: Env) -> Non
     env.idle()
     [e] = [x for x in env.entries() if x.get("capturePath") == "Captures/nope.md"]
     assert e["state"] == "failed" and e["retryable"]
+    # Sweep 2026-11-08 (work-import 8): Retry of a failed filing whose brain dump was marked filed
+    # meanwhile says so, not "This step changed."
+    from objectapp import captures
+    from objectapp.workagentmodel import QueueRefused
+
+    cap = env.post("/api/work/captures", text="never filed", fromView="now")["capture"]
+    env.idle()
+    [failed] = [x for x in env.entries() if x.get("capturePath") == cap["path"]]
+    assert failed["state"] == "failed" and failed["reason"] == NOT_FILED
+    filed = captures.set_status(env.service.space, cap["path"], "filed", base_version=cap["version"])
+    assert filed["status"] == "filed"
+    with pytest.raises(QueueRefused) as refused:
+        env.loop.retry(failed["id"])
+    assert (refused.value.status, str(refused.value)) == (409, ALREADY_FILED)
+    res = httpx.post(f"http://127.0.0.1:{env.port}/api/work/agent/retry", json={"id": failed["id"]})
+    assert res.status_code == 409 and res.json()["detail"] == ALREADY_FILED
 
 
 def test_waiting_entry_does_not_starve_a_later_due_one(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
