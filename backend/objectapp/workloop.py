@@ -152,9 +152,16 @@ def outcome(entry: dict, result: HeadlessResult, notices: list[WorkNotice], file
         return "failed", None, TIMED_OUT
     if result.state == "stopped":
         return "failed", None, STOPPED
-    if result.state == "error":
-        return "failed", None, one_line(result.error or "The run failed.", 500)
     kind = entry.get("kind")
+    if result.state == "error":
+        if kind in ("approve", "run"):
+            # The agent may have completed the step through the tools before the CLI erred: then
+            # the step is done, and a failed (retryable) entry would only answer 409 on Retry.
+            mine = [n for n in notices if n.step_id == entry.get("stepId") and n.by.role == "agent"
+                    and n.event in ("complete", "done", "fail")]
+            if mine and mine[-1].event in ("complete", "done"):
+                return "done", one_line(mine[-1].text, 500), None
+        return "failed", None, one_line(result.error or "The run failed.", 500)
     if kind in ("approve", "run"):
         mine = [n for n in notices if n.step_id == entry.get("stepId") and n.by.role == "agent"]
         for n in reversed(mine):
