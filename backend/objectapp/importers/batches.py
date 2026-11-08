@@ -192,7 +192,10 @@ def trash_batch(space: Space, batch: str) -> dict[str, Any]:
         with space._lock:
             raw = space._raw.get(recorded)
         block = provenance.read_block(raw.fm) if raw is not None else None
-        if raw is not None and (block is None or (str(block["system"]), str(block["id"])) == key):
+        # Only the object this batch created: another batch's (a re-run that created it again) or
+        # one with no provenance (Gene's own) at the recorded path is never trashed.
+        if (block is not None and block.get("batch") == batch
+                and (str(block["system"]), str(block["id"])) == key):
             rel: str | None = recorded
         else:
             rel = by_id.get(key)  # moved: found by the source id and batch it carries
@@ -259,7 +262,8 @@ def resolve_conflicts(space: Space, batch: str, action: str, paths: list[str] | 
             current = full.read_bytes()
             if action == "take":
                 snapshot(space, rel, current)
-                space._write(rel, None, lambda _of, _fm, o=new_of: o, stamp=False, history=False)
+                # at the version just read and kept: a save made since fails this item, never lost
+                space._write(rel, version_of(current), lambda _of, _fm, o=new_of: o, stamp=False, history=False)
             else:
                 if not isinstance(block, dict):
                     raise ValueError("no provenance in the held-back file")

@@ -8,10 +8,11 @@ from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from .model import ExtractedImage, ReadResult
-from .util import cell_text, iso, table_md
+from .util import cell_text, check_unpacked_size, iso, table_md
 
 
 def read(path: Path) -> ReadResult:
+    check_unpacked_size(path)
     prs = Presentation(str(path))
     images: list[ExtractedImage] = []
     notes: list[str] = []
