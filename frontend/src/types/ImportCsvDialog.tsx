@@ -205,8 +205,12 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
   const [error, setError] = useState<string | null>(null)
   const targets = useMemo(() => csvTargets(type), [type])
   // What this file's import already made (its rows, its new collection), kept so Import after a
-  // failure resumes instead of creating them again; a new file or closing the dialog clears it.
+  // failure resumes instead of creating them again; a new file, a changed mapping, header option or
+  // destination, or closing the dialog clears it (the next Import is a new run from the first row).
   const done = useRef<{ rows: WeakSet<CsvCell[]>; collection?: string }>({ rows: new WeakSet() })
+  const forget = () => {
+    done.current = { rows: new WeakSet() }
+  }
 
   const width = file ? Math.max(0, ...file.rows.map((r) => r.length)) : 0
   const columns = useMemo(() => {
@@ -220,7 +224,7 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
   const collectionName = file ? file.name.replace(/\.csv$/i, '') || 'Import' : ''
 
   const reset = () => {
-    done.current = { rows: new WeakSet() }
+    forget()
     setFile(null)
     setHeader(true)
     setMapping([])
@@ -234,7 +238,7 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
     setError(null)
     const parsed = parseCsvCells(await f.text())
     const next = { name: f.name, rows: parsed.rows, error: parsed.error }
-    done.current = { rows: new WeakSet() }
+    forget()
     setFile(next)
     const head = header ? next.rows[0] ?? [] : []
     const w = Math.max(0, ...next.rows.map((r) => r.length))
@@ -242,6 +246,7 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
   }
 
   const toggleHeader = (on: boolean) => {
+    forget()
     setHeader(on)
     if (!file) return
     const head = on ? file.rows[0] ?? [] : []
@@ -346,7 +351,10 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
                 aria-label="Import into"
                 value={into}
                 disabled={busy}
-                onChange={(e) => setInto(e.target.value === 'newCollection' ? 'newCollection' : 'type')}
+                onChange={(e) => {
+                  forget()
+                  setInto(e.target.value === 'newCollection' ? 'newCollection' : 'type')
+                }}
                 className="h-8 min-w-0 rounded-md border border-line bg-raised px-2 text-[14px]"
               >
                 <option value="type">{type.pluralName}</option>
@@ -366,7 +374,10 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
                     aria-label={`Map ${name}`}
                     value={mapping[i] ?? ''}
                     disabled={busy}
-                    onChange={(e) => setMapping((m) => columns.map((_, j) => (j === i ? e.target.value || null : m[j] ?? null)))}
+                    onChange={(e) => {
+                      forget()
+                      setMapping((m) => columns.map((_, j) => (j === i ? e.target.value || null : m[j] ?? null)))
+                    }}
                     className="h-8 min-w-0 flex-1 rounded-md border border-line bg-raised px-2 text-[14px]"
                   >
                     <option value="">{CHANGE_TYPE_TEXT.none}</option>
