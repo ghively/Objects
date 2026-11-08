@@ -164,6 +164,25 @@ describe('each block item runs its command', () => {
     else expected(editor, view)
   })
 
+  test('sweep 2026-11-08 #6: Table inserts the catalog default, 2 columns by 3 rows with a header row', () => {
+    const editor = headless('Hello\n\nWorld\n')
+    BLOCK_ITEMS.find((i) => i.id === 'table')!.run(editor)
+    const table = editor.state.doc.child(1)
+    expect(table.type.name).toBe('table')
+    expect(table.childCount).toBe(3)
+    const rows: string[][] = []
+    table.forEach((row) => {
+      const cells: string[] = []
+      row.forEach((cell) => cells.push(cell.type.name))
+      rows.push(cells)
+    })
+    expect(rows).toEqual([
+      ['tableHeader', 'tableHeader'],
+      ['tableCell', 'tableCell'],
+      ['tableCell', 'tableCell'],
+    ])
+  })
+
   test('reuse any content opens the embed picker', () => {
     const picker = vi.fn()
     setObjectEmbedPicker(picker)

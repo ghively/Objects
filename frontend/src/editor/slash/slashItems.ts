@@ -162,7 +162,8 @@ export const BLOCK_ITEMS: readonly SlashItem[] = [
     e.chain().focus().insertColumns(2).run()
   }),
   block('table', 'Table', 'Rows and columns of cells', 'ph-table', (e) => {
-    e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+    // The catalog's default table: 2 columns by 3 rows, the first a header row.
+    e.chain().focus().insertTable({ rows: 3, cols: 2, withHeaderRow: true }).run()
   }),
   block('bookmark', 'Create bookmark', undefined, 'ph-bookmark-simple', () => 'bookmark'), // pasteInput.bookmark (ours in this menu)
   // M14 (our item): a button that runs an automation; the sub-view picks the automation.
