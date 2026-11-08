@@ -179,6 +179,19 @@ describe('TrialStep', () => {
     render(<TrialStep batch="b1" onDone={vi.fn()} />)
     expect(await screen.findByRole('alert')).toHaveTextContent(T.failed)
   })
+
+  // Audit 2026-11-07 #42: a failed first status load is retried, so the Start button comes.
+  test('a failed first load is tried again until it answers', async () => {
+    m.filingStatus
+      .mockRejectedValueOnce(new Error('Server not reachable'))
+      .mockRejectedValueOnce(new Error('Server not reachable'))
+      .mockResolvedValue(trialStatus({ state: 'idle', trial: { items: [], rightShare: null } }))
+    render(<TrialStep batch="b1" onDone={vi.fn()} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Server not reachable')
+    expect(await screen.findByRole('button', { name: T.startTrial })).toBeEnabled()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(m.filingStatus).toHaveBeenCalledTimes(3)
+  })
 })
 
 describe('NormaliseStep', () => {

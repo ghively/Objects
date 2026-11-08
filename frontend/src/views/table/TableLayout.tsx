@@ -362,9 +362,14 @@ export function TableLayout(props: TableLayoutProps) {
   patchRowRef.current = props.patchRow
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
+  /** Removes a column resize's document listeners while one is under way. */
+  const endResize = useRef<(() => void) | null>(null)
+
   useEffect(
     () => () => {
       if (noticeTimer.current) clearTimeout(noticeTimer.current)
+      // Audit 2026-11-07 #45: unmounted mid-drag, the resize stops (nothing is saved).
+      endResize.current?.()
     },
     [],
   )
@@ -424,12 +429,18 @@ export function TableLayout(props: TableLayoutProps) {
       rem = startRem + (ev.clientX - startX) / REM_PX
       setLive({ id: col.id, rem })
     }
-    const up = () => {
+    const detach = () => {
       document.removeEventListener('mousemove', move)
       document.removeEventListener('mouseup', up)
+      if (endResize.current === detach) endResize.current = null
+    }
+    const up = () => {
+      detach()
       setLive(null)
       if (rem !== startRem && config) saveConfig(setColWidth(config, col.id, rem))
     }
+    endResize.current?.()
+    endResize.current = detach
     document.addEventListener('mousemove', move)
     document.addEventListener('mouseup', up)
   }

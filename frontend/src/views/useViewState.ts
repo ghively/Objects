@@ -20,17 +20,20 @@ export function useViewState<S extends ViewState = ViewState>(
   const stateRef = useRef(state)
   const pending = useRef<ViewPatch[]>([])
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Saves running now: a save in flight is still pending (audit 2026-11-07 #44). */
+  const inFlight = useRef(0)
   const saveRef = useRef(save)
   const refetchRef = useRef(refetch)
   saveRef.current = save
   refetchRef.current = refetch
 
-  // A new stored state (another window's save, a reload) replaces ours unless a save is pending.
+  // A new stored state (another window's save, a reload) replaces ours unless a save is pending
+  // or in flight.
   const lastInitial = useRef(initial)
   useEffect(() => {
     if (initial === lastInitial.current) return
     lastInitial.current = initial
-    if (pending.current.length === 0) {
+    if (pending.current.length === 0 && inFlight.current === 0) {
       stateRef.current = initial
       setState(initial)
     }
@@ -41,6 +44,7 @@ export function useViewState<S extends ViewState = ViewState>(
     const patches = pending.current
     pending.current = []
     if (patches.length === 0) return
+    inFlight.current++
     try {
       await saveRef.current(stateRef.current)
     } catch (e) {
@@ -57,6 +61,8 @@ export function useViewState<S extends ViewState = ViewState>(
       } catch (e2) {
         console.warn('Could not save the view:', e2)
       }
+    } finally {
+      inFlight.current--
     }
   }, [])
 

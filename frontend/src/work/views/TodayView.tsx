@@ -2,7 +2,7 @@
 // blocks (Morning brief, meetings, focus lines in the free gaps, Wrap-up: ported), a now-line while
 // now is inside the range (moved every minute), the deadline countdowns (amber under 21 days,
 // ported), and the focus lines with their slot times. A meeting click opens it in the side panel.
-import { useEffect, useState, type JSX } from 'react'
+import type { JSX } from 'react'
 import { useTabs } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
 import { formatInZone, zonedParts } from '@/lib/zonedTime'
@@ -18,7 +18,6 @@ const DAY_END = 17 * 60 + 30
 const SPAN = DAY_END - DAY_START
 /** Deadline countdowns turn amber under this many days (ported). */
 const DEADLINE_AMBER = 21
-const MINUTE_MS = 60_000
 
 const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 const clamp = (m: number) => Math.min(Math.max(m, DAY_START), DAY_END)
@@ -84,16 +83,9 @@ function Block({ b }: { b: DayBlock }): JSX.Element {
 }
 
 export function TodayView({ data, now }: { data: WorkDataState; now: Date }): JSX.Element {
-  // The now-line moves every minute: `now` (the page's clock) plus the time since this view showed.
-  const [shownAt] = useState(() => Date.now())
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), MINUTE_MS)
-    return () => clearInterval(t)
-  }, [])
+  // The now-line moves every minute: `now` is the page's clock, which ticks once a minute already.
   const zone = data.board?.timeZone ?? undefined
-  const current = new Date(now.getTime() + Math.max(0, Date.now() - shownAt))
-  const parts = zonedParts(current, zone)
+  const parts = zonedParts(now, zone)
   const nowMinutes = parts.hour * 60 + parts.minute
   const day = data.today?.day ?? data.board?.today ?? parts.date
 

@@ -2,7 +2,8 @@
 // the local day rolls over (today's Overdue group, Created Today and the Today pill move with it).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/api/client'
-import type { CalendarRange, ChangeKind } from '@/api/types'
+import type { CalendarRange, ChangeKind, DateValue } from '@/api/types'
+import { dayReader, daySpan } from '@/views/dates'
 import { todayYmd } from './dates'
 
 export const RANGE_RELOAD_MS = 150
@@ -12,14 +13,16 @@ export const DAY_CHECK_MS = 60_000
 /** Events that always reload the range; a `changed` reloads only when it concerns the shown days. */
 const RELOAD_KINDS: ReadonlySet<ChangeKind> = new Set<ChangeKind>(['created', 'deleted', 'renamed', 'types'])
 
-/** A date value (`{start, end?, resolution}`) touching `[from, to]` (local days; a time is cut off). */
-function dateInRange(v: unknown, from: string, to: string): boolean {
+/**
+ * A date value (`{start, end?, resolution}`) touching `[from, to]` (days in the time-zone setting:
+ * a timed value's instant is read as its day there, not as its UTC day).
+ */
+function dateInRange(v: unknown, from: string, to: string, dayOf: (iso: string) => string | null): boolean {
   if (!v || typeof v !== 'object') return false
-  const d = v as { start?: unknown; end?: unknown }
-  if (typeof d.start !== 'string') return false
-  const start = d.start.slice(0, 10)
-  const end = typeof d.end === 'string' ? d.end.slice(0, 10) : start
-  return start <= to && end >= from
+  if (typeof (v as { start?: unknown }).start !== 'string') return false
+  const span = daySpan(v as DateValue, dayOf)
+  if (!span) return false
+  return span.start <= to && (span.end ?? span.start) >= from
 }
 
 /**
@@ -31,7 +34,8 @@ export async function concernsRange(path: string, from: string, to: string): Pro
     const [row] = await api.rows({ paths: [path], preview: false })
     if (!row) return false
     if (typeof row.values.repeat === 'string' && row.values.repeat.trim() !== '') return true
-    return Object.values(row.values).some((v) => dateInRange(v, from, to))
+    const dayOf = dayReader()
+    return Object.values(row.values).some((v) => dateInRange(v, from, to, dayOf))
   } catch {
     return false
   }

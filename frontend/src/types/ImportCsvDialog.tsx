@@ -5,7 +5,7 @@
  * default, the others to a property of the same name). The objects go into the type, or into a
  * new collection named after the file. Nothing but the new objects (and that collection) is written.
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import type { PropertyDef, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
@@ -204,6 +204,9 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const targets = useMemo(() => csvTargets(type), [type])
+  // What this file's import already made (its rows, its new collection), kept so Import after a
+  // failure resumes instead of creating them again; a new file or closing the dialog clears it.
+  const done = useRef<{ rows: WeakSet<CsvCell[]>; collection?: string }>({ rows: new WeakSet() })
 
   const width = file ? Math.max(0, ...file.rows.map((r) => r.length)) : 0
   const columns = useMemo(() => {
@@ -217,6 +220,7 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
   const collectionName = file ? file.name.replace(/\.csv$/i, '') || 'Import' : ''
 
   const reset = () => {
+    done.current = { rows: new WeakSet() }
     setFile(null)
     setHeader(true)
     setMapping([])
@@ -230,6 +234,7 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
     setError(null)
     const parsed = parseCsvCells(await f.text())
     const next = { name: f.name, rows: parsed.rows, error: parsed.error }
+    done.current = { rows: new WeakSet() }
     setFile(next)
     const head = header ? next.rows[0] ?? [] : []
     const w = Math.max(0, ...next.rows.map((r) => r.length))
@@ -249,14 +254,23 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
     try {
       let collections: string[] | undefined
       if (into === 'newCollection') {
-        const c = await api.createCollection(collectionName, [type.id])
-        collections = [c.name]
+        // A retry after a failure goes on into the collection the first try made.
+        let name = done.current.collection
+        if (name === undefined) {
+          name = (await api.createCollection(collectionName, [type.id])).name
+          done.current.collection = name
+        }
+        collections = [name]
       }
       const radix = csvDecimalCommas(data, width)
       for (let i = 0; i < data.length; i++) {
-        const { title, values } = csvRecord(data[i], mapping, targets, radix)
-        // No template: the file's values are the object (our choice).
-        await api.createObject(type.id, { title, templateId: 'none', values: collections ? { ...values, collections } : values })
+        // A retry after a failure resumes there: a row already imported is not created again.
+        if (!done.current.rows.has(data[i])) {
+          const { title, values } = csvRecord(data[i], mapping, targets, radix)
+          // No template: the file's values are the object (our choice).
+          await api.createObject(type.id, { title, templateId: 'none', values: collections ? { ...values, collections } : values })
+          done.current.rows.add(data[i])
+        }
         setProgress({ done: i + 1, total: data.length })
       }
       reset()
