@@ -192,6 +192,7 @@ class WorkLoop:
         self._unsubscribe: Callable[[], None] | None = None
         self._lock = threading.RLock()
         self._busy = False
+        self._passes = 0  # counts the worker's passes, so wait_idle can tell one ran between its checks
         self._current: dict[str, Any] | None = None
         self._stops: dict[str, threading.Event] = {}
         self._notices: list[WorkNotice] = []
@@ -235,7 +236,10 @@ class WorkLoop:
         """True when nothing is running and nothing due could start (tests)."""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if not self._busy and not self._can_start():
+            # The worker can wake between the checks and claim the only due entry: then the first
+            # check sees it idle and `_can_start` sees nothing pending. Re-read both after.
+            passes = self._passes
+            if not self._busy and not self._can_start() and not self._busy and self._passes == passes:
                 return True
             self._wake.set()
             time.sleep(0.05)
@@ -443,6 +447,7 @@ class WorkLoop:
         while not self._quit.is_set():
             try:
                 self._busy = True
+                self._passes += 1
                 try:
                     self.scan_unqueued_captures()
                 except Exception:
