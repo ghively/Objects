@@ -203,6 +203,11 @@ export function matches(e: KeyEventLike, keys: string[]): boolean {
 
 const ARROW_GLYPHS: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }
 
+/** Keys the sheet names rather than prints: the catalog's Ctrl+Plus / Ctrl+Minus (`+` is Shift+= on most layouts). */
+const KEY_NAMES: Record<string, string> = { '=': 'Plus', '+': 'Plus', '-': 'Minus' }
+/** On macOS the glyphs read on their own (⌘+ / ⌘-). */
+const MAC_KEY_NAMES: Record<string, string> = { '=': '+' }
+
 /** Whether `spec` is a two-key sequence (`g n`). */
 export function isSequence(spec: string): boolean {
   return spec.includes(' ')
@@ -221,7 +226,10 @@ export function formatKeys(spec: string, mac = isMacPlatform()): string {
       .join(' then ')
   }
   const c = parseKeys(spec, mac)
-  const key = ARROW_GLYPHS[c.key] ?? (c.key === 'Space' ? 'Space' : c.key.length === 1 ? c.key.toUpperCase() : c.key)
+  const key =
+    ARROW_GLYPHS[c.key] ??
+    (mac ? MAC_KEY_NAMES[c.key] : KEY_NAMES[c.key]) ??
+    (c.key === 'Space' ? 'Space' : c.key.length === 1 ? c.key.toUpperCase() : c.key)
   if (mac) return `${c.ctrl ? '⌃' : ''}${c.alt ? '⌥' : ''}${c.shift ? '⇧' : ''}${c.meta ? '⌘' : ''}${key}`
   return [c.ctrl && 'Ctrl', c.meta && 'Meta', c.alt && 'Alt', c.shift && 'Shift', key].filter(Boolean).join('+')
 }
@@ -584,12 +592,18 @@ export const AI_SHORTCUTS: ShortcutDef[] = [
  * `editor/extensions/pasteAsPlainText.ts`. `goToCalendar` (General, Ctrl+Alt+H: "press twice to
  * jump to today") is bound by `shell/shortcuts.ts` anywhere in the window. `toggleAllToggles`
  * (Block editing, Ctrl+O) is bound by `editor/shortcuts.ts` through `editor/extensions/toggleAll.ts`.
+ * `increaseTextHierarchy` / `decreaseTextHierarchy` (Block editing, Ctrl+Plus / Ctrl+Minus) are
+ * bound by `editor/shortcuts.ts` through `editor/extensions/textHierarchy.ts`; the registry
+ * holds `Mod-=` (shown Ctrl+Plus) and the editor's key map answers the shifted `+` too. The
+ * whiteboard's zoom keys are the same chords in their own scope.
  */
 export const SWEEP_SHORTCUTS: ShortcutDef[] = [
   def('createNewTask', 'global', 'Create new task', ['Mod-Shift-t'], 'global', V, true),
   def('pasteAsPlainText', 'text', 'Paste as plain text', ['Mod-Shift-v'], 'editor', V, true),
   def('goToCalendar', 'global', 'Go to Calendar', ['Mod-Alt-h'], 'global', V, true),
   def('toggleAllToggles', 'block', 'Open or close all toggles on the page', ['Mod-o'], 'editor', V, true),
+  def('increaseTextHierarchy', 'block', 'Increase text hierarchy', ['Mod-='], 'editor', V, true),
+  def('decreaseTextHierarchy', 'block', 'Decrease text hierarchy', ['Mod--'], 'editor', V, true),
 ]
 
 registerShortcuts(EXISTING_SHORTCUTS)

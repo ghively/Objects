@@ -248,6 +248,32 @@ describe('sweep 2026-11-08: catalogued keys', () => {
     expect(keysFor('toggleAllToggles')).toEqual(['Mod-o'])
   })
 
+  test('Ctrl+Plus and Ctrl+Minus are "Increase / decrease text hierarchy" under Block editing, bound in the editor', () => {
+    const up = byId().get('increaseTextHierarchy')
+    const down = byId().get('decreaseTextHierarchy')
+    expect(up).toBeTruthy()
+    expect(down).toBeTruthy()
+    for (const d of [up, down]) {
+      expect(d?.category).toBe('block')
+      expect(d?.scope).toBe('editor')
+      expect(d?.provisional).toBe(false)
+      expect(d?.bound).toBe(true)
+    }
+    expect(up?.name).toBe('Increase text hierarchy')
+    expect(down?.name).toBe('Decrease text hierarchy')
+    // One registry key each (the editor's key map also answers the shifted `+` of Ctrl+Shift+=).
+    expect(keysFor('increaseTextHierarchy')).toEqual(['Mod-='])
+    expect(keysFor('decreaseTextHierarchy')).toEqual(['Mod--'])
+    // Shown as Ctrl+Plus / Ctrl+Minus (⌘+ / ⌘- on macOS), as the catalog writes them.
+    expect(formatKeys('Mod-=', false)).toBe('Ctrl+Plus')
+    expect(formatKeys('Mod-+', false)).toBe('Ctrl+Plus')
+    expect(formatKeys('Mod--', false)).toBe('Ctrl+Minus')
+    expect(formatKeys('Mod-=', true)).toBe('⌘+')
+    expect(formatKeys('Mod--', true)).toBe('⌘-')
+    // `Mod--` still parses as Mod with the minus key.
+    expect(parseKeys('Mod--', false)).toEqual({ ctrl: true, meta: false, alt: false, shift: false, key: '-' })
+  })
+
   test('no two registered ids in one scope share a key, except the declared pairs', () => {
     for (const mac of [false, true]) {
       const seen = new Map<string, string>()
