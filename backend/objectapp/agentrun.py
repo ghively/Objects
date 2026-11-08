@@ -347,11 +347,21 @@ def fence_rules(folders: list[Path], own: Path, state: Path, home: Path) -> list
         rules += [f"Read({s}/{sub}/**)", f"Edit({s}/{sub}/**)"]
     h = rule_path(Path(home).resolve())
     rules += [f"Read({h}/.claude/.credentials.json)", f"Edit({h}/.claude/**)", f"Edit({h}/.claude.json)"]
+    rules += _cli_file_reads(f"{h}/.claude", f"{h}/.claude.json")
     out: list[str] = []
     for r in rules:
         if r not in out:
             out.append(r)
     return out
+
+
+def _cli_file_reads(config: str, claude_json: str) -> list[str]:
+    """The ``Read`` denies for the CLI's own files under a config folder (rule form): every run's
+    session (the prompt, each tool input and result: the space text that agent read) and the
+    user's own coding sessions under ``projects/``, and the config files (an ``env`` block or a
+    user-level MCP server may hold a key). The CLI reads these itself, not through the Read tool."""
+    return [f"Read({config}/projects/**)", f"Read({config}/settings.json)",
+            f"Read({config}/settings.local.json)", f"Read({claude_json})"]
 
 
 def nesting_problem(own: Path, folders: list[Path], message: str = NESTED_MESSAGE) -> str | None:
@@ -509,7 +519,7 @@ def _fence(scope: RunScope, parts: RunParts) -> None:
     if config is not None:  # as ~/.claude's: the login and the user's Claude Code files
         for form in _both_forms(config):
             c = rule_path(form)
-            rules += [f"Read({c}/.credentials.json)", f"Edit({c}/**)"]
+            rules += [f"Read({c}/.credentials.json)", f"Edit({c}/**)", *_cli_file_reads(c, f"{c}/.claude.json")]
     for rule in rules:
         if rule not in parts.deny_rules:
             parts.deny_rules.append(rule)
