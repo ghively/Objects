@@ -2,15 +2,19 @@
 ``POST /api/agents/{id}/files/reveal`` (the plan's Contract "Routes").
 
 - ``POST /remote-agents/preview`` ``{url, auth}`` -> ``RemotePreview``. Writes nothing. 422 (a bad
-  URL, the header rule, the card refusals); 502 "Couldn't reach {host}: {reason}" / "{host}
-  answered {status}." ("{host} refused the token." for 401/403).
-- ``POST /remote-agents`` ``AddRemoteAgentRequest`` -> 201 ``Agent`` (``kind: "remote"``); the
-  card is fetched again. As preview, plus 409 "This agent is already listed as {name}." (same
-  ``cardUrl`` and endpoint).
+  URL, the header rule, the card refusals, `endpoint_refusal`); 502 "Couldn't reach {host}:
+  {reason}" / "{host} answered {status}." ("{host} refused the token." for 401/403).
+- ``POST /remote-agents`` ``AddRemoteAgentRequest`` -> 201 ``Agent`` (``kind: "remote"``) plus
+  ``warnings`` (`preview_warnings`); the card is fetched again. As preview, plus 409 "This agent
+  is already listed as {name}." (same ``cardUrl`` and endpoint).
 - ``PUT  /remote-agents/{id}`` ``SaveRemoteAgentRequest`` -> ``Agent``. 404; 409
   ``{currentRevision}``; 422 (name, header rule; not a remote agent).
-- ``POST /remote-agents/{id}/refresh`` ``{clientId?}`` -> ``Agent`` (the card fetched again; an
-  endpoint on another host drops the secret). 404; 422; 502.
+- ``POST /remote-agents/{id}/refresh`` ``{clientId?}`` -> ``Agent`` plus ``warnings`` (the card
+  fetched again; an endpoint on another host drops the secret). 404; 422 (as preview); 502.
+
+`endpoint_refusal` (audit 6): an endpoint on this computer (loopback) is accepted only from a card
+fetched from this computer, and an endpoint that is Object's own address never; otherwise a chat
+would send JSON-RPC bodies into Object's own ``/api`` routes.
 - ``POST /remote-agents/{id}/context-notice`` ``{clientId?}`` -> ``{contextNoticeAt}``. 404; 422.
 - ``POST /agents/{id}/files/reveal`` ``{file}`` (``"<chatId>/<name>"``) -> ``{ok: true}``: shows
   the file in the OS file manager. 404 for an unknown agent or file, or a ``file`` that resolves
@@ -32,11 +36,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 
-from . import a2a, agents, secretstore
+from . import a2a, agents, remotesecrets, secretstore
 from .agentmodel import AgentError, AgentInvalid, AgentNotFound
 from .agents import NOT_REMOTE, AgentRecord, AgentRegistry, endpoint_host, remote_auth
 from .api_agents import _fail
@@ -45,7 +49,7 @@ from .apictx import ApiContext
 from .remotemodel import CARD_TIMEOUT, REMOTE_KIND, AuthInput, card_url_for, clean_auth
 from .watcher import ChangeEvent
 
-__all__ = ["preview_warnings", "router"]
+__all__ = ["endpoint_refusal", "preview_warnings", "router"]
 
 FILES_DIR = ".object-agent/files"
 """A remote agent's file artifacts, under its folder (the Contract's Storage table)."""
@@ -60,6 +64,11 @@ NO_CONNECTION = "no connection could be made"  # our string
 NO_FILE = "That file isn't there."  # our string
 OTHER_HOST = "This agent's card sends messages to {endpoint}, not {card}."
 NOT_ENCRYPTED = "This address isn't encrypted (http), so the token can be read on the network."
+LOOPBACK_ENDPOINT = (
+    "This agent's card sends messages to {endpoint}, an address on this computer, but the card "
+    "isn't on this computer."
+)  # our string
+OWN_ENDPOINT = "This agent's card sends messages to {endpoint}, which is Object itself."  # our string
 _REASON_MAX = 200
 _ANSWERED_RE = re.compile(r" answered (\d{3})\.$")
 
@@ -142,6 +151,28 @@ def preview_warnings(card_url: str, endpoint_url: str, has_token: bool) -> list[
     return warnings
 
 
+def _port(url: str) -> int | None:
+    try:
+        parts = urlsplit(url or "")
+        return parts.port or {"http": 80, "https": 443}.get(parts.scheme.lower())
+    except ValueError:
+        return None
+
+
+def endpoint_refusal(card_url: str, endpoint_url: str, own_base: str) -> str | None:
+    """Why a card's endpoint can't be used, or None (audit 6, our strings): Object's own address
+    (`own_base`, or any loopback host on its port when it is on loopback) is refused; any other
+    loopback endpoint is refused unless the card itself came from a loopback host."""
+    ep_host, own_host = _hostname(endpoint_url).lower(), _hostname(own_base).lower()
+    ep_port = _port(endpoint_url)
+    same_port = ep_port is not None and ep_port == _port(own_base)
+    if same_port and (ep_host == own_host or (_loopback(ep_host) and _loopback(own_host))):
+        return OWN_ENDPOINT.format(endpoint=endpoint_host(endpoint_url))
+    if _loopback(ep_host) and not _loopback(_hostname(card_url)):
+        return LOOPBACK_ENDPOINT.format(endpoint=endpoint_host(endpoint_url))
+    return None
+
+
 def _card_out(card: a2a.Card) -> dict[str, Any]:
     """The `RemoteCard` shape of a parsed card."""
     skills = [{
@@ -181,13 +212,18 @@ def _fetch_failed(exc: a2a.A2AError, card_url: str, secrets: list[str]) -> JSONR
     return _error(502, secretstore.redact(message, secrets))
 
 
-async def _fetch(card_url: str, auth: a2a.Auth) -> tuple[a2a.Card | None, JSONResponse | None]:
-    """The card at `card_url` (fetched with `auth`), or the error answer."""
+async def _fetch(card_url: str, auth: a2a.Auth, own_base: str) -> tuple[a2a.Card | None, JSONResponse | None]:
+    """The card at `card_url` (fetched with `auth`), or the error answer (422 for an endpoint
+    `endpoint_refusal` refuses)."""
     secrets = [auth.value] if auth.value else []
     try:
-        return await a2a.fetch_card(card_url, auth), None
+        card = await a2a.fetch_card(card_url, auth)
     except a2a.A2AError as exc:
         return None, _fetch_failed(exc, card_url, secrets)
+    refused = endpoint_refusal(card_url, card.endpoint_url, own_base)
+    if refused:
+        return None, _error(422, secretstore.redact(refused, secrets))
+    return card, None
 
 
 def _target(card_url: str, auth: AuthInput) -> tuple[str, AuthInput]:
@@ -239,7 +275,7 @@ def router(ctx: ApiContext) -> APIRouter:
     # -- preview and add ----------------------------------------------------------------------
 
     @r.post("/remote-agents/preview")
-    async def preview(body: Any = Body(None)):
+    async def preview(request: Request, body: Any = Body(None)):
         req = _parse(PreviewRequest, body)
         if req is None:
             return _error(422, BAD_REQUEST)
@@ -247,7 +283,7 @@ def router(ctx: ApiContext) -> APIRouter:
             card_url, auth = _target(req.url, req.auth)
         except AgentError as exc:
             return _fail(exc)
-        card, failed = await _fetch(card_url, _a2a_auth(auth))
+        card, failed = await _fetch(card_url, _a2a_auth(auth), str(request.base_url))
         if card is None:
             return failed
         return {
@@ -259,7 +295,7 @@ def router(ctx: ApiContext) -> APIRouter:
         }
 
     @r.post("/remote-agents", status_code=201)
-    async def add(body: Any = Body(None)):
+    async def add(request: Request, body: Any = Body(None)):
         req = _parse(AddRemoteAgentRequest, body)
         if req is None:
             return _error(422, BAD_REQUEST)
@@ -267,7 +303,7 @@ def router(ctx: ApiContext) -> APIRouter:
             card_url, auth = _target(req.url, req.auth)
         except AgentError as exc:
             return _fail(exc)
-        card, failed = await _fetch(card_url, _a2a_auth(auth))
+        card, failed = await _fetch(card_url, _a2a_auth(auth), str(request.base_url))
         if card is None:
             return failed
         try:
@@ -277,7 +313,8 @@ def router(ctx: ApiContext) -> APIRouter:
         if isinstance(rec, str):
             return _error(409, ALREADY_LISTED.format(name=rec))
         announce(rec.id, rec.revision, req.clientId)
-        return JSONResponse(out(rec), status_code=201)
+        warnings = preview_warnings(card_url, card.endpoint_url, bool(auth.value))
+        return JSONResponse({**out(rec), "warnings": warnings}, status_code=201)
 
     # -- edit ---------------------------------------------------------------------------------
 
@@ -296,7 +333,7 @@ def router(ctx: ApiContext) -> APIRouter:
         return out(rec)
 
     @r.post("/remote-agents/{agent_id}/refresh")
-    async def refresh(agent_id: str, body: Any = Body(None)):
+    async def refresh(agent_id: str, request: Request, body: Any = Body(None)):
         req = _parse(ClientRequest, body)
         if req is None:
             return _error(422, BAD_REQUEST)
@@ -307,7 +344,7 @@ def router(ctx: ApiContext) -> APIRouter:
         except AgentError as exc:
             return _fail(exc)
         auth = await asyncio.to_thread(remote_auth, rec)
-        card, failed = await _fetch(card_url, auth)
+        card, failed = await _fetch(card_url, auth, str(request.base_url))
         if card is None:
             return failed
         try:
@@ -315,7 +352,8 @@ def router(ctx: ApiContext) -> APIRouter:
         except AgentError as exc:
             return _fail(exc)
         announce(rec.id, rec.revision, req.clientId)
-        return out(rec)
+        has_token = await asyncio.to_thread(remotesecrets.is_set, rec.id)
+        return {**out(rec), "warnings": preview_warnings(card_url, card.endpoint_url, has_token)}
 
     @r.post("/remote-agents/{agent_id}/context-notice")
     def context_notice(agent_id: str, body: Any = Body(None)):
