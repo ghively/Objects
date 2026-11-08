@@ -432,8 +432,10 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def('whiteboardCycle', 'whiteboard', 'Cycle selected objects', ['Tab'], 'whiteboard', false, false),
   def('whiteboardCycleBack', 'whiteboard', 'Select the previous item', ['Shift-Tab'], 'whiteboard', false, false),
   def('whiteboardPan', 'whiteboard', 'Pan', ['Space'], 'whiteboard', false, false),
-  def('undo', 'whiteboard', 'Undo last change', ['Mod-z'], 'whiteboard', false, false),
-  def('redo', 'whiteboard', 'Redo last change', ['Mod-Shift-z', 'Mod-y'], 'whiteboard', false, false),
+  // The catalog lists Undo and Redo under General: display-only, the editor (its history) and the
+  // whiteboard (`whiteboard/shortcuts.ts`) handle the keys themselves.
+  def('undo', 'global', 'Undo', ['Mod-z'], 'global', false, false),
+  def('redo', 'global', 'Redo', ['Mod-Shift-z', 'Mod-y'], 'global', false, false),
 ]
 
 /**
