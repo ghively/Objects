@@ -1,5 +1,5 @@
 // The date picker of datetime properties: a natural-language input per point, the
-// suggestion lists, "Include Time" and "Range" toggles that honour the property's constraints,
+// suggestion lists, "Include Time" and "End Date" toggles that honour the property's constraints,
 // and "Remove date". The Task `date` (M4) adds the schedule suggestions, a "Repeat" row and a
 // "Reminder" row; there every change carries `{date, repeat, remind}` together. Any other date
 // property with `supportsReminders` (M8) shows the same "Reminder" row, written on its own through
@@ -349,7 +349,7 @@ function Toggle({
  * Edits a datetime value. On an empty value it starts from the property's `startTimeDefault` /
  * `endTimeDefault` (else now) and writes only once the user picks something.
  * - `resolutionConstraint` fixes "Include Time" (on for `time`, off for `day`).
- * - `endTimeSettings: 'notAllowed'` hides "Range"; `'required'` keeps it on.
+ * - `endTimeSettings: 'notAllowed'` hides "End Date"; `'required'` keeps it on.
  * - `hideDeleteOption` hides "Remove date".
  */
 export function DatePicker({ value, constraints, onChange, now: nowProp, task, onTaskChange, reminder }: DatePickerProps) {
@@ -538,10 +538,10 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
 
       {isRange && end && (
         <div>
-          <div className="px-1 pb-1 text-[12px] font-medium text-fg-muted">Ends</div>
+          <div className="px-1 pb-1 text-[12px] font-medium text-fg-muted">End Date</div>
           <div className="flex items-center gap-2">
             <PointInput
-              label="Ends"
+              label="End Date"
               point={end}
               resolution={resolution}
               placeholder="End Date"
@@ -564,7 +564,7 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
         />
         {rangeAllowed && (
           <Toggle
-            label="Range"
+            label="End Date"
             checked={isRange}
             disabled={rangeRequired}
             onChange={(on) => emit({ start, end: on ? start : null, resolution })}
