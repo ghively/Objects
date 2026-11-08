@@ -190,6 +190,19 @@ describe('preserveBlock', () => {
     expect(preserveBlock('1. a\n2. b', '1. a\n2. b\n3. new', 'list')).toBe('1. a\n2. b\n3. new')
   })
 
+  // Fix-pass P1: one delimiter for every depth turned `   1. bZ` into `   1) bZ`, which splits the
+  // inner list (a changed delimiter starts a new list).
+  test('each depth keeps its own ordered delimiter and bullet', () => {
+    const ordered = '1) a\n   1. b\n   2. c\n2) d'
+    expect(preserveBlock(ordered, '1. a\n   1. bZ\n   2. c\n2. d', 'list')).toBe('1) a\n   1. bZ\n   2. c\n2) d')
+    expect(preserveBlock(ordered, '1. aZ\n   1. b\n   2. c\n2. d', 'list')).toBe('1) aZ\n   1. b\n   2. c\n2) d')
+    expect(preserveBlock(ordered, '1. a\n   1. b\n   2. c\n   3. new\n2. d', 'list')).toBe('1) a\n   1. b\n   2. c\n   3. new\n2) d')
+    const bullets = '- a\n  * b\n  * c\n- d'
+    expect(preserveBlock(bullets, '- a\n  - bZ\n  - c\n- d', 'list')).toBe('- a\n  * bZ\n  * c\n- d')
+    expect(preserveBlock(bullets, '- a\n  - b\n  - c\n  - new\n- d', 'list')).toBe('- a\n  * b\n  * c\n  * new\n- d')
+    expect(preserveBlock(bullets, '- aZ\n  - b\n  - c\n- d', 'list')).toBe('- aZ\n  * b\n  * c\n- d')
+  })
+
   test('editing line 2 of a paragraph keeps line 1 byte-identical', () => {
     expect(preserveBlock('_it_ first\nsecond', '*it* first\nsecondZ', 'paragraph', undefined, '*it* first\nsecond')).toBe(
       '_it_ first\nsecondZ',

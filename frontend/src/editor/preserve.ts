@@ -284,9 +284,18 @@ function preserveList(origLines: string[], regenInput: string[]): string[] {
 
   // Original style: bullet char, gap after the marker, indent per depth,
   // ordered delimiter ('.' or ')') and a repeated number ('1.' on every item).
-  const firstBullet = origParsed.find((p) => p && !/\d/.test(p.marker))
-  const origOrdered = origParsed.filter((p): p is ListLine => !!p && /\d/.test(p.marker))
-  const delimiter = origOrdered[0]?.marker.slice(-1)
+  const isOrdered = (p: ListLine) => /\d/.test(p.marker)
+  const firstBullet = origParsed.find((p) => p && !isOrdered(p))
+  const origOrdered = origParsed.filter((p): p is ListLine => !!p && isOrdered(p))
+  // A nested list may use another delimiter or bullet than its parent: the style of an item is
+  // that of the line it replaces, else of the first item of its kind at its depth, else the first
+  // of its kind (one style for every depth wrote `   1) b` in `1) a` / `   1. b`, splitting it).
+  const styleOf = (p: ListLine, replaced: ListLine | null): ListLine | undefined => {
+    const ordered = isOrdered(p)
+    if (replaced && replaced.depth === p.depth && isOrdered(replaced) === ordered) return replaced
+    const sameKind = (q: ListLine | null): q is ListLine => !!q && isOrdered(q) === ordered
+    return origParsed.find((q): q is ListLine => sameKind(q) && q.depth === p.depth) ?? (ordered ? origOrdered[0] : firstBullet ?? undefined)
+  }
   const repeated =
     origOrdered.length > 1 && origOrdered.every((p) => p.marker === origOrdered[0].marker)
       ? origOrdered[0].marker.slice(0, -1)
@@ -306,11 +315,12 @@ function preserveList(origLines: string[], regenInput: string[]): string[] {
     const replaced = replacedOriginal(i)
     const same = replaced !== null ? origParsed[replaced] : null
     const indent = same && same.depth === p.depth ? same.indent : indentByDepth.get(p.depth) ?? unit.repeat(p.depth)
-    const ordered = /\d/.test(p.marker)
+    const ordered = isOrdered(p)
+    const style = styleOf(p, same)
     let marker = p.marker
-    if (ordered && delimiter) marker = (repeated ?? p.marker.slice(0, -1)) + delimiter
-    else if (!ordered && firstBullet) marker = firstBullet.marker
-    const gap = p.content === '' ? '' : firstBullet && !ordered ? firstBullet.gap || ' ' : p.gap || ' '
+    if (ordered && style) marker = (repeated ?? p.marker.slice(0, -1)) + style.marker.slice(-1)
+    else if (!ordered && style) marker = style.marker
+    const gap = p.content === '' ? '' : style && !ordered ? style.gap || ' ' : p.gap || ' '
     return indent + marker + gap + p.content
   }
 
