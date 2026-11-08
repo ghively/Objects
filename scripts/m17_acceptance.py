@@ -16,8 +16,9 @@ text) and committed. Checks:
     ``<state>/agents/Assistant/`` with the skeleton; the fake ran there with
     ``--setting-sources project,local``, ``--permission-mode dontAsk``,
     ``--permission-prompts none`` and ``--strict-mcp-config``; ``appendPrompt`` holds the
-    guidance; Bash/PowerShell are disallowed; ``mcp__object__write_body`` is allowed; no
-    ``CLAUDE_CONFIG_DIR``; the MCP config holds no secret;
+    guidance; Bash/PowerShell are disallowed; ``mcp__object__write_body`` is allowed; the
+    ``CLAUDE_CONFIG_DIR`` the script sets (a temporary folder) reaches the run and is fenced
+    (audit 20); the MCP config holds no secret;
  3. the fence: ``runSettings.permissions.deny`` holds ``Read(<rp space>/**)`` and
     ``Edit(<rp space>/**)``; Read of the excluded page, Grep and Glob of the space and Write
     of a page are denied and the marker is in no frame; Read of a file outside every fence works;
@@ -70,7 +71,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "backend" / "tests"))
 from fake_claude import install
 
-HOOKS = ("OBJECT_STATE_DIR", "OBJECT_CACHE_DIR", "FAKE_CLAUDE_LOG")
+HOOKS = ("OBJECT_STATE_DIR", "OBJECT_CACHE_DIR", "FAKE_CLAUDE_LOG", "CLAUDE_CONFIG_DIR")
 MARKER = "M17-ACCEPTANCE-HIDDEN-7Q2X"
 DENIED = "has been denied"
 SKELETON = ("CLAUDE.md", ".claude/settings.json", ".object-agent/agent.json", ".object-agent/sessions", ".gitignore")
@@ -147,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
         "OBJECT_STATE_DIR": str(state),
         "OBJECT_CACHE_DIR": str(tmp / "cache"),
         "FAKE_CLAUDE_LOG": str(log),
+        "CLAUDE_CONFIG_DIR": str(tmp / "claude-config"),  # how the user signs in (audit 20)
     })
     fake = install(tmp / "bin")
     outside = tmp / "outside"
@@ -216,11 +218,16 @@ def main(argv: list[str] | None = None) -> int:
                    "Bash/PowerShell disallowed, mcp__object__write_body allowed")
         servers_cfg = (cli.get("mcpConfig") or {}).get("mcpServers") or {}
         others = json.dumps({k: v for k, v in servers_cfg.items() if k not in ("object", "object-agent")})
-        run.report(cli.get("env", {}).get("CLAUDE_CONFIG_DIR") is False
-                   and cli.get("token") and cli.get("envToken") is False and cli["token"] not in others
+        config_dir = tmp / "claude-config"
+        cdeny = ((cli.get("runSettings") or {}).get("permissions") or {}).get("deny") or []
+        crp = rule_path(config_dir)
+        run.report(cli.get("configDir") == str(config_dir) and f"Read({crp}/.credentials.json)" in cdeny
+                   and f"Edit({crp}/**)" in cdeny,
+                   f"CLAUDE_CONFIG_DIR passed through ({cli.get('configDir')}) and fenced")
+        run.report(cli.get("token") and cli.get("envToken") is False and cli["token"] not in others
                    and all((servers_cfg.get(n) or {}).get("env", {}).get("OBJECT_API_TOKEN") == cli["token"]
                            for n in ("object", "object-agent")),
-                   "no CLAUDE_CONFIG_DIR; the token only in Object's two servers' env blocks, not the CLI's env")
+                   "the token only in Object's two servers' env blocks, not the CLI's env")
 
         print("\n3. The fence")
         deny = ((cli.get("runSettings") or {}).get("permissions") or {}).get("deny") or []
