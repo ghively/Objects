@@ -104,12 +104,14 @@ function SwitchRow({ label, tooltip, checked, onChange }: { label: string; toolt
 
 export function GraphCustomization({ custom, onPatch, types, tagsNetworkKey }: GraphCustomizationProps) {
   const t = CUSTOMIZATION_TEXT
+  // Catalog order (section 7): Show tags network, Filter object types, Exclude object types, Show completed
+  // tasks, Hide ..., Hide dates, Hide indirect links; "Show simplified graph" is Object's own and goes last.
   const switches: { key: SwitchKey; label: string; tooltip?: string }[] = [
     { key: 'showCompletedTasks', label: t.showCompletedTasks },
-    { key: 'showMinimalNodes', label: t.alwaysMinimalNodes },
     { key: 'hideLargeNodes', label: t.hideLargeNodes, tooltip: t.hideLargeNodesTooltip(LARGE_NODE_LIMIT) },
     { key: 'hideDates', label: t.hideDates },
     { key: 'hideIndirectLinks', label: t.hideIndirectLinks, tooltip: t.hideIndirectLinksTooltip },
+    { key: 'showMinimalNodes', label: t.alwaysMinimalNodes },
   ]
   return (
     <Popover>
@@ -123,6 +125,15 @@ export function GraphCustomization({ custom, onPatch, types, tagsNetworkKey }: G
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-72 flex-col gap-3 p-2" aria-label={t.customize}>
+        {tagsNetworkKey && (
+          <div className="flex flex-col border-b border-line pb-2">
+            <SwitchRow
+              label={t.showTagsNetwork}
+              checked={!!custom[tagsNetworkKey]}
+              onChange={(v) => onPatch({ [tagsNetworkKey]: v })}
+            />
+          </div>
+        )}
         <TypeList
           label={t.filterObjectTypes}
           selected={custom.filterTypeIds ?? []}
@@ -139,13 +150,6 @@ export function GraphCustomization({ custom, onPatch, types, tagsNetworkKey }: G
           {switches.map((s) => (
             <SwitchRow key={s.key} label={s.label} tooltip={s.tooltip} checked={!!custom[s.key]} onChange={(v) => onPatch({ [s.key]: v })} />
           ))}
-          {tagsNetworkKey && (
-            <SwitchRow
-              label={t.showTagsNetwork}
-              checked={!!custom[tagsNetworkKey]}
-              onChange={(v) => onPatch({ [tagsNetworkKey]: v })}
-            />
-          )}
         </div>
       </PopoverContent>
     </Popover>

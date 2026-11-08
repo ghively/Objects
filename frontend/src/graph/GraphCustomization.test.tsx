@@ -22,9 +22,18 @@ describe('GraphCustomization', () => {
     const pop = await screen.findByRole('dialog')
     for (const label of ['Filter object types', 'Exclude object types']) expect(within(pop).getByRole('region', { name: label })).toBeInTheDocument()
     expect(within(pop).getAllByRole('button', { name: 'Deselect all' })).toHaveLength(2)
-    for (const label of ['Show completed tasks', 'Show simplified graph', 'Hide heavily linked objects', 'Hide dates', 'Hide indirect links', 'Show tags network']) {
-      expect(within(pop).getByRole('switch', { name: label })).toBeInTheDocument()
-    }
+    // Catalog order: Show tags network first, then the type lists and the switches; "Show simplified graph" is ours, last.
+    const order = Array.from(pop.querySelectorAll('[role="switch"], section[aria-label]')).map((el) => el.getAttribute('aria-label'))
+    expect(order).toEqual([
+      'Show tags network',
+      'Filter object types',
+      'Exclude object types',
+      'Show completed tasks',
+      'Hide heavily linked objects',
+      'Hide dates',
+      'Hide indirect links',
+      'Show simplified graph',
+    ])
     expect(within(pop).getByRole('switch', { name: 'Hide heavily linked objects' }).closest('label')).toHaveAttribute(
       'title',
       'Nodes with more than 20 links are hidden',
