@@ -274,6 +274,19 @@ describe('sweep 2026-11-08: catalogued keys', () => {
     expect(parseKeys('Mod--', false)).toEqual({ ctrl: true, meta: false, alt: false, shift: false, key: '-' })
   })
 
+  test('Ctrl+Shift+G is "Merge the selected text blocks" under Block editing, bound in the editor, apart from Group (Ctrl+G)', () => {
+    const d = byId().get('mergeTextBlocks')
+    expect(d).toBeTruthy()
+    expect(d?.category).toBe('block')
+    expect(d?.scope).toBe('editor')
+    expect(d?.name).toBe('Merge the selected text blocks')
+    expect(d?.provisional).toBe(false)
+    expect(d?.bound).toBe(true)
+    expect(keysFor('mergeTextBlocks')).toEqual(['Mod-Shift-g'])
+    expect(keysFor('groupBlocks')).toEqual(['Mod-g'])
+    expect(formatKeys('Mod-Shift-g', false)).toBe('Ctrl+Shift+G')
+  })
+
   test('no two registered ids in one scope share a key, except the declared pairs', () => {
     for (const mac of [false, true]) {
       const seen = new Map<string, string>()

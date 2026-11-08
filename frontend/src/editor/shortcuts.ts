@@ -12,6 +12,7 @@ import { M7_SHORTCUTS, M8_SHORTCUTS, allShortcuts, isMacPlatform, keysFor, regis
 import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
 import { showToast } from './media/upload'
 import { blockSelectionKey } from './extensions/blockSelection'
+import { mergeTextBlocks } from './extensions/mergeTextBlocks'
 import { PasteAsPlainText, armPlainPaste } from './extensions/pasteAsPlainText'
 import { stepHierarchy } from './extensions/textHierarchy'
 import { toggleAllToggles } from './extensions/toggleAll'
@@ -112,8 +113,8 @@ export function indentAtCursor(editor: Editor, dir: 1 | -1): boolean {
 
 /**
  * The editor's M8 key bindings, from the registry's keys; and the 2026-11-08 sweep's editor
- * keys (`pasteAsPlainText`, `toggleAllToggles`, `increaseTextHierarchy`, `decreaseTextHierarchy`),
- * whose extensions it brings along so the editor needs no other wiring.
+ * keys (`pasteAsPlainText`, `toggleAllToggles`, `increaseTextHierarchy`, `decreaseTextHierarchy`,
+ * `mergeTextBlocks`), whose extensions it brings along so the editor needs no other wiring.
  */
 export const M8Keys = Extension.create({
   name: 'm8Keys',
@@ -143,6 +144,7 @@ export const M8Keys = Extension.create({
       toggleAllToggles: () => toggleAllToggles(editor),
       increaseTextHierarchy: () => stepHierarchy(editor, 1),
       decreaseTextHierarchy: () => stepHierarchy(editor, -1),
+      mergeTextBlocks: () => mergeTextBlocks(editor),
     })
   },
 })

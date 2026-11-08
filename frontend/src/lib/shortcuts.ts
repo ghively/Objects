@@ -595,7 +595,9 @@ export const AI_SHORTCUTS: ShortcutDef[] = [
  * `increaseTextHierarchy` / `decreaseTextHierarchy` (Block editing, Ctrl+Plus / Ctrl+Minus) are
  * bound by `editor/shortcuts.ts` through `editor/extensions/textHierarchy.ts`; the registry
  * holds `Mod-=` (shown Ctrl+Plus) and the editor's key map answers the shifted `+` too. The
- * whiteboard's zoom keys are the same chords in their own scope.
+ * whiteboard's zoom keys are the same chords in their own scope. `mergeTextBlocks` (Block
+ * editing, Ctrl+Shift+G; Ctrl+G stays `groupBlocks`) is bound by `editor/shortcuts.ts` through
+ * `editor/extensions/mergeTextBlocks.ts`.
  */
 export const SWEEP_SHORTCUTS: ShortcutDef[] = [
   def('createNewTask', 'global', 'Create new task', ['Mod-Shift-t'], 'global', V, true),
@@ -604,6 +606,7 @@ export const SWEEP_SHORTCUTS: ShortcutDef[] = [
   def('toggleAllToggles', 'block', 'Open or close all toggles on the page', ['Mod-o'], 'editor', V, true),
   def('increaseTextHierarchy', 'block', 'Increase text hierarchy', ['Mod-='], 'editor', V, true),
   def('decreaseTextHierarchy', 'block', 'Decrease text hierarchy', ['Mod--'], 'editor', V, true),
+  def('mergeTextBlocks', 'block', 'Merge the selected text blocks', ['Mod-Shift-g'], 'editor', V, true),
 ]
 
 registerShortcuts(EXISTING_SHORTCUTS)
