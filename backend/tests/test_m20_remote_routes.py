@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 from fake_a2a import FakeA2A
 from fastapi.testclient import TestClient
-from objectapp import api_remote_agents, server, transcripts
+from objectapp import a2a, api_remote_agents, server, transcripts
 from objectapp.appstate import state_dir
 from objectapp.curator import Curator, IdleClock
 from objectapp.reviews import ReviewRunner
@@ -125,6 +125,11 @@ def test_preview_errors(api, fake: FakeA2A) -> None:
 
     res = client.post("/api/remote-agents/preview", json={"url": "ftp://x", "auth": {"kind": "none"}})
     assert (res.status_code, res.json()["detail"]) == (422, "That isn't an http or https address.")
+    # Sweep 2026-11-08 (3): a control character in the address (urlsplit drops a tab; httpx refuses
+    # it) is our 422, not a 500, both as a card path and as a bare host.
+    for bad in ("http://a\tb.example/card.json", "http://a\tb.example", "http://x.example/c\x00ard.json"):
+        res = client.post("/api/remote-agents/preview", json={"url": bad, "auth": {"kind": "none"}})
+        assert (res.status_code, res.json()["detail"]) == (422, "That isn't an http or https address."), bad
 
     # a bad header rule, and a body that doesn't fit, answer our 422 without echoing a value
     res = client.post("/api/remote-agents/preview",
@@ -134,6 +139,24 @@ def test_preview_errors(api, fake: FakeA2A) -> None:
                                                            "auth": {"kind": "magic", "value": LONG_TOKEN}})
     assert res.status_code == 422
     assert LONG_TOKEN not in res.text
+
+
+def test_control_character_in_a_url_is_refused_not_a_crash() -> None:
+    """Sweep 2026-11-08 (3): `a2a._open` turns httpx's refusal of a control character (an
+    ``InvalidURL``, not an ``HTTPError``) into the 422 the other bad-URL case gives, so a stored
+    card whose interface URL holds one fails the same way at chat time."""
+
+    async def go() -> None:
+        async with a2a._new_client(1.0) as client:
+            for bad in ("http://a\tb.example/a2a", "http://x.example/a\x00"):
+                with pytest.raises(a2a.A2AError) as info:
+                    await a2a._open(client, "POST", bad, {}, b"{}", asyncio.get_running_loop().time() + 5)
+                assert (info.value.status, info.value.message) == (422, "That isn't an http or https address.")
+        with pytest.raises(a2a.A2AError) as info:
+            await a2a.fetch_card("http://a\tb.example/card.json", a2a.Auth(kind="none"))
+        assert info.value.status == 422
+
+    asyncio.run(go())
 
 
 def test_preview_other_status(api, fake: FakeA2A) -> None:

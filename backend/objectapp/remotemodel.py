@@ -164,6 +164,8 @@ def card_url_for(url: str) -> str:
     """The Agent Card URL for what Gene typed: a ``.json`` path is the card as is; anything else
     gets `CARD_PATH` at its host's root. Only http and https; raises `AgentInvalid`."""
     text = (url or "").strip()
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in text):  # urlsplit drops a tab; httpx refuses it
+        raise AgentInvalid("That isn't an http or https address.")
     try:
         parts = urlsplit(text)
         host = parts.hostname

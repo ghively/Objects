@@ -170,13 +170,17 @@ def _host(url: str) -> str:
 
 
 def _is_http(url: Any) -> bool:
-    if not isinstance(url, str):
+    if not isinstance(url, str) or _has_control(url):  # urlsplit drops a tab; httpx refuses it
         return False
     try:
         parts = urlsplit(url)
     except ValueError:
         return False
     return parts.scheme in ("http", "https") and bool(parts.hostname)
+
+
+def _has_control(text: str) -> bool:
+    return any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in text)
 
 
 def _remaining(deadline: float) -> float:
@@ -212,6 +216,8 @@ async def _open(client: httpx.AsyncClient, method: str, url: str, headers: dict[
     host = _host(url)
     try:
         req = client.build_request(method, url, headers=headers, content=body)
+    except httpx.InvalidURL:  # `Exception` only, not an `HTTPError`: a control character and such
+        raise A2AError(NOT_HTTP, 422) from None
     except (httpx.HTTPError, ValueError, TypeError):
         raise A2AError(UNREACHABLE.format(host=host)) from None
     resp = await _within(client.send(req, stream=True, follow_redirects=False), deadline, host)

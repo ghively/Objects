@@ -17,7 +17,8 @@
   folder) and ``chatId`` its transcript (not a ULID: a new chat). Every turn's stream starts
   with ``{"type": "chat", chatId, agentId}``. An unknown agent, a missing folder, a read-only
   agent or a folder nested in (or holding) a space folder answers one ``error`` event and the
-  CLI isn't started. The turn is an agent run (`agentrun.build_run`): ``chat`` acts directly
+  CLI isn't started; so does a second turn on a chat this process is still answering
+  (`CHAT_BUSY`). The turn is an agent run (`agentrun.build_run`): ``chat`` acts directly
   (Object's write tools, a ``read-write`` token); the proposal modes run read-only (a
   ``read`` token). The token is held in memory (`TokenStore.ephemeral`, named after the agent,
   stamped with its id and the chat id) and revoked when the stream ends. Closing the stream
@@ -131,6 +132,12 @@ class SaveChatRequest(BaseModel):
 PROPOSAL_MODES = ("askBlock", "tagBlock", "tagObject", "autofill", "rephrase")
 """Modes that run read-only, so their Accept step stays meaningful (M17)."""
 MISSING_FOLDER = "This agent's folder is missing: {path}"
+CHAT_BUSY = "This chat is still answering."  # our string
+_RUNNING: set[tuple[str, str]] = set()
+"""The ``(agent id, chat id)`` of every local turn this process is running. A second turn on a
+running chat (the same chat open in two tabs or windows) would append its user line and its
+answer between the first's, and resume the same CLI session twice; it gets one ``error`` frame
+(`CHAT_BUSY`) before anything is written or started."""
 
 
 def _now() -> str:
@@ -361,6 +368,10 @@ def router(
             written()
 
         async def stream():
+            key = (agent.id, chat_id)
+            if key in _RUNNING:
+                yield frame({"type": "error", "message": CHAT_BUSY})
+                return
             token_record, secret = tokens.ephemeral(
                 name, "read-write" if write else "read", agent=agent.id, chat=chat_id
             )
@@ -370,6 +381,7 @@ def router(
             last: dict[str, Any] | None = None
             if curator is not None:
                 curator.busy_turns(1)
+            _RUNNING.add(key)  # nothing awaits between the check above and here
             try:
                 yield frame({"type": "chat", "chatId": chat_id, "agentId": agent.id})
                 try:
@@ -412,6 +424,7 @@ def router(
                         await asyncio.to_thread(finish, record, event)
                     yield frame(event)
             finally:
+                _RUNNING.discard(key)
                 TokenStore.drop_ephemeral(secret)
                 agentskills.MEMO.forget(token_record.id)
                 if gen is not None:

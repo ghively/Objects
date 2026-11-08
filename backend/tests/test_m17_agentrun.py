@@ -139,6 +139,9 @@ def test_run_loads_only_project_and_local_settings(env, monkeypatch) -> None:
     deny = cmd.run_settings["permissions"]["deny"]
     rp = rule_path(config.resolve())
     assert f"Read({rp}/.credentials.json)" in deny and f"Edit({rp}/**)" in deny
+    # Sweep 2026-11-08 (2): its session and config files too, as ~/.claude's.
+    assert {f"Read({rp}/projects/**)", f"Read({rp}/settings.json)", f"Read({rp}/settings.local.json)",
+            f"Read({rp}/.claude.json)"} <= set(deny)
     assert cmd.cwd == env["folder"].resolve()
 
 
@@ -440,6 +443,10 @@ def test_fence_rules_cover_awkward_paths(env) -> None:
     home = rule_path(Path.home().resolve())
     assert {f"Read({home}/.claude/.credentials.json)", f"Edit({home}/.claude/**)",
             f"Edit({home}/.claude.json)"} <= set(deny)
+    # Sweep 2026-11-08 (2): the CLI's own session files (every run's prompt, tool inputs and
+    # results, and the user's coding sessions) and its config files are not for the Read tool.
+    assert {f"Read({home}/.claude/projects/**)", f"Read({home}/.claude/settings.json)",
+            f"Read({home}/.claude/settings.local.json)", f"Read({home}/.claude.json)"} <= set(deny)
     assert len(deny) == len(set(deny))
 
 
@@ -447,7 +454,7 @@ def test_fence_rules_shape(tmp_path: Path) -> None:
     rules = fence_rules([tmp_path / "S"], tmp_path / "A", tmp_path / "st", tmp_path / "h")
     s = rule_path((tmp_path / "S").resolve())
     assert rules[:2] == [f"Read({s}/**)", f"Edit({s}/**)"]
-    assert len(rules) == 2 + 5 + 3 + 4 + 3  # + history and fake-trash (audit 3)
+    assert len(rules) == 2 + 5 + 3 + 4 + 7  # + history and fake-trash (audit 3); 7 home rules
 
 
 def test_fake_write_to_own_server_and_local_files_is_denied(env) -> None:
