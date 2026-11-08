@@ -137,7 +137,7 @@ export const BLOCK_ITEMS: readonly SlashItem[] = [
   block('group', 'Group', 'Keep several blocks together in one box', 'ph-rectangle', (e) => {
     e.chain().focus().wrapInGroup().run() // block_group
   }),
-  block('recordAudio', 'Record audio', 'Record from the microphone and drop the clip here.', 'ph-microphone', (e) => {
+  block('recordAudio', 'Record audio', 'Record from the microphone and drop the clip here', 'ph-microphone', (e) => {
     void recordAudio(e).catch((err) => {
       if (err instanceof NotBuiltYet) showToast(NOT_AVAILABLE)
     })
@@ -162,7 +162,8 @@ export const BLOCK_ITEMS: readonly SlashItem[] = [
     e.chain().focus().insertColumns(2).run()
   }),
   block('table', 'Table', 'Rows and columns of cells', 'ph-table', (e) => {
-    e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+    // The catalog's default table: 2 columns by 3 rows, the first a header row.
+    e.chain().focus().insertTable({ rows: 3, cols: 2, withHeaderRow: true }).run()
   }),
   block('bookmark', 'Create bookmark', undefined, 'ph-bookmark-simple', () => 'bookmark'), // pasteInput.bookmark (ours in this menu)
   // M14 (our item): a button that runs an automation; the sub-view picks the automation.
@@ -206,7 +207,7 @@ export const AI_ITEMS: readonly SlashItem[] = [
 export const MERMAID_ITEM: SlashItem = block(
   'mermaid',
   'Mermaid Diagram',
-  'A code block',
+  'A Mermaid diagram in a code block',
   'vscode-icons-file-type-mermaid',
   (e) => {
     e.chain().focus().setCodeBlock({ language: 'mermaid' }).run()
@@ -256,7 +257,7 @@ export function typedDateItems(query: string, today: string): SlashItem[] {
   const label = dayLabel(day)
   return [
     { id: `date:${day}`, name: label, description: 'Add a link to this daily note', icon: 'ph-calendar-blank', pinned: true, run: (e) => insertLink(e, day) },
-    { id: `dateToken:${day}`, name: `${label} - date link`, description: 'Add a link to this date.', icon: 'ph-calendar-check', pinned: true, run: (e) => insertDateToken(e, day) },
+    { id: `dateToken:${day}`, name: `${label} - date link`, description: 'Add a link to this date', icon: 'ph-calendar-check', pinned: true, run: (e) => insertDateToken(e, day) },
   ]
 }
 
@@ -308,8 +309,16 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
     {
       id: 'dates',
       label: SLASH_TEXT.dates,
+      // Catalog item 41's order: Time, Now, Today, Tomorrow, Yesterday, In a week, A week ago
+      // (the typed-date items, when any, stay first). One dash style, " - ", throughout.
       items: [
         ...typedDateItems(ctx.query, today()),
+        block('timestamp', 'Now - timestamp', 'Insert the time right now', 'ph-clock', (e) => {
+          e.chain().focus().insertContent(timestampText(now(), ctx.twentyFourHourTime)).run()
+        }),
+        block('dateLink', 'Today - date link', "Insert today's date as a link", 'ph-calendar-check', (e) =>
+          insertDateToken(e, today()),
+        ),
         block('today', 'Today', "Link today's daily note here", 'ph-calendar-blank', (e) => insertLink(e, today())),
         block('tomorrow', 'Tomorrow', "Link tomorrow's daily note here", 'ph-calendar-plus', (e) =>
           insertLink(e, addDayStr(today(), 1)),
@@ -324,12 +333,6 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
         block('aWeekAgo', 'A week ago', 'Add a link to the daily note of a week ago', 'ph-calendar-minus', (e) =>
           insertLink(e, addDayStr(today(), -7)),
         ),
-        block('dateLink', 'Today - date link', "Insert today's date as a link.", 'ph-calendar-check', (e) =>
-          insertDateToken(e, today()),
-        ),
-        block('timestamp', 'Now – timestamp', 'Insert the time right now', 'ph-clock', (e) => {
-          e.chain().focus().insertContent(timestampText(now(), ctx.twentyFourHourTime)).run()
-        }),
       ],
     },
     {

@@ -121,6 +121,13 @@ export function SlashMenu({ editor }: { editor: Editor }) {
   const active = selection.query === query ? selection.index : 0
   const setActive = (index: number) => setSelection({ query, index })
 
+  // The list shows about eight rows: keep the active one in view as the arrow keys move it.
+  const listRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const row = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (row && typeof row.scrollIntoView === 'function') row.scrollIntoView({ block: 'nearest' })
+  }, [active, open, sub])
+
   const run = (item: SlashItem) => {
     const s = useSlashMenu.getState()
     if (!s.range || editor.isDestroyed) return
@@ -195,7 +202,7 @@ export function SlashMenu({ editor }: { editor: Editor }) {
   const starts = sections.reduce<number[]>((acc, _s, i) => [...acc, i === 0 ? 0 : acc[i - 1] + sections[i - 1].items.length], [])
   return createPortal(
     <div className="slash-menu" role="listbox" aria-label="/" style={position(state.rect)} onMouseDown={(e) => e.preventDefault()}>
-      <div className="slash-menu-list">
+      <div ref={listRef} className="slash-menu-list">
         {sections.length === 0 && <div className="slash-menu-empty">{SLASH_TEXT.noResults}</div>}
         {sections.map((section, si) => (
           <div key={section.id} role="group" aria-label={section.label} className="slash-menu-section">

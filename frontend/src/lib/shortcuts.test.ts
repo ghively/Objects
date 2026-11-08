@@ -121,6 +121,14 @@ describe('shortcuts', () => {
     for (const id of Object.keys(EXPECTED)) expect(allShortcuts().find((d) => d.id === id)?.provisional, id).toBe(false)
   })
 
+  test('sweep 2026-11-08 #4: shortcut names follow the catalog wording', () => {
+    const name = (id: string) => allShortcuts().find((d) => d.id === id)?.name
+    expect(name('mathToken')).toBe('Format as TeX formula')
+    expect(name('toggleSidepanel')).toBe('Toggle right side panel')
+    expect(name('toggleShortcutsMenu')).toBe('Show or hide the shortcuts list')
+    expect(name('openImportMenu')).toBe('Import')
+  })
+
   test('isEditableTarget follows App.tsx rule', () => {
     const div = document.createElement('div')
     div.innerHTML = '<div contenteditable="true"><p id="p">x</p></div><div contenteditable="false"><span id="s">y</span></div><textarea id="t"></textarea>'

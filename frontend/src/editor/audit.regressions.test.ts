@@ -679,7 +679,7 @@ describe('wikilink targets (audit 2026-11-01)', () => {
   test.each([
     ['A|B', '[[A]]'],
     ['A]]B', '[[AB]]'],
-    ['A#B', '[[AB]]'],
+    ['A#B', '[[A#B]]'],
     ['Plain title', '[[Plain title]]'],
   ])('a link to %j is written unambiguously as %s', (target, saved) => {
     expect(wikilinkMarkdown(target, null)).toBe(saved)

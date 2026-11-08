@@ -312,3 +312,12 @@ describe('#38 a table cell with a bare pipe in a code span', () => {
     expect(topTypes(headless(body))).toEqual(['table'])
   })
 })
+
+describe('sweep 2026-11-08 #1: a wikilink with a heading or block anchor keeps its `#`', () => {
+  test('one typed character leaves `[[Page#Heading]]` and `[[Page#^id|label]]` as they were', () => {
+    const body = 'See [[Page#Heading]] and [[Page#^abc123|q]] here\n'
+    expect(serializeBody(headless(body))).toBe(body)
+    expectEveryEditLocal(body)
+    expect(editAt(body, 0)).toBe('See [[Page#Heading]] and [[Page#^abc123|q]] hereZ\n')
+  })
+})

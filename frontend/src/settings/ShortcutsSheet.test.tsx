@@ -1,6 +1,6 @@
 import { act, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test } from 'vitest'
-import { CATEGORY_LABELS, allShortcuts, formatKeys } from '@/lib/shortcuts'
+import { CATEGORY_LABELS, CATEGORY_ORDER, allShortcuts, formatKeys } from '@/lib/shortcuts'
 import '@/theme/shortcuts'
 import { ShortcutsSheet } from './ShortcutsSheet'
 import { resetSettingsModal, useSettingsModal } from './useSettingsModal'
@@ -22,7 +22,9 @@ describe('ShortcutsSheet', () => {
     expect(defs.length).toBeGreaterThan(40)
     // Ids with no key are left out.
     expect(sheet.querySelector('[data-shortcut="openCommandPalette"]')).toBeNull()
-    const categories = [...new Set(defs.map((d) => d.category))]
+    // Groups in the catalog's order (`CATEGORY_ORDER`), then the others as registered.
+    const registered = [...new Set(defs.map((d) => d.category))]
+    const categories = [...CATEGORY_ORDER.filter((c) => registered.includes(c)), ...registered.filter((c) => !CATEGORY_ORDER.includes(c))]
     expect(within(sheet).getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(
       categories.map((c) => CATEGORY_LABELS[c] ?? c),
     )
@@ -38,6 +40,16 @@ describe('ShortcutsSheet', () => {
     expect(sheet.querySelector('[data-shortcut="openSettings"] [data-unverified]')).toBeNull()
     expect(sheet.querySelector('[data-shortcut="toggleDarkMode"] [data-unverified]')).toBeNull()
     expect(sheet.querySelector('[data-shortcut="toggleDarkMode"] [data-keys]')?.textContent).toBe('Ctrl+Shift+L')
+  })
+
+  test('sweep 2026-11-08 #5: the group headings read in the catalog order, the uncatalogued groups after', async () => {
+    render(<ShortcutsSheet />)
+    act(() => useSettingsModal.getState().openShortcuts())
+    const sheet = await screen.findByRole('dialog', { name: 'Shortcuts' })
+    const headings = within(sheet).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    expect(headings.slice(0, 7)).toEqual(['General', 'Text editing', 'Block editing', 'Page', 'Navigation', 'Calendar', 'AI Assistant'])
+    expect(headings.slice(7)).toContain('Whiteboard')
+    expect(CATEGORY_ORDER).toEqual(['global', 'text', 'markdown', 'block', 'page', 'navigation', 'calendar', 'ai', 'table', 'date', 'pdf', 'weblink'])
   })
 
   test('test the AI Assistant group is left out while AI features are hidden', async () => {

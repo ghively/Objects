@@ -81,6 +81,25 @@ describe('<SlashMenu>', () => {
     await waitFor(() => expect(screen.queryByRole('listbox', { name: '/' })).toBeNull())
   })
 
+  test('sweep 2026-11-08 #2: arrowing past the visible rows scrolls the active row into view', async () => {
+    const scroll = vi.fn()
+    const had = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView')
+    Object.defineProperty(Element.prototype, 'scrollIntoView', { value: scroll, configurable: true, writable: true })
+    try {
+      const editor = mounted('Hello\n')
+      const menu = await openMenu(editor)
+      for (let i = 0; i < 12; i++) press(editor, 'ArrowDown')
+      await waitFor(() => expect(within(menu).getAllByRole('option')[12]).toHaveAttribute('aria-selected', 'true'))
+      expect(scroll).toHaveBeenCalled()
+      const last = scroll.mock.contexts[scroll.mock.contexts.length - 1] as HTMLElement
+      expect(last).toBe(within(menu).getAllByRole('option')[12])
+      expect(scroll.mock.lastCall).toEqual([{ block: 'nearest' }])
+    } finally {
+      if (had) Object.defineProperty(Element.prototype, 'scrollIntoView', had)
+      else delete (Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView
+    }
+  })
+
   test('slash filter: no match shows No results, a space then closes the menu', async () => {
     useLinkIndex.setState({ types: [] })
     const editor = mounted('Hello\n')

@@ -62,7 +62,7 @@ export const TOKENS_MENU_TEXT = {
   underline: 'Underline',
   strikethrough: 'Strikethrough',
   code: 'Code',
-  formula: 'Formula',
+  formula: 'TeX formula',
   bullet: 'Bullet list',
   todo: 'To-do',
   link: 'Link',
