@@ -284,6 +284,28 @@ def test_object_without_id_keyed_by_path(client, space, clock):
     assert versions[-1]["id"] == vid
 
 
+def test_rename_of_an_object_without_id_keeps_the_pre_rename_version(client, space, clock):
+    # Sweep 2026-11-08: the rename's snapshot was keyed by the old path, the file then got an
+    # id and moved, so the renamed object's history was empty.
+    rel = "Pages/No id.md"
+    (space.root / rel).write_bytes(b"---\ntype: 'Page'\ntitle: No id\n---\n\nPlain.\n")
+    space.rescan_file(rel)
+    r = client.post(
+        "/api/object/rename",
+        json={"path": rel, "title": "Has id", "baseVersion": _version(client, rel)},
+    )
+    assert r.status_code == 200, r.text
+    new_rel = r.json()["path"]
+    assert new_rel != rel and _fm(space.root, new_rel).get("id")
+    versions = _versions(client, new_rel)
+    assert [v["title"] for v in versions] == ["No id"]
+    assert _content(client, new_rel, versions[0]["id"]).endswith("title: No id\n---\n\nPlain.\n")
+    # The next edit lists both, under one key.
+    clock.advance(minutes=6)
+    _save_body(client, new_rel, "Edited after the rename.\n")
+    assert [v["title"] for v in _versions(client, new_rel)] == ["Has id", "No id"]
+
+
 # --- restore -------------------------------------------------------------------------------
 
 
