@@ -109,17 +109,6 @@ function oneLine(content: JSONContent[] | undefined): JSONContent[] | undefined 
 
 type Render = (node: JSONContent, h: unknown, ctx: unknown) => string
 
-/**
- * An ordered item whose text starts with a box (`1. [ ] a`) is a GFM task item
- * that the editor shows as text: the serializer's escaped brackets (`\\[ \\]`)
- * would drop its checkbox for other Markdown readers, so they are written bare
- * (audit 2026-11-07 #18). The load keeps such a list editable only when the
- * source box was bare too (`document.ts`, `sameListShape`).
- */
-export function unescapeOrderedBox(md: string): string {
-  return md.replace(/^([ \t]*\d{1,9}[.)][ \t]+)\\\[([ xX])\\\](?= +\S)/, '$1[$2]')
-}
-
 /** `ext` (StarterKit's paragraph or heading) with these escapes in its Markdown. */
 export function withTextEscapes<T extends AnyExtension>(ext: T): T {
   if (ext.name === 'paragraph') {
@@ -137,14 +126,6 @@ export function withTextEscapes<T extends AnyExtension>(ext: T): T {
         if (!node.content?.length) return finish(md)
         const prefix = /^#+ /.exec(md)?.[0] ?? ''
         return prefix + finish(escapeHeadingEnd(md.slice(prefix.length)))
-      },
-    }) as unknown as T
-  }
-  if (ext.name === 'listItem') {
-    return ext.extend({
-      renderMarkdown(this: { parent: Render | null }, node: JSONContent, h: unknown, ctx: unknown) {
-        const md = this.parent?.(node, h, ctx) ?? ''
-        return (ctx as { parentType?: string } | undefined)?.parentType === 'orderedList' ? unescapeOrderedBox(md) : md
       },
     }) as unknown as T
   }
