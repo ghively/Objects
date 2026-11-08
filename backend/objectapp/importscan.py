@@ -12,6 +12,7 @@ from __future__ import annotations
 import fnmatch
 import os
 import re
+import stat
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
@@ -108,6 +109,8 @@ def _scan_line(line: str, seen: set[str]) -> None:
 
 def _text_of(path: Path) -> str | None:
     """The text to scan, or None when the file has no text to look at."""
+    if not stat.S_ISREG(os.stat(path).st_mode):
+        return None  # a FIFO, socket or device: opening it can block forever
     suffix = path.suffix.lower()
     if suffix in readers.supported_suffixes():
         r = readers.read_file(path)
@@ -204,9 +207,10 @@ def scan_tree(root: Path, leave_out: list[str] | None = None) -> ScanReport:
                 report.left_out.append(rel)
                 continue
             try:
-                if p.is_symlink():
-                    continue
-                too_big = p.stat().st_size > MAX_SCAN_BYTES
+                st = p.lstat()
+                if not stat.S_ISREG(st.st_mode):
+                    continue  # a symlink, FIFO, socket or device is never opened (nor imported)
+                too_big = st.st_size > MAX_SCAN_BYTES
             except OSError:
                 report.unscanned += 1
                 continue
@@ -246,6 +250,9 @@ def _scan_zip(path: Path, patterns: list[str], report: ScanReport) -> ScanReport
 
     total = 0
     try:
+        if not stat.S_ISREG(os.stat(path).st_mode):
+            report.unscanned = 1
+            return report
         zf = zipfile.ZipFile(path)
     except (zipfile.BadZipFile, OSError):
         report.unscanned = 1
