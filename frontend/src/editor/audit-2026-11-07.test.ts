@@ -103,3 +103,31 @@ describe('#5 a nested list the editor would mis-nest', () => {
     })
   }
 })
+
+describe('#18 a GFM task item in an ordered list', () => {
+  const body = '1. [ ] a\n2. [x] b\n'
+
+  test('keeps its box when the item text is edited', () => {
+    expect(serializeBody(headless(body))).toBe(body)
+    expect(editAt(body, 0)).toBe('1. [ ] aZ\n2. [x] b\n')
+    expect(editAt(body, 1)).toBe('1. [ ] a\n2. [x] bZ\n')
+    expectEveryEditLocal(body)
+  })
+
+  test('still loads as an editable ordered list', () => {
+    expect(topTypes(headless(body))).toEqual(['orderedList'])
+  })
+
+  test('an escaped box stays escaped: such a list loads raw', () => {
+    const escaped = '1. \\[ ] a\n2. b\n'
+    expect(topTypes(headless(escaped))).toEqual(['rawBlock'])
+    expectEveryEditLocal(escaped)
+  })
+
+  test('a bullet item typed as `[ ] a` text stays text', () => {
+    const editor = headless('- x\n')
+    const tb = textblocks(editor)[0]
+    editor.view.dispatch(editor.state.tr.insertText('[ ] a', tb.pos + 1, tb.pos + tb.node.nodeSize - 1))
+    expect(serializeBody(editor)).toBe('- \\[ \\] a\n')
+  })
+})
