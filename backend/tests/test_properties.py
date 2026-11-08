@@ -473,3 +473,34 @@ def test_properties_route_and_events(space_dir: Path):
         assert (
             c.post("/api/object/ensure-id", json={"path": "Pages/Bad yaml.md"}).status_code == 423
         )
+
+
+# -- bug audit 2026-11-07, finding 8: non-finite numbers --------------------------------
+
+_NAN_FILE = b"---\ntitle: Nan\nscore: .nan\nbig: -.inf\n---\nbody\n"
+
+
+def test_non_finite_number_is_refused_and_a_stored_one_reads_as_empty(space_dir: Path):
+    target = space_dir / "Pages" / "Nan.md"
+    target.write_bytes(_NAN_FILE)
+    space = Space(space_dir)
+    alpha = space_dir / "Pages" / "Alpha.md"
+    before = alpha.read_bytes()
+    for bad in (float("nan"), float("inf"), [1.0, float("-inf")]):
+        with pytest.raises(InvalidValue):
+            space.update_properties("Pages/Alpha.md", {"foo": bad}, version_of(before))
+    assert alpha.read_bytes() == before
+    with TestClient(create_app(space, None, watch=False)) as c:
+        r = c.get("/api/object", params={"path": "Pages/Nan.md"})
+        assert r.status_code == 200, r.text
+        assert r.json()["frontmatter"]["score"] is None
+        v = c.get("/api/object", params={"path": "Pages/Alpha.md"}).json()["version"]
+        body = '{"path": "Pages/Alpha.md", "updates": {"foo": NaN}, "baseVersion": "' + v + '"}'
+        r = c.put(
+            "/api/object/properties",
+            content=body.encode(),
+            headers={"content-type": "application/json"},
+        )
+        assert r.status_code == 422, r.text
+    assert alpha.read_bytes() == before
+    assert target.read_bytes() == _NAN_FILE

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import io
 import json
+import math
 import re
 import threading
 from collections.abc import Callable, Iterable
@@ -149,7 +150,8 @@ def _plain(value: Any) -> Any:
     if isinstance(value, int):
         return int(value)
     if isinstance(value, float):
-        return float(value)
+        # `.nan` and `.inf` have no JSON form: they read as empty (the file keeps them).
+        return float(value) if math.isfinite(value) else None
     return value
 
 
