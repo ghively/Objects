@@ -131,3 +131,23 @@ describe('#18 a GFM task item in an ordered list', () => {
     expect(serializeBody(editor)).toBe('- \\[ \\] a\n')
   })
 })
+
+describe('#17 an indented code block inside a list item', () => {
+  const cases = [
+    '- a\n\n      indented code in item\n- b\n',
+    '1. a\n\n       code\n       more\n2. b\n',
+    '- a\n  - b\n\n        nested code\n- c\n',
+    '> - a\n>\n>       code\n',
+  ]
+  for (const body of cases) {
+    test(`survives an edit to the item and to the code: ${JSON.stringify(body)}`, () => {
+      expect(serializeBody(headless(body))).toBe(body)
+      expectEveryEditLocal(body)
+    })
+  }
+
+  test('a fenced code block in an item, and a top-level indented one, stay editable', () => {
+    expect(topTypes(headless('- item\n\n  ```js\n  x\n  ```\n- next\n'))).toEqual(['bulletList'])
+    expect(topTypes(headless('    code block\n    more\n'))).toEqual(['codeBlock'])
+  })
+})
