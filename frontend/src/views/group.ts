@@ -568,9 +568,17 @@ function swapText(current: unknown, fromLabel: string | null, add: string, same:
   return items
 }
 
+/** Whether a long-text value has text past its first paragraph (what its group shows). */
+const hasLaterParagraphs = (v: unknown) =>
+  typeof v === 'string' &&
+  v
+    .split(/\n\s*\n/)
+    .slice(1)
+    .some((p) => p.trim() !== '')
+
 /**
  * The update that moves a row into `group`, or null where a drag can't (created, updated, type,
- * backlinks, number ranges, date periods, long text; M12 formulas, rollups, IDs and files). With `move`, a
+ * backlinks, number ranges, date periods, long text past its first paragraph; M12 formulas, rollups, IDs and files). With `move`, a
  * multi-value property keeps its other values: the source column's value is removed and the
  * target's added.
  */
@@ -638,8 +646,10 @@ export function valueForGroup(
     }
     case 'textBlock':
       // A column is the value's first paragraph: a dropped card would keep only that (audit
-      // 2026-11-07 #41), so a drop can't; a new card in the column takes its text.
-      return entry.option === 'entity' || move ? null : { key, value: groupText(group) }
+      // 2026-11-07 #41), so a card whose value has more can't be dropped; a one-paragraph value
+      // moves, and a new card in the column takes its text.
+      if (entry.option === 'entity' || (move && hasLaterParagraphs(current))) return null
+      return { key, value: groupText(group) }
     default:
       return { key, value: groupText(group) }
   }
