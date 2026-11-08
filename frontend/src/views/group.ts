@@ -23,6 +23,7 @@ import {
   computedText,
 } from '@/properties/computed'
 import { formatDate, formatNumber } from '@/properties/format'
+import { useSettings } from '@/settings/useSettings'
 import { STATUS_CATEGORIES, optionCategory } from '@/tasks/statusCategory'
 import { wallClock } from '@/lib/zonedTime'
 import { wallStart } from './dates'
@@ -195,7 +196,8 @@ function dateBucket(at: Date, option: string, now: Date): Bucket {
     case 'hour': {
       const id = `${dayId(at)}T${pad(at.getHours())}`
       const h = at.getHours()
-      const period = `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}`
+      // The hour reads as the Time format setting has it (`properties/format.ts`): "14:00" or "2 PM".
+      const period = useSettings.getState().settings.twentyFourHourTime ? `${pad(h)}:00` : `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}`
       return { id, label: `${SHORT_MONTHS[at.getMonth()]} ${at.getDate()}, ${at.getFullYear()}, ${period}`, sort: id }
     }
     case 'week': {
