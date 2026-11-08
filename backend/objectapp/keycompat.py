@@ -126,7 +126,10 @@ def upgrade_body(raw: bytes) -> bytes:
         return raw
     if not upgrade_keys(data, skip=VALUE_KEYS):
         return raw
-    return json.dumps(data, ensure_ascii=False).encode("utf-8")
+    try:
+        return json.dumps(data, ensure_ascii=False).encode("utf-8")
+    except UnicodeEncodeError:  # a lone surrogate (`\ud800`): the route answers it itself
+        return raw
 
 
 Scope = MutableMapping[str, Any]

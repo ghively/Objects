@@ -225,6 +225,27 @@ def test_upgrade_keys_shapes_and_precedence():
     assert json.loads(upgrade_body(b'{"structureId": "t"}')) == {"typeId": "t"}
 
 
+def test_upgrade_body_with_a_lone_surrogate_does_not_raise():
+    # JSON may spell a lone surrogate (`\ud800`); it can't be encoded as UTF-8 again, so the
+    # body goes through unchanged and the route answers its own 4xx instead of a bare 500.
+    raw = b'{"structureId": null, "t": "\\ud800"}'
+    assert upgrade_body(raw) is raw
+
+
+def test_a_body_with_a_lone_surrogate_and_an_old_key_is_not_a_500(m8_space_dir: Path):
+    app = create_app(Space(m8_space_dir), None, watch=False)
+    with TestClient(app, raise_server_exceptions=False) as c:
+        ver = c.get("/api/object", params={"path": "People/Ada Lovelace.md"}).json()["version"]
+        res = c.put(
+            "/api/object/body",
+            content=b'{"path": "People/Ada Lovelace.md", "body": "\\ud800 x", "baseVersion": "'
+            + ver.encode() + b'", "structureId": null}',
+            headers={"content-type": "application/json"},
+        )
+        assert res.status_code < 500, res.text
+        assert "detail" in res.json()
+
+
 # -- a user's own property keys are not definition keys (sweep 2026-11-08) ------------------
 
 
