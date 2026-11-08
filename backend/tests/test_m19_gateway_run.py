@@ -259,7 +259,7 @@ def test_each_server_gets_only_its_own_secrets(env, tmp_path: Path) -> None:
     prompt = "\n".join(f"FAKE:mcp:{n}:whoami" for n in ("alpha", "gh", "nosy", "nosier"))
     res = subprocess.run([sys.executable, fake_claude.__file__, *cmd.args[1:]], input=prompt,
                          capture_output=True, text=True, encoding="utf-8", cwd=cmd.cwd,
-                         env={**cmd.env, "FAKE_CLAUDE_LOG": str(log)}, timeout=120)
+                         env={**cmd.env, "FAKE_CLAUDE_LOG": str(log)}, timeout=120, check=False)
     assert res.returncode == 0, res.stderr
     blocks = [b for line in res.stdout.splitlines() if line.strip()
               for e in [json.loads(line)] if e.get("type") == "user" for b in e["message"]["content"]]
