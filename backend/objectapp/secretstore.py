@@ -155,10 +155,26 @@ class SecretStore:
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
         aside = self.state_dir / f"{stem}.unreadable-{stamp}.json"
         n = 2
-        while aside.exists():
+        while True:
+            if sys.platform == "win32":
+                if not aside.exists():
+                    break
+            else:
+                # Create it 0600 first, as `_save` does, so atomic_write's temp file takes that
+                # mode: the copy holds secrets too (audit 2026-11-07 #25).
+                try:
+                    os.close(os.open(aside, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
+                    break
+                except FileExistsError:
+                    pass
             aside = self.state_dir / f"{stem}.unreadable-{stamp}-{n}.json"
             n += 1
-        atomic_write(aside, raw)
+        try:
+            atomic_write(aside, raw)
+        except BaseException:
+            if sys.platform != "win32":
+                aside.unlink(missing_ok=True)  # the empty file made above
+            raise
         _private(aside)
 
     def _save(self, data: dict[str, Any]) -> None:

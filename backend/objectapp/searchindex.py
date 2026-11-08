@@ -118,6 +118,26 @@ def build_match(q: str) -> str | None:
     return " AND ".join(terms) if terms else None
 
 
+def _key(path: str) -> str | bytes:
+    """``path`` as SQLite stores it: a name that is not UTF-8 (read with surrogate escapes,
+    which SQLite cannot encode) goes in as its raw bytes, a BLOB; every other path as text.
+
+    Audit 2026-11-07 #4: one such name failed every index write of its batch.
+    """
+    try:
+        path.encode("utf-8")
+    except UnicodeEncodeError:
+        return path.encode("utf-8", errors="surrogateescape")
+    return path
+
+
+def _path(value: str | bytes) -> str:
+    """A stored path back as the space names it (the inverse of `_key`)."""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="surrogateescape")
+    return value
+
+
 def _clean_snippet(text: str) -> str:
     return " ".join(text.split())
 
@@ -511,7 +531,8 @@ class SearchIndex:
     def _put(
         conn: sqlite3.Connection, path: str, version: str, doc: dict[str, str]
     ) -> None:
-        row = conn.execute("SELECT rowid FROM meta WHERE path = ?", (path,)).fetchone()
+        key = _key(path)
+        row = conn.execute("SELECT rowid FROM meta WHERE path = ?", (key,)).fetchone()
         if row is not None:
             conn.execute("DELETE FROM fts WHERE rowid = ?", (row[0],))
             conn.execute(
@@ -520,17 +541,17 @@ class SearchIndex:
             rowid = row[0]
         else:
             rowid = conn.execute(
-                "INSERT INTO meta(path, version) VALUES (?, ?)", (path, version)
+                "INSERT INTO meta(path, version) VALUES (?, ?)", (key, version)
             ).lastrowid
         conn.execute(
             "INSERT INTO fts(rowid, path, type, title, aliases, description, props, body, tags) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (rowid, path, doc["type"], *(doc[c] for c in _COLUMNS)),
+            (rowid, key, doc["type"], *(doc[c] for c in _COLUMNS)),
         )
 
     @staticmethod
     def _drop(conn: sqlite3.Connection, path: str) -> None:
-        row = conn.execute("SELECT rowid FROM meta WHERE path = ?", (path,)).fetchone()
+        row = conn.execute("SELECT rowid FROM meta WHERE path = ?", (_key(path),)).fetchone()
         if row is not None:
             conn.execute("DELETE FROM fts WHERE rowid = ?", (row[0],))
             conn.execute("DELETE FROM meta WHERE rowid = ?", (row[0],))
@@ -539,7 +560,8 @@ class SearchIndex:
         with self._db_lock:
             if self._conn is None:
                 return {}
-            return dict(self._conn.execute("SELECT path, version FROM meta").fetchall())
+            rows = self._conn.execute("SELECT path, version FROM meta").fetchall()
+        return {_path(p): v for p, v in rows}
 
     def _sync(self) -> None:
         """Bring the index in line with the scan; writes only what changed."""
@@ -628,7 +650,7 @@ class SearchIndex:
             rows = self._conn.execute(
                 "SELECT m.path, f.props, f.type FROM fts f JOIN meta m ON m.rowid = f.rowid"
             ).fetchall()
-        indexed = {path: (props, type_id) for path, props, type_id in rows}
+        indexed = {_path(path): (props, type_id) for path, props, type_id in rows}
         updates: list[str] = []
         for p, (_raw, summary) in self._snapshot().items():
             row = indexed.get(p)
@@ -781,12 +803,13 @@ class SearchIndex:
                 f"SELECT rowid, {_BM25} AS r FROM fts WHERE {where} ORDER BY r LIMIT ?",
                 [*params, fetch],
             )
-            names = dict(
-                self._query(
+            names = {
+                rowid: _path(p)
+                for rowid, p in self._query(
                     f"SELECT rowid, path FROM meta WHERE rowid IN ({', '.join('?' for _ in rows)})",
                     [rowid for rowid, _r in rows],
                 )
-            ) if rows else {}
+            } if rows else {}
         return [
             (p, round(-float(r), 4))
             for rowid, r in rows
@@ -809,7 +832,7 @@ class SearchIndex:
         rows = self._query(
             f"SELECT path, {snippets} FROM fts WHERE fts MATCH ? AND +rowid IN "
             f"(SELECT rowid FROM meta WHERE path IN ({', '.join('?' for _ in paths)}))",
-            [match, *paths],
+            [match, *(_key(p) for p in paths)],
         )
         out: dict[str, list[dict[str, Any]]] = {}
         for row in rows:
@@ -819,7 +842,7 @@ class SearchIndex:
                     hl.append(
                         {"field": _FIELD[col], "snippets": [_clean_snippet(text)]}
                     )
-            out[row[0]] = hl
+            out[_path(row[0])] = hl
         return out
 
     def _result(
@@ -860,7 +883,7 @@ class SearchIndex:
                 ).fetchall()
             except sqlite3.Error:
                 return None
-        return {r[0] for r in rows}
+        return {_path(r[0]) for r in rows}
 
     def similar(self, path: str, limit: int) -> list[tuple[str, float]]:
         """Objects sharing ``path``'s strongest terms (tf-idf), best first; never ``path`` itself.
@@ -872,7 +895,7 @@ class SearchIndex:
         rows = self._query(
             "SELECT f.title, f.aliases, f.description, f.props, f.body, f.tags "
             "FROM fts f JOIN meta m ON m.rowid = f.rowid WHERE m.path = ?",
-            (path,),
+            (_key(path),),
         )
         if not rows:
             return []
@@ -907,6 +930,6 @@ class SearchIndex:
         got = self._query(
             f"SELECT path, {_BM25} AS r FROM fts WHERE fts MATCH ? AND path != ? "
             "ORDER BY r LIMIT ?",
-            (match, path, limit),
+            (match, _key(path), limit),
         )
-        return [(p, round(-float(r), 4)) for p, r in got]
+        return [(_path(p), round(-float(r), 4)) for p, r in got]
