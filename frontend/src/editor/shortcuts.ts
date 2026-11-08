@@ -5,7 +5,7 @@
  * registry keeps one entry per id, so this is idempotent) and turns them into
  * a ProseMirror key map through `keysFor(id)`, so correcting a key in the
  * registry needs no other edit. The keys follow the shortcut table
- * (reference-check-2026-10-28 §1); an id with no key there has none here.
+ * (the behaviour catalog's Shortcuts sheet); an id with no key there has none here.
  */
 import { Extension, type Editor } from '@tiptap/core'
 import { M7_SHORTCUTS, M8_SHORTCUTS, allShortcuts, isMacPlatform, keysFor, registerShortcuts, type ShortcutDef } from '@/lib/shortcuts'

@@ -29,7 +29,7 @@ const ROWS: Row[] = [
 const paths = (key: keyof typeof TASK_SECTIONS) => sectionRows(key, ROWS, TASK_TYPE, NOW).map((r) => r.summary.path.slice(6, -3))
 
 describe('taskSections', () => {
-  test('test sections titles and descriptions match reference', () => {
+  test('test sections titles and descriptions match the catalog', () => {
     // In tab order: Inbox, Today, Scheduled, Status, Context, Tags, Open, Deadline,
     // Recurring, Reminders, Completed, then All.
     const want: Record<string, [string, string]> = {

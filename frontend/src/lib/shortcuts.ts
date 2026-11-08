@@ -10,7 +10,7 @@
  * it, but `matches` never matches it (its handler reads the sequence itself).
  *
  * The keys follow the shortcut table checked in
- * `docs/superpowers/plans/reference-check-2026-10-28.md` §1. An id the table lists no key for
+ * the Shortcuts sheet of `docs/behavior-catalog.md`. An id the table lists no key for
  * has `keys: []` and the Shortcuts sheet leaves it out. `provisional: true` marks a key that is
  * ours (no table key to check against). `bound: false` entries are display-only: their
  * handlers live elsewhere (M1–M6 code), and they are registered so the Shortcuts sheet lists them
@@ -264,7 +264,7 @@ export function useGlobalShortcut(
 
 // ---- the registered shortcuts ----
 
-/** Checked against the shortcut table (reference-check-2026-10-28 §1). */
+/** Checked against the shortcut table (the behaviour catalog's Shortcuts sheet). */
 const V = false
 /** Object-only keys: the table has no such action to check against. */
 const OURS = true

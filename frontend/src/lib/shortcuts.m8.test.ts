@@ -48,7 +48,7 @@ describe('M8 shortcuts', () => {
       expect(d?.category, id).toBe(category)
       expect(d?.scope, id).toBe(scope)
       expect(d?.name, id).toBe(name)
-      // Every key is checked against the shortcut table (reference-check-2026-10-28 §1).
+      // Every key is checked against the shortcut table (the behaviour catalog's Shortcuts sheet).
       expect(d?.provisional, id).toBe(false)
       expect(d?.bound, id).toBe(true)
       expect(keysFor(id)).toEqual(keys)

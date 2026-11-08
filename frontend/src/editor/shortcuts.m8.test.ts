@@ -75,7 +75,7 @@ describe('m8 editor shortcuts', () => {
       // The same entry as the registry's (no copy with its own keys).
       expect(r.keys).toEqual(def.keys)
     }
-    // The expected shortcut table (reference-check-2026-10-28 §1).
+    // The expected shortcut table (the behaviour catalog's Shortcuts sheet).
     expect(keysFor('copyBlockReference')).toEqual(['Mod-AltCtrl-l'])
     expect(keysFor('turnIntoObject')).toEqual(['i'])
     expect(keysFor('turnIntoTask')).toEqual([])

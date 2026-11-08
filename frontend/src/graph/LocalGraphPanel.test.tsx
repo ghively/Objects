@@ -198,7 +198,7 @@ describe('LocalGraphPanel', () => {
     expect(tabs[0].history[0]).toEqual({ kind: 'object', path: 'Ada.md' })
   })
 
-  test('labels match reference', async () => {
+  test('labels match the catalog', async () => {
     const user = userEvent.setup()
     render(<LocalGraphPanel path="Charles.md" />)
     await sigmaReady()

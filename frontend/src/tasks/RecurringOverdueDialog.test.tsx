@@ -16,7 +16,7 @@ const INFO: OverdueInfo = {
 const day = (s: string) => formatDate({ start: s, resolution: 'day' })
 
 describe('RecurringOverdueDialog', () => {
-  test('test overdue dialog strings match reference', () => {
+  test('test overdue dialog strings match the catalog', () => {
     const rule = parseRepeat('every day')
     const cases = [
       {

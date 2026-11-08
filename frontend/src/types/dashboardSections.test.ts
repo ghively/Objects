@@ -244,7 +244,7 @@ describe('No backlinks section (M5)', () => {
   const BL = propertyDef({ id: 'backlinks', key: 'backlinks', name: 'Backlinks', type: 'entity_backlinks' })
   const PERSON = typeDef({ id: 'person', name: 'Person', propertyDefinitions: [TAGS, BL] })
 
-  test('test no backlinks section addable, lists unlinked objects, title and description match reference', () => {
+  test('test no backlinks section addable, lists unlinked objects, title and description match the catalog', () => {
     // Not in the default set; offered in "Add a section".
     const all = buildSections(PERSON, views(OLD), ctx())
     expect(all.map((s) => s.key)).toEqual([...OLD])

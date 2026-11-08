@@ -46,7 +46,7 @@ describe('editor shortcuts', () => {
       'indentBlocks', 'unindentBlocks', 'toggleTodoInBlockWithCursor', 'toggleToggleInBlockWithCursor',
       'insertBlockAbove', 'insertBlockBelow',
     ])
-    // The expected shortcut table (reference-check-2026-10-28 §1), Windows column; [] = none listed.
+    // The expected shortcut table (the behaviour catalog's Shortcuts sheet), Windows column; [] = none listed.
     const EXPECTED: Record<string, string[]> = {
       mathToken: ['Mod-m'],
       heading1: [], heading2: [], heading3: [], heading4: [], toDo: [], toggle: [],
