@@ -64,6 +64,7 @@ from .apiquery import (
     parse_since,
     read_section,
     replace_section,
+    resolve_saved_filters,
     sort_rows,
 )
 from .propvalues import InvalidValue
@@ -401,10 +402,21 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
              "descending": str(sorts[0].get("option", "")).startswith("descending")}
             if sorts else None
         )
+        # The app stores a label filter's option id, a tag filter's Tag object id and a
+        # relation filter's object id; the rows carry texts, so resolve them first as the
+        # app's engine does (sweep 2026-11-08).
+        types = [t for t in (space.type_by_id(i) for i in type_ids or []) if t is not None] or list(
+            space.types
+        )
+        summaries = space.list()
+        group, unresolved = resolve_saved_filters(
+            d.get("filterGroup"),
+            types,
+            {s.id: s.title for s in summaries if s.id and s.type == "tag"},
+            {s.id: s.path for s in summaries if s.id},
+        )
         try:
-            out = run_query(
-                type_ids, collection_ids, None, d.get("filterGroup"), sort, req.limit, req.offset
-            )
+            out = run_query(type_ids, collection_ids, None, group, sort, req.limit, req.offset)
         except InvalidValue as exc:
             return _error(422, str(exc))
         # Parts of a saved query this engine doesn't apply yet; the app's own view does.
@@ -421,7 +433,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             )
             if present
         ]
-        out["unsupported"] = sorted({*out["unsupported"], *skipped})
+        out["unsupported"] = sorted({*out["unsupported"], *skipped, *unresolved})
         out["query"] = {"id": q.id, "name": q.name}
         return SafeJSONResponse(json.loads(json.dumps(out, default=str)))
 

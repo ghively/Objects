@@ -115,6 +115,21 @@ def test_matcher_dates_and_unsupported() -> None:
     assert m.matches(row) and m.unsupported == {"frobnicate"}
 
 
+def test_matcher_relative_names_match_the_apps() -> None:
+    # `views/dates.ts`: inOneWeek (oneWeekFromNow is still read), oneMonthAgo, inOneMonth.
+    today = date(2026, 3, 31)
+    row = {"due": {"start": "2026-04-07", "resolution": "day"}}
+    for rel in ("inOneWeek", "oneWeekFromNow"):
+        m = Matcher(_g(_f("due", "is", {"relative": rel})), today)
+        assert m.matches(row) and m.unsupported == set(), rel
+    m = Matcher(_g(_f("due", "isAfter", {"relative": "oneMonthAgo"})), today)  # 2026-02-28 (clamped)
+    assert m.matches({"due": {"start": "2026-03-01"}}) and not m.matches({"due": {"start": "2026-02-28"}})
+    assert m.unsupported == set()
+    m = Matcher(_g(_f("due", "is", {"relative": "inOneMonth"})), today)  # 2026-04-30 (clamped)
+    assert m.matches({"due": {"start": "2026-04-30"}}) and not m.matches({"due": {"start": "2026-05-01"}})
+    assert m.unsupported == set()
+
+
 def test_parse_since() -> None:
     assert parse_since("2026-11-05") == "2026-11-05"
     assert parse_since("2026-11-05T10:00:00Z") == "2026-11-05T10:00:00"

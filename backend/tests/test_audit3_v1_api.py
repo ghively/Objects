@@ -319,3 +319,87 @@ def test_activity_trim_needs_no_fixed_temp_name(tmp_path: Path, monkeypatch):
     for i in range(7):
         log.add(_activity_record(), "edit", f"{i}.md")
     assert [e["path"] for e in log.since(None)] == ["4.md", "5.md", "6.md"]
+
+
+# -- sweep 2026-11-08: a saved query's label, tag and relation filters hold ids -------------
+
+
+def test_saved_query_filters_resolve_ids_like_the_app(client: TestClient, space_dir: Path):
+    c = client
+    h = _bearer(space_dir, "read-write")
+    wt = c.post("/api/types", json={"name": "Widget", "pluralName": "Widgets"}).json()
+    wt["propertyDefinitions"] = wt.get("propertyDefinitions", []) + [
+        {
+            "id": "status",
+            "key": "status",
+            "name": "Status",
+            "type": "label",
+            "options": {"set": [{"id": "o1", "text": "Todo"}, {"id": "o2", "text": "Done"}]},
+        },
+        {"id": "owner", "key": "owner", "name": "Owner", "type": "entity", "options": {}},
+    ]
+    r = c.put(f"/api/types/{wt['id']}", json={"type": wt, "baseRevision": wt.get("revision", "")})
+    assert r.status_code == 200, r.text
+    w1 = c.post("/api/objects", json={"typeId": wt["id"], "title": "W1", "values": {"status": "Todo"}})
+    w2 = c.post("/api/objects", json={"typeId": wt["id"], "title": "W2", "values": {"status": "Done"}})
+    assert w1.status_code == 201 and w2.status_code == 201, (w1.text, w2.text)
+    a, b = w1.json()["path"], w2.json()["path"]
+
+    def run(name: str, element: dict) -> dict:
+        group = {
+            "type": "filterGroup",
+            "operator": "and",
+            "elements": [{"type": "filter", "typeId": wt["id"], **element}],
+        }
+        q = c.post(
+            "/api/queries", json={"name": name, "definition": {"types": [{"id": wt["id"]}], "filterGroup": group}}
+        )
+        assert q.status_code == 201, q.text
+        res = c.post(f"/api/v1/queries/{q.json()['id']}/run", json={}, headers=h)
+        assert res.status_code == 200, res.text
+        out = res.json()
+        return {"titles": [x["title"] for x in out["rows"]], "unsupported": out["unsupported"]}
+
+    # A label filter stores the option id; the row carries the option text.
+    assert run("Done widgets", {"propertyId": "status", "option": "is", "referenceValue": "o2"}) == {
+        "titles": ["W2"],
+        "unsupported": [],
+    }
+    assert run("Done too", {"propertyId": "status", "option": "contains", "referenceValue": ["o2"]}) == {
+        "titles": ["W2"],
+        "unsupported": [],
+    }
+    assert run("Not done", {"propertyId": "status", "option": "notContains", "referenceValue": ["o2"]}) == {
+        "titles": ["W1"],
+        "unsupported": [],
+    }
+    # A tag filter stores the Tag object's id; the row carries the tag's title.
+    tag = c.post("/api/tags/ensure", json={"name": "Urgent"}).json()["path"]
+    tag_id = c.get("/api/object", params={"path": tag}).json()["frontmatter"]["id"]
+    ver = c.get("/api/object", params={"path": a}).json()["version"]
+    r = c.put("/api/object/properties", json={"path": a, "updates": {"tags": ["[[Urgent]]"]}, "baseVersion": ver})
+    assert r.status_code == 200, r.text
+    assert run("Urgent widgets", {"propertyId": "tags", "option": "contains", "referenceValue": [tag_id]}) == {
+        "titles": ["W1"],
+        "unsupported": [],
+    }
+    # A relation filter stores the target object's id; the row carries the link.
+    w1_id = c.get("/api/object", params={"path": a}).json()["frontmatter"]["id"]
+    ver = c.get("/api/object", params={"path": b}).json()["version"]
+    r = c.put("/api/object/properties", json={"path": b, "updates": {"owner": ["[[W1]]"]}, "baseVersion": ver})
+    assert r.status_code == 200, r.text
+    assert run("Owned by W1", {"propertyId": "owner", "option": "contains", "referenceValue": [w1_id]}) == {
+        "titles": ["W2"],
+        "unsupported": [],
+    }
+    # An id that names nothing is reported, not silently matched against nothing.
+    assert run("Mystery", {"propertyId": "status", "option": "is", "referenceValue": "o9"}) == {
+        "titles": [],
+        "unsupported": ["status is o9"],
+    }
+    # The app's relative-date names are known.
+    for rel in ("inOneWeek", "inOneMonth"):
+        out = run(f"Before {rel}", {"propertyId": "createdAt", "option": "isBefore", "referenceValue": {"relative": rel}})
+        assert out == {"titles": ["W1", "W2"], "unsupported": []}, (rel, out)
+    out = run("After a month ago", {"propertyId": "createdAt", "option": "isAfter", "referenceValue": {"relative": "oneMonthAgo"}})
+    assert out == {"titles": ["W1", "W2"], "unsupported": []}
