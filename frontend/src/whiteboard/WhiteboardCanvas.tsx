@@ -91,7 +91,7 @@ export const FIT_PADDING = GRID * 2
 
 /** Ink tool defaults when a shortcut arms one (the plan's pen 4, highlighter 16, gray). */
 const INK_DEFAULTS: Record<InkToolState['tool'], number> = { pen: 4, highlighter: 16, eraser: 4 }
-const INK_DEFAULT_COLOR = '#5c5959'
+const INK_DEFAULT_COLOR = '#71717a'
 
 /** Files dropped together are placed in a diagonal cascade this far apart (our choice: one grid step). */
 export const DROP_CASCADE = GRID

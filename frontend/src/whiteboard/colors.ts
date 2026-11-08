@@ -3,6 +3,10 @@
  * Shape fill and border colours (`COLOR_VALUES`):
  * `bgDark`/`borderDark` in dark mode, `bgLight`/`borderLight` in light mode. `isDarkMode()` reads
  * the `dark` class on `<html>`, which `theme/applyTheme.ts` sets for the Dark and Dark Dimmed themes.
+ *
+ * From the Tailwind CSS v3 default palette (MIT; `theme/tailwindPalette.ts`), per hue h (stone for
+ * gray): bgLight h-50, borderLight h-300, bgDark an sRGB mix of 40% h-900 into zinc-900 (the dark
+ * surface), borderDark h-400. `colors.test.ts` checks every value against that rule.
  */
 import type { CSSProperties } from 'react'
 import type { WhiteboardFillColor, WhiteboardThemeColor } from '@/api/whiteboardTypes'
@@ -15,24 +19,24 @@ interface ColorValue {
 }
 
 export const COLOR_VALUES: Record<WhiteboardThemeColor, ColorValue> = {
-  gray: { bgLight: '#FAF8F5', borderLight: '#E7E2D7', bgDark: '#282E36', borderDark: '#313844' },
-  rose: { bgLight: '#FFEAEC', borderLight: '#FDA4AF', bgDark: '#4B2D38', borderDark: '#FB7185' },
-  pink: { bgLight: '#FDEDF7', borderLight: '#F9A9D4', bgDark: '#4A2E43', borderDark: '#F471B5' },
-  fuchsia: { bgLight: '#FBEEFF', borderLight: '#F0ABFD', bgDark: '#462D54', borderDark: '#E979FA' },
-  purple: { bgLight: '#F7EEFF', borderLight: '#D8B4FE', bgDark: '#3B3057', borderDark: '#C084FC' },
-  violet: { bgLight: '#F1EFFE', borderLight: '#C3B6FE', bgDark: '#353157', borderDark: '#A88BFB' },
-  indigo: { bgLight: '#E8EDFF', borderLight: '#A5B4FD', bgDark: '#2D3255', borderDark: '#818CF9' },
-  blue: { bgLight: '#E4EFFE', borderLight: '#92C5FE', bgDark: '#263956', borderDark: '#60A5FB' },
-  sky: { bgLight: '#E7F5FE', borderLight: '#7DD3FC', bgDark: '#224053', borderDark: '#38BDF9' },
-  cyan: { bgLight: '#DBFBFE', borderLight: '#67E8FA', bgDark: '#22434F', borderDark: '#24D3EE' },
-  teal: { bgLight: '#D9FCF6', borderLight: '#5EEAD5', bgDark: '#244346', borderDark: '#2DD4BF' },
-  emerald: { bgLight: '#DDFBEB', borderLight: '#6EE7B8', bgDark: '#24433F', borderDark: '#34D399' },
-  green: { bgLight: '#E4FDED', borderLight: '#87EFAD', bgDark: '#254638', borderDark: '#49DE80' },
-  lime: { bgLight: '#F1FCD9', borderLight: '#BFF164', bgDark: '#34472F', borderDark: '#A3E634' },
-  yellow: { bgLight: '#FFFBD2', borderLight: '#FDE047', bgDark: '#48422E', borderDark: '#FACC14' },
-  amber: { bgLight: '#FFF6D6', borderLight: '#FBD34C', bgDark: '#4B3D2E', borderDark: '#FBBF24' },
-  orange: { bgLight: '#FFF2E0', borderLight: '#FDBA75', bgDark: '#4B362E', borderDark: '#FB923C' },
-  red: { bgLight: '#FFE9EA', borderLight: '#FDA5A5', bgDark: '#4A2D33', borderDark: '#F87171' },
+  gray: { bgLight: '#fafaf9', borderLight: '#d6d3d1', bgDark: '#1a1819', borderDark: '#a8a29e' },
+  rose: { bgLight: '#fff1f2', borderLight: '#fda4af', bgDark: '#451626', borderDark: '#fb7185' },
+  pink: { bgLight: '#fdf2f8', borderLight: '#f9a8d4', bgDark: '#43182b', borderDark: '#f472b6' },
+  fuchsia: { bgLight: '#fdf4ff', borderLight: '#f0abfc', bgDark: '#3b193f', borderDark: '#e879f9' },
+  purple: { bgLight: '#faf5ff', borderLight: '#d8b4fe', bgDark: '#321a46', borderDark: '#c084fc' },
+  violet: { bgLight: '#f5f3ff', borderLight: '#c4b5fd', bgDark: '#2d1a4c', borderDark: '#a78bfa' },
+  indigo: { bgLight: '#eef2ff', borderLight: '#a5b4fc', bgDark: '#222144', borderDark: '#818cf8' },
+  blue: { bgLight: '#eff6ff', borderLight: '#93c5fd', bgDark: '#1a2647', borderDark: '#60a5fa' },
+  sky: { bgLight: '#f0f9ff', borderLight: '#7dd3fc', bgDark: '#132c3c', borderDark: '#38bdf8' },
+  cyan: { bgLight: '#ecfeff', borderLight: '#67e8f9', bgDark: '#172e38', borderDark: '#22d3ee' },
+  teal: { bgLight: '#f0fdfa', borderLight: '#5eead4', bgDark: '#162e2e', borderDark: '#2dd4bf' },
+  emerald: { bgLight: '#ecfdf5', borderLight: '#6ee7b7', bgDark: '#112e28', borderDark: '#34d399' },
+  green: { bgLight: '#f0fdf4', borderLight: '#86efac', bgDark: '#163022', borderDark: '#4ade80' },
+  lime: { bgLight: '#f7fee7', borderLight: '#bef264', bgDark: '#243018', borderDark: '#a3e635' },
+  yellow: { bgLight: '#fefce8', borderLight: '#fde047', bgDark: '#3c2817', borderDark: '#facc15' },
+  amber: { bgLight: '#fffbeb', borderLight: '#fcd34d', bgDark: '#3e2416', borderDark: '#fbbf24' },
+  orange: { bgLight: '#fff7ed', borderLight: '#fdba74', bgDark: '#402017', borderDark: '#fb923c' },
+  red: { bgLight: '#fef2f2', borderLight: '#fca5a5', bgDark: '#411a1c', borderDark: '#f87171' },
 }
 
 /** The ring of a node with no `borderColor` (`var(--color-border-base)`). */

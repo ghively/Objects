@@ -13,7 +13,7 @@ import {
 import type { InkStroke } from './types'
 
 function stroke(id: string, pts: [number, number][], pressure = 0.5): InkStroke {
-  return finishStroke(id, 'pen', '#5c5959', 4, pts.map(([x, y]) => [x, y, pressure]), pressure === 0.5 ? 'mouse' : 'pen')
+  return finishStroke(id, 'pen', '#71717a', 4, pts.map(([x, y]) => [x, y, pressure]), pressure === 0.5 ? 'mouse' : 'pen')
 }
 
 const square: [number, number, number][] = [
@@ -51,7 +51,7 @@ describe('inkSelect', () => {
       [110, 5, 0.5],
     ])
     // The outline moves exactly with the points: same as drawing it there.
-    const drawn = finishStroke('a', 'pen', '#5c5959', 4, next[0].points, 'mouse')
+    const drawn = finishStroke('a', 'pen', '#71717a', 4, next[0].points, 'mouse')
     const nums = (d: string) => d.split(' ').filter((t) => !/[MQZ]/.test(t)).map(Number)
     const got = nums(next[0].d)
     const want = nums(drawn.d)
@@ -78,7 +78,7 @@ describe('inkSelect', () => {
       [200, 100, 0.7],
     ])
     expect(next[0].width).toBe(8)
-    expect(next[0].d).toBe(finishStroke('a', 'pen', '#5c5959', 8, next[0].points, 'pen').d)
+    expect(next[0].d).toBe(finishStroke('a', 'pen', '#71717a', 8, next[0].points, 'pen').d)
     expect(next[0].d).not.toBe(a.d)
   })
 

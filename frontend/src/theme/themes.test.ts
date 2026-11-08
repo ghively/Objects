@@ -1,8 +1,9 @@
-// Light, Light Dimmed and Dark Dimmed (themes.css) against the dark default (tokens.css) and
-// the expected values, through the M7 plan's token table.
+// Light, Light Dimmed and Dark Dimmed (themes.css) against the dark default (tokens.css), and every
+// theme's colours against the Tailwind palette rules in themes.css's header.
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
 import { THEME_COLORS } from './palette'
+import { TAILWIND, mixHex } from './tailwindPalette'
 
 const dir = `${process.cwd()}/src/theme`
 const tokensCss = readFileSync(`${dir}/tokens.css`, 'utf8')
@@ -28,42 +29,36 @@ const theme = (t: (typeof THEMES)[number]) => block(themesCss, `html[data-theme=
 /** Layout and font tokens: the same in every theme, so the theme blocks leave them alone. */
 const NOT_COLOUR = /^--(radius-|object-font-|app-font$|page-content-width$|cover-crop-height$|profile-|infobox-width$)/
 
-// Palette values used below.
-const gray = {
-  0: 'oklch(1.0000 0.0001 263.28)',
-  25: 'oklch(0.9916 0.0016 67.00)',
-  50: 'oklch(0.9856 0.0016 67.00)',
-  100: 'oklch(0.9676 0.0016 67.02)',
-  125: 'oklch(0.9556 0.0016 67.03)',
-  150: 'oklch(0.9406 0.0016 67.05)',
-  200: 'oklch(0.9163 0.0017 67.07)',
-  300: 'oklch(0.8643 0.0017 67.13)',
-  400: 'oklch(0.7161 0.0060 30.59)',
-  450: 'oklch(0.6441 0.0061 30.65)',
-  500: 'oklch(0.5725 0.0051 33.89)',
-  600: 'oklch(0.4668 0.0039 16.75)',
-  675: 'oklch(0.4098 0.0033 286.02)',
-  700: 'oklch(0.3887 0.0052 301.05)',
-  725: 'oklch(0.3688 0.0051 286.01)',
-  750: 'oklch(0.3461 0.0069 285.94)',
-  775: 'oklch(0.3226 0.0070 285.92)',
-  800: 'oklch(0.2987 0.0072 285.88)',
-  825: 'oklch(0.2780 0.0055 285.95)',
-  850: 'oklch(0.2574 0.0056 285.92)',
-  900: 'oklch(0.2191 0.0058 285.84)',
-} as const
-/** The colour palette's tones the themes use. */
-const TONES: Record<string, Record<number, string>> = {
-  blue: { 200: 'oklch(0.8823 0.0571 254.14)', 400: 'oklch(0.7137 0.1435 254.63)', 650: 'oklch(0.5035 0.1579 264.41)' },
-  teal: { 100: 'oklch(0.9526 0.0498 180.90)', 800: 'oklch(0.3652 0.0444 191.00)' },
-  red: { 50: 'oklch(0.9705 0.0129 17.04)', 850: 'oklch(0.3803 0.0737 21.10)' },
-  rose: { 300: 'oklch(0.8097 0.1061 11.61)', 500: 'oklch(0.6345 0.2004 15.44)' },
-  green: { 400: 'oklch(0.8003 0.1820 151.73)', 500: 'oklch(0.6981 0.1758 150.49)' },
-}
-const colourTone = (name: string, tone: number): string => {
-  const v = TONES[name]?.[tone]
-  if (!v) throw new Error(`no ${name} ${tone}`)
-  return v
+const stone = TAILWIND.stone
+const zinc = TAILWIND.zinc
+const HUES = THEME_COLORS.filter((c) => c !== 'gray')
+
+/** themes.css's per-hue rule (its header) for one theme. */
+function hueTokens(t: 'dark' | (typeof THEMES)[number], h: (typeof HUES)[number]): Record<string, string> {
+  const c = TAILWIND[h]
+  if (t === 'light' || t === 'lightDimmed') {
+    return {
+      [`--type-${h}-fg`]: c[700],
+      [`--type-${h}-bg`]: c[50],
+      [`--tag-bg-${h}`]: c[100],
+      [`--tag-text-${h}`]: c[800],
+      [`--label-bg-${h}`]: c[50],
+      [`--label-text-${h}`]: c[600],
+      [`--label-border-${h}`]: c[300],
+      [`--line-${h}`]: c[500],
+    }
+  }
+  const s = t === 'dark' ? zinc[900] : zinc[800]
+  return {
+    [`--type-${h}-fg`]: c[200],
+    [`--type-${h}-bg`]: mixHex(c[900], s, 0.45),
+    [`--tag-bg-${h}`]: mixHex(c[800], s, 0.55),
+    [`--tag-text-${h}`]: c[50],
+    [`--label-bg-${h}`]: mixHex(c[950], s, 0.5),
+    [`--label-text-${h}`]: c[400],
+    [`--label-border-${h}`]: c[500],
+    [`--line-${h}`]: `var(--label-border-${h})`,
+  }
 }
 
 describe('themes', () => {
@@ -77,65 +72,55 @@ describe('themes', () => {
     }
   })
 
-  test('test light token values follow the token table', () => {
-    const light = theme('light')
-    const lightDimmed = theme('lightDimmed')
-    const darkDimmed = theme('darkDimmed')
-    // The plan's spot checks.
-    expect(light.get('--bg-panel')).toBe(gray[0])
-    expect(light.get('--bg-app')).toBe(gray[50])
-    expect(light.get('--text')).toBe(gray[900])
-    expect(lightDimmed.get('--bg-panel')).toBe(gray[25])
-    expect(darkDimmed.get('--bg-panel')).toBe(gray[850])
+  test('test colour tokens follow the palette rules', () => {
+    const blocks = { dark, light: theme('light'), lightDimmed: theme('lightDimmed'), darkDimmed: theme('darkDimmed') }
+    for (const [name, b] of Object.entries(blocks)) {
+      for (const h of HUES) {
+        for (const [token, value] of Object.entries(hueTokens(name as keyof typeof blocks, h))) {
+          expect(b.get(token), `${name} ${token}`).toBe(value)
+        }
+      }
+      expect(b.get('--border-chrome'), name).toBe(mixHex(b.get('--border-subtle')!, b.get('--bg-app')!, 0.6))
+    }
 
-    // One token per mapping row (light / light dimmed / dark dimmed).
-    const rows: [string, string, string, string][] = [
-      ['--bg-app', gray[50], gray[100], gray[900]],
-      ['--bg-raised', gray[0], gray[0], gray[825]],
-      ['--bg-raised-2', gray[100], gray[125], gray[725]],
-      ['--bg-hover', gray[50], gray[50], gray[775]],
-      ['--bg-hover-2', gray[150], gray[150], gray[700]],
-      ['--border-subtle', gray[200], gray[200], gray[725]],
-      ['--text', gray[900], gray[750], gray[200]],
-      ['--text-muted', gray[500], gray[450], gray[450]],
-      ['--primary-btn', gray[700], gray[675], gray[200]],
-      ['--primary-btn-text', gray[100], gray[125], gray[800]],
-      ['--text-section', gray[500], gray[450], gray[450]],
-      ['--chrome-btn-border', gray[200], gray[200], gray[700]],
-      ['--float-bg', 'var(--bg-raised)', 'var(--bg-raised)', 'var(--bg-raised)'],
-      ['--float-border', 'var(--border-subtle)', 'var(--border-subtle)', 'var(--border-subtle)'],
-      ['--float-btn-border', 'var(--chrome-btn-border)', 'var(--chrome-btn-border)', 'var(--chrome-btn-border)'],
-      ['--block-selection-bg', '#4494f748', '#4494f748', '#5090dd3a'],
-      ['--block-selection-border', colourTone('blue', 400), colourTone('blue', 400), colourTone('blue', 400)],
-      ['--editor-bullet', gray[500], gray[500], 'oklch(0.8643 0.0017 67.13)'],
-      ['--editor-quote-line', gray[400], gray[400], gray[400]],
-      ['--editor-hr', gray[300], gray[300], gray[600]],
-      ['--editor-toggle', gray[700], gray[700], 'oklch(0.9163 0.0017 67.07)'],
-      ['--code-bg', gray[25], gray[100], gray[775]],
-      ['--code-border', gray[200], gray[150], gray[725]],
-      ['--code-text', gray[900], gray[825], 'oklch(0.9163 0.0017 67.07)'],
-      ['--type-blue-fg', colourTone('blue', 650), colourTone('blue', 650), colourTone('blue', 200)],
-      ['--type-gray-bg', gray[50], gray[50], gray[775]],
-      ['--tag-bg-teal', colourTone('teal', 100), colourTone('teal', 100), colourTone('teal', 800)],
-      ['--tag-text-gray', gray[800], gray[800], 'oklch(0.9676 0.0016 67.02)'],
-      ['--label-bg-red', colourTone('red', 50), colourTone('red', 50), colourTone('red', 850)],
-      ['--label-bg-gray', gray[50], gray[100], gray[800]],
-      ['--label-text-gray', gray[600], gray[600], gray[500]],
-      ['--label-border-rose', colourTone('rose', 300), colourTone('rose', 300), colourTone('rose', 500)],
-      ['--line-green', colourTone('green', 500), colourTone('green', 500), colourTone('green', 400)],
-      // `text-amber-600 dark:text-amber-400` ("Scheduled after deadline").
-      ['--warning', '#dd7400', '#dd7400', '#fcbb00'],
+    // Surfaces and text, one row per token (dark / light / light dimmed / dark dimmed).
+    const rows: [string, string, string, string, string][] = [
+      ['--bg-app', zinc[950], stone[50], stone[100], zinc[900]],
+      ['--bg-panel', mixHex(zinc[900], zinc[950], 0.5), '#ffffff', stone[50], mixHex(zinc[800], zinc[900], 0.35)],
+      ['--bg-raised', zinc[900], '#ffffff', '#ffffff', zinc[800]],
+      ['--border-subtle', zinc[800], stone[200], stone[200], zinc[700]],
+      ['--text', zinc[100], stone[900], stone[800], zinc[200]],
+      ['--text-muted', zinc[400], stone[500], stone[500], zinc[400]],
+      ['--primary-btn', zinc[200], stone[800], stone[700], zinc[200]],
+      ['--code-text', zinc[200], stone[800], stone[800], zinc[200]],
+      ['--float-bg', 'var(--bg-raised)', 'var(--bg-raised)', 'var(--bg-raised)', 'var(--bg-raised)'],
+      ['--float-border', 'var(--border-subtle)', 'var(--border-subtle)', 'var(--border-subtle)', 'var(--border-subtle)'],
+      ['--block-selection-border', TAILWIND.blue[400], TAILWIND.blue[400], TAILWIND.blue[400], TAILWIND.blue[400]],
+      ['--block-selection-bg', `${TAILWIND.blue[500]}40`, `${TAILWIND.blue[500]}33`, `${TAILWIND.blue[500]}33`, `${TAILWIND.blue[500]}40`],
+      ['--type-gray-fg', zinc[200], stone[700], stone[700], zinc[200]],
+      ['--tag-text-gray', zinc[50], stone[800], stone[800], zinc[50]],
+      ['--label-bg-gray', zinc[800], stone[50], stone[100], zinc[700]],
+      ['--label-text-gray', zinc[400], stone[600], stone[600], zinc[400]],
+      ['--danger', TAILWIND.rose[600], TAILWIND.rose[600], TAILWIND.rose[600], TAILWIND.rose[600]],
+      ['--accent-today', TAILWIND.red[500], TAILWIND.red[500], TAILWIND.red[500], TAILWIND.red[500]],
+      ['--warning', TAILWIND.amber[400], TAILWIND.amber[600], TAILWIND.amber[600], TAILWIND.amber[400]],
     ]
-    for (const [token, l, ld, dd] of rows) {
-      expect([light.get(token), lightDimmed.get(token), darkDimmed.get(token)], token).toEqual([l, ld, dd])
+    for (const [token, d, l, ld, dd] of rows) {
+      expect([dark.get(token), blocks.light.get(token), blocks.lightDimmed.get(token), blocks.darkDimmed.get(token)], token).toEqual([d, l, ld, dd])
     }
-    expect(light.get('--border-chrome')).toBe(`color-mix(in srgb, ${gray[200]} 80%, ${gray[50]})`)
-    // The same in every theme.
-    for (const t of THEMES) {
-      expect(theme(t).get('--danger')).toBe(dark.get('--danger'))
-      expect(theme(t).get('--accent-today')).toBe(dark.get('--accent-today'))
-      expect(theme(t).get('--card-shadow')).toBe(dark.get('--card-shadow'))
+    for (const t of THEMES) expect(theme(t).get('--card-shadow')).toBe(dark.get('--card-shadow'))
+
+    // Every literal colour is a palette step, white, a mix the rules name, or a step with alpha.
+    const steps = new Set<string>(Object.values(TAILWIND).flatMap((f) => Object.values(f)))
+    for (const [name, b] of Object.entries(blocks)) {
+      for (const [token, value] of b) {
+        if (NOT_COLOUR.test(token) || !value.startsWith('#')) continue
+        const plain = value.slice(0, 7)
+        const isMix = /^--(bg-(panel|raised-2|hover|hover-2)|border-chrome|code-bg|type-.*-bg|tag-bg-.*|label-bg-.*)$/.test(token)
+        expect(steps.has(plain) || plain === '#ffffff' || isMix, `${name} ${token} ${value}`).toBe(true)
+      }
     }
+
     // color-scheme follows the theme's type.
     const scheme = (t: string) => strip(themesCss).match(new RegExp(`html\\[data-theme='${t}'\\] \\{[^}]*color-scheme: (\\w+);`))?.[1]
     expect([scheme('light'), scheme('lightDimmed'), scheme('darkDimmed')]).toEqual(['light', 'light', 'dark'])
@@ -159,230 +144,27 @@ describe('themes', () => {
   })
 
   test('test search and find-in-page highlights are set in all four themes', () => {
-    // Light bg #fef08a4b + yellow 900 text; dark bg #fddf472c + yellow 100 text.
-    // ::highlight(find-in-page) #facc1573, find-in-page-active #f97316b3.
-    const yellow900 = 'oklch(0.3495 0.0387 62.84)'
-    const yellow100 = 'oklch(0.9729 0.0693 103.22)'
+    // Light: yellow-200 at 40% with yellow-900 text; dark: yellow-300 at 20% with yellow-100 text.
+    // ::highlight(find-in-page) yellow-400 at 50%, find-in-page-active orange-500 at 65%.
+    const y = TAILWIND.yellow
     const expected = {
-      dark: ['#fddf472c', yellow100],
-      darkDimmed: ['#fddf472c', yellow100],
-      light: ['#fef08a4b', yellow900],
-      lightDimmed: ['#fef08a4b', yellow900],
+      dark: [`${y[300]}33`, y[100]],
+      darkDimmed: [`${y[300]}33`, y[100]],
+      light: [`${y[200]}66`, y[900]],
+      lightDimmed: [`${y[200]}66`, y[900]],
     } as const
     const blocks = { dark, light: theme('light'), lightDimmed: theme('lightDimmed'), darkDimmed: theme('darkDimmed') }
     for (const [name, [bg, text]] of Object.entries(expected)) {
       const b = blocks[name as keyof typeof blocks]
       expect(b.get('--bg-search-highlight'), name).toBe(bg)
       expect(b.get('--text-search-highlight'), name).toBe(text)
-      expect(b.get('--bg-find-match'), name).toBe('#facc1573')
-      expect(b.get('--bg-find-match-current'), name).toBe('#f97316b3')
+      expect(b.get('--bg-find-match'), name).toBe(`${y[400]}80`)
+      expect(b.get('--bg-find-match-current'), name).toBe(`${TAILWIND.orange[500]}a6`)
       expect(b.has('--bg-search-highlight-current'), name).toBe(false)
     }
     const index = readFileSync(`${process.cwd()}/src/index.css`, 'utf8')
     expect(index).toMatch(/\.search-highlights-bold b \{\s*font-weight: 600;/)
     expect(index).toMatch(/\.find-match \{\s*background-color: var\(--bg-find-match\);\s*color: inherit;/)
     expect(index).toMatch(/\.find-match-current \{\s*background-color: var\(--bg-find-match-current\);\s*color: inherit;/)
-  })
-
-  test('test existing dark token values are unchanged', () => {
-    // Regression guard (green from the start): tokens.css's :root as it was before Task 16.
-    const BASELINE = `
---bg-app: #0d0c10
---bg-panel: #151418
---bg-raised: #1a1a1d
---bg-raised-2: #212024
---bg-hover: #232326
---bg-hover-2: #28272b
---border-subtle: #2d2c31
---danger: #cd1e46
---text: #f4f4f5
---text-muted: #9a9aa0
---accent-today: #ff0000
---primary-btn: #e8e7e6
---primary-btn-text: #232326
---text-section: #a7a2a1
---chrome-btn-border: #2a292d
---float-bg: #18181b
---float-border: #232226
---float-btn-border: #29282d
---card-shadow: 0 2px 3px #00000001, 0 4px 9px #00000003, 0 8px 12px #00000001
---block-selection-bg: #5090dd3a
---block-selection-border: #60a5fa
---text-selection-bg: #5090dd3a
---editor-bullet: #e4e3e2
---editor-bullet-nested: #7c7c7d
---editor-quote-line: #4e4b4c
---editor-hr: var(--border-subtle)
---editor-toggle: #e4e3e2
---editor-toggle-empty: #7b7776
---editor-toggle-outline: #5c5959
---code-bg: #28282b
---code-border: #333337
---code-text: #e4e3e2
---border-chrome: #27262b
---type-blue-fg: #c0d8ff
---type-blue-bg: #323458
---type-green-fg: #b1ffd2
---type-green-bg: #1f4430
---type-orange-fg: #fed8a5
---type-orange-bg: #553025
---type-purple-fg: #eecaff
---type-purple-bg: #491f57
---type-pink-fg: #ffc5d0
---type-pink-bg: #5d1e37
---type-teal-fg: #b1f6ff
---type-teal-bg: #1f4346
---type-yellow-fg: #fff0a8
---type-yellow-bg: #4f4420
---type-red-fg: #ffc2c7
---type-red-bg: #59282d
---type-gray-fg: #e4e3e2
---type-gray-bg: #3c3b3e
---type-rose-fg: #ffbdc7
---type-rose-bg: #52282f
---type-fuchsia-fg: #f7bdff
---type-fuchsia-bg: #4d2852
---type-violet-fg: #cfbdff
---type-violet-bg: #342852
---type-indigo-fg: #bdc0ff
---type-indigo-bg: #282b52
---type-sky-fg: #bdeaff
---type-sky-bg: #284552
---type-cyan-fg: #bdf6ff
---type-cyan-bg: #284c52
---type-emerald-fg: #bdffe8
---type-emerald-bg: #285244
---type-lime-fg: #e6ffbd
---type-lime-bg: #425228
---type-amber-fg: #ffeabd
---type-amber-bg: #524528
---tag-bg-gray: #333337
---tag-text-gray: #f5f4f3
---tag-bg-rose: #742c40
---tag-text-rose: #fff1f2
---tag-bg-pink: #742f4b
---tag-text-pink: #fdf2f8
---tag-bg-fuchsia: #632c67
---tag-text-fuchsia: #fdf4ff
---tag-bg-purple: #5c377a
---tag-text-purple: #faf5ff
---tag-bg-violet: #573a85
---tag-text-violet: #f5f3ff
---tag-bg-indigo: #434078
---tag-text-indigo: #eef2ff
---tag-bg-blue: #35467d
---tag-text-blue: #eff6ff
---tag-bg-sky: #1d455a
---tag-text-sky: #f0f9ff
---tag-bg-cyan: #22434d
---tag-text-cyan: #ecfeff
---tag-bg-teal: #1f4644
---tag-text-teal: #f0fdfa
---tag-bg-emerald: #184739
---tag-text-emerald: #ecfdf5
---tag-bg-green: #265237
---tag-text-green: #f0fdf4
---tag-bg-lime: #34451e
---tag-text-lime: #f7fee7
---tag-bg-yellow: #5f4323
---tag-text-yellow: #fefce8
---tag-bg-amber: #704429
---tag-text-amber: #fffbeb
---tag-bg-orange: #733d2c
---tag-text-orange: #fff7ed
---tag-bg-red: #723131
---tag-text-red: #fef2f2
---label-bg-gray: #28282b
---label-text-gray: #7b7776
---label-bg-rose: #672d3d
---label-text-rose: #f45a73
---label-bg-pink: #662f45
---label-text-pink: #ec5fa7
---label-bg-fuchsia: #562c59
---label-text-fuchsia: #de62f0
---label-bg-purple: #513469
---label-text-purple: #b26ef6
---label-bg-violet: #4f3773
---label-text-violet: #9975f4
---label-bg-indigo: #3e3c67
---label-text-indigo: #7279f1
---label-bg-blue: #334069
---label-text-blue: #4f93f3
---label-bg-sky: #1f3d4e
---label-text-sky: #26aeeb
---label-bg-cyan: #213a43
---label-text-cyan: #19bed8
---label-bg-teal: #1f3e3c
---label-text-teal: #25c0af
---label-bg-emerald: #183e33
---label-text-emerald: #26c18b
---label-bg-green: #254833
---label-text-green: #3ace70
---label-bg-lime: #2f3d1e
---label-text-lime: #92d22a
---label-bg-yellow: #543c24
---label-text-yellow: #ecbc13
---label-bg-amber: #633f2a
---label-text-amber: #f2ad1d
---label-bg-orange: #63392b
---label-text-orange: #f4832d
---label-bg-red: #643131
---label-text-red: #f05d5d
---label-border-gray: #636060
---line-gray: #5c5959
---label-border-rose: #ea4561
---line-rose: var(--label-border-rose)
---label-border-pink: #e34d97
---line-pink: var(--label-border-pink)
---label-border-fuchsia: #d14be5
---line-fuchsia: var(--label-border-fuchsia)
---label-border-purple: #a558ee
---line-purple: var(--label-border-purple)
---label-border-violet: #8a5fed
---line-violet: var(--label-border-violet)
---label-border-indigo: #6568e8
---line-indigo: var(--label-border-indigo)
---label-border-blue: #3f80eb
---line-blue: var(--label-border-blue)
---label-border-sky: #199dd9
---line-sky: var(--label-border-sky)
---label-border-cyan: #11a9c3
---line-cyan: var(--label-border-cyan)
---label-border-teal: #1dad9d
---line-teal: var(--label-border-teal)
---label-border-emerald: #19ae7d
---line-emerald: var(--label-border-emerald)
---label-border-green: #2bbb60
---line-green: var(--label-border-green)
---label-border-lime: #7fbe1f
---line-lime: var(--label-border-lime)
---label-border-yellow: #daaa14
---line-yellow: var(--label-border-yellow)
---label-border-amber: #e89a17
---line-amber: var(--label-border-amber)
---label-border-orange: #ec731f
---line-orange: var(--label-border-orange)
---label-border-red: #e54a4a
---line-red: var(--label-border-red)
---radius-xs-v: 2px
---radius-sm-v: 4px
---radius-md-v: 6px
---radius-lg-v: 8px
---radius-xl-v: 12px
---radius-2xl-v: 16px
---radius-3xl-v: 24px
---object-font-sans-serif: "Inter", ui-sans-serif, system-ui, sans-serif
---object-font-serif: Georgia, serif
---object-font-monospace: "Courier New", monospace
---page-content-width: 820px
---cover-crop-height: 240px
---profile-image-size: 132px
---profile-column-width: 280px
---infobox-width: 300px`
-    for (const line of BASELINE.trim().split('\n')) {
-      const at = line.indexOf(': ')
-      const name = line.slice(0, at)
-      expect(dark.get(name), name).toBe(line.slice(at + 2))
-    }
   })
 })

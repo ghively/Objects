@@ -8,7 +8,7 @@ import type { InkResponse, InkStroke } from './types'
 const PATH = 'Whiteboards/Board.md'
 
 function s(id: string): InkStroke {
-  return { id, tool: 'pen', color: '#5c5959', width: 4, points: [[0, 0, 0.5]], d: 'M 0 0 Q 0 0 0 0 Z', colorName: 'gray' }
+  return { id, tool: 'pen', color: '#71717a', width: 4, points: [[0, 0, 0.5]], d: 'M 0 0 Q 0 0 0 0 Z', colorName: 'gray' }
 }
 
 function deferred<T>() {

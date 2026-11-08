@@ -49,7 +49,7 @@ function line(pressure: number): [number, number, number][] {
 }
 
 function stroke(id: string, points: [number, number][]): InkStroke {
-  return { id, tool: 'pen', color: '#5c5959', width: 2, points: points.map(([x, y]) => [x, y, 0.5]), d: 'M 0 0 Z' }
+  return { id, tool: 'pen', color: '#71717a', width: 2, points: points.map(([x, y]) => [x, y, 0.5]), d: 'M 0 0 Z' }
 }
 
 function fakePointer(init: Partial<PointerEvent> & { coalesced?: Partial<PointerEvent>[] }): PointerEvent {
@@ -100,13 +100,13 @@ describe('ink model', () => {
     for (let i = 0; i < MAX_STROKE_POINTS; i++) {
       pts.push([1000 + Math.sin(i / 7) * 300 + i * 0.05, 2000 + Math.cos(i / 11) * 200, 0.3 + 0.4 * Math.abs(Math.sin(i / 5))])
     }
-    const whole = finishStroke('X', 'pen', '#5c5959', 4, pts, 'pen')
+    const whole = finishStroke('X', 'pen', '#71717a', 4, pts, 'pen')
     expect(new TextEncoder().encode(whole.d).length).toBeGreaterThan(1_000_000) // why splitting is needed
     const pieces = splitPoints(pts)
     expect(pieces.length).toBeGreaterThan(1)
     for (const piece of pieces) {
       expect(piece.length).toBeLessThanOrEqual(SPLIT_STROKE_POINTS)
-      const d = finishStroke('Y', 'pen', '#5c5959', 4, piece, 'pen').d
+      const d = finishStroke('Y', 'pen', '#71717a', 4, piece, 'pen').d
       expect(new TextEncoder().encode(d).length).toBeLessThan(750_000)
     }
     // Consecutive pieces share their joining sample, so the line stays unbroken.
@@ -119,7 +119,7 @@ describe('ink model', () => {
     expect(HIGHLIGHTER_WIDTHS).toEqual([16, 32])
     expect(HIGHLIGHTER_OPACITY).toBe(0.35)
     expect(ERASER_RADIUS_PX).toBe(10)
-    expect(DEFAULT_INK).toEqual({ tool: 'pen', color: '#5c5959', width: 4 })
+    expect(DEFAULT_INK).toEqual({ tool: 'pen', color: '#71717a', width: 4 })
   })
 
   test('higher pressure gives a wider outline', () => {
@@ -173,7 +173,7 @@ describe('ink model', () => {
   })
 
   test('svg path charset matches the server rule', () => {
-    const s = finishStroke('s1', 'pen', '#3f80eb', 4, [
+    const s = finishStroke('s1', 'pen', '#3b82f6', 4, [
       [-10.123456, 5.5, 0.2],
       [-3.3333, 7.77777, 0.5],
       [12.5, -1e-7, 1],
@@ -239,9 +239,9 @@ describe('ink model', () => {
     }
     expect(INK_COLORS.map((c) => c.name)).toEqual([...THEME_COLORS])
     for (const c of INK_COLORS) expect(c.hex, c.name).toBe(token(`--line-${c.name}`))
-    expect(INK_COLORS.find((c) => c.name === 'gray')?.hex).toBe('#5c5959')
-    expect(INK_COLORS.find((c) => c.name === 'blue')?.hex).toBe('#3f80eb')
-    expect(INK_COLORS.find((c) => c.name === 'yellow')?.hex).toBe('#daaa14')
+    expect(INK_COLORS.find((c) => c.name === 'gray')?.hex).toBe('#71717a')
+    expect(INK_COLORS.find((c) => c.name === 'blue')?.hex).toBe('#3b82f6')
+    expect(INK_COLORS.find((c) => c.name === 'yellow')?.hex).toBe('#eab308')
   })
 
   test('tilt scales pressure', () => {

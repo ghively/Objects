@@ -91,7 +91,7 @@ function setup(props: Partial<InkLayerProps> = {}) {
 }
 
 function stroke(id: string, pts: [number, number][]): InkStroke {
-  return finishStroke(id, 'pen', '#5c5959', 4, pts.map(([x, y]) => [x, y, 0.5]), 'mouse')
+  return finishStroke(id, 'pen', '#71717a', 4, pts.map(([x, y]) => [x, y, 0.5]), 'mouse')
 }
 
 describe('InkLayer', () => {
@@ -201,11 +201,11 @@ describe('InkLayer', () => {
   })
 
   test('highlighter strokes render with the highlighter opacity', () => {
-    const hl = finishStroke('h1', 'highlighter', '#daaa14', 16, [[0, 0, 0.5], [50, 0, 0.5]], 'mouse')
+    const hl = finishStroke('h1', 'highlighter', '#eab308', 16, [[0, 0, 0.5], [50, 0, 0.5]], 'mouse')
     const { container } = setup({ strokes: [stroke('a', [[0, 0], [10, 10]]), hl] })
     const paths = container.querySelectorAll('[data-ink-layer] path[data-stroke-id]')
     expect(paths).toHaveLength(2)
-    expect(paths[1].getAttribute('fill')).toBe('#daaa14')
+    expect(paths[1].getAttribute('fill')).toBe('#eab308')
     expect(paths[1].getAttribute('fill-opacity')).toBe('0.35')
     expect(paths[0].getAttribute('fill-opacity')).toBeNull()
   })

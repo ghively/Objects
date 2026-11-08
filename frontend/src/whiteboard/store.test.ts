@@ -4,7 +4,7 @@ import { createBoardStore } from './store'
 import { board, edge, node, textBlock } from './test/boards'
 import type { InkStroke } from './plugin'
 
-const stroke = (id: string): InkStroke => ({ id, tool: 'pen', color: '#5c5959', width: 4, points: [[0, 0, 0.5]], d: 'M0 0Z' })
+const stroke = (id: string): InkStroke => ({ id, tool: 'pen', color: '#71717a', width: 4, points: [[0, 0, 0.5]], d: 'M0 0Z' })
 
 function storeWith(b = board()) {
   return createBoardStore({ doc: { board: b, strokes: [] } })

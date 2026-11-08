@@ -58,7 +58,7 @@ vi.mock('./chrome', () => ({
 }))
 
 const PATH = 'Whiteboards/Board.md'
-const stroke = (id: string): InkStroke => ({ id, tool: 'pen', color: '#5c5959', width: 4, points: [[0, 0, 0.5]], d: 'M0 0Z' })
+const stroke = (id: string): InkStroke => ({ id, tool: 'pen', color: '#71717a', width: 4, points: [[0, 0, 0.5]], d: 'M0 0Z' })
 
 function fakeHost(): WhiteboardHost {
   return {

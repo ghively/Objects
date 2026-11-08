@@ -51,7 +51,7 @@ describe('no raw colours', () => {
 
   test('the literal pattern catches each kind and spares ids', () => {
     const hits = (s: string) => [...s.matchAll(LITERAL)].map((m) => m[0])
-    expect(hits('color: #a7a2a1; border: #fff; x: #4494f748')).toEqual(['#a7a2a1', '#fff', '#4494f748'])
+    expect(hits('color: #1a2b3c; border: #fff; x: #33669980')).toEqual(['#1a2b3c', '#fff', '#33669980'])
     expect(hits('rgb(1 2 3) rgba(0,0,0,0) hsl(1 2% 3%) oklch(1 0 0)')).toEqual(['rgb(', 'rgba(', 'hsl(', 'oklch('])
     expect(hits('href="#root" #section-2 #add-button')).toEqual([])
   })

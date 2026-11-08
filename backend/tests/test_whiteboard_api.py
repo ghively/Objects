@@ -40,7 +40,7 @@ STROKES = [
     {
         "id": "s1",
         "tool": "pen",
-        "color": "#3f80eb",
+        "color": "#3b82f6",
         "width": 4,
         "points": [[10.5, 20.25, 0.2], [30, 40, 0.555], [50, 60, 1]],
         "d": "M 10 20 L 30 40 L 50 60 Z",
@@ -48,7 +48,7 @@ STROKES = [
     {
         "id": "s2",
         "tool": "highlighter",
-        "color": "#daaa14",
+        "color": "#eab308",
         "width": 16,
         "points": [[100, 100, 0.5], [200, 120, 0.5]],
         "d": "M100,92L200,112L200,128L100,108Z",

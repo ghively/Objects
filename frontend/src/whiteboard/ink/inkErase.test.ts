@@ -4,7 +4,7 @@ import { finishStroke, hitStrokes } from './inkModel'
 import type { InkStroke } from './types'
 
 function stroke(id: string, pts: [number, number][]): InkStroke {
-  return finishStroke(id, 'pen', '#3f80eb', 4, pts.map(([x, y]) => [x, y, 0.5]), 'mouse')
+  return finishStroke(id, 'pen', '#3b82f6', 4, pts.map(([x, y]) => [x, y, 0.5]), 'mouse')
 }
 
 function ids() {
@@ -27,9 +27,9 @@ describe('erasePartially', () => {
     expect(left.points[0]).toEqual([0, 0, 0.5])
     expect(right.points[right.points.length - 1]).toEqual([100, 0, 0.5])
     expect(left.tool).toBe('pen')
-    expect(left.color).toBe('#3f80eb')
+    expect(left.color).toBe('#3b82f6')
     expect(left.colorName).toBe('blue')
-    expect(left.d).toBe(finishStroke('new1', 'pen', '#3f80eb', 4, left.points, 'mouse').d)
+    expect(left.d).toBe(finishStroke('new1', 'pen', '#3b82f6', 4, left.points, 'mouse').d)
     // The pieces no longer pass under the eraser.
     expect(hitStrokes([left, right], [[50, -20, 0.5], [50, 20, 0.5]], 4.9).size).toBe(0)
   })

@@ -18,7 +18,7 @@ describe('graphStyle', () => {
     expect(nodeColor({ type: 'person', tag: true }, types, 'bg-rose')).toBe('rose')
     expect(nodeColor({ type: 'person', tag: true }, types, null)).toBe('teal')
     // jsdom has no stylesheet: the fallback line colours are concrete.
-    expect(colorValue('teal')).toBe('#1dad9d')
+    expect(colorValue('teal')).toBe('#14b8a6')
   })
 
   test('edge kinds are links and tag edges only (no synthesized indirect edges)', () => {

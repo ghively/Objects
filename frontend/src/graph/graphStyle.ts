@@ -31,24 +31,24 @@ export function nodeColor(
 
 /** The theme colours' line values (`--line-<c>` in tokens.css), for when CSS can't be read. */
 const FALLBACK: Record<ThemeColor, string> = {
-  gray: '#5c5959',
-  rose: '#ea4561',
-  pink: '#e34d97',
-  fuchsia: '#d14be5',
-  purple: '#a558ee',
-  violet: '#8a5fed',
-  indigo: '#6568e8',
-  blue: '#3f80eb',
-  sky: '#199dd9',
-  cyan: '#11a9c3',
-  teal: '#1dad9d',
-  emerald: '#19ae7d',
-  green: '#2bbb60',
-  lime: '#7fbe1f',
-  yellow: '#daaa14',
-  amber: '#e89a17',
-  orange: '#ec731f',
-  red: '#e54a4a',
+  gray: '#71717a',
+  rose: '#f43f5e',
+  pink: '#ec4899',
+  fuchsia: '#d946ef',
+  purple: '#a855f7',
+  violet: '#8b5cf6',
+  indigo: '#6366f1',
+  blue: '#3b82f6',
+  sky: '#0ea5e9',
+  cyan: '#06b6d4',
+  teal: '#14b8a6',
+  emerald: '#10b981',
+  green: '#22c55e',
+  lime: '#84cc16',
+  yellow: '#eab308',
+  amber: '#f59e0b',
+  orange: '#f97316',
+  red: '#ef4444',
 }
 
 function cssVar(name: string): string {
@@ -69,8 +69,8 @@ export function colorValue(c: ThemeColor): string {
 export function canvasColors(): { label: string; dim: string; edge: string } {
   return {
     label: cssVar('--text') || '#f4f4f5',
-    dim: cssVar('--border-subtle') || '#2d2c31',
-    edge: '#4a494f',
+    dim: cssVar('--border-subtle') || '#27272a',
+    edge: '#52525b',
   }
 }
 
