@@ -45,6 +45,7 @@ import { invalidateLinkIndex, typeOf, useLinkIndex, ensureLinkIndex } from '@/li
 import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
 import { formatKeys, isEditableTarget, keysFor, matches } from '@/lib/shortcuts'
 import { cn } from '@/lib/utils'
+import { revealMenuLabel } from '@/lib/platformText'
 import { canGoBack, usePeek, useTabs, type Target } from '@/nav/tabs'
 import { ReferencesSection } from '@/references/ReferencesSection'
 import { byPluralName, TypeChip } from '@/shell/Sidebar'
@@ -1037,7 +1038,7 @@ export function ObjectView({
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void api.reveal(path).catch(() => undefined)}>
               <Icon name="ph-folder-open" size={14} />
-              Reveal in Explorer
+              {revealMenuLabel()}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => useFind.getState().open(path)}>
               <Icon name="ph-magnifying-glass" size={14} />

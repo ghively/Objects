@@ -91,7 +91,9 @@ describe('TrashView', () => {
     const list = await screen.findByRole('list', { name: 'Trash' })
     expect(within(list).getAllByRole('listitem').map((li) => li.getAttribute('aria-label'))).toEqual(['Note', 'Book'])
     expect(within(list).getByRole('listitem', { name: 'Book' })).toHaveTextContent('3 objects')
-    expect(screen.getByText(/30 days/)).toHaveTextContent(/not the Windows Recycle Bin/)
+    const info = screen.getByText(/30 days/)
+    expect(info).not.toHaveTextContent(/Windows/)
+    expect(info).toHaveTextContent('Object types and collections cannot be restored completely.')
   })
 
   test('test Empty Trash requires typing "Delete"', async () => {

@@ -1,5 +1,5 @@
 /**
- * The app's own Trash (in `.object/trash/`, not the Windows Recycle Bin): deleted objects and
+ * The app's own Trash (in `.object/trash/`, separate from the computer's): deleted objects and
  * types (a type shows its object count), "Restore", "Delete permanently", and "Empty Trash", which
  * asks the user to type "Delete". Entries are removed after 30 days.
  * M14: deleted automations are listed too ("Automation"), restored under their id.
@@ -24,7 +24,7 @@ import { invalidateLinkIndex } from '@/links/linkIndex'
 
 export const TRASH_TEXT = {
   heading: 'Trash',
-  info: 'Objects and object types are kept in the Trash for 30 days and are then removed completely. This is the app\'s Trash, not the Windows Recycle Bin.',
+  info: 'Objects and object types are kept in the Trash for 30 days and are then removed completely. Object types and collections cannot be restored completely. This is Object\'s own Trash, separate from your computer\'s.',
   empty: 'Trash is empty',
   restore: 'Restore',
   deletePermanently: 'Delete permanently',
