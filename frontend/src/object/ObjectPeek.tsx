@@ -1,10 +1,79 @@
+import { useEffect, useState } from 'react'
+import { api } from '@/api/client'
+import { ReviewedButton } from '@/calendar/DayHeader'
+import { useCalendar } from '@/calendar/useCalendar'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Icon } from '@/components/Icon'
-import { stemOf, summaryOf, useLinkIndex } from '@/links/linkIndex'
+import { stemOf, summaryOf, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { useIsWhiteboard } from '@/whiteboard/isWhiteboard'
+import { isDailyNoteType } from './ObjectHeader'
 import { ObjectView } from './ObjectView'
 import { WhiteboardPageLazy } from './WhiteboardLazy'
+
+export const PEEK_TEXT = {
+  /** Catalog section 5: a daily note's peek adds a "Calendar" button (jump to that day). */
+  calendar: 'Calendar',
+}
+
+const DAY_PREFIX = /^(\d{4}-\d{2}-\d{2})/
+
+/** The day a daily note is for: its `date` property, else its title, else its file stem (as the server). */
+function dailyNoteDay(frontmatter: Record<string, unknown>, title: string, path: string): string | null {
+  for (const v of [frontmatter.date, frontmatter.title, title, stemOf(path)]) {
+    if (typeof v !== 'string') continue
+    const m = DAY_PREFIX.exec(v.trim())
+    if (m) return m[1]
+  }
+  return null
+}
+
+/**
+ * A daily note's peek header controls: the Reviewed checkbox (the calendar's own) and "Calendar",
+ * which opens the calendar's Day view on that day. `version` is the one the peek's view holds, so
+ * the Reviewed write never races a body save; the note's `reviewed` and day are read once per version.
+ */
+function DailyNoteControls({ path, version, onDismiss }: { path: string; version: string | undefined; onDismiss(): void }) {
+  const [note, setNote] = useState<{ path: string; reviewed: boolean; day: string | null } | null>(null)
+  useEffect(() => {
+    let live = true
+    api
+      .object(path)
+      .then((d) => {
+        if (!live) return
+        setNote({ path, reviewed: d.frontmatter.reviewed === true, day: dailyNoteDay(d.frontmatter, d.summary.title, path) })
+      })
+      .catch(() => {
+        /* the view shows the load's error */
+      })
+    return () => {
+      live = false
+    }
+  }, [path, version])
+  if (!note || note.path !== path) return null
+  const openCalendar = () => {
+    if (note.day) {
+      const cal = useCalendar.getState()
+      cal.setView('day')
+      cal.setAnchor(note.day)
+    }
+    useTabs.getState().open({ kind: 'calendar' })
+    onDismiss()
+  }
+  return (
+    <div className="absolute top-3.5 left-1/2 z-10 flex h-10 -translate-x-1/2 items-center gap-0.5 rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] px-1">
+      <ReviewedButton note={note} version={version} />
+      <button
+        type="button"
+        onClick={openCalendar}
+        className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-[12px] font-medium text-fg transition-colors hover:bg-hover"
+      >
+        <Icon name="ph-calendar-blank" size={14} />
+        {PEEK_TEXT.calendar}
+      </button>
+    </div>
+  )
+}
 
 function Pager() {
   const { index, list, next, prev } = usePeek()
@@ -40,7 +109,11 @@ export function ObjectPeek() {
   const close = usePeek((s) => s.close)
   useLinkIndex((s) => s.revision)
   const whiteboard = useIsWhiteboard(path)
-  const title = path ? (summaryOf(path)?.title ?? stemOf(path)) : ''
+  const summary = path ? summaryOf(path) : undefined
+  const title = path ? (summary?.title ?? stemOf(path)) : ''
+  const dailyNote = !!summary && isDailyNoteType(typeOf(summary.type), summary.type)
+  // The version the peek's view adopts (load, saves, reloads); reset with the path.
+  const [version, setVersion] = useState<{ path: string; version: string } | null>(null)
 
   return (
     <Dialog open={path !== null} onOpenChange={(open) => !open && close()}>
@@ -68,6 +141,7 @@ export function ObjectPeek() {
               key={path}
               path={path}
               mode="peek"
+              onVersion={(v) => setVersion({ path, version: v })}
               onExpand={() => {
                 useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
                 close()
@@ -76,6 +150,9 @@ export function ObjectPeek() {
               footer={<Pager />}
             />
           ))}
+        {path && dailyNote && !whiteboard && (
+          <DailyNoteControls path={path} version={version?.path === path ? version.version : undefined} onDismiss={close} />
+        )}
       </DialogContent>
     </Dialog>
   )

@@ -9,6 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import { useCalendar } from '@/calendar/useCalendar'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPeek } from './ObjectPeek'
@@ -27,7 +28,12 @@ function typeDef(id: string, name: string, pluralName: string, color: string): T
   })
 }
 
-const TYPES = [typeDef('person', 'Person', 'People', 'orange'), typeDef('page', 'Page', 'Pages', 'pink')]
+const TYPES = [
+  typeDef('person', 'Person', 'People', 'orange'),
+  typeDef('page', 'Page', 'Pages', 'pink'),
+  typeDef('dailynote', 'DailyNote', 'Daily Notes', 'blue'),
+]
+const DAILY_PATH = 'Daily Notes/2026-11-08.md'
 
 function summary(path: string, title: string, type = 'page'): ObjectSummary {
   return objectSummary({ path, type, title })
@@ -40,11 +46,20 @@ const OBJECTS = [
   summary('Pages/Four.md', 'Four'),
   summary('Pages/Five.md', 'Five'),
   summary('People/Ada Lovelace.md', 'Ada Lovelace', 'person'),
+  summary(DAILY_PATH, '2026-11-08', 'dailynote'),
 ]
 const LIST = OBJECTS.slice(0, 5).map((o) => o.path)
 
 function detail(path: string): ObjectDetail {
   const s = OBJECTS.find((o) => o.path === path)!
+  if (s.type === 'dailynote') {
+    return objectDetail({
+      summary: s,
+      frontmatter: { type: 'DailyNote', title: s.title, date: '2026-11-08', reviewed: false },
+      body: '\nA day.\n',
+      version: 'v-daily',
+    })
+  }
   return objectDetail({
     summary: { ...s, tags: ['infra'] },
     frontmatter: { type: s.type, title: s.title, tags: ['infra'] },
@@ -57,6 +72,7 @@ beforeEach(() => {
   localStorage.clear()
   useTabs.getState().reset()
   usePeek.getState().close()
+  useCalendar.setState({ view: 'month', anchor: '2020-01-01' })
   resetLinkIndex()
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
   mocked.space.mockResolvedValue({ name: 's', root: '/s', types: TYPES } satisfies SpaceInfo)
@@ -138,5 +154,32 @@ describe('ObjectPeek', () => {
     const missing = await chip(screen.getByRole('dialog'), 'Nobody Here').catch(() => null)
     if (missing) fireEvent.click(missing)
     expect(usePeek.getState().path).toBe(before)
+  })
+
+  // Catalog section 5: a daily note's peek adds a Reviewed checkbox and a "Calendar" button (jump to that day).
+  test('a daily note peek shows Reviewed and Calendar; Calendar opens the calendar on that day', async () => {
+    usePeek.getState().peek(DAILY_PATH, [DAILY_PATH])
+    render(<ObjectPeek />)
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByRole('heading', { level: 1, name: '2026-11-08' })
+
+    const reviewed = await within(dialog).findByRole('checkbox', { name: 'Reviewed' })
+    expect(reviewed).toHaveAttribute('aria-checked', 'false')
+    await waitFor(() => expect(reviewed).toBeEnabled())
+    fireEvent.click(reviewed)
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith(DAILY_PATH, { reviewed: true }, 'v-daily'))
+    expect(reviewed).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Calendar' }))
+    expect(useCalendar.getState().anchor).toBe('2026-11-08')
+    expect(useCalendar.getState().view).toBe('day')
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'calendar' })
+    expect(usePeek.getState().path).toBeNull()
+  })
+
+  test('a page peek shows neither Reviewed nor Calendar', async () => {
+    const dialog = await openPeekAt(0)
+    expect(within(dialog).queryByRole('checkbox', { name: 'Reviewed' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: 'Calendar' })).toBeNull()
   })
 })
