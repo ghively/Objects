@@ -399,6 +399,22 @@ def test_batch_records_and_move_to_trash(client, tmp_path):
     assert client.post("/api/import/batches/nope/trash").status_code == 404
 
 
+def test_report_is_stamped_in_the_spaces_time_zone(space_dir, tmp_path):
+    """Sweep 2026-11-08 (work-import 9): the "Imported:" line used the server's local zone; every
+    other stamp in Object uses the space's time zone."""
+    from datetime import UTC, datetime, timedelta, timezone
+
+    sp = Space(space_dir)
+    sp.tz = timezone(timedelta(hours=5, minutes=45))  # a zone no server runs in
+    sp.clock = lambda: datetime(2026, 11, 8, 3, 30, tzinfo=UTC)
+    vault = copy_fixture("import-obsidian", tmp_path / "Vault")
+    with TestClient(create_app(sp, watch=False)) as c:
+        c.space_root = space_dir  # type: ignore[attr-defined]
+        res = run(c, vault)["result"]
+    report = (space_dir / res["reportPath"]).read_text(encoding="utf-8")
+    assert "- Imported: 2026-11-08 09:15\n" in report
+
+
 def test_batch_trash_leaves_updated_objects(client, tmp_path):
     src = tmp_path / "S"
     src.mkdir()

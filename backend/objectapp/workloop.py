@@ -40,15 +40,16 @@ from .workagentmodel import (
     WorkEntryState,
 )
 from .workbody import one_line
+from .workfields import is_work_type
 from .workprompts import entry_prompt
 from .workqueue import QueueStore, auto_run_key, plan_for_notice
 from .workread import NotWorkItem
 from .workrules import IllegalMove
-from .workservice import Actor, StepChanged, add_work_listener
+from .workservice import Actor, StepChanged, add_work_listener, in_work_write
 
 if TYPE_CHECKING:
     from .headless import HeadlessResult
-    from .space import Space
+    from .space import Space, SpaceChange
     from .workservice import WorkNotice, WorkService
 
 log = logging.getLogger(__name__)
@@ -74,6 +75,10 @@ TEST_TIMEOUT_ENV = "OBJECT_TEST_WORK_TIMEOUT"
 """Seconds; honoured only while OBJECT_FAKE_NOTIFY_FILE is set (M14's test-hook rule)."""
 CAPTURE_UNREADABLE = "This brain dump couldn't be read. Try again."
 CHANGED_409 = "This step changed. Look again."
+GONE_409 = "This item is gone or isn't a work item any more."
+_RETRY_409 = {ALREADY_FILED: ALREADY_FILED, GONE: GONE_409}
+"""What Retry answers for the pre-run check's reason: a brain dump filed meanwhile and a gone item
+say so; a changed step says `CHANGED_409`."""
 
 _loops: dict[str, WorkLoop] = {}
 _loops_lock = threading.Lock()
@@ -148,19 +153,20 @@ def outcome(entry: dict, result: HeadlessResult, notices: list[WorkNotice], file
     """(state, result, reason) of a finished run. Pure."""
     if withdrawn:
         return "withdrawn", None, WITHDRAWN_REDECIDED
-    if timed_out:
-        return "failed", None, TIMED_OUT
-    if result.state == "stopped":
-        return "failed", None, STOPPED
     kind = entry.get("kind")
-    if result.state == "error":
+    if timed_out or result.state in ("stopped", "error"):
         if kind in ("approve", "run"):
-            # The agent may have completed the step through the tools before the CLI erred: then
-            # the step is done, and a failed (retryable) entry would only answer 409 on Retry.
+            # The agent may have completed the step through the tools before the CLI erred, idled
+            # past the limit or was stopped: then the step is done, and a failed (retryable) entry
+            # would only answer 409 on Retry.
             mine = [n for n in notices if n.step_id == entry.get("stepId") and n.by.role == "agent"
                     and n.event in ("complete", "done", "fail")]
             if mine and mine[-1].event in ("complete", "done"):
                 return "done", one_line(mine[-1].text, 500), None
+        if timed_out:
+            return "failed", None, TIMED_OUT
+        if result.state == "stopped":
+            return "failed", None, STOPPED
         return "failed", None, one_line(result.error or "The run failed.", 500)
     if kind in ("approve", "run"):
         mine = [n for n in notices if n.step_id == entry.get("stepId") and n.by.role == "agent"]
@@ -205,6 +211,9 @@ class WorkLoop:
         self._notices: list[WorkNotice] = []
         self._cap_lock = threading.RLock()
         self._queued: set[tuple[str, str]] = set()
+        self._changed_lock = threading.Lock()
+        self._changed: set[str] = set()  # work items written since the worker last looked (any write)
+        self._unsubscribe_space: Callable[[], None] | None = None
         with _loops_lock:
             _loops[self._key(space)] = self
 
@@ -219,6 +228,7 @@ class WorkLoop:
             return
         self._quit.clear()
         self._unsubscribe = add_work_listener(self.on_notice)
+        self._unsubscribe_space = self.space.add_listener(self._on_space_change)
         self._thread = threading.Thread(target=self._work, name="work-loop", daemon=True)
         self._thread.start()
 
@@ -226,6 +236,9 @@ class WorkLoop:
         if self._unsubscribe is not None:
             self._unsubscribe()
             self._unsubscribe = None
+        if self._unsubscribe_space is not None:
+            self._unsubscribe_space()
+            self._unsubscribe_space = None
         self._quit.set()
         with self._lock:
             for flag in self._stops.values():
@@ -306,6 +319,38 @@ class WorkLoop:
             self._auto_check(notice.path)
         except Exception:
             log.exception("Auto-run check failed for %s", notice.path)
+
+    def _on_space_change(self, change: SpaceChange) -> None:
+        """`Space.add_listener`: a work item written any way (a status set back in the property
+        editor, an edit outside the app) is looked at again by the worker. Runs under the space
+        lock, so it only records the path and wakes the worker; the look happens there."""
+        path = change.path
+        if change.kind != "object" or not path or in_work_write():
+            return  # a work service write is heard as the `WorkNotice` that follows it
+        try:
+            summary = self.space.get(path)
+        except KeyError:
+            return  # gone: nothing to queue
+        if not is_work_type(self.space.type_by_id(summary.type)):
+            return
+        with self._changed_lock:
+            self._changed.add(path)
+        self.wake()
+
+    def _requeue_changed(self) -> None:
+        """Queue the approved step of each work item written since the last pass whose entry was
+        withdrawn while the step stayed approved: closing an item withdraws its approved step, and
+        reopening it by its status is a plain property write that raises no work notice."""
+        with self._changed_lock:
+            paths = sorted(self._changed)
+            self._changed.clear()
+        for path in paths:
+            try:
+                item = self._item(path)
+                if item is not None and not item.get("done"):
+                    self._requeue_approved(item)
+            except Exception:
+                log.exception("Looking again at %s failed", path)
 
     # -- auto-run ----------------------------------------------------------------------------
 
@@ -432,9 +477,9 @@ class WorkLoop:
             raise QueueRefused(422, NOT_RETRYABLE)
         item = self._item(e.get("path"))
         cap = self._capture(e.get("capturePath"))
-        verdict, _p, _r = precheck(e, item, cap, self.clock())
+        verdict, _p, reason = precheck(e, item, cap, self.clock())
         if verdict == "withdraw":
-            raise QueueRefused(409, CHANGED_409)
+            raise QueueRefused(409, _RETRY_409.get(reason or "", CHANGED_409))
         fields = {k: e.get(k) for k in (
             "kind", "path", "objectId", "title", "stepId", "stepN", "stepKind", "stepText", "text",
             "capturePath", "notBefore", "auto", "by")}
@@ -480,6 +525,7 @@ class WorkLoop:
                     self.scan_unqueued_captures()
                 except Exception:
                     log.exception("Scanning for unqueued brain dumps failed")
+                self._requeue_changed()
                 ran = self._pass()
             except Exception:
                 log.exception("The work loop failed")

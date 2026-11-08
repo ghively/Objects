@@ -174,6 +174,64 @@ def test_zip_members_are_scanned(tmp_path):
     assert scan_tree(make_zip(tmp_path), ["Notes/bad.md"]).findings == {}
 
 
+def make_notion_zip(tmp_path: Path, name: str = "Export-abc.zip") -> Path:
+    """Notion's multi-part export: a zip holding ``Export-abc-Part-1.zip`` at its top level."""
+    import io
+
+    part = io.BytesIO()
+    with zipfile.ZipFile(part, "w") as f:
+        f.writestr("Notes/bad.md", f"# bad\n\nkey {AWS}\n")
+        deeper = io.BytesIO()
+        with zipfile.ZipFile(deeper, "w") as d:
+            d.writestr("hidden.md", f"key {AWS}\n")
+        f.writestr("Notes/deeper.zip", deeper.getvalue())  # two levels down: the lister skips it too
+    z = tmp_path / name
+    with zipfile.ZipFile(z, "w") as f:
+        f.writestr("Export-abc-Part-1.zip", part.getvalue())
+    return z
+
+
+def test_members_of_a_top_level_nested_zip_are_scanned(tmp_path):
+    """Sweep 2026-11-08 (work-import 1): the lister reads a zip at the top level of the source one
+    level deep, so the scan must read the same files, or a secret inside a Notion part is imported
+    plain and handed to the filing agent."""
+    report = scan_tree(make_notion_zip(tmp_path))
+    assert list(report.findings) == ["Notes/bad.md"]
+    assert [(f.kind, f.line) for f in report.findings["Notes/bad.md"]] == [("api-key", 3)]
+    assert report.scanned == 1 and report.unscanned == 1  # the deeper zip is not opened
+    assert scan_tree(make_notion_zip(tmp_path), ["Notes"]).findings == {}
+
+
+def test_a_zip_at_the_top_of_a_folder_source_is_scanned_one_level_deep(tmp_path):
+    folder = tmp_path / "folder"
+    (folder / "sub").mkdir(parents=True)
+    (folder / "plain.md").write_text("# plain\n\nnothing\n", encoding="utf-8")
+    with zipfile.ZipFile(folder / "part.zip", "w") as f:
+        f.writestr("Notes/bad.md", f"key {AWS}\n")
+        f.writestr("Notes/ok.md", "fine\n")
+    # a zip inside a zip, and a zip below the top level: both skipped by the lister (nestedArchive)
+    make_notion_zip(folder, "Export-abc.zip")
+    with zipfile.ZipFile(folder / "sub" / "deep.zip", "w") as f:
+        f.writestr("deep.md", f"key {AWS}\n")
+    report = scan_tree(folder)
+    assert list(report.findings) == ["Notes/bad.md"]
+    assert report.scanned == 3  # plain.md and part.zip's two members
+    assert report.unscanned == 2  # Export-abc-Part-1.zip (one level too deep) and sub/deep.zip
+    assert scan_tree(folder, ["Notes/bad.md"]).findings == {}
+
+
+def test_a_single_top_folder_in_a_zip_is_stripped_as_the_lister_does(tmp_path):
+    z = tmp_path / "one-top.zip"
+    with zipfile.ZipFile(z, "w") as f:
+        f.writestr("Export/Notes/bad.md", f"key {AWS}\n")
+        f.writestr("Export/Notes/ok.md", "fine\n")
+    assert list(scan_tree(z).findings) == ["Notes/bad.md"]
+    from objectapp.importers.source import open_source
+
+    with open_source(z) as src:
+        assert sorted(src.files) == ["Notes/bad.md", "Notes/ok.md"]
+
+
 def test_a_binary_file_is_not_reported_as_scanned(tmp_path):
     p = tmp_path / "x.bin"
     p.write_bytes(b"\x00\x01\x02")
@@ -196,6 +254,22 @@ def test_draft_and_import_of_a_zip_use_the_scan(client, tmp_path):
     from objectapp.importers import batches
 
     assert "Notes/bad.md" in batches.load_scan(root, result["batch"])["findings"]
+
+
+def test_draft_and_import_of_a_notion_multi_part_zip_use_the_scan(client, tmp_path):
+    from test_m27_agent import do_import
+
+    z = make_notion_zip(tmp_path)
+    res = client.post("/api/import/batches", json={"path": str(z)}).json()
+    assert list(res["scan"]["findings"]) == ["Notes/bad.md"]
+    result = do_import(client, z)
+    root = client.space_root
+    bad = next(p for p in root.rglob("bad.md"))
+    assert _fm(root, bad.relative_to(root).as_posix())["excludeFromAI"] is True
+    from objectapp.importers import batches
+
+    stored = batches.load_scan(root, result["batch"])
+    assert "Notes/bad.md" in stored["findings"] and stored["choices"]["excludeFromAi"] == ["Notes/bad.md"]
 
 
 # -- 11. import_scan never overwrites a finished batch's scan --------------------------------------

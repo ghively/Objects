@@ -483,6 +483,22 @@ def test_unreadable_capture_fails_and_non_new_capture_withdraws(env: Env) -> Non
     env.idle()
     [e] = [x for x in env.entries() if x.get("capturePath") == "Captures/nope.md"]
     assert e["state"] == "failed" and e["retryable"]
+    # Sweep 2026-11-08 (work-import 8): Retry of a failed filing whose brain dump was marked filed
+    # meanwhile says so, not "This step changed."
+    from objectapp import captures
+    from objectapp.workagentmodel import QueueRefused
+
+    cap = env.post("/api/work/captures", text="never filed", fromView="now")["capture"]
+    env.idle()
+    [failed] = [x for x in env.entries() if x.get("capturePath") == cap["path"]]
+    assert failed["state"] == "failed" and failed["reason"] == NOT_FILED
+    filed = captures.set_status(env.service.space, cap["path"], "filed", base_version=cap["version"])
+    assert filed["status"] == "filed"
+    with pytest.raises(QueueRefused) as refused:
+        env.loop.retry(failed["id"])
+    assert (refused.value.status, str(refused.value)) == (409, ALREADY_FILED)
+    res = httpx.post(f"http://127.0.0.1:{env.port}/api/work/agent/retry", json={"id": failed["id"]})
+    assert res.status_code == 409 and res.json()["detail"] == ALREADY_FILED
 
 
 def test_waiting_entry_does_not_starve_a_later_due_one(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -610,3 +626,67 @@ def test_a_run_whose_cli_errs_after_completing_the_step_is_done() -> None:
         "failed", None, "CLI exited 1")
     assert outcome(entry, died, [note("complete"), note("fail", text="no")], False, timed_out=False,
                    withdrawn=False)[0] == "failed"
+
+
+def test_a_run_that_completed_its_step_and_then_timed_out_or_was_stopped_is_done() -> None:
+    """Sweep 2026-11-08 (work-import 5): the same gap for a run that completed the step and then
+    idled past the limit, or was stopped: the entry was failed and retryable, and Retry answered 409."""
+    from objectapp.headless import HeadlessResult
+    from objectapp.workloop import outcome
+    from objectapp.workservice import WorkNotice
+
+    def note(event: str, step: str = STEP, text: str = "Spooler restarted.") -> WorkNotice:
+        return WorkNotice(path=P, object_id="o1", event=event, step_id=step, n=2, kind="approve",
+                          step_text="Restart", before="approved", after="done", by=Actor("agent", "Work"),
+                          text=text, not_before=None, at=NOW, version="v")
+
+    stopped = HeadlessResult(chat_id="c", state="stopped", text="", session_id=None, model=None, error=None)
+    for kind in ("approve", "run"):
+        entry = {"kind": kind, "stepId": STEP}
+        assert outcome(entry, stopped, [note("complete")], False, timed_out=True, withdrawn=False) == (
+            "done", "Spooler restarted.", None)
+        assert outcome(entry, stopped, [note("done")], False, timed_out=False, withdrawn=False) == (
+            "done", "Spooler restarted.", None)
+        # nothing completed for this step: still failed with the time-out or the stop
+        assert outcome(entry, stopped, [note("complete", step="other")], False, timed_out=True,
+                       withdrawn=False) == ("failed", None, TIMED_OUT)
+        assert outcome(entry, stopped, [], False, timed_out=False, withdrawn=False) == ("failed", None, STOPPED)
+        assert outcome(entry, stopped, [note("complete"), note("fail", text="no")], False, timed_out=True,
+                       withdrawn=False) == ("failed", None, TIMED_OUT)
+    # a withdrawn run stays withdrawn, and a stopped filing run stays failed
+    assert outcome({"kind": "approve", "stepId": STEP}, stopped, [note("complete")], False, timed_out=True,
+                   withdrawn=True)[0] == "withdrawn"
+    assert outcome({"kind": "capture"}, stopped, [], False, timed_out=True, withdrawn=False) == (
+        "failed", None, TIMED_OUT)
+
+
+def test_an_approved_step_is_queued_again_when_its_item_is_reopened_by_status(
+    env: Env, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sweep 2026-11-08 (work-import 3): closing the item withdrew the approved step's entry; reopening
+    it the only way the UI offers (the status set back in the property editor) is a plain property
+    write, which raised no work notice, so the step stayed "Approved step: withdrawn" and never ran."""
+    actions(monkeypatch, {"approve": [step_call("complete", "Change review: PASS. Done.")]})
+    env.setting(workAutoRun=False)
+    env.step(P, STEP, "approve")
+    assert [x["state"] for x in env.entries()] == ["pending"]
+    space = env.loop.space
+    env.service.close(P, space.read(P)[2], GENE)
+    assert [(x["state"], x["reason"]) for x in env.entries()] == [("withdrawn", WITHDRAWN_REDECIDED)]
+    assert env.service.item(P)["done"]
+    space.update_properties(P, {"status": ["In Progress"]}, space.read(P)[2])
+    assert not env.service.item(P)["done"]
+    env.wait_for(lambda: [x for x in env.entries() if x["state"] == "pending"])
+    approve = [x for x in env.entries() if x["kind"] == "approve"]
+    assert [x["state"] for x in approve] == ["withdrawn", "pending"]
+    assert approve[1]["stepId"] == STEP and approve[1]["by"] == "Gene" and approve[1]["path"] == P
+    # and it runs once the agent acts
+    env.acts()
+    env.idle()
+    assert [x["state"] for x in env.entries() if x["kind"] == "approve"] == ["withdrawn", "done"]
+    assert next(s for s in env.service.item(P)["steps"] if s["id"] == STEP)["state"] == "done"
+    assert len(env.runs()) == 1
+    # a property write on an item with nothing withdrawn queues nothing
+    space.update_properties(P, {"priority": ["Low"]}, space.read(P)[2])
+    env.idle()
+    assert len([x for x in env.entries() if x["kind"] == "approve"]) == 2
