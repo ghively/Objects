@@ -183,6 +183,22 @@ describe('fix-pass P1: a nested list with its own delimiter or bullet', () => {
   })
 })
 
+describe('fix-pass P2: two blank lines inside a list', () => {
+  test('stay two on an edit anywhere in the list (the repro)', () => {
+    expectEveryEditLocal('1. a0\n   1. b1\n\n   2. c3\n\n\n2. d8\n')
+  })
+
+  // The editor reads the extra blank line of a bullet item as an empty paragraph (typing there
+  // adds text to the item); an edit of the item's text keeps both blank lines as they were.
+  for (const body of ['- a\n\n\n- b\n\n- c\n', '- a\n\n\n\n  para\n- b\n']) {
+    test(`stay as many when an item's text is edited: ${JSON.stringify(body)}`, () => {
+      for (const word of ['a', 'b', 'c', 'para'].filter((w) => body.includes(`${w}\n`))) {
+        expect(editWhere(body, word)).toBe(body.replace(`${word}\n`, `${word}Z\n`))
+      }
+    })
+  }
+})
+
 describe('#17 an indented code block inside a list item', () => {
   const cases = [
     '- a\n\n      indented code in item\n- b\n',
