@@ -152,7 +152,7 @@ describe('SpacesMenu', () => {
     expect(useSettingsModal.getState()).toMatchObject({ isOpen: true, section: 'space' })
 
     await user.click(screen.getByRole('button', { name: 'Space button' }))
-    await user.click(await screen.findByRole('button', { name: 'Add space' }))
+    await user.click(await screen.findByRole('button', { name: 'Create space' }))
     expect(useCreateSpaceDialog.getState().isOpen).toBe(true)
   })
 

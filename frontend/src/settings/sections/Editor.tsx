@@ -18,7 +18,7 @@ import { useSettingsTypes } from './ObjectTypes'
 
 export const EDITOR_TEXT = {
   heading: 'Editor',
-  description: 'Manage your preferences for how the editor of Object should work.', // our string
+  description: "Manage your preferences for Object's editor.", // our string
   toggleStyle: 'Toggle style',
   toggleStyleDescription:
     "How toggle blocks look: 'toggle' (the default) or 'bullet', which suits people used to outliners.",
@@ -94,9 +94,9 @@ export const EDITOR_TEXT = {
     'Removes the controls for editing properties and type settings from pages. Settings is still where you change them.',
   highlightStyle: 'Highlight Style',
   highlightStyleDescription:
-    'How highlight blocks and their notes look: with a coloured rail and a separate notes area, or as plain text.',
+    'How highlight blocks and their notes look: with a colored rail and a separate notes area, or as plain text.',
   highlightStyles: {
-    default: { name: 'Default', description: 'A coloured rail marks the highlight, and its notes sit below in smaller type.' },
+    default: { name: 'Default', description: 'A colored rail marks the highlight, and its notes sit below in smaller type.' },
     minimal: { name: 'Minimal', description: 'No rail; the highlight reads as ordinary text.' },
   },
 } as const
@@ -132,7 +132,12 @@ export const EDITOR_SEARCH: string[] = [
 ]
 
 const SECTION_KEYS = ['backlinks', 'relatedContent', 'unlinkedMentions'] as const
+// Catalog: Backlinks (and Related Content) Open | Closed; only Unlinked Mentions adds Hidden.
 const TRIS: Tri[] = ['open', 'closed', 'hidden']
+const TRIS_OPEN_CLOSED: Tri[] = ['open', 'closed']
+function trisFor(k: (typeof SECTION_KEYS)[number]): Tri[] {
+  return k === 'unlinkedMentions' ? TRIS : TRIS_OPEN_CLOSED
+}
 const NESTED_MODES = ['showBlockContainingBacklink', 'showFullPathAbove'] as const
 
 /** "Types without related content": a checkbox per type and "Clear all". */
@@ -217,7 +222,7 @@ function SpellCheckLangInput({ value, onSave }: { value: string | null; onSave(n
   )
 }
 
-const OPEN_MODES: OpenOnStartMode[] = ['lastOpenedPage', 'today', 'calendar', 'specificObject']
+const OPEN_MODES: OpenOnStartMode[] = ['lastOpenedPage', 'calendar', 'today', 'specificObject']
 
 function ObjectSelect({ value, onSelect }: { value: string | undefined; onSelect(path: string): void }) {
   const [open, setOpen] = useState(false)
@@ -445,7 +450,7 @@ export function EditorSection() {
               <OptionCards
                 label={T.sections[k]}
                 value={sectionsDefault[k]}
-                options={TRIS.map((v) => ({ value: v, label: T.tri[v] }))}
+                options={trisFor(k).map((v) => ({ value: v, label: T.tri[v] }))}
                 onChange={(v) => set({ backlinkSectionsDefault: { ...sectionsDefault, [k]: v } })}
               />
             </div>

@@ -106,7 +106,7 @@ export const TYPE_SETTINGS_TEXT = {
   deleteHeading: 'Delete Object Type',
   // The saved-queries part is our string (see DeleteTypeDialog).
   deleteExplanation:
-    'Moves the type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
+    'Moves the object type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
   deleteAction: 'Delete Object Type',
 }
 

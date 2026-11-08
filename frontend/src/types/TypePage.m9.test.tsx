@@ -97,7 +97,7 @@ describe('TypePage Import CSV (Task 19)', () => {
     render(<TypePage type={BOOK} />)
     await user.click(await screen.findByRole('button', { name: 'More' }))
     const items = (await screen.findAllByRole('menuitem')).map((m) => m.textContent)
-    expect(items.indexOf('Import CSV')).toBe(items.indexOf('Create collection') + 1)
+    expect(items.indexOf('Import CSV')).toBe(items.indexOf('New Collection') + 1)
     await user.click(screen.getByRole('menuitem', { name: 'Import CSV' }))
     expect(await screen.findByText('Bulk import from CSV')).toBeInTheDocument()
   })

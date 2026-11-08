@@ -4,7 +4,7 @@
  * row's "…" has "Rename" (the current space only: writes `space.json`'s name), "Remove" (never
  * the current space: Object forgets it, the folder stays) and, M8, "Delete space" (never the
  * current space: the folder goes to the OS trash, see `DeleteSpaceDialog`). Below the list: "Space settings",
- * "Add space" (the create dialog) and "Open folder…" (registers an existing folder).
+ * "Create space" (the create dialog) and "Open folder…" (registers an existing folder).
  *
  * `SpaceSwitchOverlay` covers the app while a switch waits for the server to come back on the new
  * space, and shows why a switch stopped.
@@ -45,7 +45,7 @@ export const SPACES_MENU_TEXT = {
   removeConfirm: 'Object forgets this space. Its folder and files stay where they are.', // our string
   cancel: 'Cancel',
   spaceSettings: 'Space settings',
-  addSpace: 'Add space',
+  addSpace: 'Create space',
   openFolder: 'Open folder…', // our string
   folderPath: 'Folder path', // our string
   open: 'Open',

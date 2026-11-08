@@ -21,7 +21,7 @@ describe('InkToolbar', () => {
 
     rerender(<InkToolbar value={DEFAULT_INK} readOnly={false} onChange={onChange} />)
     expect(screen.getByRole('button', { name: 'Pen' })).toHaveAttribute('aria-pressed', 'true')
-    const colours = screen.getByRole('radiogroup', { name: INK_STRINGS.inkColour })
+    const colours = screen.getByRole('radiogroup', { name: 'Ink color' })
     expect(colours.querySelectorAll('[role="radio"]')).toHaveLength(18)
     const widths = screen.getByRole('radiogroup', { name: INK_STRINGS.width })
     expect([...widths.querySelectorAll('[data-width]')].map((b) => b.getAttribute('data-width'))).toEqual(['2', '4', '8'])

@@ -129,6 +129,8 @@ function ThemeButton() {
 
 /** The footer gear's tooltip. */
 export const SETTINGS_TOOLTIP = 'Settings'
+/** The footer's Shortcuts icon: opens the shortcuts sheet (catalog §4: settings gear, theme toggle, Shortcuts icon). */
+export const SHORTCUTS_TOOLTIP = 'Shortcuts'
 
 /** The square search button's tooltip. */
 export const SEARCH_THIS_SPACE = 'Search this space'
@@ -553,9 +555,6 @@ export function Sidebar({
       {importFor && <ImportCsvDialog type={importFor} open onOpenChange={(o) => !o && setImportFor(null)} />}
 
       <footer className="flex items-center gap-1 py-2 text-fg-muted">
-        <button type="button" disabled aria-label="Profile" title="Profile" className="flex size-8 items-center justify-center rounded-md disabled:opacity-60">
-          <Icon name="ph-user" size={17} />
-        </button>
         <button
           type="button"
           aria-label={SETTINGS_TOOLTIP}
@@ -566,8 +565,14 @@ export function Sidebar({
           <Icon name="ph-gear" size={17} />
         </button>
         <ThemeButton />
-        <button type="button" disabled aria-label="Share" title="Share" className="ml-auto flex size-8 items-center justify-center rounded-md disabled:opacity-60">
-          <Icon name="ph-share-fat" size={17} />
+        <button
+          type="button"
+          aria-label={SHORTCUTS_TOOLTIP}
+          title={SHORTCUTS_TOOLTIP}
+          onClick={() => useSettingsModal.getState().openShortcuts()}
+          className="flex size-8 items-center justify-center rounded-md hover:bg-hover hover:text-fg"
+        >
+          <Icon name="ph-keyboard" size={17} />
         </button>
       </footer>
     </aside>

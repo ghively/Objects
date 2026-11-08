@@ -30,7 +30,7 @@ export const INTEGRATIONS_TEXT = {
   read: 'Read only',
   readHelp: 'Search, query and read objects.',
   readWrite: 'Read and write',
-  readWriteHelp: 'Also create objects, edit properties and sections, rename and move to the trash.',
+  readWriteHelp: 'Also create objects, edit properties and sections, rename and move to the Trash.',
   create: 'Create token',
   created: 'Copy this token now. It will not be shown again.',
   copyToken: 'Copy token',

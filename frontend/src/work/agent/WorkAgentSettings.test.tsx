@@ -72,6 +72,17 @@ describe('WorkAgentSettings', () => {
     expect(mocked.saveWorkAgentSettings).not.toHaveBeenCalled()
   })
 
+  test('test the "Agent runs by itself" switch (the catalog\'s name) saves autoRun', async () => {
+    const user = userEvent.setup()
+    // The fixture starts with autoRun on, so the click turns it off.
+    mocked.saveWorkAgentSettings.mockResolvedValue(workAgentSettings({ autoRun: false, settingsRevision: 'rev2' }))
+    render(<WorkAgentSettings />)
+    const sw = await screen.findByRole('switch', { name: 'Agent runs by itself' })
+    expect(screen.queryByRole('switch', { name: 'Auto-run read-only steps' })).toBeNull()
+    await user.click(sw)
+    await waitFor(() => expect(mocked.saveWorkAgentSettings).toHaveBeenCalledWith({ autoRun: false }, 'rev1'))
+  })
+
   test('test ticking a tool saves readTools with the revision; a 409 reloads and toasts', async () => {
     const user = userEvent.setup()
     mocked.saveWorkAgentSettings.mockRejectedValueOnce(new ConflictError('rev2'))

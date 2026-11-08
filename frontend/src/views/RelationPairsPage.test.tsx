@@ -105,6 +105,7 @@ describe('RelationPairsPage', () => {
   test('a basic type can not take the pairs', () => {
     render(<Harness type={{ ...STORY, basic: true }} />)
     expect((screen.getByRole('button', { name: 'Turn on sub-items' }) as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.getByText('Not available for basic object types.')).toBeTruthy()
+    // The one sentence the backend and the Add property menu use for basic types.
+    expect(screen.getByText('The properties of basic types are fixed.')).toBeTruthy()
   })
 })

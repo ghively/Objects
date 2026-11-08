@@ -85,24 +85,6 @@ export function SpaceSettingsSection() {
   return (
     <div>
       <SectionHeader icon="ph-gear-six" heading={T.heading} description={T.description} />
-      <SettingGroup title={T.name} help={T.nameHeader}>
-        <input
-          aria-label={T.name}
-          value={name}
-          maxLength={MAX_SPACE_NAME}
-          placeholder={T.namePlaceholder}
-          disabled={!space}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={commitName}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              commitName()
-            }
-          }}
-          className="h-9 w-full max-w-[420px] rounded-md border border-line bg-raised px-2 text-[15px] text-fg outline-none focus:border-fg-muted"
-        />
-      </SettingGroup>
       <SettingGroup title={T.icon} help={T.iconHeader}>
         <Popover open={iconOpen} onOpenChange={setIconOpen}>
           <PopoverTrigger asChild>
@@ -126,6 +108,24 @@ export function SpaceSettingsSection() {
             />
           </PopoverContent>
         </Popover>
+      </SettingGroup>
+      <SettingGroup title={T.name} help={T.nameHeader}>
+        <input
+          aria-label={T.name}
+          value={name}
+          maxLength={MAX_SPACE_NAME}
+          placeholder={T.namePlaceholder}
+          disabled={!space}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              commitName()
+            }
+          }}
+          className="h-9 w-full max-w-[420px] rounded-md border border-line bg-raised px-2 text-[15px] text-fg outline-none focus:border-fg-muted"
+        />
       </SettingGroup>
       <SettingGroup title={T.description_} help={T.descriptionHeader}>
         <textarea

@@ -48,4 +48,12 @@ describe('TaskManagementSection', () => {
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'typeSettings', typeId: 'task' })
     expect(useSettingsModal.getState().isOpen).toBe(false)
   })
+
+  test('test the hide explanation says "you can hide them"', async () => {
+    render(<TaskManagementSection />)
+    const text = await screen.findByText(/If you don't want to use tasks in Object/)
+    expect(text).toHaveTextContent('you can hide them.')
+    expect(text).not.toHaveTextContent('simply')
+  })
+
 })

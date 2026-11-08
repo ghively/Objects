@@ -20,7 +20,7 @@ export const INK_STRINGS = {
   /** our string */
   width: 'Width',
   /** our string */
-  inkColour: 'Ink colour',
+  inkColour: 'Ink color',
   /** our string: a failed ink save (the server's reason follows) */
   saveFailed: 'Could not save the ink.',
   /** our string: the pen group's tooltip when the ink file is read-only */
