@@ -60,6 +60,7 @@ from .agentmodel import (
     AgentReadOnly,
     clean_input,
 )
+from .agentrun import NESTED_AGENT, NESTED_AGENTS_DIR, NESTED_TRASH
 from .appstate import state_dir
 from .ids import new_ulid
 from .jsonstore import dump_json, parse_json_object
@@ -217,6 +218,13 @@ def endpoint_host(url: str) -> str:
     if ":" in host:
         host = f"[{host}]"
     return f"{host}:{port}" if host and port is not None else host
+
+
+def _scheme(url: str) -> str:
+    try:
+        return urlsplit(url or "").scheme.lower()
+    except ValueError:
+        return ""
 
 
 def _str(value: Any) -> str | None:
@@ -537,17 +545,32 @@ class AgentRegistry:
                 continue
         return out
 
-    def _check_nesting(self, folder: Path) -> None:
+    def _check_spaces(self, folder: Path) -> None:
         for space in self._space_folders():
             if _within(folder, space) or _within(space, folder):
                 raise AgentInvalid(NESTED)
+
+    def _check_nesting(self, folder: Path) -> None:
+        """Refuse a folder in or holding a space, the agents folder itself (or one holding it),
+        one in the agent trash, or one in or holding another agent's folder (audit 13): each
+        would stop the agent, or the other, from running."""
+        self._check_spaces(folder)
+        agents_dir = _resolve(self.agents_dir)
+        if _within(agents_dir, folder):
+            raise AgentInvalid(NESTED_AGENTS_DIR)
+        if _within(folder, agents_dir / TRASH_DIR):
+            raise AgentInvalid(NESTED_TRASH)
+        mine = _key(folder)
+        for other in (*self.local_folders(), *self.remote_folders()):
+            if _key(other) != mine and (_within(folder, other) or _within(other, folder)):
+                raise AgentInvalid(NESTED_AGENT)
 
     def _claim_folder(self, name: str, location: Path | None) -> Path:
         """Make the new agent's (empty) folder and return it, resolved."""
         stem = safe_filename(name)
         if location is None:
             parent = _resolve(self.agents_dir)
-            self._check_nesting(parent / stem)
+            self._check_spaces(parent / stem)  # a fresh name in the agents folder: no other agent's
             parent.mkdir(parents=True, exist_ok=True)
             reserved = {_key(self._default_folder())}
             n = 1
@@ -764,12 +787,13 @@ class AgentRegistry:
 
     def refresh_remote(self, agent_id: str, card: a2a.Card, card_raw: dict[str, Any], card_url: str) -> AgentRecord:
         """A card fetched again: ``card.json``, the endpoint, streaming and ``cardFetchedAt``. Gene's
-        name is kept. An endpoint whose host changed removes the secret, so a token never follows
-        a card to a new host."""
+        name is kept. An endpoint whose host changed, or that went from https to http, removes the
+        secret, so a token never follows a card to a new host or onto an unencrypted line."""
         with _lock:
             rec = self._writable_remote(agent_id)
             data = dict(rec.data)
-            old_host = endpoint_host(_str(_endpoint(data).get("url")) or "")
+            old_url = _str(_endpoint(data).get("url")) or ""
+            old_host = endpoint_host(old_url)
             now = _now()
             data["cardUrl"] = card_url
             data["endpoint"] = {"url": card.endpoint_url, "protocolVersion": card.protocol_version,
@@ -777,7 +801,8 @@ class AgentRegistry:
             data["streaming"] = card.streaming is True
             data["cardFetchedAt"] = now
             data["updatedAt"] = now
-            if endpoint_host(card.endpoint_url) != old_host:
+            lost_tls = _scheme(old_url) == "https" and _scheme(card.endpoint_url) != "https"
+            if endpoint_host(card.endpoint_url) != old_host or lost_tls:
                 remotesecrets.remove(agent_id)
             atomic_write(rec.folder / CARD_FILE, dump_json(card_raw))
             agentfiles.write_agent_file(rec.folder, data)

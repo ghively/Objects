@@ -122,6 +122,8 @@ async def run_chat(
     header: dict[str, Any] | None = None,
     stop: Callable[[], Awaitable[bool]] | None = None,
     announce: Callable[[ChangeEvent], None] | None = None,
+    scope: str = "read-write",
+    budget: int | None = None,
 ) -> HeadlessResult:
     """One turn of the local agent `target` with `prompt`, recorded as a new chat.
 
@@ -129,7 +131,8 @@ async def run_chat(
     (`ai.NOT_FOUND`), the default agent's folder can't be made, or the folder is nested in (or
     holds) a fenced folder. The run may last `timeout` seconds (``ai.Turn.timeout``); reaching
     it, or ``stop()`` answering True (polled every `STOP_POLL` seconds), stops the run's process
-    tree and ends the result ``"stopped"``.
+    tree and ends the result ``"stopped"``. `scope` and `budget` are the run token's: a delegated
+    run passes its caller's, so it is never stronger than the turn that asked for it.
     """
     from .agents import AgentRegistry
 
@@ -150,7 +153,7 @@ async def run_chat(
     def scope_for(secret: str) -> agentrun.RunScope:
         return agentrun.RunScope(
             agent=target, space_root=space_root, space_name=space_name, api_url=api_url,
-            token=secret, write=True, chat_id=chat_id, purpose=purpose, state=state,
+            token=secret, write=scope == "read-write", chat_id=chat_id, purpose=purpose, state=state,
         )
 
     def check() -> None:
@@ -176,7 +179,7 @@ async def run_chat(
     written()
 
     token_record, secret = TokenStore(space_root).ephemeral(
-        name, "read-write", agent=target.id, chat=chat_id, purpose=purpose
+        name, scope, agent=target.id, chat=chat_id, purpose=purpose, budget=budget
     )
     seen = _Seen()
     last: dict[str, Any] | None = None

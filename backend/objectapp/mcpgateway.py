@@ -11,9 +11,9 @@ M17's extension points:
 Cache keys: ``gw:<serverId>:<revision>`` and ``folder:<agentId>:<name>:<sha256 of its .mcp.json
 entry>``.
 
-Secret values reach a run only through `RunParts.env` (under `secret_env_name` names, or a
-folder server's own ``${VAR}`` names); the run's ``mcp.json`` holds only ``${...}`` references.
-Nothing here writes a file. Imports no network client.
+Secret values reach a run only in their own server's entry in the run's ``mcp.json``
+(`agentrun.fill_refs`), never in the CLI's environment, which every stdio server inherits
+(audit 7). Nothing here writes a file. Imports no network client.
 """
 
 from __future__ import annotations
@@ -170,7 +170,7 @@ def _cached_names(result: ProbeResult | None) -> list[str]:
 
 
 def gateway_contributor(scope: RunScope, parts: RunParts) -> None:
-    """Each enabled server (file order) into ``parts.mcp_servers`` and its secrets into ``parts.env``,
+    """Each enabled server (file order) into ``parts.mcp_servers``, its secrets filled into its own entry,
     for `mcpmodel.GATEWAY_PURPOSES` only; skips a name the folder already has (a note), a stored
     entry that can't be read (a note), a server whose every known tool is off (no note) and one
     with a missing secret (a note)."""
@@ -199,8 +199,7 @@ def gateway_contributor(scope: RunScope, parts: RunParts) -> None:
         except MissingSecret:
             parts.notes.append(MISSING_NOTE.format(name=name))
             continue
-        parts.mcp_servers[name] = entry
-        parts.env.update(env)
+        parts.mcp_servers[name] = agentrun.fill_refs(entry, env)  # its secrets, for it alone
 
 
 def gateway_tools_contributor(scope: RunScope, parts: RunParts) -> None:
