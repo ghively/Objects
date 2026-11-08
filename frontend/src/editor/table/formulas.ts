@@ -35,7 +35,7 @@ export const FORMULA_STATEMENTS: ReadonlyArray<{ name: string; description: stri
   { name: 'E', description: "The number e (about 2.718)" },
   { name: 'FLOOR', description: 'Drop the fraction, rounding toward minus infinity' },
   { name: 'LN', description: 'Logarithm to base e' },
-  { name: 'LOG', description: 'Logarithm to base e' },
+  { name: 'LOG', description: 'Logarithm to the given base (e when none)' },
   { name: 'MAX', description: 'Find maximum value' },
   { name: 'MEDIAN', description: 'Find median value' },
   { name: 'MIN', description: 'Find minimum value' },
