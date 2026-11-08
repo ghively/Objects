@@ -280,14 +280,30 @@ def _lines(src: str) -> list[str]:
     return lines
 
 
+_DOC_END_RE = re.compile(r"\.\.\.(?:[ \t]|\r|\n|$)")
+
+
+def _doc_end(lines: list[str]) -> int:
+    """Index of the YAML document-end line (``...`` at column 0), else ``len(lines)``.
+
+    Only blank and comment lines can follow it, so the mapping's keys all come before it:
+    a key appended after it would be a second document (bug audit 2026-11-07, 19).
+    """
+    for i, line in enumerate(lines):
+        if _DOC_END_RE.match(line):
+            return i
+    return len(lines)
+
+
 def _key_spans(data: CommentedMap | None, lines: list[str]) -> dict[Any, tuple[int, int]]:
     """Line range ``[start, end)`` of each top-level key, trailing blank/comment lines excluded."""
     if data is None:
         return {}
     starts = sorted((data.lc.key(k)[0], k) for k in data.keys())
     spans: dict[Any, tuple[int, int]] = {}
+    last = _doc_end(lines)
     for i, (start, k) in enumerate(starts):
-        end = starts[i + 1][0] if i + 1 < len(starts) else len(lines)
+        end = starts[i + 1][0] if i + 1 < len(starts) else last
         while end > start + 1 and _is_filler(lines[end - 1]):
             end -= 1
         spans[k] = (start, end)
@@ -341,8 +357,12 @@ def set_keys(
                 target.extend(_render(k, v))
 
     out: list[str] = list(prepended)
+    tail = _doc_end(lines)
     i = 0
     while i < len(lines):
+        if i == tail:
+            out.extend(appended)  # new keys go before a `...` document-end line
+            appended = []
         if i in replacements:
             end, new_lines = replacements[i]
             out.extend(new_lines)
