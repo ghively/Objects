@@ -9,7 +9,9 @@ work); each registers its own order (the plan's registry of contributor orders).
 
 `build_run` runs the contributors and writes the run's files into a new temp folder outside
 every space and agent folder (``mcp.json``, ``run-settings.json``, ``append.md``); the caller
-removes that folder after the run (``mkdtemp``: readable by the user only). Secrets never go into
+removes that folder after the run (``mkdtemp``: readable by the user only). The run's file tools
+are fenced off that folder, and a run removes such folders left behind more than a day ago (when
+Object stopped mid-run). Secrets never go into
 the CLI's own environment, since the CLI hands its whole environment to every stdio MCP server:
 each server gets only its own secrets, filled into its own entry in ``mcp.json`` (`fill_refs`).
 The turn's token is in the ``env`` blocks of Object's two servers (``object``, ``object-agent``)
@@ -40,6 +42,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -563,6 +566,33 @@ def _run_env(scope: RunScope, parts: RunParts) -> dict[str, str]:
     return env
 
 
+RUN_TMP_PREFIX = "object-agent-run-"
+_STALE_RUN_SECONDS = 86400
+
+
+def _sweep_stale_run_folders() -> None:
+    """Remove ``object-agent-run-*`` folders in the temp folder older than a day and owned by
+    this user: a run's folder (with its servers' secrets) left behind when Object stopped mid-run.
+    Only folders (not links or files) with that prefix; a failure is ignored."""
+    cutoff = time.time() - _STALE_RUN_SECONDS
+    uid = os.getuid() if hasattr(os, "getuid") else None
+    try:
+        entries = list(os.scandir(tempfile.gettempdir()))
+    except OSError:
+        return
+    for e in entries:
+        if not e.name.startswith(RUN_TMP_PREFIX):
+            continue
+        try:
+            st = e.stat(follow_symlinks=False)
+            if (not e.is_dir(follow_symlinks=False) or st.st_mtime >= cutoff
+                    or (uid is not None and st.st_uid != uid)):
+                continue
+        except OSError:
+            continue
+        shutil.rmtree(e.path, ignore_errors=True)
+
+
 def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | None) -> RunCommand:
     """One turn's command: the contributors' parts, written into a new temp folder.
 
@@ -574,10 +604,15 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
         fn(scope, parts)
     own = Path(scope.agent.folder).resolve()
     mcp = {"mcpServers": parts.mcp_servers}
-    settings = _run_settings(own, parts)
     append = "\n\n".join(p for p in parts.append_prompt if p)
-    tmp = Path(tempfile.mkdtemp(prefix="object-agent-run-"))
+    _sweep_stale_run_folders()
+    tmp = Path(tempfile.mkdtemp(prefix=RUN_TMP_PREFIX))
     try:
+        # The run's own folder holds the servers' secrets (mcp.json): fenced like a space.
+        for f in _both_forms(tmp):
+            rp = rule_path(f)
+            _extend(parts.deny_rules, [f"Read({rp}/**)", f"Edit({rp}/**)"])
+        settings = _run_settings(own, parts)
         (tmp / "mcp.json").write_bytes(dump_json(mcp))
         (tmp / "run-settings.json").write_bytes(dump_json(settings))
         (tmp / "append.md").write_bytes(append.encode("utf-8"))

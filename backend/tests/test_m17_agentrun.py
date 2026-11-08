@@ -449,6 +449,45 @@ def test_fence_covers_version_history_and_deleted_spaces(env) -> None:
     assert not fake_claude._denied("Edit", str(mine), deny)
 
 
+def test_fence_covers_the_runs_own_temp_folder(env) -> None:
+    """Review of audit 7: the run's temp folder holds mcp.json with the servers' secrets; the file
+    tools are denied on it, by its given and its resolved path."""
+    import fake_claude
+
+    cmd = _build(_scope(env))
+    deny = cmd.run_settings["permissions"]["deny"]
+    assert json.loads((cmd.tmp / "run-settings.json").read_text(encoding="utf-8")) == cmd.run_settings
+    for tmp in (Path(os.path.abspath(cmd.tmp)), cmd.tmp.resolve()):
+        for tool in ("Read", "Edit", "Write"):
+            assert fake_claude._denied(tool, str(tmp / "mcp.json"), deny), (tool, tmp)
+        for tool in ("Grep", "Glob"):
+            assert fake_claude._denied(tool, str(tmp), deny), (tool, tmp)
+
+
+def test_stale_run_folders_are_swept_at_the_next_run(env, monkeypatch) -> None:
+    """A run folder left behind (Object stopped mid-run) holds secrets: the next run removes every
+    ``object-agent-run-*`` folder older than a day, and nothing else."""
+    import tempfile
+    import time
+
+    temp = env["tmp"] / "temp"
+    temp.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(temp))
+    old = time.time() - 2 * 86400
+    stale, fresh, other = temp / "object-agent-run-old1", temp / "object-agent-run-new1", temp / "other-old"
+    for d in (stale, fresh, other):
+        d.mkdir()
+        (d / "mcp.json").write_text("{}", encoding="utf-8")
+    stale_file = temp / "object-agent-run-file"
+    stale_file.write_text("x", encoding="utf-8")
+    for p in (stale, stale / "mcp.json", other, stale_file):
+        os.utime(p, (old, old))
+    cmd = _build(_scope(env))
+    assert cmd.tmp.parent == temp and cmd.tmp.is_dir()
+    assert not stale.exists()
+    assert fresh.is_dir() and other.is_dir() and stale_file.is_file()
+
+
 def test_fence_folders(env) -> None:
     state = env["state"]
     reg_a = env["tmp"] / "Space A"
