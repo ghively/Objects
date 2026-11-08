@@ -36,16 +36,16 @@ _MAX_PERIODS = 2_000
 
 
 def week_start_of(root: Path | str) -> WeekStart:
-    """`ui.json` `calendar.weekStart` ('monday' by default). Reads, never writes."""
+    """`ui.json` `calendar.weekStart` ('sunday' when unset, as the calendar shows it). Reads, never writes."""
     from .uistate import load_ui  # lazy: uistate is not needed by pure callers
 
     try:
         cal = load_ui(Path(root)).get("calendar")
     except OSError:
-        return "monday"
+        return "sunday"
     if isinstance(cal, dict) and cal.get("weekStart") in ("monday", "sunday"):
         return cal["weekStart"]
-    return "monday"
+    return "sunday"
 
 
 def _week_anchor(d: date, week_start: WeekStart) -> date:

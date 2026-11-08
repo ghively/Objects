@@ -190,7 +190,7 @@ def test_weekly_on_list_respects_week_start():
 
 
 def test_week_start_of_reads_ui_json(tmp_path):
-    assert week_start_of(tmp_path) == "monday"  # no .object at all
+    assert week_start_of(tmp_path) == "sunday"  # no .object at all
     cap = tmp_path / ".object"
     cap.mkdir()
     ui = cap / "ui.json"
@@ -199,7 +199,7 @@ def test_week_start_of_reads_ui_json(tmp_path):
     assert week_start_of(tmp_path) == "sunday"
     assert ui.read_bytes() == before
     ui.write_text("not json", encoding="utf-8")
-    assert week_start_of(tmp_path) == "monday"
+    assert week_start_of(tmp_path) == "sunday"
     assert sorted(p.name for p in cap.iterdir()) == ["ui.json"]
 
 
