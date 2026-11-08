@@ -64,12 +64,20 @@ let bodyReferences: BodyReferences | null = null
 /** A link label as Markdown matches it: case-folded, inner blanks collapsed. */
 const labelKey = (label: string) => label.trim().replace(/\s+/g, ' ').toLowerCase()
 
+/**
+ * A link definition's label at a line start, also inside quotes and list items
+ * (`> [foo]: …`, `- [foo]: …`, an item's indented line): a raw block's text
+ * keeps those prefixes. Counting a label too many (in indented code, say) is
+ * harmless: a bare `[foo]` that defines nothing reads as the same text.
+ */
+const LINK_DEFINITION = /^(?:[ \t]*(?:>|(?:[*+-]|\d{1,9}[.)])(?=[ \t])))*[ \t]*\[([^\]\n^][^\]\n]*)\]:/gm
+
 /** The link definitions (`[foo]: …` at a line start) and footnote references (`[^1]`) in `text`. */
 export function referencesIn(text: string): BodyReferences {
   const labels = new Set<string>()
   const footnotes = new Set<string>()
   if (!text.includes('[')) return { labels, footnotes }
-  for (const m of text.matchAll(/^ {0,3}\[([^\]\n^][^\]\n]*)\]:/gm)) labels.add(labelKey(m[1]))
+  for (const m of text.matchAll(LINK_DEFINITION)) labels.add(labelKey(m[1]))
   for (const m of text.matchAll(/\[\^([^\]\s]+)\]/g)) {
     const at = m.index ?? 0
     const lineStart = text.lastIndexOf('\n', at - 1) + 1
