@@ -88,7 +88,7 @@ describe('wikilink presenter', () => {
     expect(icon(dom)).toHaveAttribute('aria-hidden', 'true')
     expect(dom.textContent).toBe('Beta')
 
-    // "Show object type icon for inline object links" off: gone, and back when turned on.
+    // "Type icons on inline links" off: gone, and back when turned on.
     useSettings.setState({ settings: { ...settingsDefaults, hideEntityIconsOnInlineLinks: true } })
     await vi.waitFor(() => expect(icon(dom)).toBeNull())
     useSettings.setState({ settings: { ...settingsDefaults, hideEntityIconsOnInlineLinks: false } })

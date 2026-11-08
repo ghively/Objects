@@ -2,8 +2,8 @@
  * The action palette's clipboard group (M8 Task 17).
  *
  * What the clipboard holds decides the offers:
- * - text: "Add to today's daily note" (preview "1 block | {count} blocks"; appends to today's
- *   note, creating it; "Added content to daily note") and "Create new page with content";
+ * - text: "Paste into today's daily note" (preview "1 block | {count} blocks"; appends to today's
+ *   note, creating it; "Added content to daily note") and "Make a new page from the clipboard";
  * - Markdown with a heading: also "Create page", titled with the first heading (which then leaves
  *   the body; our choice);
  * - a URL: also "Create {structureName}" for Page: a page titled with the URL's host and path
@@ -27,13 +27,13 @@ import { invalidateLinkIndex } from '@/links/linkIndex'
 
 /** The paste rows' strings, plus the denial line. */
 export const PASTE_TEXT = {
-  addToDailyNote: "Add to today's daily note",
+  addToDailyNote: "Paste into today's daily note",
   blocks: (count: number) => (count === 1 ? '1 block' : `${count} blocks`),
   addedToDailyNote: 'Added content to daily note',
   upload: 'Upload',
   createHttpLinkEntity: (structureName: string) => `Create ${structureName}`,
   createPageFromMd: 'Create page',
-  createPageWithBlocks: 'Create new page with content',
+  createPageWithBlocks: 'Make a new page from the clipboard',
   denied: 'Clipboard access was denied.', // our string
   /** The row that reads the clipboard when picked. */
   readClipboard: 'Clipboard',

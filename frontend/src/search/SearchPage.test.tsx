@@ -61,7 +61,7 @@ describe('SearchPage', () => {
   test('shows the empty state without a keyword', () => {
     render(<SearchPage />)
     expect(screen.getByRole('heading', { name: 'Search' })).toBeTruthy()
-    expect(screen.getByText('Enter a search keyword to show content from your space.')).toBeTruthy()
+    expect(screen.getByText('Type a word to find content in this space.')).toBeTruthy()
     expect(mocked.search).not.toHaveBeenCalled()
     expect((screen.getByRole('button', { name: /Save as Query/ }) as HTMLButtonElement).disabled).toBe(true)
   })

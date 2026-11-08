@@ -21,44 +21,44 @@ export const EDITOR_TEXT = {
   description: 'Manage your preferences for how the editor of Object should work.', // our string
   toggleStyle: 'Toggle style',
   toggleStyleDescription:
-    "Set the style of the toggle block. You can choose between 'toggle' (default) and 'bullet'. The latter is especially for those, who are coming from an outliner way of thinking.",
+    "How toggle blocks look: 'toggle' (the default) or 'bullet', which suits people used to outliners.",
   toggleStyleToggle: 'Toggle',
   toggleStyleBullet: 'Bullet',
-  disableNumbered: 'Disable automatic detection of numbered lists',
+  disableNumbered: 'Turn off automatic numbered lists',
   disableNumberedDescription:
-    "This will disable the automatic transformation of the shortcut for numbered lists at the start of a text block (e.g., in the case of '1.' followed by a space).",
+    "Typing '1.' and a space at the start of a text block will no longer turn it into a numbered list.",
   disableSpellcheck: 'Disable spellcheck',
-  disableSpellcheckDescription: 'Disables system spellcheck in the editor and in text inputs.',
-  fullPage: 'Always open as full page',
+  disableSpellcheckDescription: 'Turns off the system spellchecker in the editor and all text fields.',
+  fullPage: 'Open objects as a full page',
   fullPageDescription:
-    'Enabling this option will always open objects as a full page on click. Images and PDFs still open in the preview. Opening other content in the preview modal will still be available by holding Option-Shift (Mac) or Alt-Shift (Windows) while clicking.',
-  inlineIcons: 'Show object type icon for inline object links',
-  inlineIconsDescription: 'Set whether to display a small colored icon in front of inline links to an object.',
+    'Clicking an object opens it as a full page. Images and PDFs keep opening in the preview, and you can still preview anything else by clicking with Option-Shift (Mac) or Alt-Shift (Windows) held down.',
+  inlineIcons: 'Type icons on inline links',
+  inlineIconsDescription: 'Put a small colored type icon before each inline link to an object.',
   outliner: 'Hide outliner lines',
-  outlinerDescription: 'Hides the vertical lines along the blocks nested inside a toggle block.',
+  outlinerDescription: 'Removes the vertical guide lines beside blocks nested in a toggle.',
   openOnStart: 'When this space opens',
   openOnStartDescription:
-    'Used when you start the app and when you switch to this space. It applies only to the current space and stays on this device. You can choose for each space individually.',
+    'What appears when the app starts or you switch to this space. Each space has its own choice, kept on this device only.',
   openModes: {
     lastOpenedPage: 'Where I left off',
     today: 'Calendar today',
     calendar: 'Calendar',
     specificObject: 'Specific object',
   },
-  specificObjectDescription: 'Choose which object should open when you start the app or switch to this space.',
+  specificObjectDescription: 'The object shown when the app starts or you switch to this space.',
   selectObject: 'Select object',
   startup: 'When Object starts', // our string
   startupDescription:
-    'Choose which space opens on this device, then what that space shows when you start the app or switch to it.',
+    'Pick the space this device opens first, and what it shows on start or when you switch to it.',
   startupSpace: 'Space on this device',
   startupSpaceDescription: 'If the selected space no longer exists, Object falls back to the last opened space.', // our string
   startupLast: 'Last opened space',
   startupSpecific: 'Specific space',
   noObjects: 'No results',
   // M8
-  backlinkSections: 'Default state for backlink sections',
+  backlinkSections: 'Backlink sections start as',
   backlinkSectionsDescription:
-    'Choose whether these sections should start open or closed on object pages. You can still change them per object.',
+    'Whether each section is expanded or collapsed when an object page opens. Each object can still override it.',
   sections: {
     backlinks: 'Backlinks',
     relatedContent: 'Related Content',
@@ -66,14 +66,14 @@ export const EDITOR_TEXT = {
   },
   tri: { open: 'Open', closed: 'Closed', hidden: 'Hidden' },
   backlinkContentView: 'Backlink content view',
-  backlinkContentViewDescription: 'Choose the default view for backlink content. Embed is the default when no option is selected.',
+  backlinkContentViewDescription: 'How backlink content shows at first. With nothing picked, it is embedded.',
   hiddenTypes: 'Hide related content for object types',
-  hiddenTypesDescription: 'Select object types for which the related content section should be hidden on their pages.',
+  hiddenTypesDescription: 'Pages of the types picked here leave out the related content section.',
   clearAll: 'Clear all',
   // M8
   nestedBacklinks: 'Default display of nested backlinks',
   nestedBacklinksDescription:
-    'Set the default behavior of how to display contextual backlinks when they are nested within other blocks. You can get a more compact view by starting with the block with the actual backlink as root or get a more detailed view by showing the full path that is leading to the block with the backlink.',
+    'How a backlink inside nested blocks is shown by default: just the block that holds the link, which is shorter, or that block with every parent block above it, which gives more context.',
   nestedModes: {
     showBlockContainingBacklink: 'Only block with backlink',
     showFullPathAbove: 'Full path above',
@@ -86,18 +86,18 @@ export const EDITOR_TEXT = {
   spellCheckLangPlaceholder: 'e.g. "en-GB"...',
   spellCheckLangInvalid: 'Invalid language tag...',
   experimental: 'Experimental',
-  inlineLinks: 'Always create inline links',
+  inlineLinks: 'Insert links inline by default',
   inlineLinksDescription:
-    'With this setting, linking to other objects will always default to creating an inline link, even at the start of an empty block.',
+    'Linking to an object always makes an inline link, even at the start of an empty block.',
   hideStructure: 'Hide object type settings outside of settings',
   hideStructureDescription:
-    'Hide all buttons and options to edit properties and other object type settings in the UI. You can still edit them from the settings.',
+    'Removes the controls for editing properties and type settings from pages. Settings is still where you change them.',
   highlightStyle: 'Highlight Style',
   highlightStyleDescription:
-    'Choose how highlight blocks and their notes are displayed — with a coloured rail and a distinct notes section, or minimally as plain text.',
+    'How highlight blocks and their notes look: with a coloured rail and a separate notes area, or as plain text.',
   highlightStyles: {
-    default: { name: 'Default', description: 'Highlights show a coloured rail, with their notes as a smaller, distinct section.' },
-    minimal: { name: 'Minimal', description: 'No rail — the highlight blends in as plain text.' },
+    default: { name: 'Default', description: 'A coloured rail marks the highlight, and its notes sit below in smaller type.' },
+    minimal: { name: 'Minimal', description: 'No rail; the highlight reads as ordinary text.' },
   },
 } as const
 

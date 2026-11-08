@@ -37,7 +37,7 @@ describe('TabStrip', () => {
     render(<TabStrip space={null} />)
     const tab = tabs()[0]
     expect(tab).toHaveClass('italic')
-    expect(tab).toHaveAttribute('title', 'Double click to make tab persistent.')
+    expect(tab).toHaveAttribute('title', 'Double-click to keep this tab open.')
     fireEvent.doubleClick(tab)
     expect(s().tabs[0].persistent).toBe(true)
     expect(tabs()[0]).not.toHaveClass('italic')

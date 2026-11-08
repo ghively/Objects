@@ -49,8 +49,8 @@ export const SIDEPANEL_TEXT = {
   tabList: 'Browse sidepanel tabs',
   newEntry: 'New Sidepanel Tab',
   swap: 'Swap',
-  swapTooltip: 'Drag onto the main content to swap.',
-  swapNotSupported: 'This side panel tab cannot be swapped into the main panel.',
+  swapTooltip: 'Drop on the main area to switch places.',
+  swapNotSupported: 'This tab cannot move to the main area.',
   openAsPage: 'Open as page',
   menu: 'Open sidepanel menu',
   /** our strings */
@@ -65,7 +65,7 @@ export const SIDEPANEL_TEXT = {
   aiChat: AI_CHAT_TEXT.title,
   /** `LocalGraphPanel`'s heading (M5) */
   graph: 'Graph View',
-  doubleClickToPersist: 'Double click to make tab persistent.',
+  doubleClickToPersist: 'Double-click to keep this tab open.',
   backlinks: REFERENCES_TEXT.backlinksPanelTitle,
   /** The backlinks tooltip, its bold heading as a plain first line */
   backlinksTooltip: 'Backlinks & Mentions\n\nShows the backlinks and mentions of the object in the main window.',

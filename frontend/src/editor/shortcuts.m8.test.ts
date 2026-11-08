@@ -83,8 +83,8 @@ describe('m8 editor shortcuts', () => {
     expect(keysFor('highlightText')).toEqual(['Mod-Shift-h'])
     // the catalogued names
     expect(registered.get('copyBlockReference')!.name).toBe('Copy block reference')
-    expect(registered.get('highlightText')!.name).toBe('Highlight text selection')
-    expect(registered.get('turnBlockIntoTaskObject')!.name).toBe('Turn block into task object')
+    expect(registered.get('highlightText')!.name).toBe('Highlight the selected text')
+    expect(registered.get('turnBlockIntoTaskObject')!.name).toBe('Make this block a task')
   })
 
   test('tab indents any block', () => {

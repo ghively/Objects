@@ -169,7 +169,7 @@ describe('shortcuts', () => {
   test('one list: no mode switch; the placeholder names content and actions; opening "actions" shows the same list', async () => {
     const { user } = setup()
     const input = await openSearch(user)
-    expect(input).toHaveAttribute('placeholder', 'Search for content and actions, or paste from clipboard')
+    expect(input).toHaveAttribute('placeholder', 'Find objects and commands, or paste')
     expect(screen.queryByRole('button', { name: /Switch to/ })).toBeNull()
     expect(document.querySelector('[data-palette-info]')).not.toBeNull()
     await user.keyboard('{Escape}')
@@ -207,7 +207,7 @@ describe('search mode', () => {
     useRecent.setState({ paths: [], openedAt: {} })
     await openSearch(user)
     expect(screen.getByText('Nothing here yet')).toBeInTheDocument()
-    expect(screen.getByText('Objects you open will show up here for quick access.')).toBeInTheDocument()
+    expect(screen.getByText('Recently opened objects appear here.')).toBeInTheDocument()
   })
 
   test('typing debounces one request and drops stale responses', async () => {
@@ -369,7 +369,7 @@ describe('search mode', () => {
     )
 
     await user.type(input, ' wor')
-    await user.click(await screen.findByText('Only search content tagged with "work"'))
+    await user.click(await screen.findByText('Limit results to the tag "work"'))
     await waitFor(() => expect(mocked.search).toHaveBeenLastCalledWith('alpha', expect.objectContaining({ tag: 'work' })))
     expect(document.querySelectorAll('[data-filter-chip]')).toHaveLength(3)
 
@@ -431,9 +431,9 @@ describe('search mode', () => {
     const input = await openSearch(user)
     await user.type(input, 'zzz')
     expect(await screen.findByText('No results for "zzz"')).toBeInTheDocument()
-    expect(screen.getByText('Try a different term, or remove filters to widen the search.')).toBeInTheDocument()
+    expect(screen.getByText('Try other words, or clear a filter to see more.')).toBeInTheDocument()
     expect(
-      screen.getByText('Your content in not fully indexed yet. Search results might not return all matches.'),
+      screen.getByText('Indexing is still running, so some matches may be missing.'),
     ).toBeInTheDocument()
   })
 })
@@ -545,11 +545,11 @@ describe('actions in the list', () => {
 })
 
 test('palette string templates', () => {
-  expect(PALETTE_TEXT.placeholder).toBe('Search for content and actions, or paste from clipboard')
+  expect(PALETTE_TEXT.placeholder).toBe('Find objects and commands, or paste')
   expect(PALETTE_TEXT.emptyTitle('q')).toBe('No results for "q"')
   expect(PALETTE_TEXT.createNewWithTitle('Page', 't')).toBe('Create new Page with title "t"')
   expect(PALETTE_TEXT.structureFilter('X')).toBe('Only search for type "X"')
   expect(PALETTE_TEXT.structureFilterExclude('X')).toBe('Exclude type "X"')
-  expect(PALETTE_TEXT.tagFilter('x')).toBe('Only search content tagged with "x"')
+  expect(PALETTE_TEXT.tagFilter('x')).toBe('Limit results to the tag "x"')
   expect(ACTION_TEXT.createNewEntity('Page')).toBe('Create Page')
 })

@@ -26,7 +26,7 @@ describe('DateTimeSection', () => {
     useSettings.setState({ settings: { ...settingsDefaults, twentyFourHourTime: true } })
     render(<DateTimeSection />)
     const preview = screen.getByRole('status', { name: 'Preview' })
-    await user.click(within(screen.getByRole('radiogroup', { name: 'Date formatting' })).getByRole('radio', { name: 'year-month-day (ISO 8601)' }))
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Date formatting' })).getByRole('radio', { name: 'ISO 8601 (year-month-day)' }))
     expect(preview.textContent).toMatch(/^\d{4}-\d{2}-\d{2}, \d{2}:\d{2}$/)
     await user.click(within(screen.getByRole('radiogroup', { name: 'Date formatting' })).getByRole('radio', { name: 'day-month-year' }))
     expect(preview.textContent).toMatch(/^\d{2}-\d{2}-\d{4}, \d{2}:\d{2}$/)
@@ -68,9 +68,9 @@ describe('DateTimeSection', () => {
       'Localized',
       'day-month-year',
       'month/day/year',
-      'year-month-day (ISO 8601)',
+      'ISO 8601 (year-month-day)',
     ])
-    await user.click(within(fmt).getByRole('radio', { name: 'year-month-day (ISO 8601)' }))
+    await user.click(within(fmt).getByRole('radio', { name: 'ISO 8601 (year-month-day)' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ dateFormatting: 'YMD' }, expect.anything())
   })
 
@@ -82,7 +82,7 @@ describe('DateTimeSection', () => {
     expect(timeZoneList()).toContain(other)
     const { rerender } = render(<DateTimeSection />)
     expect(screen.getByRole('heading', { name: 'Time zone' })).toBeInTheDocument()
-    expect(screen.getByText('Select your preferred time zone.')).toBeInTheDocument()
+    expect(screen.getByText('The time zone used for dates and times.')).toBeInTheDocument()
     // No setting: the device's zone, no mismatch.
     const button = screen.getByRole('button', { name: 'Time zone' })
     expect(button).toHaveTextContent(device)

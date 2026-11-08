@@ -37,7 +37,7 @@ export function useTabShortcuts(): void {
   useGlobalShortcut('closeTab', closeActiveTab)
   useGlobalShortcut('openNewTab', () => useTabs.getState().newTab())
   useGlobalShortcut('navigateTabs', cycleTabs, { allowInEditable: true })
-  // "Toggle tab menu when multiple tabs are open".
+  // "Show or hide the list of open tabs".
   useGlobalShortcut('openTabList', () => {
     const menu = useTabMenu.getState()
     if (menu.open) menu.setOpen(false)

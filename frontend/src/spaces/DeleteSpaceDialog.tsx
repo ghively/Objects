@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button'
 export const DELETE_SPACE_TEXT = {
   menuItem: 'Delete space',
   heading: 'Delete this space?',
-  description: 'Deletes the space and everything in it.',
+  description: 'Removes this space along with all of its content.',
   confirm: 'Delete space',
   warning: "This can't be undone.",
   cancel: 'Cancel',

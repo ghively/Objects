@@ -73,11 +73,11 @@ describe('editor shortcuts', () => {
       if (!(def.id in EXPECTED)) expect(r.keys.length, def.id).toBeGreaterThan(0)
     }
     // the catalogued names
-    expect(registered.get('heading1')!.name).toBe('Turn selected blocks into heading 1')
+    expect(registered.get('heading1')!.name).toBe('Make the selected blocks heading 1')
     expect(registered.get('mathToken')!.name).toBe('Format as TeX-formula')
-    expect(registered.get('insertBlockBelow')!.name).toBe('Insert block below and set cursor there')
+    expect(registered.get('insertBlockBelow')!.name).toBe('New block below, with the cursor in it')
     expect(registered.get('moveUpBlockWithCursor')!.name).toBe('Move active block up')
-    expect(registered.get('moveSelectedBlocksUpOnSameLevel')!.name).toBe('Move selected blocks up on same level')
+    expect(registered.get('moveSelectedBlocksUpOnSameLevel')!.name).toBe('Shift the selected blocks up among their siblings')
   })
 
   test('editor shortcuts come from the registry and a changed key takes effect', () => {

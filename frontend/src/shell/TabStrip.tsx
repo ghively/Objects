@@ -169,7 +169,7 @@ function TabItem({ tab, active, space }: { tab: Tab; active: boolean; space: Spa
           data-persistent={tab.persistent ? '' : undefined}
           data-pinned={tab.pinned ? '' : undefined}
           tabIndex={0}
-          title={tab.persistent ? undefined : 'Double click to make tab persistent.'}
+          title={tab.persistent ? undefined : 'Double-click to keep this tab open.'}
           onClick={() => activate(tab.id)}
           onDoubleClick={() => togglePersistent(tab.id)}
           onAuxClick={(e) => e.button === 1 && !tab.pinned && close(tab.id)}

@@ -13,7 +13,7 @@ import { useCalendar, type StepKey } from './useCalendar'
 const VIEW_TABS: { view: CalendarView; label: string; tooltip: string }[] = [
   { view: 'month', label: 'Month', tooltip: 'Go to monthly view' },
   { view: 'week', label: 'Week', tooltip: 'Go to weekly view' },
-  { view: 'rolling', label: 'Three days', tooltip: 'Go to 3 days rolling view' },
+  { view: 'rolling', label: 'Three days', tooltip: 'Show three days from today' },
   { view: 'day', label: 'Day', tooltip: 'Go to daily view' },
 ]
 
@@ -23,9 +23,9 @@ const VIEW_TABS: { view: CalendarView; label: string; tooltip: string }[] = [
 const VIEW_KEYS: Record<string, CalendarView> = { m: 'month', w: 'week', r: 'rolling', d: 'day' }
 const TODAY_KEY = 't'
 
-const PREVIOUS_TIP = 'Go to previous day, week, or month'
-const NEXT_TIP = 'Go to next day, week, or month'
-const TODAY_TIP = 'Set active date to today'
+const PREVIOUS_TIP = 'Back one day, week or month'
+const NEXT_TIP = 'Forward one day, week or month'
+const TODAY_TIP = 'Jump to today'
 const HIDE_SIDEBAR = 'Hide calendar sidebar'
 const SHOW_SIDEBAR = 'Show calendar sidebar'
 

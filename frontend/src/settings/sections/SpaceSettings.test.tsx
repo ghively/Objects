@@ -29,8 +29,8 @@ describe('SpaceSettingsSection', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Space Settings' })).toBeInTheDocument()
     const name = screen.getByRole('textbox', { name: 'Name' })
     await waitFor(() => expect(name).toHaveValue('Lab'))
-    expect(name).toHaveAttribute('placeholder', 'What you want to call this space')
-    expect(screen.getByText('Set or update the name for this space.')).toBeInTheDocument()
+    expect(name).toHaveAttribute('placeholder', 'Name of this space')
+    expect(screen.getByText('The name shown for this space.')).toBeInTheDocument()
 
     await user.clear(name)
     await user.type(name, 'Home lab{Enter}')

@@ -10,34 +10,34 @@ import { OptionCards, SaveError, SecondaryButton, SectionHeader, SettingGroup, S
 
 export const APPEARANCE_TEXT = {
   heading: 'Appearance',
-  description: 'Adjust the appearance of the app.',
+  description: 'Themes, fonts and colors.',
   theme: 'Theme',
   themeDescription: 'Define the theme you want to use for Object', // our string
   modeLight: 'Light',
   modeDark: 'Dark',
   lightTheme: 'Light theme',
-  lightThemeDescription: 'Pick a light mode theme.',
+  lightThemeDescription: 'The theme used in light mode.',
   darkTheme: 'Dark theme',
   darkThemeDescription: 'Pick a dark mode theme.',
   themes: {
-    light: { name: 'Light', description: 'The default light theme.' },
-    lightDimmed: { name: 'Light Dimmed', description: 'A light theme with a dimmed contrast' },
+    light: { name: 'Light', description: 'The standard light look.' },
+    lightDimmed: { name: 'Light Dimmed', description: 'Light, with softer contrast' },
     dark: { name: 'Dark', description: 'The default dark theme' },
-    darkDimmed: { name: 'Dark Dimmed', description: 'A dark theme with a dimmed contrast' },
+    darkDimmed: { name: 'Dark Dimmed', description: 'Dark, with softer contrast' },
   },
   font: 'Font',
   fontDescription: 'Pick a global font for the app.', // our string
   fonts: {
-    'sans-serif': { name: 'Sans Serif', description: 'Inter – a beautiful timeless typeface.' },
-    serif: { name: 'Serif', description: 'Georgia – a classic serif typeface with good readability.' },
-    monospace: { name: 'Monospace', description: 'Courier New – a monospace typeface resembling a typewriter.' },
+    'sans-serif': { name: 'Sans Serif', description: 'Inter, a clean and neutral face.' },
+    serif: { name: 'Serif', description: 'Georgia, an easy-to-read serif face.' },
+    monospace: { name: 'Monospace', description: 'Courier New, a fixed-width, typewriter-like face.' },
   },
   colors: 'Colors',
   colorsDescription: 'Settings around colors.',
   monoTypeLabels: 'Monochrome type labels',
-  monoTypeLabelsDescription: 'Enable to have all type labels in the same color.',
+  monoTypeLabelsDescription: 'Show every type label in one color.',
   monoTags: 'Monochrome tags',
-  monoTagsDescription: 'Enable to have all tags in the same color.',
+  monoTagsDescription: 'Show every tag in one color.',
   // A browser has no View menu to zoom from, so the text size lives here (our choice).
   textSize: 'Text size', // our string
   textSizeDescription: 'Make the text of your notes larger or smaller.', // our string

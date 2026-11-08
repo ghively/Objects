@@ -12,10 +12,10 @@ export const LANGUAGE_TEXT = {
   // our string: Object has no translations, so the language only sets the formatting locale.
   info: "Object's interface is in English; the language sets how dates and numbers are formatted.",
   changeLanguage: 'Change your language',
-  changeLanguageDescription: 'You can change the language of the application interface.',
+  changeLanguageDescription: 'The language the app is shown in.',
   decimalSeparator: 'Decimal separator',
   decimalSeparatorDescription:
-    'Choose the decimal separator for numbers. The decimal separator separates the whole number part from the fractional part.',
+    'The character that splits whole numbers from their fractions, such as the point in 3.5.',
   separators: {
     automatic: 'Automatic',
     dot: 'Dot',

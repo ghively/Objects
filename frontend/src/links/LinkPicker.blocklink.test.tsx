@@ -1,4 +1,4 @@
-// "Always create inline links" (`DeviceSettings.alwaysCreateInlineLinks`): without it, linking at
+// "Insert links inline by default" (`DeviceSettings.alwaysCreateInlineLinks`): without it, linking at
 // the start of an empty block makes an object block; with it, always an inline link.
 import { Editor as TiptapEditor } from '@tiptap/core'
 import { fireEvent, render, screen } from '@testing-library/react'

@@ -57,15 +57,15 @@ describe('CalendarChrome', () => {
     expect(buttons.map((b) => b.title)).toEqual([
       'Go to monthly view',
       'Go to weekly view',
-      'Go to 3 days rolling view',
+      'Show three days from today',
       'Go to daily view',
     ])
     expect(screen.getByRole('button', { name: 'Day' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('button', { name: 'Go to previous day, week, or month' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Go to next day, week, or month' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back one day, week or month' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Forward one day, week or month' })).toBeInTheDocument()
     const today = screen.getByRole('button', { name: 'Today' })
-    expect(today).toHaveAttribute('title', 'Set active date to today')
+    expect(today).toHaveAttribute('title', 'Jump to today')
     expect(today.className).toContain('font-semibold')
     // Day view: no period title.
     expect(screen.getByTestId('calendar-period-title')).toHaveTextContent('')
@@ -79,12 +79,12 @@ describe('CalendarChrome', () => {
     await user.click(screen.getByRole('button', { name: 'Month' }))
     expect(screen.getByTestId('calendar-period-title')).toHaveTextContent('Oct 2026')
 
-    await user.click(screen.getByRole('button', { name: 'Go to next day, week, or month' }))
+    await user.click(screen.getByRole('button', { name: 'Forward one day, week or month' }))
     expect(anchor()).toBe('2026-11-23')
     expect(screen.getByRole('button', { name: 'Today' }).className).toContain('font-normal')
     expect(screen.getByTestId('calendar-period-title')).toHaveTextContent('Nov 2026')
-    await user.click(screen.getByRole('button', { name: 'Go to previous day, week, or month' }))
-    await user.click(screen.getByRole('button', { name: 'Go to previous day, week, or month' }))
+    await user.click(screen.getByRole('button', { name: 'Back one day, week or month' }))
+    await user.click(screen.getByRole('button', { name: 'Back one day, week or month' }))
     expect(anchor()).toBe('2026-09-23')
     await user.click(screen.getByRole('button', { name: 'Today' }))
     expect(anchor()).toBe(TODAY)

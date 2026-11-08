@@ -4,7 +4,7 @@
  * and offers to switch to it. An existing folder is never touched (the server answers 409, shown
  * as "A folder with that name already exists here."). M8: "How do you want to start?" picks
  * "Start with basic setup" (the server also writes the Person, Meeting, Project and Book types)
- * or "Start with a blank space" (nothing else is created; the default, our choice).
+ * or "Empty space" (nothing else is created; the default, our choice).
  * M15: "Import from…" below the choices closes this dialog and opens the import dialog with the
  * name and location typed here (the import makes the new space itself).
  */
@@ -25,7 +25,7 @@ export const CREATE_SPACE_TEXT = {
   namePlaceholder: 'Name',
   location: 'Location', // our string
   explainHeading: 'Do I need a new space?',
-  explainText: 'Only if this work should stay isolated. You cannot link notes across spaces.',
+  explainText: 'Use one only for work that must stay separate: notes in different spaces cannot link to each other.',
   cancel: 'Cancel',
   create: 'Create space',
   exists: 'A folder with that name already exists here.', // our string
@@ -34,9 +34,9 @@ export const CREATE_SPACE_TEXT = {
   later: 'Later', // our string
   howToStart: 'How do you want to start?',
   basicLabel: 'Start with basic setup',
-  basicDescription: 'Includes people, meetings, projects, and books.',
-  blankLabel: 'Start with a blank space',
-  blankDescription: 'Add object types when you need them.',
+  basicDescription: 'Comes with types for people, meetings, projects and books.',
+  blankLabel: 'Empty space',
+  blankDescription: 'Starts with no extra types; create them as you go.',
   importFrom: 'Import from…', // our string
   importDescription: 'Make the new space from a Notion, Obsidian or Anytype export.', // our string
 } as const

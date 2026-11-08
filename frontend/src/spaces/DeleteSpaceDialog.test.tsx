@@ -71,7 +71,7 @@ describe('DeleteSpaceDialog', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Delete space' }))
     const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getByText('Delete this space?')).toBeInTheDocument()
-    expect(within(dialog).getByText('Deletes the space and everything in it.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Removes this space along with all of its content.')).toBeInTheDocument()
     expect(within(dialog).queryByText("This can't be undone.")).toBeNull()
     expect(mocked.deleteSpace).not.toHaveBeenCalled()
 

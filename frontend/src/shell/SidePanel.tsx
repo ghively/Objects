@@ -7,7 +7,7 @@
  * goes back to 45 %). Resizers write the tab's layout on pointer up.
  *
  * M8: an entry dragged by its title and dropped anywhere on the main view (`[data-main-column]`)
- * swaps with it, as "Swap" does ("Drag onto the main content to swap."). The drop is taken in the
+ * swaps with it, as "Swap" does ("Drop on the main area to switch places."). The drop is taken in the
  * capture phase, only for that drag's data, so the main view's own drop targets never see it.
  */
 import { Fragment, useEffect, useRef, useState } from 'react'

@@ -4,7 +4,7 @@
  *
  * `on`, `toggle()`, `enter()` and `leave()` are Task 3's names. While `on`, `FocusMode.tsx` hides
  * the shell's chrome with one stylesheet (nothing else changes, so leaving restores each part
- * exactly as it was) and leaves again with "Focus mode is not available here" when the open tab
+ * exactly as it was) and leaves again with "Focus mode does not work on this tab" when the open tab
  * is not an object (our rule: objects only).
  *
  * The timer is a per-viewer convenience: it is kept in `localStorage` (so it survives a reload)
@@ -36,7 +36,7 @@ export interface FocusModeState {
   timer: FocusTimer
   /** The last finished session until "Continue". */
   completed: FocusCompleted | null
-  /** A transient message ("Focus mode is not available here"). */
+  /** A transient message ("Focus mode does not work on this tab"). */
   notice: string | null
   startTimer(minutes: number, now?: number): void
   pauseTimer(now?: number): void
@@ -63,7 +63,7 @@ export const FOCUS_TIMER_KEY = 'object.focusTimer'
 export const FOCUS_TEXT = {
   enter: 'Enter Focus Mode',
   leave: 'Leave Focus Mode',
-  unavailable: 'Focus mode is not available here',
+  unavailable: 'Focus mode does not work on this tab',
   label: 'Focus',
   chooseDuration: 'Choose focus duration',
   preset: (m: number) => `${m} min`,

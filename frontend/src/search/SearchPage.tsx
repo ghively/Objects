@@ -35,7 +35,7 @@ import './searchPage.css'
 /** The search page's strings. */
 export const SEARCH_PAGE_TEXT = {
   heading: 'Search',
-  emptyState: 'Enter a search keyword to show content from your space.',
+  emptyState: 'Type a word to find content in this space.',
   fullTextSearchOnly: 'Text matches only',
   openSearch: 'Open extended search',
   saveAsQuery: 'Save as Query',

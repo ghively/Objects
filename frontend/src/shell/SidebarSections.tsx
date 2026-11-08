@@ -30,7 +30,7 @@ import { enqueueUiSave, pendingUiSaves, reloadUi, SIDEBAR_SAVE_FAILED, usePinned
 
 export const SECTION_TEXT = {
   add: 'Add Section',
-  addHint: 'Group pages and collections under a named heading in your space overview.',
+  addHint: 'Put pages and collections under a heading of your own in the sidebar.',
   edit: 'Edit Section',
   delete: 'Delete Section',
   name: 'Section Name',

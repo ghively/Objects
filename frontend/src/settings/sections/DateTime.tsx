@@ -13,23 +13,23 @@ import { OptionCards, SaveError, SecondaryButton, SectionHeader, SettingGroup, S
 
 export const DATE_TIME_TEXT = {
   heading: 'Date & Time',
-  description: 'Manage your preferences for how time and dates get displayed.',
+  description: 'How dates and times are shown.',
   startOfWeek: 'Start of the week',
-  startOfWeekDescription: 'Select whether a week should start on a Monday or on a Sunday.',
+  startOfWeekDescription: 'The first day of the week: Monday or Sunday.',
   monday: 'Monday',
   sunday: 'Sunday',
   twentyFour: '24-hour time',
-  twentyFourDescription: 'Displays time in 24-hour time format (e.g. 16:24).',
+  twentyFourDescription: 'Show times on a 24-hour clock, like 16:24.',
   dateFormatting: 'Date formatting',
-  dateFormattingDescription: 'Choose between date formatting based on your language or explicit formatting.',
+  dateFormattingDescription: 'Show dates in the style of your language, or pick a fixed format.',
   formats: {
     localized: 'Localized',
     DMY: 'day-month-year',
     MDY: 'month/day/year',
-    YMD: 'year-month-day (ISO 8601)',
+    YMD: 'ISO 8601 (year-month-day)',
   },
   timeZone: 'Time zone',
-  timeZoneDescription: 'Select your preferred time zone.',
+  timeZoneDescription: 'The time zone used for dates and times.',
   timeZoneMismatch: 'Your time zone in Object does not match the time zone of your device.', // our string
   timeZoneReset: 'Set to local time zone',
   timeZoneSearch: 'Search time zones', // our string

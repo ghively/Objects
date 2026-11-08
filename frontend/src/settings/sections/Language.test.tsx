@@ -29,7 +29,7 @@ describe('LanguageSection', () => {
       screen.getByText("Object's interface is in English; the language sets how dates and numbers are formatted."),
     ).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Change your language' })).toBeInTheDocument()
-    expect(screen.getByText('You can change the language of the application interface.')).toBeInTheDocument()
+    expect(screen.getByText('The language the app is shown in.')).toBeInTheDocument()
     const langs = screen.getByRole('radiogroup', { name: 'Change your language' })
     expect(within(langs).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
       'English',
