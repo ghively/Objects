@@ -47,7 +47,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .agentrun import RunCommand, RunRefused
+from .agentrun import RunCommand, RunRefused, run_base_env
 from .apiquery import EXCLUDE_TAG, is_excluded
 
 __all__ = [
@@ -117,7 +117,8 @@ def _hidden_window() -> dict[str, Any]:
 
 
 def status(setting: str | None) -> dict[str, Any]:
-    """`AiStatus`: whether the CLI is there and answers ``--version``.
+    """`AiStatus`: whether the CLI is there and answers ``--version``, run with the environment a
+    turn gets (`agentrun.run_base_env`), so "available" means what a turn will find.
 
     Whether it is signed in can't be told without a model call; a turn that finds it
     isn't reports that (`AUTH_MESSAGE`).
@@ -137,6 +138,7 @@ def status(setting: str | None) -> dict[str, Any]:
             timeout=STATUS_TIMEOUT,
             stdin=subprocess.DEVNULL,
             check=False,
+            env=run_base_env(),
             **_hidden_window(),
         )
     except subprocess.TimeoutExpired:

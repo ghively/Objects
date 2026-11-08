@@ -157,6 +157,27 @@ def test_status_uses_path_when_no_setting(api, fake, monkeypatch) -> None:
     assert client.get("/api/ai/status").json()["reason"] == "ok"
 
 
+def test_status_uses_the_turns_environment(api, fake, monkeypatch) -> None:
+    """Audit 20: ``--version`` runs with the environment a turn gets, so "available" means the same."""
+    from objectapp import agentrun
+
+    _space, client, _ = api
+    monkeypatch.setenv("CLAUDECODE", "1")
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "fake-oauth")
+    seen: list = []
+    real = ai.subprocess.run
+
+    def spy(*args, **kw):
+        seen.append(kw.get("env"))
+        return real(*args, **kw)
+
+    monkeypatch.setattr(ai.subprocess, "run", spy)
+    assert client.get("/api/ai/status").json()["reason"] == "ok"
+    [env] = seen
+    assert env == agentrun.run_base_env()
+    assert "CLAUDECODE" not in env and env["CLAUDE_CODE_OAUTH_TOKEN"] == "fake-oauth"
+
+
 def test_status_error(api, monkeypatch) -> None:
     _space, client, _ = api
     monkeypatch.setenv("FAKE_CLAUDE_VERSION_FAIL", "1")

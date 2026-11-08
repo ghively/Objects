@@ -121,7 +121,8 @@ def _form(p: Path) -> str:
 
 
 def test_run_loads_only_project_and_local_settings(env, monkeypatch) -> None:
-    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(env["tmp"] / "elsewhere"))
+    config = env["tmp"] / "elsewhere"
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(config))
     cmd = _build(_scope(env))
     i = cmd.args.index("--setting-sources")
     assert cmd.args[i : i + 2] == ["--setting-sources", "project,local"]
@@ -129,7 +130,15 @@ def test_run_loads_only_project_and_local_settings(env, monkeypatch) -> None:
         assert a != "user"
         assert "user" not in a.split(","), a
     assert _value(cmd.args, "--setting-sources") == "project,local"
-    assert "CLAUDE_CONFIG_DIR" not in cmd.env
+    # Audit 20: the user's config dir (where their login lives) is kept, and its CLAUDE.md, rules
+    # and credentials are kept out of the run as ~/.claude's are.
+    assert cmd.env["CLAUDE_CONFIG_DIR"] == str(config)
+    form = str(config.resolve()).replace("\\", "/")
+    excludes = cmd.run_settings["claudeMdExcludes"]
+    assert form + "/CLAUDE.md" in excludes and form + "/rules/**" in excludes
+    deny = cmd.run_settings["permissions"]["deny"]
+    rp = rule_path(config.resolve())
+    assert f"Read({rp}/.credentials.json)" in deny and f"Edit({rp}/**)" in deny
     assert cmd.cwd == env["folder"].resolve()
 
 
@@ -168,12 +177,19 @@ def test_run_settings_keep_user_instructions_out(env) -> None:
 
 
 def test_run_env_drops_parent_session_vars(env, monkeypatch) -> None:
-    for name in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_AGENT_SDK_VERSION", "AI_AGENT"):
+    session = ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SSE_PORT", "CLAUDE_CODE_USE_CCR_V2",
+               "CLAUDE_AGENT_SDK_VERSION", "AI_AGENT")
+    sign_in = ("CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK",
+               "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY")
+    for name in (*session, *sign_in):
         monkeypatch.setenv(name, "1")
     cmd = _build(_scope(env))
-    for name in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_AGENT_SDK_VERSION", "AI_AGENT"):
+    for name in session:
         assert name not in cmd.env
-    assert not any(k.upper().startswith(RUN_ENV_DROP) for k in cmd.env)
+    for name in sign_in:  # audit 20: how the user signs in to Claude Code reaches every turn
+        assert cmd.env[name] == "1", name
+    assert not any(k.upper().startswith(RUN_ENV_DROP) for k in cmd.env if k not in agentrun.RUN_ENV_KEEP)
+    assert agentrun.run_base_env().items() <= cmd.env.items()
     assert "PATH" in {k.upper() for k in cmd.env}
     assert cmd.env["OBJECT_API_URL"] == "http://127.0.0.1:8765"
     # Audit 7: every stdio server inherits the CLI's environment, so the token isn't in it.
