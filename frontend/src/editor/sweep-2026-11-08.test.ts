@@ -72,6 +72,37 @@ function paste(editor: TiptapEditor, data: { html?: string; text: string }): voi
 
 const RICH = { html: '<p><strong>Bold</strong> text</p><ul><li>item</li></ul>', text: 'Bold text\nitem' }
 
+const CLOSED = '<!-- toggle -->\n### Closed toggle\nHidden child paragraph.\n<!-- /toggle -->\n'
+const OPEN = '<!-- toggle open -->\n### Server checklist\n- [ ] Patch the hosts\n<!-- /toggle -->\n'
+const MIXED = `Intro.\n\n${CLOSED}\n${OPEN}\nAfter.\n`
+
+describe('Open or close all toggles on the page (Ctrl+O)', () => {
+  test('with a closed toggle on the page, the key opens every toggle; with all open, it closes them all', () => {
+    expect(keysFor('toggleAllToggles')).toEqual(['Mod-o'])
+    const editor = headless(MIXED)
+    cursorAtEndOf(editor, 'Intro.')
+    expect(press(editor, 'Mod-o')).toBe(true)
+    const allOpen = MIXED.replace('<!-- toggle -->', '<!-- toggle open -->')
+    expect(serializeBody(editor)).toBe(allOpen)
+    press(editor, 'Mod-o')
+    expect(serializeBody(editor)).toBe(allOpen.replaceAll('<!-- toggle open -->', '<!-- toggle -->'))
+    // And open again: the file's open lines only (the rest of the text is untouched).
+    press(editor, 'Mod-o')
+    expect(serializeBody(editor)).toBe(allOpen)
+  })
+
+  test('the key is consumed in the editor (no browser "Open file"), and a read-only editor changes nothing', () => {
+    const editor = headless('No toggles here.\n')
+    cursorAtEndOf(editor, 'No toggles')
+    expect(press(editor, 'Mod-o')).toBe(true)
+    expect(serializeBody(editor)).toBe('No toggles here.\n')
+    const readOnly = headless(MIXED)
+    readOnly.setEditable(false)
+    press(readOnly, 'Mod-o')
+    expect(serializeBody(readOnly)).toBe(MIXED)
+  })
+})
+
 describe('Paste as plain text (Ctrl+Shift+V)', () => {
   test('the key is the registry’s, and the clipboard’s plain text lands as paragraphs, ignoring the HTML', () => {
     expect(keysFor('pasteAsPlainText')).toEqual(['Mod-Shift-v'])

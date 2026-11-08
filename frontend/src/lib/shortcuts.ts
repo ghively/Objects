@@ -549,12 +549,14 @@ export const AI_SHORTCUTS: ShortcutDef[] = [
  * targets; inside the editor the key stays `turnBlockIntoTaskObject` (a shared pair).
  * `pasteAsPlainText` (Text editing, Ctrl+Shift+V) is bound by `editor/shortcuts.ts` through
  * `editor/extensions/pasteAsPlainText.ts`. `goToCalendar` (General, Ctrl+Alt+H: "press twice to
- * jump to today") is bound by `shell/shortcuts.ts` anywhere in the window.
+ * jump to today") is bound by `shell/shortcuts.ts` anywhere in the window. `toggleAllToggles`
+ * (Block editing, Ctrl+O) is bound by `editor/shortcuts.ts` through `editor/extensions/toggleAll.ts`.
  */
 export const SWEEP_SHORTCUTS: ShortcutDef[] = [
   def('createNewTask', 'global', 'Create new task', ['Mod-Shift-t'], 'global', V, true),
   def('pasteAsPlainText', 'text', 'Paste as plain text', ['Mod-Shift-v'], 'editor', V, true),
   def('goToCalendar', 'global', 'Go to Calendar', ['Mod-Alt-h'], 'global', V, true),
+  def('toggleAllToggles', 'block', 'Open or close all toggles on the page', ['Mod-o'], 'editor', V, true),
 ]
 
 registerShortcuts(EXISTING_SHORTCUTS)

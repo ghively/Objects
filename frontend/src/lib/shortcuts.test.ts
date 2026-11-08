@@ -229,6 +229,17 @@ describe('sweep 2026-11-08: catalogued keys', () => {
     expect(formatKeys('Mod-Alt-h', false)).toBe('Ctrl+Alt+H')
   })
 
+  test('Ctrl+O is "Open or close all toggles on the page" under Block editing, bound in the editor', () => {
+    const d = byId().get('toggleAllToggles')
+    expect(d).toBeTruthy()
+    expect(d?.category).toBe('block')
+    expect(d?.scope).toBe('editor')
+    expect(d?.name).toBe('Open or close all toggles on the page')
+    expect(d?.provisional).toBe(false)
+    expect(d?.bound).toBe(true)
+    expect(keysFor('toggleAllToggles')).toEqual(['Mod-o'])
+  })
+
   test('no two registered ids in one scope share a key, except the declared pairs', () => {
     for (const mac of [false, true]) {
       const seen = new Map<string, string>()

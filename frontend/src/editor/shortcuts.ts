@@ -13,6 +13,7 @@ import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
 import { showToast } from './media/upload'
 import { blockSelectionKey } from './extensions/blockSelection'
 import { PasteAsPlainText, armPlainPaste } from './extensions/pasteAsPlainText'
+import { toggleAllToggles } from './extensions/toggleAll'
 import { copyBlockReference } from './nodes/blockRef'
 import { runHighlightText } from './nodes/textStyle'
 import { turnIntoObject, turnIntoTask, turnTodoIntoTask } from './turnInto'
@@ -99,7 +100,8 @@ export function indentAtCursor(editor: Editor, dir: 1 | -1): boolean {
 
 /**
  * The editor's M8 key bindings, from the registry's keys; and the 2026-11-08 sweep's editor
- * keys (`pasteAsPlainText`), whose extensions it brings along so the editor needs no other wiring.
+ * keys (`pasteAsPlainText`, `toggleAllToggles`), whose extensions it brings along so the editor
+ * needs no other wiring.
  */
 export const M8Keys = Extension.create({
   name: 'm8Keys',
@@ -126,6 +128,7 @@ export const M8Keys = Extension.create({
         armPlainPaste()
         return false
       },
+      toggleAllToggles: () => toggleAllToggles(editor),
     })
   },
 })
