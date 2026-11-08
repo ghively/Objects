@@ -61,7 +61,8 @@ describe('editor shortcuts', () => {
       moveDownBlockWithCursor: ['Alt-ArrowDown'],
       moveUpBlockWithCursorOnSameLevel: ['Alt-Shift-ArrowUp'],
       moveDownBlockWithCursorOnSameLevel: ['Alt-Shift-ArrowDown'],
-      toggleToggleInBlockWithCursor: ['Mod-Enter', 'Mod-Shift-Enter'],
+      toggleToggleInBlockWithCursor: ['Mod-Enter', 'Mod-Shift-Enter', 'Mod-ArrowUp', 'Mod-ArrowDown'],
+      underline: [],
     }
     for (const [id, keys] of Object.entries(EXPECTED)) expect(keysFor(id), id).toEqual(keys)
     const registered = new Map(allShortcuts().map((d) => [d.id, d]))

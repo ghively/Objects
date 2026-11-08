@@ -286,7 +286,8 @@ const def = (
 export const M7_SHORTCUTS: ShortcutDef[] = [
   def('bold', 'text', 'Format bold', ['Mod-b'], 'editor', V),
   def('italic', 'text', 'Italicize', ['Mod-i'], 'editor', V),
-  def('underline', 'text', 'Underline', ['Mod-u'], 'editor', V),
+  // The table leaves Underline unbound: Ctrl+U is "Add new content" (`openAddEntityMenu`).
+  def('underline', 'text', 'Underline', [], 'editor', V),
   def('strikethrough', 'text', 'Strikethrough', ['Mod-Shift-s'], 'editor', V),
   def('codeToken', 'text', 'Format as code', ['Mod-e'], 'editor', V),
   def('mathToken', 'text', 'Format as TeX-formula', ['Mod-m'], 'editor', V),
@@ -327,7 +328,8 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
     'toggleToggleInBlockWithCursor',
     'block',
     'Expand or collapse the toggle in this block; with no children yet, it adds one and puts the cursor there. In a to-do, add ⇧.',
-    ['Mod-Enter', 'Mod-Shift-Enter'],
+    // The table's keys are Ctrl+Up/Down; Mod-Enter and Mod-Shift-Enter stay for the hands used to them.
+    ['Mod-Enter', 'Mod-Shift-Enter', 'Mod-ArrowUp', 'Mod-ArrowDown'],
     'editor',
     V,
   ),
