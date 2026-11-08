@@ -22,14 +22,15 @@ export function TrialStep({ batch, onDone }: { batch: string; onDone: (status: F
   const [error, setError] = useState<string | null>(null)
   const finished = useRef(false)
 
-  const loaded = useRef(false)
+  /** Whether the error shown came from a failed status load (a later answer clears it). */
+  const loadFailed = useRef(false)
 
   const refresh = useCallback(async () => {
     try {
       const s = await api.filingStatus(batch)
-      if (!loaded.current) {
-        // The first answer after failed tries: their error no longer stands.
-        loaded.current = true
+      if (loadFailed.current) {
+        // An answer after failed tries: their error no longer stands.
+        loadFailed.current = false
         setError(null)
       }
       setStatus(s)
@@ -43,27 +44,38 @@ export function TrialStep({ batch, onDone }: { batch: string; onDone: (status: F
       }
       return s
     } catch (e) {
+      loadFailed.current = true
       setError(msg(e))
       return null
     }
   }, [batch, onDone])
+  /** Shows an error from an action (not a status load), which a later status answer keeps. */
+  const fail = (e: unknown) => {
+    loadFailed.current = false
+    setError(msg(e))
+  }
 
   const state = status?.state
+  // Audit 2026-11-07 #42: a failed first load is tried again (else no Start button ever comes). Each
+  // try is scheduled after the last one failed, so tries never overlap.
   useEffect(() => {
-    void refresh()
+    let cancelled = false
+    let retry: ReturnType<typeof setTimeout> | undefined
+    const load = async () => {
+      const s = await refresh()
+      if (s === null && !cancelled) retry = setTimeout(() => void load(), agentTiming.pollMs)
+    }
+    void load()
+    return () => {
+      cancelled = true
+      clearTimeout(retry)
+    }
   }, [refresh])
   useEffect(() => {
     if (state !== 'running' && !(continuing && state !== 'done' && state !== 'failed')) return
     const t = setInterval(() => void refresh(), agentTiming.pollMs)
     return () => clearInterval(t)
   }, [state, continuing, refresh])
-  // Audit 2026-11-07 #42: a failed first load is tried again (else no Start button ever comes).
-  const firstLoadFailed = status === null && error !== null
-  useEffect(() => {
-    if (!firstLoadFailed) return
-    const t = setInterval(() => void refresh(), agentTiming.pollMs)
-    return () => clearInterval(t)
-  }, [firstLoadFailed, refresh])
 
   const start = async () => {
     setBusy(true)
@@ -72,14 +84,14 @@ export function TrialStep({ batch, onDone }: { batch: string; onDone: (status: F
       await api.startFiling(batch, true)
       await refresh()
     } catch (e) {
-      setError(msg(e))
+      fail(e)
     } finally {
       setBusy(false)
     }
   }
   const mark = (path: string, verdict: FilingVerdict) => {
     setVerdicts((v) => ({ ...v, [path]: verdict }))
-    api.markFiling(batch, path, verdict).catch((e: unknown) => setError(msg(e)))
+    api.markFiling(batch, path, verdict).catch(fail)
   }
   const proceed = async () => {
     setContinuing(true)
@@ -89,7 +101,7 @@ export function TrialStep({ batch, onDone }: { batch: string; onDone: (status: F
       await refresh()
     } catch (e) {
       setContinuing(false)
-      setError(msg(e))
+      fail(e)
     }
   }
 
