@@ -261,6 +261,34 @@ def test_folder_servers(env, monkeypatch) -> None:
     assert "mcp__gh" in _value(cmd.args, "--allowedTools").split(",")
 
 
+def test_outside_stdio_servers_dont_inherit_the_claude_sign_in(env, monkeypatch) -> None:
+    """Review of audit 20: the CLI hands its environment (with how the user signs in to Claude
+    Code) to every stdio server; each outside one gets those names set empty in its own env,
+    unless its config sets the name itself. Object's own servers and remote ones are left alone."""
+    names = (*agentrun.RUN_ENV_KEEP, "ANTHROPIC_API_KEY")
+    for name in names:
+        monkeypatch.setenv(name, "sign-in-7")
+    mcp = {"mcpServers": {
+        "plain": {"command": "node", "args": ["srv.js"]},
+        "own-key": {"type": "stdio", "command": "x", "env": {"ANTHROPIC_API_KEY": "its-own", "A": "1"}},
+        "remote": {"type": "http", "url": "https://example.test/mcp"},
+    }}
+    (env["folder"] / ".mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
+    cmd = _build(_scope(env))
+    servers = cmd.mcp_config["mcpServers"]
+    for name in names:
+        assert cmd.env[name] == "sign-in-7"  # the CLI itself still signs in
+        assert servers["plain"]["env"][name] == "", name
+    assert servers["own-key"]["env"]["ANTHROPIC_API_KEY"] == "its-own"
+    assert servers["own-key"]["env"]["A"] == "1"
+    assert all(servers["own-key"]["env"][n] == "" for n in agentrun.RUN_ENV_KEEP)
+    assert servers["remote"] == mcp["mcpServers"]["remote"]
+    for own in ("object", "object-agent"):
+        assert set(servers[own]["env"]) == {"OBJECT_API_URL", "OBJECT_API_TOKEN"}
+    assert json.loads((cmd.tmp / "mcp.json").read_text(encoding="utf-8")) == cmd.mcp_config
+    assert "sign-in-7" not in json.dumps(servers)
+
+
 def test_guidance_appended(env) -> None:
     cmd = _build(_scope(env))
     assert OBJECT_GUIDANCE.format(agent="Researcher", space="Notes") in cmd.append
