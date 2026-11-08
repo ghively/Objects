@@ -48,6 +48,7 @@ __all__ = [
     "create_space",
     "delete_space",
     "folder_token",
+    "is_full_path",
     "normalize",
 ]
 
@@ -103,6 +104,14 @@ def normalize(path: Path | str) -> Path:
     if any(_component_too_long(part) for part in text.replace("\\", "/").split("/")):
         raise ValueError(f"path component too long: {text[:60]!r}")
     return Path(text).resolve()
+
+
+def is_full_path(path: Path | str) -> bool:
+    """Whether `path` (``~`` expanded) is absolute. The spaces routes take only full paths:
+    a relative one would be read against the server's working folder, which is nothing
+    the user chose (sweep 2026-11-08)."""
+    text = str(path).strip()
+    return bool(text) and Path(os.path.expanduser(text)).is_absolute()
 
 
 def _key(path: Path | str) -> str:
@@ -268,6 +277,8 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     name = name.strip()
     if len(name) > MAX_NAME_LENGTH:
         raise SpaceNameProblem(f"A space name can have at most {MAX_NAME_LENGTH} characters.")
+    if "\x00" in name:  # `safe_filename` would cut the name there, silently
+        raise SpaceNameProblem("A space name can't contain a NUL character.")
     try:
         parent = normalize(location)
         if not parent.is_dir():
