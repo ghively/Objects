@@ -307,10 +307,21 @@ const gfmLexer = new Marked({ gfm: true })
 
 const LIST_ITEMS = new Set(['listItem', 'taskItem'])
 
-/** Each list item's depth and list kind (`o` ordered, `b` bullet), in document order. */
+/** An ordered item's text that GFM reads as a task item (`1. [ ] a`), as `marked` tells it. */
+const ORDERED_BOX = /^\[[ xX]\] +\S/
+
+/**
+ * Each list item's depth and list kind (`o` ordered, `b` bullet), in document
+ * order; an ordered item whose text starts with a box adds `t` (audit
+ * 2026-11-07 #18: the box is written bare, so the source's must be bare too).
+ */
 function nodeListShape(node: JSONContent, depth = 0, kind = '', out: string[] = []): string[] {
   const isItem = LIST_ITEMS.has(node.type ?? '')
-  if (isItem) out.push(depth + kind)
+  if (isItem) {
+    const first = node.content?.[0]
+    const text = first?.type === 'paragraph' ? (first.content ?? []).map((n) => n.text ?? '').join('') : ''
+    out.push(depth + kind + (kind === 'o' && ORDERED_BOX.test(text) ? 't' : ''))
+  }
   const childKind = node.type === 'orderedList' ? 'o' : node.type === 'bulletList' || node.type === 'taskList' ? 'b' : kind
   for (const child of node.content ?? []) nodeListShape(child, isItem ? depth + 1 : depth, childKind, out)
   return out
@@ -320,8 +331,9 @@ function nodeListShape(node: JSONContent, depth = 0, kind = '', out: string[] = 
 function tokenListShape(tokens: Token[], depth = 0, out: string[] = []): string[] {
   for (const t of tokens) {
     if (t.type === 'list') {
-      for (const item of (t as { items: { tokens?: Token[] }[] }).items) {
-        out.push(depth + ((t as { ordered?: boolean }).ordered ? 'o' : 'b'))
+      const ordered = (t as { ordered?: boolean }).ordered
+      for (const item of (t as { items: { task?: boolean; tokens?: Token[] }[] }).items) {
+        out.push(depth + (ordered ? (item.task ? 'ot' : 'o') : 'b'))
         tokenListShape(item.tokens ?? [], depth + 1, out)
       }
     } else if (t.type === 'blockquote' && 'tokens' in t && t.tokens) tokenListShape(t.tokens, depth, out)
