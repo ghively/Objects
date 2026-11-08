@@ -168,7 +168,11 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
     space = ctx.space
     tokens = TokenStore(space.root, state_folder)
     activity = ActivityLog(space.root, state_folder)
-    r = APIRouter()
+    from .server import SafeJSONResponse  # lazy: server.py imports this module
+
+    # A file name that is not UTF-8 holds surrogate escapes; its answers show them as U+FFFD
+    # instead of failing to encode (audit 2026-11-07 #4).
+    r = APIRouter(default_response_class=SafeJSONResponse)
 
     guard = V1Guard(ctx, tokens, activity)
     auth = guard.auth
@@ -338,7 +342,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             )
         except InvalidValue as exc:
             return _error(422, str(exc))
-        return JSONResponse(json.loads(json.dumps(out, default=str)))
+        return SafeJSONResponse(json.loads(json.dumps(out, default=str)))
 
     @r.post("/v1/queries/{query_id}/run")
     @guarded
@@ -382,7 +386,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         ]
         out["unsupported"] = sorted({*out["unsupported"], *skipped})
         out["query"] = {"id": q.id, "name": q.name}
-        return JSONResponse(json.loads(json.dumps(out, default=str)))
+        return SafeJSONResponse(json.loads(json.dumps(out, default=str)))
 
     def read_visible(path: str):
         rel = visible_rel(path)
@@ -405,7 +409,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         links = space.links_of(rel, fm)
         links = {k: [p for p in v if p not in hidden] for k, v in links.items()}
         body = of.body
-        return JSONResponse(
+        return SafeJSONResponse(
             json.loads(
                 json.dumps(
                     {
@@ -437,7 +441,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             if found is None:
                 return _error(404, f"No heading {section!r} in {rel!r}")
             body = found
-        return JSONResponse(
+        return SafeJSONResponse(
             json.loads(
                 json.dumps(
                     {**summary_out(space.get(rel)), "version": version, "values": values,
@@ -459,7 +463,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             return _error(404, f"No object at {path!r}")
         hidden = hidden_paths()
         items = [b for b in space.backlinks(rel) if b.get("path") not in hidden]
-        return JSONResponse(json.loads(json.dumps({"backlinks": items}, default=str)))
+        return SafeJSONResponse(json.loads(json.dumps({"backlinks": items}, default=str)))
 
     @r.get("/v1/daily-note")
     @guarded
@@ -574,7 +578,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             announce("changed", path, space.cached_version(path), token)
         rows = space.rows(None, None, [rel], None, False)
         values = rows[0].values if rows else {}
-        return JSONResponse(
+        return SafeJSONResponse(
             json.loads(
                 json.dumps(
                     {"version": result.version, "values": values,

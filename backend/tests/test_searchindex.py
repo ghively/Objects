@@ -720,3 +720,55 @@ def test_second_start_sync_under_2s(big_index, big_space_dir: Path):
     second.stop()
     assert took < 2 * SLACK, f"second start sync took {took:.2f}s"
     assert _cache_state(cache) == before
+
+
+# -- audit 2026-11-07 #4: a file name that is not UTF-8 ----------------------------------
+
+
+def _undecodable_page(root: Path, name: bytes, body: bytes) -> str:
+    """Write ``Pages/<name>`` with raw bytes; the space path it reads back as (surrogates)."""
+    if sys.platform != "linux":
+        pytest.skip("only Linux file systems take a file name that is not UTF-8")
+    raw = os.fsencode(root) + b"/Pages/" + name
+    try:
+        with open(raw, "wb") as f:
+            f.write(body)
+    except OSError:
+        pytest.skip("this file system refuses a file name that is not UTF-8")
+    return os.fsdecode(b"Pages/" + name)
+
+
+def test_undecodable_file_name_is_indexed_and_searchable(
+    links_space_dir: Path, tmp_path: Path, caplog: pytest.LogCaptureFixture
+):
+    bad = _undecodable_page(
+        links_space_dir,
+        b"Caf\xe9 notes.md",
+        b"---\ntype: Page\ntitle: Cafe notes\n---\nBody about quillwort and the engine.\n",
+    )
+    caplog.set_level("ERROR", logger="objectapp.searchindex")
+    space, idx = _start(links_space_dir, tmp_path / "cache")
+    try:
+        assert bad in space._summaries
+        res = idx.search("quillwort")  # full text: snippets of the surrogate path
+        assert _paths(res) == [bad]
+        assert _hit(res, bad)["highlights"]
+        assert bad in _paths(idx.search("Cafe"))
+        assert idx.phrase_candidates("quillwort") == {bad}
+        # The other objects of its chunk were indexed too, and later changes still apply.
+        assert ENGINE in _paths(idx.search("engine"))
+        version = version_of(space._raw[LOOSE].data)
+        space.save_body(LOOSE, "Now mentions zephyrquill.\n", version)
+        assert _wait(lambda: LOOSE in _paths(idx.search("zephyrquill")))
+        version = version_of(space._raw[bad].data)
+        space.save_body(bad, "Now about marshwort and the engine.\n", version)
+        assert _wait(lambda: bad in _paths(idx.search("marshwort")))
+        assert bad not in _paths(idx.search("quillwort"))
+        assert all(isinstance(p, str) for p, _r in idx.similar(ENGINE, 50))
+        idx.similar(bad, 10)  # no error
+        os.remove(os.fsencode(links_space_dir) + b"/" + os.fsencode(bad))
+        space.rescan_file(bad)
+        assert _wait(lambda: idx.search("marshwort")["results"] == [])
+        assert "could not apply a change" not in caplog.text
+    finally:
+        idx.stop()
