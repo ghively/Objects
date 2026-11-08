@@ -1,7 +1,12 @@
-// Test fixtures for the task modules: the basic Task type as the server tops it up (M4 Task 3).
-// Imported by tests only.
-import type { Row } from '@/api/types'
+// Test fixtures for the task modules: the basic Task type with the fields the server adds to it
+// (M4 Task 3), as the API returns it. Imported by tests only.
+import type { DateConstraints, Row } from '@/api/types'
 import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
+
+/** A day-resolution date with no end, as Date and Deadline are defined. */
+const dayDate = (extra: Partial<DateConstraints> = {}): { constraints: DateConstraints } => ({
+  constraints: { endTimeSettings: 'notAllowed', resolutionPreference: 'day', ...extra },
+})
 
 export const TASK_TYPE = typeDef({
   id: 'task',
@@ -44,9 +49,9 @@ export const TASK_TYPE = typeDef({
       id: 'date',
       type: 'datetimeSimple',
       name: 'Date',
-      options: { constraints: { resolutionPreference: 'day', endTimeSettings: 'notAllowed', supportsReminders: true } },
+      options: dayDate({ supportsReminders: true }),
     }),
-    propertyDef({ id: 'deadline', type: 'datetimeSimple', name: 'Deadline', options: { constraints: { resolutionPreference: 'day', endTimeSettings: 'notAllowed' } } }),
+    propertyDef({ id: 'deadline', type: 'datetimeSimple', name: 'Deadline', options: dayDate() }),
     propertyDef({ id: 'completed', type: 'datetimeSimple', name: 'Completed', visibility: 'hidden', options: { constraints: { resolutionPreference: 'time' } } }),
     propertyDef({ id: 'repeat', type: 'text', name: 'Repeat', visibility: 'hidden' }),
     propertyDef({ id: 'remind', type: 'text', name: 'Remind', visibility: 'hidden' }),

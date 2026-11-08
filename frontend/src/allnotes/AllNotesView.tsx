@@ -12,9 +12,9 @@ import { useRows } from '@/views/useRows'
 
 export const ALL_NOTES_TEXT = {
   heading: 'All notes',
-  description: 'All notes in this space, grouped by when they were created.',
+  description: 'Every note in the space, sorted into groups by creation date.',
   emptyTitle: 'No notes yet',
-  emptyBody: 'Notes you create will appear here.',
+  emptyBody: 'New notes show up here.',
 }
 
 /** The types All notes leaves out. */

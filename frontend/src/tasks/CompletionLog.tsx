@@ -1,6 +1,6 @@
 // "Completion Log" under "Task Stats": the recurring task's
 // occurrence log, newest first, each entry its scheduled date and action ("Completed", "Skipped",
-// "Excused"). An entry can be deleted after a confirm ("Delete completion log entry");
+// "Excused"). An entry can be deleted after a confirm ("Remove this entry from the log?");
 // the owner writes the remaining log lines (an unparseable line is never listed and always kept),
 // so the file changes only by that entry's line. Deleting the last line removes the key.
 import { useState } from 'react'
@@ -19,8 +19,8 @@ import { formatDate } from '@/properties/format'
 
 export const COMPLETION_LOG_TEXT = {
   heading: 'Completion Log',
-  deleteTitle: 'Delete completion log entry',
-  deleteDescription: 'This log entry will be permanently removed from the completion history.',
+  deleteTitle: 'Remove this entry from the log?',
+  deleteDescription: 'It will be gone from the task history for good.',
   cancel: 'Cancel',
   delete: 'Delete',
 } as const

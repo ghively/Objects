@@ -115,7 +115,7 @@ export function resolveY(config: ChartViewConfig, viewTypes: TypeDef[]): PropCho
 /** The group-by entry for an axis property: dates by the chosen bucket, the rest by value. */
 export function entryFor(choice: PropChoice, bucket: ChartViewConfig['xDateBucket']): GroupByEntry {
   const entry: GroupByEntry = { propertyId: choice.key, option: DATE_KINDS.has(choice.kind) ? bucket : 'default' }
-  if (choice.structureId) entry.structureId = choice.structureId
+  if (choice.typeId) entry.typeId = choice.typeId
   return entry
 }
 
@@ -185,7 +185,7 @@ export function yLabelOf(calc: CalcKind, y: PropChoice | null): string {
 /** One Y value over `rows`: the calculation's number (an empty result is 0, as is no rows). */
 function valueOf(rows: Row[], calc: CalcKind, y: PropChoice | null, ctx: GroupCtx): number {
   if (calc === 'countAll' || !y || rows.length === 0) return rows.length
-  const r = calculate(rows, y.key, calc, ctx, y.structureId)
+  const r = calculate(rows, y.key, calc, ctx, y.typeId)
   return typeof r.value === 'number' && Number.isFinite(r.value) ? r.value : 0
 }
 
@@ -359,8 +359,8 @@ export function buildChartData(rows: Row[], config: ChartViewConfig, viewTypes: 
 
 // ---- "Show as table": the filter that stands for one group -----------------------------------
 
-const base = (choice: PropChoice): Pick<Filter, 'type' | 'propertyId' | 'structureId'> =>
-  choice.structureId ? { type: 'filter', propertyId: choice.key, structureId: choice.structureId } : { type: 'filter', propertyId: choice.key }
+const base = (choice: PropChoice): Pick<Filter, 'type' | 'propertyId' | 'typeId'> =>
+  choice.typeId ? { type: 'filter', propertyId: choice.key, typeId: choice.typeId } : { type: 'filter', propertyId: choice.key }
 
 /** The first and last day (`YYYY-MM-DD`) of a date bucket. */
 function bucketDays(id: string, bucket: ChartViewConfig['xDateBucket']): [string, string] | null {
@@ -382,7 +382,7 @@ export function filtersForGroup(
   bucket: ChartViewConfig['xDateBucket'],
   ctx: GroupCtx,
 ): Filter[] | null {
-  const def = findDef(ctx.types, choice.key, choice.structureId, ctx.viewTypeIds)
+  const def = findDef(ctx.types, choice.key, choice.typeId, ctx.viewTypeIds)
   if (!def) return null
   const f = base(choice)
   const one = (option: string, referenceValue?: Filter['referenceValue']): Filter[] =>
@@ -439,7 +439,7 @@ export function filtersForGroup(
   })()
   if (!out) return null
   // A property only one of the view's types has: the group holds that type's rows only.
-  return choice.structureId ? [{ type: 'filter', propertyId: 'type', option: 'contains', referenceValue: [choice.structureId] }, ...out] : out
+  return choice.typeId ? [{ type: 'filter', propertyId: 'type', option: 'contains', referenceValue: [choice.typeId] }, ...out] : out
 }
 
 /** The view's filters with `added` joined by AND (top level when it is already AND). */

@@ -13,11 +13,11 @@ export const CUSTOMIZATION_TEXT = {
   deselectAll: 'Deselect all',
   showCompletedTasks: 'Show completed tasks',
   alwaysMinimalNodes: 'Show simplified graph',
-  hideLargeNodes: 'Hide objects with many links',
+  hideLargeNodes: 'Hide heavily linked objects',
   hideLargeNodesTooltip: (limit: number) => `Nodes with more than ${limit} links are hidden`,
   hideDates: 'Hide dates',
   hideIndirectLinks: 'Hide indirect links',
-  hideIndirectLinksTooltip: 'Links that only pass through a hidden object are not shown.',
+  hideIndirectLinksTooltip: 'A link that runs only through hidden objects is hidden too.',
   showTagsNetwork: 'Show tags network',
 }
 
@@ -125,15 +125,15 @@ export function GraphCustomization({ custom, onPatch, types, tagsNetworkKey }: G
       <PopoverContent align="end" className="flex w-72 flex-col gap-3 p-2" aria-label={t.customize}>
         <TypeList
           label={t.filterObjectTypes}
-          selected={custom.filterStructureIds ?? []}
+          selected={custom.filterTypeIds ?? []}
           types={types}
-          onChange={(next) => onPatch({ filterStructureIds: next })}
+          onChange={(next) => onPatch({ filterTypeIds: next })}
         />
         <TypeList
           label={t.excludeObjectTypes}
-          selected={custom.excludeStructureIds ?? []}
+          selected={custom.excludeTypeIds ?? []}
           types={types}
-          onChange={(next) => onPatch({ excludeStructureIds: next })}
+          onChange={(next) => onPatch({ excludeTypeIds: next })}
         />
         <div className="flex flex-col border-t border-line pt-2">
           {switches.map((s) => (

@@ -1,4 +1,4 @@
-// M9 Task 19: Import CSV into a type ("Batch import to collection").
+// M9 Task 19: Import CSV into a type ("Bulk import from CSV").
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -29,7 +29,7 @@ const BOOK = typeDef({ id: 'book', name: 'Book', pluralName: 'Books', propertyDe
 const csvFile = (text: string, name = 'Reading list.csv') => new File([text], name, { type: 'text/csv' })
 
 async function upload(user: ReturnType<typeof userEvent.setup>, text: string, name?: string) {
-  await user.upload(screen.getByLabelText('Choose file or drop here.'), csvFile(text, name))
+  await user.upload(screen.getByLabelText('Pick a file, or drag one here.'), csvFile(text, name))
 }
 
 beforeEach(() => {
@@ -42,7 +42,7 @@ describe('ImportCsvDialog', () => {
   test('test header row toggle', async () => {
     const user = userEvent.setup()
     render(<ImportCsvDialog type={BOOK} open onOpenChange={() => undefined} />)
-    expect(screen.getByText('Batch import to collection')).toBeInTheDocument()
+    expect(screen.getByText('Bulk import from CSV')).toBeInTheDocument()
     expect(screen.getByText('Use this with caution')).toBeInTheDocument()
     await upload(user, 'Name,Author\nDune,Herbert\nEmma,Austen\n')
     expect(await screen.findByText('Add 2 new Books to')).toBeInTheDocument()
@@ -155,7 +155,7 @@ describe('ImportCsvDialog', () => {
     render(<ImportCsvDialog type={BOOK} open onOpenChange={() => undefined} />)
     const lines = ['Name', ...Array.from({ length: CSV_ROW_LIMIT + 1 }, (_, i) => `Book ${i}`)]
     await upload(user, lines.join('\n'))
-    expect(await screen.findByText('This file is not supported. We only support CSV imports up to 1000 rows.')).toBeInTheDocument()
+    expect(await screen.findByText("This file can't be imported. CSV files of up to 1000 rows are supported.")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Import' })).toBeDisabled()
   })
 
@@ -175,7 +175,7 @@ describe('ImportCsvDialog', () => {
     render(<ImportCsvDialog type={BOOK} open onOpenChange={() => undefined} />)
     await upload(user, 'Name\n"Dune\n')
     expect(
-      await screen.findByText('Some issues were found while parsing your file. Make sure to use a valid CSV file to ensure the import you expect.'),
+      await screen.findByText('Parts of this file could not be read. Check that it is a valid CSV so the import comes out as expected.'),
     ).toBeInTheDocument()
   })
 
@@ -192,7 +192,7 @@ describe('ImportCsvDialog', () => {
 
   test('a file dropped on the drop zone is read', async () => {
     render(<ImportCsvDialog type={BOOK} open onOpenChange={() => {}} />)
-    const zone = screen.getByText('Choose file or drop here.').closest('label')!
+    const zone = screen.getByText('Pick a file, or drag one here.').closest('label')!
     const dataTransfer = { files: [csvFile('Name\nDune\nEmma\n')], types: ['Files'] }
     expect(fireEvent.dragOver(zone, { dataTransfer })).toBe(false)
     fireEvent.drop(zone, { dataTransfer })

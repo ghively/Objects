@@ -41,13 +41,13 @@ export const QUERY_TEXT = {
   unpinFromDashboard: 'Unpin from dashboard',
   delete: 'Delete',
   notReadyTitle: 'Query isn’t ready',
-  notReadyBody: 'This draft is saved, but returns no results until you add a search term, choose a tag, or select an object type.',
+  notReadyBody: 'The draft is kept, but it lists nothing until it has a search term, a tag or an object type.',
   empty: 'No content found',
   unknown: 'Unknown query',
 }
 
 /**
- * M22: the note on the built-in Tickets view (`builtIn: 'tickets'`, our string). Its structures are
+ * M22: the note on the built-in Tickets view (`builtIn: 'tickets'`, our string). Its types are
  * every work type, set by the server at each read, so it has no type picker (no query builder) and
  * no Delete (the server refuses it: "The Tickets view is built in.").
  */
@@ -135,9 +135,9 @@ export function QueryPage({ id }: { id: string }) {
   const readOnly = !!q.readOnlyReason
   const tickets = q.builtIn === 'tickets'
   const title = queryTitle(q, titleCtx)
-  const structures = def.structures.map((s) => allTypes.find((t) => t.id === s.id)).filter((t): t is TypeDef => !!t)
+  const queryTypes = def.types.map((s) => allTypes.find((t) => t.id === s.id)).filter((t): t is TypeDef => !!t)
   const pausedNow = isSearching(def)
-  const multiType = def.structures.length !== 1
+  const multiType = def.types.length !== 1
   const layouts = multiType ? FULL_VIEW_LAYOUTS.filter((l) => l !== 'table') : FULL_VIEW_LAYOUTS
   const shownState =
     multiType && state.viewDefinition.dataViewLayout === 'table'
@@ -167,7 +167,7 @@ export function QueryPage({ id }: { id: string }) {
 
   const loadTypePins = (open: boolean) => {
     if (!open) return
-    for (const t of structures) {
+    for (const t of queryTypes) {
       void api
         .views(t.id)
         .then((v) => setTypePins((cur) => ({ ...cur, [t.id]: viewsHaveQuery(v.views, q.id) })))
@@ -182,7 +182,7 @@ export function QueryPage({ id }: { id: string }) {
       setNotice(e instanceof Error ? e.message : String(e))
     })
   }
-  const dashboardCollections = defs.collections.filter((c) => def.structures.length === 0 || def.structures.some((s) => c.typeIds.includes(s.id)))
+  const dashboardCollections = defs.collections.filter((c) => def.types.length === 0 || def.types.some((s) => c.typeIds.includes(s.id)))
 
   const doDelete = () => {
     void removeQuery(q.id)
@@ -254,10 +254,10 @@ export function QueryPage({ id }: { id: string }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="border-line bg-raised">
             <PinMenuItems pin={{ kind: 'query', id: q.id }} />
-            {structures.map((t) => (
+            {queryTypes.map((t) => (
               <DropdownMenuItem key={t.id} onSelect={() => toggleType(t)}>
                 <Icon name={typePins[t.id] ? 'ph-push-pin-slash' : 'ph-push-pin'} size={14} />
-                {(typePins[t.id] ? QUERY_TEXT.unpinFromType : QUERY_TEXT.pinToType) + (structures.length > 1 ? ` (${t.name})` : '')}
+                {(typePins[t.id] ? QUERY_TEXT.unpinFromType : QUERY_TEXT.pinToType) + (queryTypes.length > 1 ? ` (${t.name})` : '')}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSub>
@@ -316,7 +316,7 @@ export function QueryPage({ id }: { id: string }) {
         ) : (
           <DataView
             rows={rows}
-            types={allTypes.length > 0 ? allTypes : structures}
+            types={allTypes.length > 0 ? allTypes : queryTypes}
             collections={defs.collections}
             scope={scope}
             loading={loading}

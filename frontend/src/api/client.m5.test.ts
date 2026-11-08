@@ -113,9 +113,9 @@ describe('api client M5', () => {
   test('test patchUi sends the graph customization', async () => {
     const fetchMock = respond(200, { ui: { pinned: [], sections: [], allNotesLayout: 'list' }, revision: 'r2' })
     vi.stubGlobal('fetch', fetchMock)
-    await api.patchUi({ graph: { showCompletedTasks: true, excludeStructureIds: ['task'] } }, { baseRevision: 'r1' })
+    await api.patchUi({ graph: { showCompletedTasks: true, excludeTypeIds: ['task'] } }, { baseRevision: 'r1' })
     expect(JSON.parse(callOf(fetchMock)[1]?.body as string).patch).toEqual({
-      graph: { showCompletedTasks: true, excludeStructureIds: ['task'] },
+      graph: { showCompletedTasks: true, excludeTypeIds: ['task'] },
     })
   })
 })

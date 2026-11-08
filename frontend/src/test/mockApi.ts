@@ -240,7 +240,7 @@ export function query(partial: Partial<Query> & Pick<Query, 'id'>): Query {
     titleIsCustom: name !== '',
     icon: null,
     description: '',
-    definition: { structures: [], filterGroup: emptyGroup(), sorts: [], groupBy: null },
+    definition: { types: [], filterGroup: emptyGroup(), sorts: [], groupBy: null },
     view: { viewDefinition: { dataViewLayout: 'list' } },
     readOnlyReason: null,
     revision: '',

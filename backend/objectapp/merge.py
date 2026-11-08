@@ -1,7 +1,8 @@
 """Merge an object (or a tag) into another (M8 Task 6).
 
-"Single values already set on “{targetName}” stay. Lists are combined with “{sourceName}”, and
-empty properties are filled from there. Content is added on." So `merge_objects`:
+"“{targetName}” keeps the single values it already has, picks up the list items from
+“{sourceName}”, which also fills any properties that are blank. Its content goes at the end." So
+`merge_objects`:
 
 1. refuses merging into itself, a tag into a non-tag and a non-tag into a tag (`InvalidValue`,
    422) and a whiteboard on either side (our choice: a board's content is its sidecar files);
@@ -59,7 +60,7 @@ class TooLarge(Exception):
     """More referencing files than `MERGE_LIMIT` (the route answers 413)."""
 
     def __init__(self, count: int, limit: int) -> None:
-        super().__init__(f"Merging is limited to {limit} references ({count} found)")
+        super().__init__(f"A merge can move at most {limit} references ({count} found)")
         self.count = count
         self.limit = limit
 

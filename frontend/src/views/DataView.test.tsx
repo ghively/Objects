@@ -195,8 +195,8 @@ describe('DataView', () => {
     const user = userEvent.setup()
     const onCreate = vi.fn()
     render(<Harness rows={[]} onCreate={onCreate} />)
-    expect(screen.getByText("There's nothing here (yet).")).toBeInTheDocument()
-    expect(screen.getByText('You can change this by creating a new object.')).toBeInTheDocument()
+    expect(screen.getByText("Nothing to show yet.")).toBeInTheDocument()
+    expect(screen.getByText('Create an object to see it here.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Create Page' }))
     expect(onCreate).toHaveBeenCalledWith({}, 'page')
   })
@@ -233,11 +233,11 @@ describe('DataView', () => {
         state={base()}
         onState={() => undefined}
         layouts={['list']}
-        pausedHint="Sort and property filters pause while searching."
+        pausedHint="Sorting and property filters are off during a search."
       />,
     )
-    expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('title', 'Sort and property filters pause while searching.')
-    expect(screen.getByTestId('view-summary')).toHaveTextContent('pause while searching')
+    expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('title', 'Sorting and property filters are off during a search.')
+    expect(screen.getByTestId('view-summary')).toHaveTextContent('off during a search')
   })
 
   test('the layout picker offers only the given layouts', async () => {

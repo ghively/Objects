@@ -28,7 +28,7 @@ import { EmbedMenu, ResizableEmbed, type EmbedMenuItem, type ResizableEmbedProps
 import { cachedAttachments, decodeMarkdownPath, findAttachment, isExternalUrl, showToast } from './upload'
 
 /** The image load error. */
-export const IMAGE_ERROR = 'This image could not be loaded. Please try again or delete the object.'
+export const IMAGE_ERROR = "The image didn't load. Try again, or delete it."
 /** Our string. */
 export const FILE_NOT_FOUND = 'File not found.'
 /** Default PDF height in px (our value). */

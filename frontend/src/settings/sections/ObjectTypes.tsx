@@ -12,9 +12,9 @@ import { SectionHeader, SettingGroup } from '../controls'
 
 export const OBJECT_TYPES_TEXT = {
   heading: 'Object Types',
-  description: 'Here you can customize your object types.',
+  description: 'Edit the object types in this space.',
   yourTypes: 'Your object types',
-  yourTypesDescription: 'Select an object type to customize it.',
+  yourTypesDescription: 'Pick a type to edit it.',
   basic: 'Basic object types',
   custom: 'Custom object types',
 } as const

@@ -32,7 +32,7 @@ Every feature is simply available; nothing is gated behind a paid tier.
 
 | Concept | Must support |
 |---|---|
-| **Object type** (Structure) | name, plural name, icon, colour, description; ordered property definitions; layout `profile` / `indexCard` / `encyclopedia`, wide mode, cover crop; how objects of the type render elsewhere (inline, small card, wide card, embed, page) with per-view settings; default view; templates; calendar options |
+| **Object type** | name, plural name, icon, colour, description; ordered property definitions; layout `profile` / `indexCard` / `encyclopedia`, wide mode, cover crop; how objects of the type render elsewhere (inline, small card, wide card, embed, page) with per-view settings; default view; templates; calendar options |
 | **Property kinds** | text, rich text block, simple table, number (formats: number, currency, percentage, progress; decimals, thousands separator), checkbox, URL, date and date+time (with ranges, `time`/`day` resolution, constraints), relation to objects (single or multiple, limited to chosen types, fixed set, property syncing), label (single or multiple, options with colour and icon, can act as **status** with categories not-started / in-progress / blocked / done), blocks. Per property: icon, description, visibility (always / hide when empty / hidden), searchable |
 | **System properties** | title, icon, description, aliases, tags, type, collections, created, last updated, backlinks |
 | **Collections** (Databases) | named sets of objects of one or more types, an object can be in several; their own views, pinned items, templates, dashboard sections |
@@ -96,11 +96,10 @@ Body = the object's blocks, as Markdown.
 - **Body blocks** that plain Markdown can express are written as plain Markdown. Block options Markdown can't express (toggles, colours, columns, standout quotes, embed view settings, alphabetical/roman lists) are kept with a small inline annotation, so the file still reads cleanly in any editor. The annotation syntax is the builder's choice.
 - **Links** are `[[Title]]`. Renaming an object renames its file and updates the links to it.
 - **Files outside the app:** if a file is edited elsewhere, the app picks up the change. Saving never rewrites parts of a file that weren't edited.
-- **Older spaces:** spaces made before 2026-11-04 keep their app data under an older folder name; the app renames it to `.object/` (and the cache to `.object-cache/`) once, automatically, on open, and changes no `.md` file. [amended 2026-11-04]
 
 ## 5. Look and feel
 
-- Match the behaviour catalog and the design tokens: Inter at a 15px base, the measured dark palette, radii, soft layered shadows, the Phosphor icons. Light mode is included.
+- Match the behaviour catalog and the design tokens: Inter at a 15px base, Object's dark palette, radii, soft layered shadows, the Phosphor icons. Light mode is included.
 - **Interactions to copy:**
   - the peek modal with its pager
   - the `…` menus and their groupings

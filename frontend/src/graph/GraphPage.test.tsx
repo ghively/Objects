@@ -81,15 +81,15 @@ describe('GraphPage', () => {
     mocked.graph.mockImplementation(async () => graphData())
     const empty = render(<GraphPage onOpenTarget={vi.fn()} />)
     expect(await screen.findByText('Nothing to show')).toBeInTheDocument()
-    expect(screen.getByText('There is nothing in this graph yet.')).toBeInTheDocument()
+    expect(screen.getByText('This graph has no nodes yet.')).toBeInTheDocument()
     empty.unmount()
 
     // Filters hide everything.
     resetGraphData()
     mocked.graph.mockImplementation(async () => DATA)
-    setUi({ excludeStructureIds: ['page', 'task'] })
+    setUi({ excludeTypeIds: ['page', 'task'] })
     render(<GraphPage onOpenTarget={vi.fn()} />)
-    expect(await screen.findByText('The current filters are hiding everything in this graph.')).toBeInTheDocument()
+    expect(await screen.findByText('Your filters hide every node in this graph.')).toBeInTheDocument()
     expect(screen.getByText('Nothing to show')).toBeInTheDocument()
   })
 
@@ -110,7 +110,7 @@ describe('GraphPage', () => {
     const user = userEvent.setup()
     render(<GraphPage onOpenTarget={vi.fn()} />)
     const sigma = await sigmaReady()
-    const search = screen.getByRole('searchbox', { name: 'Search for a note in the graph' })
+    const search = screen.getByRole('searchbox', { name: 'Find a note in this graph' })
     await user.type(search, 'babage{Enter}')
     expect(sigma.camera.animate).toHaveBeenCalledTimes(1)
     expect(sigma.camera.animate).toHaveBeenCalledWith({ x: 0.5, y: 0.25, ratio: expect.any(Number) }, expect.anything())

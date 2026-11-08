@@ -39,7 +39,7 @@ const text = (s: string): Key => (s.trim() === '' ? EMPTY_KEY : { empty: false, 
 
 function sortKey(row: Row, sort: Sort, ctx: FilterCtx): Key {
   // A sort scoped to one type sees every other type's rows as empty.
-  if (sort.structureId && row.summary.type !== sort.structureId) return EMPTY_KEY
+  if (sort.typeId && row.summary.type !== sort.typeId) return EMPTY_KEY
   const def = findDef(ctx.types, sort.propertyId, row.summary.type) ?? findDef(ctx.types, sort.propertyId)
   if (!def) return EMPTY_KEY
   const v = rowValue(row, sort.propertyId)
@@ -154,7 +154,7 @@ function createdMs(row: Row): number | null {
  */
 export function applySorts(rows: Row[], sorts: Sort[], ctx: FilterCtx): Row[] {
   const active = sorts.filter((s) => {
-    const kind = findDef(ctx.types, s.propertyId, s.structureId, ctx.viewTypeIds)?.type
+    const kind = findDef(ctx.types, s.propertyId, s.typeId, ctx.viewTypeIds)?.type
     return !!kind && !UNSORTABLE.has(kind)
   })
   const keyed = rows.map((row, i) => ({ row, i, keys: active.map((s) => sortKey(row, s, ctx)) }))

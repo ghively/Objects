@@ -27,7 +27,7 @@ const R = (title: string, type: string, over: Partial<Row['summary']> = {}): Row
 }
 
 const def = (over: Partial<QueryDefinition> = {}): QueryDefinition => ({
-  structures: [],
+  types: [],
   filterGroup: emptyFilterGroup(),
   sorts: [],
   groupBy: null,
@@ -36,7 +36,7 @@ const def = (over: Partial<QueryDefinition> = {}): QueryDefinition => ({
 const titles = (rows: Row[]) => rows.map((r) => r.summary.title)
 
 describe('runQuery', () => {
-  test('test runQuery collection filters per structure', () => {
+  test('test runQuery collection filters per type', () => {
     const rows = [
       R('A', 'server', { collections: ['Tooling'] }),
       R('B', 'server', { collections: ['Unknown'] }),
@@ -44,13 +44,13 @@ describe('runQuery', () => {
       R('D', 'server', { collections: ['Gear', 'Ops'] }),
       R('P', 'page', { collections: ['Ops'] }),
     ]
-    const run = (s: QueryDefinition['structures'][number]) => titles(runQuery(def({ structures: [s] }), rows, ctx).rows).sort()
+    const run = (s: QueryDefinition['types'][number]) => titles(runQuery(def({ types: [s] }), rows, ctx).rows).sort()
     expect(run({ id: 'server', inNoCollection: true })).toEqual(['B', 'C'])
     expect(run({ id: 'server', inAnyCollection: true })).toEqual(['A', 'D'])
     expect(run({ id: 'server', collectionIds: ['tooling'] })).toEqual(['A', 'D'])
     expect(run({ id: 'server', excludeCollectionIds: ['ops'] })).toEqual(['A', 'B', 'C'])
-    // A type that is not among the structures is left out.
-    expect(titles(runQuery(def({ structures: [{ id: 'server', inNoCollection: true }] }), rows, ctx).rows)).not.toContain('P')
+    // A type that is not among the query types is left out.
+    expect(titles(runQuery(def({ types: [{ id: 'server', inNoCollection: true }] }), rows, ctx).rows)).not.toContain('P')
   })
 
   test('test tags any vs all', () => {
@@ -63,7 +63,7 @@ describe('runQuery', () => {
   test('test excludeTags removes tagged rows', () => {
     const rows = [R('A', 'page', { tags: ['alpha'] }), R('B', 'page', { tags: ['beta'] }), R('C', 'page')]
     const out = runQuery(
-      def({ structures: [{ id: 'page' }], tags: { ids: ['tag-a', 'tag-b'], operator: 'or' }, excludeTags: { ids: ['tag-b'] } }),
+      def({ types: [{ id: 'page' }], tags: { ids: ['tag-a', 'tag-b'], operator: 'or' }, excludeTags: { ids: ['tag-b'] } }),
       rows,
       ctx,
     )
@@ -72,20 +72,20 @@ describe('runQuery', () => {
 
   test('test excludeTags and excluded types ignored without search or tag', () => {
     const rows = [R('A', 'page', { tags: ['alpha'] }), R('S', 'server')]
-    const d = def({ structures: [{ id: 'page' }], excludeTags: { ids: ['tag-a'] } })
+    const d = def({ types: [{ id: 'page' }], excludeTags: { ids: ['tag-a'] } })
     expect(titles(runQuery(d, rows, ctx).rows)).toEqual(['A'])
-    const e = def({ excludeStructureIds: ['page'] })
+    const e = def({ excludeTypeIds: ['page'] })
     expect(titles(runQuery(e, rows, ctx).rows).sort()).toEqual(['A', 'S'])
     expect(queryScope(e, ['page', 'server'])).toEqual({})
     // With a search term the exclusion counts.
-    const f = def({ excludeStructureIds: ['page'], search: { searchTerms: [{ text: 'zz' }], searchMode: 'auto' } })
+    const f = def({ excludeTypeIds: ['page'], search: { searchTerms: [{ text: 'zz' }], searchMode: 'auto' } })
     expect(titles(runQuery(f, rows, ctx).rows)).toEqual(['S'])
     expect(queryScope(f, ['page', 'server'])).toEqual({ typeIds: ['server'], search: { terms: ['zz'], mode: 'auto' } })
   })
 
   test('test limit first and random with seeded rng, ignored when grouped', () => {
     const rows = ['A', 'B', 'C', 'D', 'E'].map((t, i) => R(t, 'page', { createdAt: `2026-01-0${5 - i}T00:00:00Z` }))
-    const base = { structures: [{ id: 'page' }] }
+    const base = { types: [{ id: 'page' }] }
     expect(titles(runQuery(def({ ...base, limit: { size: 2 } }), rows, ctx).rows)).toEqual(['A', 'B'])
     const seq = [0.99, 0, 0.5]
     let i = 0
@@ -108,7 +108,7 @@ describe('runQuery', () => {
       R('Gamma', 'page', { createdAt: '2026-02-01T00:00:00Z' }),
     ]
     const base = def({
-      structures: [{ id: 'page' }],
+      types: [{ id: 'page' }],
       filterGroup: { type: 'filterGroup', operator: 'and', elements: [{ type: 'filter', propertyId: 'title', option: 'isNot', referenceValue: 'Alpha' }] },
       sorts: [{ propertyId: 'title', option: 'descending' }],
     })
@@ -127,12 +127,12 @@ describe('runQuery', () => {
 
   test('isQueryReady needs a search term, a tag or a type; queryScope sends the types and terms', () => {
     expect(isQueryReady(def())).toBe(false)
-    expect(isQueryReady(def({ structures: [{ id: 'page' }] }))).toBe(true)
+    expect(isQueryReady(def({ types: [{ id: 'page' }] }))).toBe(true)
     expect(isQueryReady(def({ tags: { ids: ['tag-a'], operator: 'or' } }))).toBe(true)
     expect(isQueryReady(def({ search: { searchTerms: [{ text: 'x' }], searchMode: 'auto' } }))).toBe(false)
     expect(isQueryReady(def({ search: { searchTerms: [{ text: 'xy' }], searchMode: 'title' } }))).toBe(true)
     expect(
-      queryScope(def({ structures: [{ id: 'page' }, { id: 'server' }], search: { searchTerms: [{ text: 'xy' }], searchMode: 'title' } })),
+      queryScope(def({ types: [{ id: 'page' }, { id: 'server' }], search: { searchTerms: [{ text: 'xy' }], searchMode: 'title' } })),
     ).toEqual({ typeIds: ['page', 'server'], search: { terms: ['xy'], mode: 'title' } })
   })
 })

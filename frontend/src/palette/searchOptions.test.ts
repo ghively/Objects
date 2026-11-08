@@ -51,8 +51,8 @@ describe('buildSearchOptions', () => {
   test('tag options match tag names', () => {
     const opts = buildSearchOptions('wor', TYPES, ['work', 'Work', 'world', 'home'], NO_FILTERS)
     expect(opts.filter((o) => o.kind === 'tag').map((o) => o.label)).toEqual([
-      'Only search content tagged with "work"',
-      'Only search content tagged with "world"',
+      'Limit results to the tag "work"',
+      'Limit results to the tag "world"',
     ])
   })
 })

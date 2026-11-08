@@ -1,4 +1,4 @@
-// M9 Task 16: "Recalculate content index"; polish 2026-11-03 moved it from Space Settings to
+// M9 Task 16: "Rebuild search index"; polish 2026-11-03 moved it from Space Settings to
 // Offline & Sync.
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -17,11 +17,11 @@ import { OFFLINE_SYNC_TEXT, OfflineSyncSection, REINDEX_POLL_MS } from './Offlin
 const mocked = vi.mocked(api)
 const SPACE: SpaceInfo = { name: 'Lab', root: '/spaces/Lab', types: [], icon: null, description: null, hideTaskManagement: false, revision: 's1' }
 
-const BUTTON = 'Recalculate content index'
+const BUTTON = 'Rebuild search index'
 const DESCRIPTION =
-  'If some of your views are inconsistent or search results are not returning content, you can reindex your notes. This is usually not needed, only use it if you are having issues.'
-const HEADING = 'Content is being indexed'
-const RUNNING = 'Your notes are getting analyzed for search, backlinking, and your content views.'
+  'Rebuilds the search index from your notes. Try it only when search misses things or views look out of date; normally it is never needed.'
+const HEADING = 'Rebuilding the index'
+const RUNNING = 'Object is reading your notes again for search, backlinks and views.'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -31,7 +31,7 @@ beforeEach(() => {
   mocked.reindex.mockResolvedValue({ started: true })
 })
 
-describe('Recalculate content index', () => {
+describe('Rebuild search index', () => {
   test('test button calls reindex', async () => {
     const user = userEvent.setup()
     render(<OfflineSyncSection />)

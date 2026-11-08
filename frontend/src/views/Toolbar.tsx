@@ -32,7 +32,7 @@ export interface ToolbarProps {
   hidden: Group[]
   pausedHint?: string
   extraPages?: CustomizePage[]
-  structureId?: string
+  typeId?: string
   /** The pill's last control (the Calendar Tasks section's `+`). */
   end?: ReactNode
 }
@@ -168,7 +168,7 @@ export function Toolbar(p: ToolbarProps) {
               layouts={narrow ? p.layouts : undefined}
               only={p.compact ? 'calcs' : undefined}
               extraPages={p.extraPages}
-              structureId={p.structureId}
+              typeId={p.typeId}
             />
           </PopoverContent>
         </Popover>

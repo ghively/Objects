@@ -3,7 +3,7 @@
  * to..."): the selected blocks' Markdown is added to the target, then removed here.
  * - "Today" / "Tomorrow": appended to that
  *   day's daily note, created when there is none (the action palette's `addToDailyNote`, with its
- *   "Added content to daily note" toast).
+ *   "Sent to the daily note" toast).
  * - "New page": a new page (the Page type) holding the blocks, opened
  *   after the blocks leave this page.
  * The blocks are removed only after the target was written; a failed write keeps them and shows

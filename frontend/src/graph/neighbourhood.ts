@@ -1,7 +1,7 @@
 // The local graph's neighbourhood: breadth-first over link edges from the centre, `hops` steps
 // (1–5), plus the `tagged` pairs when the centre is a Tag and "Show tags network" is on.
 // The local walk: completed tasks are not walked
-// unless shown; with "Hide objects with many links" the walk doesn't go on from a large node (the
+// unless shown; with "Hide heavily linked objects" the walk doesn't go on from a large node (the
 // centre included); a tag other than the centre with 10 or more backlinks isn't walked through
 // its backlinks.
 import type { GraphCustomization, GraphData } from '@/api/types'

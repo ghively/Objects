@@ -45,6 +45,7 @@ import {
   snapPosition,
   WEBLINK_DEFAULT_SIZE,
   type Box,
+  type Size,
 } from './model'
 
 // ---- ids ----
@@ -79,7 +80,7 @@ export const DEFAULT_ENTITY_HEIGHT = GRID * 4
 export const DEFAULT_CONNECTOR_LENGTH = GRID * 4
 
 /** Rendered sizes of nodes, by id, as React Flow measured them (auto-sized blocks have no stored size). */
-export type MeasuredSizes = Readonly<Record<string, { width: number; height: number }>>
+export type MeasuredSizes = Readonly<Record<string, Size>>
 
 /**
  * A node's box; a missing size is taken from `measured` (the rendered size), else its kind's
@@ -162,14 +163,14 @@ export interface CreateOptions {
   id?: string
   /** Snap to the grid (default true; off while Ctrl is held). */
   snap?: boolean
-  /** Remembered edge style of the board (`rememberedWhiteboardEdgeStyle`). */
+  /** The board's remembered connector style (`rememberedEdgeStyle`). */
   lastConnection?: WhiteboardEdgeConnection
   lastLine?: WhiteboardEdgeLine
   /** Shape colours (the tool memory's last fill and border). */
   fillColor?: WhiteboardFillColor
   borderColor?: WhiteboardThemeColor
   /** Click-placed size for shapes (the tool memory's last node size). */
-  size?: { width: number; height: number }
+  size?: Size
   /** Initial Markdown of a text block. */
   text?: string
 }
@@ -177,7 +178,7 @@ export interface CreateOptions {
 type Placement = Box | WhiteboardPosition | { start: WhiteboardPosition; end: WhiteboardPosition }
 
 /** A click (point, default size centred on it) or a drag (box, snapped with the floor). */
-function placeBox(at: Placement, size: { width: number; height: number }, min: { width: number; height: number }, snap: boolean): Box {
+function placeBox(at: Placement, size: Size, min: Size, snap: boolean): Box {
   if (isSegment(at)) {
     at = {
       x: Math.min(at.start.x, at.end.x),
@@ -861,8 +862,8 @@ export const RESIZE_STEP_LARGE = GRID * 5
 
 /**
  * "Resize selection": grows or shrinks each node from its right or bottom edge by `(dw, dh)`
- * ("Grows or shrinks from the right or bottom edge"), never below its kind's floor (an embedded
- * object stays at least 360 wide). Points and locked nodes stay. `measured` gives the rendered
+ * ("The right and bottom edges move; the top-left corner stays put"), never below its kind's floor (an embedded
+ * object stays at least `LINK_BLOCK_MIN_WIDTH` wide). Points and locked nodes stay. `measured` gives the rendered
  * size of nodes that still size themselves, so the first step starts from what is on screen.
  */
 export function resizeBy(
@@ -870,7 +871,7 @@ export function resizeBy(
   ids: Iterable<string>,
   dw: number,
   dh: number,
-  measured: Record<string, { width: number; height: number }> = {},
+  measured: Record<string, Size> = {},
 ): WhiteboardData {
   if ((!dw && !dh) || !Number.isFinite(dw) || !Number.isFinite(dh)) return board
   let nodes: Record<string, WhiteboardNode> | null = null

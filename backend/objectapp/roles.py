@@ -1,6 +1,6 @@
-"""Structure roles for our types, and the role lists M5 needs.
+"""Type roles for our types, and the role lists M5 needs.
 
-Each structure role (``page``, ``entity``, ``image`` …) decides whether an
+Each type role (``page``, ``entity``, ``image`` …) decides whether an
 object has a references section, unlinked mentions, backlinks or a graph view.
 Our basic types map onto those roles; every other type is an ``entity``
 (custom object types). The lists below hold the roles we have (``whiteboard``
@@ -114,7 +114,7 @@ NO_GRAPH_SUPPORT: frozenset[str] = frozenset()
 
 
 def role_of(t: TypeDefinition | None) -> str:
-    """The structure role of objects of type ``t`` (``entity`` for custom types)."""
+    """The role of objects of type ``t`` (``entity`` for custom types)."""
     if t is None or not t.basic:
         return "entity"
     name = _basic_name(t.name)

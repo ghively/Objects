@@ -92,7 +92,7 @@ describe('DatePicker', () => {
     expect(onTaskChange).not.toHaveBeenCalled()
     const confirm = screen.getByRole('alertdialog', { name: 'Remove date?' })
     expect(confirm).toHaveTextContent(
-      'This recurring task already has completed or skipped occurrences. Removing the date will discard its history.',
+      'Some repeats of this task are already done or skipped. Clearing the date throws that history away.',
     )
     await userEvent.click(screen.getByRole('button', { name: 'Keep date' }))
     expect(onTaskChange).not.toHaveBeenCalled()
@@ -259,7 +259,7 @@ describe('DatePicker: the Task date', () => {
         now={NOW}
       />,
     )
-    expect(screen.getByRole('button', { name: 'Next month' })).toHaveAttribute('title', 'Schedule task for the next month')
+    expect(screen.getByRole('button', { name: 'Next month' })).toHaveAttribute('title', 'Set the date one month ahead')
     expect(screen.queryByRole('button', { name: 'Yesterday' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Next week' }))
     expect(onTaskChange).toHaveBeenLastCalledWith({ date: { start: '2026-10-28', resolution: 'day' }, repeat: null, remind: null })

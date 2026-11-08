@@ -148,11 +148,11 @@ const DATE_LABELS: Record<string, string> = {
   earlier: 'Earlier',
   lastWeek: 'Last week',
   thisWeek: 'This week',
-  theDayBeforeYesterday: 'The day before yesterday',
+  theDayBeforeYesterday: '2 days ago',
   yesterday: 'Yesterday',
   today: 'Today',
   tomorrow: 'Tomorrow',
-  theDayAfterTomorrow: 'The day after tomorrow',
+  theDayAfterTomorrow: 'In 2 days',
   nextWeek: 'Next week',
   later: 'Later', // our string: dates beyond next week
 }
@@ -430,7 +430,7 @@ function computedBuckets(v: unknown, def: Pick<PropertyDef, 'type' | 'options'>)
 
 /** Whether `row` groups under `def`: its type is the grouping's (if named) and defines the key as the same kind, or not at all. */
 function sameKind(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'>, type: TypeDef | undefined): boolean {
-  if (entry.structureId && row.summary.type !== entry.structureId) return false
+  if (entry.typeId && row.summary.type !== entry.typeId) return false
   const own = defIn(type, entry.propertyId)
   return !own || own.type === def.type
 }
@@ -458,7 +458,7 @@ export function groupRows(
   ctx: GroupCtx,
 ): { groups: Group[]; hidden: Group[] } {
   const entry = groupBy?.groups?.[0]
-  const def = entry ? findDef(ctx.types, entry.propertyId, entry.structureId, ctx.viewTypeIds) : undefined
+  const def = entry ? findDef(ctx.types, entry.propertyId, entry.typeId, ctx.viewTypeIds) : undefined
   if (!entry || !def) return { groups: [{ id: OTHER_ID, label: 'Objects', rows }], hidden: [] }
   const isStatus = isStatusLabel(def)
   const byCategory = isStatus && entry.option === STATUS_CATEGORY_OPTION

@@ -1,37 +1,40 @@
-// The view model: layouts, defaults and the layout constants shared by every data view.
-// Labels, icons and flags come from the layout table; `gallery` has no catalogued
-// label (no picker offers it), so its label is ours and only used in tooltips and tests.
+// The view model: the layouts a data view can take, their labels and icons, which pickers offer
+// which layouts, the default view of a type, and the sizes shared by every layout.
+// The pickers list layouts in the behaviour catalog's order: List, Wall, Kanban, Gallery, Table,
+// Embed, then Object's own Calendar, Timeline and Chart. `gallery` (the dashboard's card strip)
+// is in no picker; its label only shows in tooltips and tests.
 import type { Layout, SmallCardViewConfig, TypeDef, ViewState, FilterGroup } from '@/api/types'
 
 export interface LayoutInfo {
   label: string
   /** An Iconify id. */
   icon: string
-  requiresGroupByEntity: boolean
-  hasSeparateBlocksGroup: boolean
 }
 
 export const LAYOUTS: Record<Layout, LayoutInfo> = {
-  list: { label: 'List', icon: 'ph-list-dashes', requiresGroupByEntity: true, hasSeparateBlocksGroup: false },
-  grid: { label: 'Gallery', icon: 'ph-grid-four', requiresGroupByEntity: false, hasSeparateBlocksGroup: true },
-  wall: { label: 'Wall', icon: 'ph-wall', requiresGroupByEntity: false, hasSeparateBlocksGroup: false },
-  table: { label: 'Table', icon: 'ph-table', requiresGroupByEntity: true, hasSeparateBlocksGroup: false },
-  embed: { label: 'Embed', icon: 'ph-text-indent', requiresGroupByEntity: true, hasSeparateBlocksGroup: false },
-  kanban: { label: 'Kanban', icon: 'ph-kanban', requiresGroupByEntity: false, hasSeparateBlocksGroup: false },
-  // Our string: no picker offers this layout; it is set only by code (dashboard sections).
-  gallery: { label: 'Gallery strip', icon: 'ph-slideshow', requiresGroupByEntity: true, hasSeparateBlocksGroup: true },
-  // M13: our layouts (our strings)
-  calendar: { label: 'Calendar', icon: 'ph-calendar-dots', requiresGroupByEntity: false, hasSeparateBlocksGroup: false },
-  timeline: { label: 'Timeline', icon: 'ph-chart-bar-horizontal', requiresGroupByEntity: false, hasSeparateBlocksGroup: false },
-  chart: { label: 'Chart', icon: 'ph-chart-pie-slice', requiresGroupByEntity: false, hasSeparateBlocksGroup: false },
+  list: { label: 'List', icon: 'ph-list-dashes' },
+  wall: { label: 'Wall', icon: 'ph-wall' },
+  kanban: { label: 'Kanban', icon: 'ph-kanban' },
+  grid: { label: 'Gallery', icon: 'ph-grid-four' },
+  table: { label: 'Table', icon: 'ph-table' },
+  embed: { label: 'Embed', icon: 'ph-text-indent' },
+  calendar: { label: 'Calendar', icon: 'ph-calendar-dots' },
+  timeline: { label: 'Timeline', icon: 'ph-chart-bar-horizontal' },
+  chart: { label: 'Chart', icon: 'ph-chart-pie-slice' },
+  gallery: { label: 'Gallery strip', icon: 'ph-slideshow' },
 }
 
 /** M13: the layouts that draw every row themselves (no paging, no "Load more", no group headers). */
 export const WHOLE_SET_LAYOUTS: ReadonlySet<Layout> = new Set<Layout>(['calendar', 'timeline', 'chart'])
 
-export const STANDARD_LAYOUTS: readonly Layout[] = ['list', 'grid', 'wall', 'table', 'embed']
-export const FULL_VIEW_LAYOUTS: readonly Layout[] = [...STANDARD_LAYOUTS, 'kanban', 'calendar', 'timeline', 'chart']
-export const ALL_NOTES_LAYOUTS: readonly Layout[] = ['list', 'grid', 'wall', 'embed']
+/** Every layout a type page or an embedded view offers. */
+export const FULL_VIEW_LAYOUTS: readonly Layout[] = ['list', 'wall', 'kanban', 'grid', 'table', 'embed', 'calendar', 'timeline', 'chart']
+/** The picker without Kanban and Object's own layouts. */
+export const STANDARD_LAYOUTS: readonly Layout[] = FULL_VIEW_LAYOUTS.filter(
+  (l) => l !== 'kanban' && !WHOLE_SET_LAYOUTS.has(l),
+)
+/** The All notes picker: the standard layouts except Table (rows of every type share no columns). */
+export const ALL_NOTES_LAYOUTS: readonly Layout[] = STANDARD_LAYOUTS.filter((l) => l !== 'table')
 
 export function emptyFilterGroup(): FilterGroup {
   return { type: 'filterGroup', operator: 'and', elements: [] }

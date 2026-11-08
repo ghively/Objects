@@ -9,7 +9,7 @@ Layout:
   each saved query of only this type, and ``manifest.json`` ``{id, kind: 'type',
   typeId, name, deletedAt, objectTrashIds, allowedTypesRefs, templates, queries,
   queryRefs}`` (``queryRefs``: ``{queryId, list, index, entry}`` per entry dropped
-  from another query's ``structures`` or ``excludeStructureIds``). Its objects are
+  from another query's ``types`` or ``excludeTypeIds``). Its objects are
   ordinary object entries carrying ``typeTrashId``;
 - a collection: ``collections/<ulid>/`` with ``collection.json``, ``before/<n>.md``
   (a member's bytes before its ``collections:`` item was removed) and

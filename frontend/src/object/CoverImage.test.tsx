@@ -42,7 +42,7 @@ describe('CoverImage (M9)', () => {
     expect(COVER_TEXT).toMatchObject({
       toggleWide: 'Toggle wide cover image',
       reposition: 'Reposition cover image',
-      dragHint: 'Drag image to reposition',
+      dragHint: 'Drag to move the image',
       save: 'Save',
       cancel: 'Cancel',
     })
@@ -58,14 +58,14 @@ describe('CoverImage (M9)', () => {
     const { img, onOffsetChange } = cover()
     expect(img.style.objectPosition).toBe('0% 50%')
     await user.click(screen.getByRole('button', { name: 'Reposition cover image' }))
-    expect(screen.getByText('Drag image to reposition')).toBeInTheDocument()
+    expect(screen.getByText('Drag to move the image')).toBeInTheDocument()
     // Down by 40 px of 200: 50 − 40 / 200 × 100 = 30.
     drag(img, 40)
     expect(img.style.objectPosition).toBe('0% 30%')
     expect(onOffsetChange).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(onOffsetChange).toHaveBeenCalledWith(30)
-    expect(screen.queryByText('Drag image to reposition')).toBeNull()
+    expect(screen.queryByText('Drag to move the image')).toBeNull()
   })
 
   test('test clicking outside saves', async () => {

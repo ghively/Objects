@@ -16,20 +16,20 @@ import { settingsDefaults, useSettings } from '@/settings/useSettings'
 export const PRESENTATION_SETTINGS_TEXT = {
   heading: 'Presentation settings',
   preferences: 'Preferences',
-  hideCoverImage: { heading: 'Hide cover image', description: "Don't show the cover image on the title slide." },
+  hideCoverImage: { heading: 'Hide cover image', description: "Leave the cover image off the first slide." },
   hideProgressIndicator: {
     heading: 'Hide progress indicator',
-    description: "Don't show the horizontal progress bar at the top.",
+    description: "Leave out the bar along the top that tracks your place.",
   },
   hideTitle: {
     heading: 'Hide title in header',
-    description: "Don't show the object title in the top-left corner on content slides.",
+    description: "Leave the title out of the corner on every slide after the first.",
   },
   footer: 'Footer',
-  left: { heading: 'Left footer', description: 'Text shown in the bottom-left corner of every slide.', placeholder: 'e.g. Company name' },
+  left: { heading: 'Left footer', description: 'Appears at the lower left on each slide.', placeholder: 'e.g. Company name' },
   right: {
     heading: 'Right footer',
-    description: 'Text shown in the bottom-right corner of every slide.',
+    description: 'Appears at the lower right on each slide.',
     placeholder: 'e.g. Confidential',
   },
 } as const

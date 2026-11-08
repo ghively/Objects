@@ -547,7 +547,7 @@ def build_server(client: ObjectClient, write: bool = True) -> MCPServer:
 
     @server.tool(annotations=WRITE)
     def create_query(name: str, definition: dict | None = None) -> dict:
-        """Save a query (the app's saved-query JSON: structures, filterGroup, sorts)."""
+        """Save a query (the app's saved-query JSON: types, filterGroup, sorts)."""
         return client.post("/queries", {"name": name, "definition": definition})
 
     @server.tool(annotations=REPLACE)

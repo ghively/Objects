@@ -25,7 +25,7 @@ function fakeHost(): WhiteboardHost {
   }
 }
 
-const stroke = (id: string): InkStroke => ({ id, tool: 'pen', color: '#5c5959', width: 4, points: [[0, 0, 0.5]], d: 'M0 0Z' })
+const stroke = (id: string): InkStroke => ({ id, tool: 'pen', color: '#71717a', width: 4, points: [[0, 0, 0.5]], d: 'M0 0Z' })
 
 function fakeInk() {
   const layerProps: InkLayerProps[] = []
@@ -243,15 +243,15 @@ describe('WhiteboardCanvas', () => {
   test('empty and lost states', async () => {
     const empty = renderCanvas()
     await act(async () => {})
-    expect(screen.getByText('You can change this by creating a new node.')).toBeInTheDocument()
+    expect(screen.getByText('Add a block or object to get started.')).toBeInTheDocument()
     empty.unmount()
 
     const far = board([node({ id: 'far', position: { x: 50000, y: 50000 }, width: 420, height: 60 })], [], {}, { viewport: { x: 0, y: 0, zoom: 1 } })
     renderCanvas({ doc: { board: far, strokes: [] } })
     await act(async () => {})
-    expect(screen.queryByText('You can change this by creating a new node.')).toBeNull()
+    expect(screen.queryByText('Add a block or object to get started.')).toBeNull()
     expect(screen.getByText('Nothing in this view')).toBeInTheDocument()
-    expect(screen.getByText("But don't worry, we can just take you back.")).toBeInTheDocument()
+    expect(screen.getByText("Jump back to the content to carry on.")).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Back to content' }))
     await act(async () => {})
     expect(screen.queryByText('Nothing in this view')).toBeNull()
@@ -291,7 +291,7 @@ describe('WhiteboardCanvas', () => {
     expect(layer.dataset.tool).toBe('')
     fireEvent.keyDown(wrapper, { key: 'd' })
     expect(screen.getByTestId('ink-layer').dataset.tool).toBe('pen')
-    expect(store.getState().inkTool).toEqual({ tool: 'pen', color: '#5c5959', width: 4 })
+    expect(store.getState().inkTool).toEqual({ tool: 'pen', color: '#71717a', width: 4 })
     const last = layerProps[layerProps.length - 1]
     expect(last.readOnly).toBe(false)
     act(() => last.onStrokesChange([stroke('s1')], 'erase'))
@@ -355,18 +355,18 @@ describe('WhiteboardCanvas theme (M7)', () => {
     const { container } = renderCanvas({ doc: { board: board([n], [], {}), strokes: [] } })
     const flowRoot = () => container.querySelector('.react-flow') as HTMLElement
     const fill = () => (screen.getByTestId('whiteboard-text-node') as HTMLElement).style.backgroundColor
-    // Dark: React Flow's dark colours and colors.ts' bgDark (#263956).
+    // Dark: React Flow's dark colours and colors.ts' bgDark (#1a2647).
     expect(flowRoot().classList.contains('dark')).toBe(true)
-    expect(fill()).toBe('rgb(38, 57, 86)')
+    expect(fill()).toBe('rgb(26, 38, 71)')
 
     await act(async () => {
       document.documentElement.setAttribute('data-theme', 'light')
       document.documentElement.classList.remove('dark')
       await Promise.resolve()
     })
-    // Light: React Flow's light colours and bgLight (#E4EFFE), without a remount.
+    // Light: React Flow's light colours and bgLight (#eff6ff), without a remount.
     expect(flowRoot().classList.contains('light')).toBe(true)
-    expect(fill()).toBe('rgb(228, 239, 254)')
+    expect(fill()).toBe('rgb(239, 246, 255)')
 
     await act(async () => {
       document.documentElement.setAttribute('data-theme', 'darkDimmed')
@@ -374,6 +374,6 @@ describe('WhiteboardCanvas theme (M7)', () => {
       await Promise.resolve()
     })
     expect(flowRoot().classList.contains('dark')).toBe(true)
-    expect(fill()).toBe('rgb(38, 57, 86)')
+    expect(fill()).toBe('rgb(26, 38, 71)')
   })
 })

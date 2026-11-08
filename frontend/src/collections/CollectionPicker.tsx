@@ -1,4 +1,4 @@
-// "Search collections or create one": the picker behind the collections property and
+// "Find or create a collection": the picker behind the collections property and
 // "Edit Collections". It lists the collections that hold the object's type; values are names.
 import { useMemo, useState } from 'react'
 import { api } from '@/api/client'
@@ -7,7 +7,7 @@ import { findByName, useCollections } from './useCollections'
 import { COLLECTION_ICON } from '@/lib/defIcons'
 
 export const COLLECTION_TEXT = {
-  placeholder: 'Search collections or create one',
+  placeholder: 'Find or create a collection',
   heading: 'Select Collections',
 }
 

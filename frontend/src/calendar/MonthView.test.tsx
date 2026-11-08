@@ -45,15 +45,15 @@ describe('MonthView', () => {
     expect(titles[1]).toContain('2026-10-20')
     expect(titles[2]).toContain('2026-10-31')
     expect(screen.getByTestId('grid-layout')).toBeInTheDocument()
-    expect(screen.queryByText('No daily notes created for this month.')).toBeNull()
+    expect(screen.queryByText('This month has no daily notes yet.')).toBeNull()
   })
 
   test('test month empty line when no daily notes in the month', async () => {
     setDay('2026-10-05', { created: ['Pages/New.md'] })
     render(<MonthView anchor={TODAY} weekStart="sunday" />)
-    expect(await screen.findByText('No daily notes created for this month.')).toBeInTheDocument()
+    expect(await screen.findByText('This month has no daily notes yet.')).toBeInTheDocument()
     expect(screen.queryByTestId('grid-layout')).toBeNull()
-    expect(screen.getByText('You can change this by creating a new object.')).toBeInTheDocument()
+    expect(screen.getByText('Create an object to see it here.')).toBeInTheDocument()
     expect(mocked.rows).not.toHaveBeenCalled()
   })
 
@@ -82,7 +82,7 @@ describe('MonthView', () => {
     await user.click(within(strip).getByRole('button', { name: 'Mar' }))
     expect(useCalendar.getState().anchor).toBe('2026-03-01')
     // Empty months keep the strip.
-    expect(await screen.findByText('No daily notes created for this month.', { exact: false })).toBeInTheDocument()
+    expect(await screen.findByText('This month has no daily notes yet.', { exact: false })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Months' })).toBeInTheDocument()
   })
 
@@ -106,7 +106,7 @@ describe('MonthView', () => {
     const user = userEvent.setup()
     mocked.createDailyNote.mockRejectedValueOnce(new DailyNoteExistsError('exists', 'DailyNotes/2026-03-01.md'))
     render(<MonthView anchor="2026-03-15" weekStart="sunday" />)
-    expect(await screen.findByText('No daily notes created for this month.', { exact: false })).toBeInTheDocument()
+    expect(await screen.findByText('This month has no daily notes yet.', { exact: false })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'New Object' }))
     expect(mocked.createDailyNote).toHaveBeenCalledWith('2026-03-01')
     await waitFor(() => expect(usePeek.getState().path).toBe('DailyNotes/2026-03-01.md'))
@@ -114,11 +114,11 @@ describe('MonthView', () => {
 
   test('test views reload when a daily note is created elsewhere', async () => {
     render(<MonthView anchor={TODAY} weekStart="sunday" />)
-    expect(await screen.findByText('No daily notes created for this month.')).toBeInTheDocument()
+    expect(await screen.findByText('This month has no daily notes yet.')).toBeInTheDocument()
     addNote('2026-10-12')
     act(() => listeners.forEach((l) => l({ kind: 'created', path: 'DailyNotes/2026-10-12.md', version: 'v1' })))
     await waitFor(() => expect(screen.getByTestId('grid').children).toHaveLength(1))
-    expect(screen.queryByText('No daily notes created for this month.')).toBeNull()
+    expect(screen.queryByText('This month has no daily notes yet.')).toBeNull()
     expect(mocked.calendar).toHaveBeenCalledTimes(2)
   })
 })

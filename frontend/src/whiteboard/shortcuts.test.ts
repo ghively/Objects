@@ -131,7 +131,7 @@ describe('keyToCommand', () => {
         expect(keyToCommand(e, sel), `${id} ${spec}`).toEqual(cmd)
       }
     }
-    // The whiteboard table (reference-check-2026-10-28 §1).
+    // The whiteboard table (the behaviour catalog's Shortcuts sheet).
     expect(keysFor('whiteboardArrow')).toEqual(['Shift-l'])
     expect(keysFor('whiteboardTriangle')).toEqual(['p'])
     expect(keysFor('whiteboardBringToFront')).toEqual([']'])

@@ -96,7 +96,7 @@ export const REMOTE_CHAT_TEXT = {
 export const MODE_LABELS: Record<AiMode, string> = {
   chat: '',
   askBlock: 'Ask AI about this block',
-  tagBlock: 'Add tags to block using AI',
+  tagBlock: 'Let AI suggest tags for this block',
   tagObject: 'Add tags using AI',
   autofill: 'Fill empty properties using AI', // our string
   rephrase: 'Rephrase',

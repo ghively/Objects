@@ -13,17 +13,17 @@ export interface PageLayoutCardsProps {
 }
 
 export const PAGE_LAYOUTS: readonly { value: ViewDesign | null; name: string; description: string }[] = [
-  { value: null, name: 'Standard', description: 'Neutral default focused on functionality.' },
-  { value: 'indexCard', name: 'Index card', description: 'Compact layout for short-form or draft-like content.' },
+  { value: null, name: 'Standard', description: 'A plain, all-purpose layout.' },
+  { value: 'indexCard', name: 'Index card', description: 'A small layout for short notes and drafts.' },
   {
     value: 'profile',
     name: 'Profile',
-    description: 'Circular preview and side properties — ideal for people or organizations.',
+    description: 'Round image with properties at the side, made for people and organizations.',
   },
   {
     value: 'encyclopedia',
     name: 'Encyclopedia',
-    description: 'Side properties, with a table of contents, linked objects, and text stats.',
+    description: 'Properties at the side, plus contents, links and text statistics.',
   },
 ]
 

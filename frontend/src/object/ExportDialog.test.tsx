@@ -50,15 +50,15 @@ describe('Export dialog (polish item 23)', () => {
     expect(tiles.map((t) => t.textContent)).toEqual(['PDF', 'Markdown', 'Microsoft Word', 'Latex'])
     expect(within(dialog).getByRole('radio', { name: 'Markdown' })).toHaveAttribute('aria-checked', 'true')
     for (const name of [
-      'Export folder containing all subpages',
+      'Include subpages (as a folder)',
       'Include media',
-      'Include title as heading 1',
+      'Add the title as a top heading',
       'Links as wikilinks',
     ]) {
       expect(within(dialog).getByRole('switch', { name })).toBeInTheDocument()
     }
     expect(within(dialog).getByRole('switch', { name: 'Links as wikilinks' })).toHaveAttribute('aria-checked', 'true')
-    expect(within(dialog).getByText('Export links as [[title]] instead of [title](path).')).toBeInTheDocument()
+    expect(within(dialog).getByText('Writes links as [[title]] rather than [title](path).')).toBeInTheDocument()
   })
 
   test('plain Markdown keeps the short url; options travel as flags and zip the folder', async () => {
@@ -71,8 +71,8 @@ describe('Export dialog (polish item 23)', () => {
 
     cleanup()
     ;({ dialog } = open())
-    await user.click(within(dialog).getByRole('switch', { name: 'Export folder containing all subpages' }))
-    await user.click(within(dialog).getByRole('switch', { name: 'Include title as heading 1' }))
+    await user.click(within(dialog).getByRole('switch', { name: 'Include subpages (as a folder)' }))
+    await user.click(within(dialog).getByRole('switch', { name: 'Add the title as a top heading' }))
     await user.click(within(dialog).getByRole('switch', { name: 'Links as wikilinks' }))
     await user.click(within(dialog).getByRole('button', { name: 'Export' }))
     await waitFor(() => expect(clicked).toHaveLength(2))
@@ -92,7 +92,7 @@ describe('Export dialog (polish item 23)', () => {
     await user.click(styles[2])
 
     expect(within(dialog).getByRole('switch', { name: 'Hide empty properties' })).toHaveAttribute('aria-checked', 'true')
-    expect(within(dialog).getByRole('switch', { name: 'Include embedded content' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('switch', { name: 'Include embeds' })).toBeInTheDocument()
     await user.click(within(dialog).getByRole('switch', { name: 'Include outline' }))
     await user.click(within(dialog).getByRole('switch', { name: 'Show type labels' }))
     await user.click(within(dialog).getByRole('radio', { name: 'Letter' }))
@@ -100,7 +100,7 @@ describe('Export dialog (polish item 23)', () => {
     // Properties: the empty one is hidden while "Hide empty properties" is on.
     expect(await within(dialog).findByText('Bio')).toBeInTheDocument()
     expect(within(dialog).queryByText('Manager')).toBeNull()
-    expect(within(dialog).getByText('Deselect properties to hide them from the export.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Untick a property to leave it out.')).toBeInTheDocument()
     await user.click(within(dialog).getByRole('checkbox', { name: 'Bio' }))
     expect(within(dialog).getByRole('checkbox', { name: 'All properties' })).toHaveAttribute('aria-checked', 'false')
 

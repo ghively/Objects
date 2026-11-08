@@ -135,7 +135,7 @@ describe('change type', () => {
     expect(go).toBeDisabled()
     await user.click(
       within(dialog).getByRole('checkbox', {
-        name: 'I know that with this transformation all or parts of my notes will get lost.',
+        name: 'I understand that changing the type can lose some or all of this note.',
       }),
     )
     expect(go).toBeEnabled()
@@ -211,7 +211,7 @@ describe('templates', () => {
     render(<Harness />)
     const marker = screen.getByRole('region', { name: 'Template' })
     expect(within(marker).getByRole('textbox', { name: 'Template Name' })).toHaveValue('Kickoff')
-    expect(within(marker).getByText('Templates prefill new objects.')).toBeInTheDocument()
+    expect(within(marker).getByText('A template fills in new objects for you.')).toBeInTheDocument()
     await user.click(within(marker).getByRole('button', { name: 'Make default' }))
     await waitFor(() => expect(mocked.saveType).toHaveBeenCalledTimes(1))
     const [saved, opts] = mocked.saveType.mock.calls[0]

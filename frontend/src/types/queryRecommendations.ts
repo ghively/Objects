@@ -12,7 +12,7 @@ export interface QueryRecommendation {
 
 function definition(typeId: string, filters: Filter[], groupBy: QueryDefinition['groupBy'] = null): QueryDefinition {
   return {
-    structures: [{ id: typeId }],
+    types: [{ id: typeId }],
     filterGroup: { ...emptyFilterGroup(), elements: filters },
     sorts: [],
     groupBy,
@@ -24,7 +24,7 @@ const filter = (def: PropertyDef, typeId: string, option: string, referenceValue
   propertyId: def.key,
   option,
   ...(referenceValue !== undefined ? { referenceValue } : {}),
-  structureId: typeId,
+  typeId,
 })
 
 export function queryRecommendations(type: TypeDef): QueryRecommendation[] {
@@ -33,7 +33,7 @@ export function queryRecommendations(type: TypeDef): QueryRecommendation[] {
     if (def.type === 'label') {
       out.push({
         title: `Kanban by ${def.name}`,
-        definition: definition(type.id, [], { groups: [{ propertyId: def.key, option: 'default', structureId: type.id }] }),
+        definition: definition(type.id, [], { groups: [{ propertyId: def.key, option: 'default', typeId: type.id }] }),
         layout: 'kanban',
       })
       out.push({

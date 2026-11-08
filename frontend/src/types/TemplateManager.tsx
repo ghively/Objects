@@ -36,7 +36,7 @@ import { useAutomations } from '@/automations/useAutomations'
 
 export const TEMPLATE_TEXT = {
   explanation:
-    "Templates allow you to prefill your properties and can create a structure for your content so you don't have to copy it every time.",
+    "A template fills in properties and lays out content up front, so you don't rebuild it each time.",
   empty: 'No templates yet',
   notAvailable: 'Templates are not available for this object type.',
   edit: 'Edit Template',

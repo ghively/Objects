@@ -278,7 +278,7 @@ describe('TimelineLayout', () => {
   test('the table shows the chosen columns and their calculations', () => {
     const init = timeline({
       timelineConfig: { startProperty: null, endProperty: null, zoom: 'week', showTable: true, tableColumns: ['points'], showDependencies: true },
-      calculations: [{ propertyId: 'points', structureId: 'story', kind: 'sum' }],
+      calculations: [{ propertyId: 'points', typeId: 'story', kind: 'sum' }],
     })
     render(<Harness rows={[story('A', { due: d('2026-11-03'), points: 2 }), story('B', { points: 5 })]} init={init} />)
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Title', 'Points'])

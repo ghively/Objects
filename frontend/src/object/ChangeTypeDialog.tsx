@@ -19,10 +19,10 @@ import {
 
 export const CHANGE_TYPE_TEXT = {
   heading: 'Change object type?',
-  description: 'Map each property to the new type. Unmapped data may be lost.',
+  description: 'Choose where each property goes in the new type. Anything left unmatched can be dropped.',
   mappings: 'Property Mappings',
-  lossy: 'This property might not be transferable to the target property, some information might be lost.',
-  confirmLoss: 'I know that with this transformation all or parts of my notes will get lost.',
+  lossy: "These two properties don't hold the same kind of value, so part of it may not carry over.",
+  confirmLoss: 'I understand that changing the type can lose some or all of this note.',
   none: 'Do not transfer',
   action: 'Change type',
 }

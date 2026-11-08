@@ -65,7 +65,7 @@ export function UrlCell({ def, value, readOnly, density, inTable, onChange }: Ce
         <DialogContent className="border-line bg-raised text-fg sm:max-w-md">
           <DialogTitle>{value ? 'Edit link' : 'Add link'}</DialogTitle>
           <DialogDescription className="text-fg-muted">
-            Paste a URL. Saving replaces the current link.
+            Paste a link; saving overwrites the one already here.
           </DialogDescription>
           <form
             onSubmit={(e) => {

@@ -106,7 +106,7 @@ describe('ReferencesSection', () => {
 
     const panel = screen.getByRole('tabpanel')
     expect(within(panel).getByText('No backlinks yet')).toBeInTheDocument()
-    expect(within(panel).getByText('Link to this object from another page to create a backlink.')).toBeInTheDocument()
+    expect(within(panel).getByText('Backlinks show up here once another page links to this one.')).toBeInTheDocument()
     expect(within(panel).getByText('No related content yet')).toBeInTheDocument()
     expect(within(panel).getByText('Objects that share words with this one will appear here.')).toBeInTheDocument()
     expect(within(panel).getByText('No unlinked mentions')).toBeInTheDocument()

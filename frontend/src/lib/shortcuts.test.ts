@@ -97,7 +97,7 @@ describe('shortcuts', () => {
     expect(matches(key({ key: 'p', metaKey: true, altKey: true }), ['Mod-AltCtrl-p'])).toBe(false)
   })
 
-  // The expected shortcut table (reference-check-2026-10-28 §1), Windows column.
+  // The expected shortcut table (the behaviour catalog's Shortcuts sheet), Windows column.
   test('global and navigation keys match the expected table', () => {
     const EXPECTED: Record<string, string[]> = {
       closeTab: ['Mod-w'],

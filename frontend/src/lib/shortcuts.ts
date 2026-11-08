@@ -10,7 +10,7 @@
  * it, but `matches` never matches it (its handler reads the sequence itself).
  *
  * The keys follow the shortcut table checked in
- * `docs/superpowers/plans/reference-check-2026-10-28.md` §1. An id the table lists no key for
+ * the Shortcuts sheet of `docs/behavior-catalog.md`. An id the table lists no key for
  * has `keys: []` and the Shortcuts sheet leaves it out. `provisional: true` marks a key that is
  * ours (no table key to check against). `bound: false` entries are display-only: their
  * handlers live elsewhere (M1–M6 code), and they are registered so the Shortcuts sheet lists them
@@ -264,7 +264,7 @@ export function useGlobalShortcut(
 
 // ---- the registered shortcuts ----
 
-/** Checked against the shortcut table (reference-check-2026-10-28 §1). */
+/** Checked against the shortcut table (the behaviour catalog's Shortcuts sheet). */
 const V = false
 /** Object-only keys: the table has no such action to check against. */
 const OURS = true
@@ -291,54 +291,54 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
   def('codeToken', 'text', 'Format as code', ['Mod-e'], 'editor', V),
   def('mathToken', 'text', 'Format as TeX-formula', ['Mod-m'], 'editor', V),
 
-  def('heading1', 'block', 'Turn selected blocks into heading 1', [], 'editor', V),
-  def('heading2', 'block', 'Turn selected blocks into heading 2', [], 'editor', V),
-  def('heading3', 'block', 'Turn selected blocks into heading 3', [], 'editor', V),
-  def('heading4', 'block', 'Turn selected blocks into heading 4', [], 'editor', V),
-  def('toDo', 'block', 'Turn selected blocks into to-do', [], 'editor', V),
-  def('toggle', 'block', 'Add/remove toggle style to/from selected blocks', [], 'editor', V),
+  def('heading1', 'block', 'Make the selected blocks heading 1', [], 'editor', V),
+  def('heading2', 'block', 'Make the selected blocks heading 2', [], 'editor', V),
+  def('heading3', 'block', 'Make the selected blocks heading 3', [], 'editor', V),
+  def('heading4', 'block', 'Make the selected blocks heading 4', [], 'editor', V),
+  def('toDo', 'block', 'Make the selected blocks to-dos', [], 'editor', V),
+  def('toggle', 'block', 'Turn toggle style on or off for the selected blocks', [], 'editor', V),
   // With blocks selected (Mod-e / Mod-m on a text selection stay codeToken / mathToken).
-  def('toggleCodeBlock', 'block', 'Turn block selection into code block', ['Mod-e'], 'editor', V),
-  def('toggleMathBlock', 'block', 'Turn block selection into math block', ['Mod-m'], 'editor', V),
+  def('toggleCodeBlock', 'block', 'Make the selected blocks a code block', ['Mod-e'], 'editor', V),
+  def('toggleMathBlock', 'block', 'Make the selected blocks a math block', ['Mod-m'], 'editor', V),
   def('textAlignLeft', 'block', 'Align text left', [], 'editor', V),
   def('textAlignCenter', 'block', 'Text align center', [], 'editor', V),
   def('textAlignRight', 'block', 'Text align right', [], 'editor', V),
-  def('selectActiveBlock', 'block', 'Set active block as block selection', ['Escape'], 'editor', V),
-  def('expandBlockSelectionUpwards', 'block', 'Expand block selection upwards', ['Shift-ArrowUp'], 'editor', V),
-  def('expandBlockSelectionDownwards', 'block', 'Expand block selection downwards', ['Shift-ArrowDown'], 'editor', V),
-  def('selectAllBlocks', 'block', 'Select all blocks on current level or next higher level', ['Mod-a'], 'editor', V),
+  def('selectActiveBlock', 'block', 'Select this block as a whole', ['Escape'], 'editor', V),
+  def('expandBlockSelectionUpwards', 'block', 'Grow the block selection up', ['Shift-ArrowUp'], 'editor', V),
+  def('expandBlockSelectionDownwards', 'block', 'Grow the block selection down', ['Shift-ArrowDown'], 'editor', V),
+  def('selectAllBlocks', 'block', 'Select the blocks at this level, then the level above', ['Mod-a'], 'editor', V),
   def('deleteBlocks', 'block', 'Delete selected blocks', ['Backspace', 'Delete'], 'editor', V),
-  def('duplicateBlocks', 'block', 'Duplicate selected blocks', ['Mod-d'], 'editor', V),
-  def('copyBlocksAsMarkdown', 'block', 'Copy selected blocks as markdown', ['Mod-Shift-c'], 'editor', V),
+  def('duplicateBlocks', 'block', 'Make a copy of the selected blocks', ['Mod-d'], 'editor', V),
+  def('copyBlocksAsMarkdown', 'block', 'Copy the selected blocks as Markdown text', ['Mod-Shift-c'], 'editor', V),
   // Alt+Up/Down moves the selected blocks, or the block holding the cursor; with Shift, on the
   // same level. Object's move always stays on the block's level, so both pairs do the same.
   def('moveSelectedBlocksUp', 'block', 'Move selected blocks up', ['Alt-ArrowUp'], 'editor', V),
-  def('moveSelectedBlocksDown', 'block', 'Move selected blocks down', ['Alt-ArrowDown'], 'editor', V),
-  def('moveSelectedBlocksUpOnSameLevel', 'block', 'Move selected blocks up on same level', ['Alt-Shift-ArrowUp'], 'editor', V),
-  def('moveSelectedBlocksDownOnSameLevel', 'block', 'Move selected blocks down on same level', ['Alt-Shift-ArrowDown'], 'editor', V),
+  def('moveSelectedBlocksDown', 'block', 'Shift the selected blocks down', ['Alt-ArrowDown'], 'editor', V),
+  def('moveSelectedBlocksUpOnSameLevel', 'block', 'Shift the selected blocks up among their siblings', ['Alt-Shift-ArrowUp'], 'editor', V),
+  def('moveSelectedBlocksDownOnSameLevel', 'block', 'Shift the selected blocks down among their siblings', ['Alt-Shift-ArrowDown'], 'editor', V),
   def('moveUpBlockWithCursor', 'block', 'Move active block up', ['Alt-ArrowUp'], 'editor', V),
   def('moveDownBlockWithCursor', 'block', 'Move active block down', ['Alt-ArrowDown'], 'editor', V),
-  def('moveUpBlockWithCursorOnSameLevel', 'block', 'Move active block up on same level', ['Alt-Shift-ArrowUp'], 'editor', V),
-  def('moveDownBlockWithCursorOnSameLevel', 'block', 'Move active block down on same level', ['Alt-Shift-ArrowDown'], 'editor', V),
+  def('moveUpBlockWithCursorOnSameLevel', 'block', 'Move this block up among its siblings', ['Alt-Shift-ArrowUp'], 'editor', V),
+  def('moveDownBlockWithCursorOnSameLevel', 'block', 'Move this block down among its siblings', ['Alt-Shift-ArrowDown'], 'editor', V),
   def('indentBlocks', 'block', 'Indent selected blocks', ['Tab'], 'editor', V),
-  def('unindentBlocks', 'block', 'Unindent selected blocks', ['Shift-Tab'], 'editor', V),
-  def('toggleTodoInBlockWithCursor', 'block', 'Check/uncheck to-do in active block', ['Mod-Enter'], 'editor', V),
+  def('unindentBlocks', 'block', 'Outdent the selected blocks', ['Shift-Tab'], 'editor', V),
+  def('toggleTodoInBlockWithCursor', 'block', 'Tick or untick the to-do in this block', ['Mod-Enter'], 'editor', V),
   def(
     'toggleToggleInBlockWithCursor',
     'block',
-    'Open/close toggle of active block. Inserts and focuses child block if no children are present. If to-do is present, use alternative with ⇧ key.',
+    'Expand or collapse the toggle in this block; with no children yet, it adds one and puts the cursor there. In a to-do, add ⇧.',
     ['Mod-Enter', 'Mod-Shift-Enter'],
     'editor',
     V,
   ),
-  def('insertBlockAbove', 'block', 'Insert block above and set cursor there', ['Alt-Shift-Enter'], 'editor', V),
-  def('insertBlockBelow', 'block', 'Insert block below and set cursor there', ['Alt-Enter'], 'editor', V),
+  def('insertBlockAbove', 'block', 'New block above, with the cursor in it', ['Alt-Shift-Enter'], 'editor', V),
+  def('insertBlockBelow', 'block', 'New block below, with the cursor in it', ['Alt-Enter'], 'editor', V),
 
   def('closeTab', 'navigation', 'Close current tab', ['Mod-w'], 'global', V),
   def('openNewTab', 'navigation', 'Open new tab', ['Mod-t'], 'global', V),
   def('navigateTabs', 'navigation', 'Navigate tabs', ['Ctrl-Tab'], 'global', V),
   // Ctrl+Shift+A is not the tab menu (it is reserved for a checklist menu).
-  def('openTabList', 'navigation', 'Toggle tab menu when multiple tabs are open', ['Mod-Shift-ArrowUp'], 'global', V),
+  def('openTabList', 'navigation', 'Show or hide the list of open tabs', ['Mod-Shift-ArrowUp'], 'global', V),
   def('navigateBack', 'navigation', 'Navigate back', ['Mod-ArrowLeft', 'Mod-['], 'global', V),
   def('navigateForward', 'navigation', 'Navigate forward', ['Mod-ArrowRight', 'Mod-]'], 'global', V),
 
@@ -347,7 +347,7 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
   def('toggleCalendarSidebar', 'global', 'Toggle calendar sidebar', ['Mod-Alt-s'], 'global', V),
   def('toggleDarkMode', 'global', 'Toggle dark mode', ['Mod-Shift-l'], 'global', V),
   def('openSettings', 'global', 'Open settings', ['Mod-,'], 'global', V),
-  def('toggleShortcutsMenu', 'global', 'Show/hide shortcuts menu', ['Mod-Shift-b'], 'global', V),
+  def('toggleShortcutsMenu', 'global', 'Toggle the shortcuts list', ['Mod-Shift-b'], 'global', V),
 ]
 
 /**
@@ -363,20 +363,20 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def('findInPage', 'page', 'Find in page', ['Mod-f'], 'global', false, false),
   // M1–M3, App.tsx (outside editable targets)
   def('openAddEntityMenu', 'global', 'Add new content', ['Mod-u'], 'global', false, false),
-  def('createNewEntityOfType', 'global', 'Create new object of current type', ['Mod-n'], 'global', false, false),
+  def('createNewEntityOfType', 'global', 'New object of the same type as this one', ['Mod-n'], 'global', false, false),
   def('deleteCurrentPage', 'page', 'Delete current page', ['Mod-Backspace'], 'global', false, false),
   // M4, calendar/CalendarChrome.tsx
-  def('goToToday', 'calendar', 'Set active date to today', ['t'], 'calendar', false, false),
+  def('goToToday', 'calendar', 'Jump to today', ['t'], 'calendar', false, false),
   def('setViewToMonth', 'calendar', 'Go to monthly view', ['m'], 'calendar', false, false),
   def('setViewToWeek', 'calendar', 'Go to weekly view', ['w'], 'calendar', false, false),
-  def('setViewToRolling', 'calendar', 'Go to 3 days rolling view', ['r'], 'calendar', false, false),
+  def('setViewToRolling', 'calendar', 'Show three days from today', ['r'], 'calendar', false, false),
   def('setViewToDay', 'calendar', 'Go to daily view', ['d'], 'calendar', false, false),
-  def('goToPrevious', 'calendar', 'Go to previous day, week, or month', ['ArrowLeft'], 'calendar', false, false),
-  def('goToNext', 'calendar', 'Go to next day, week, or month', ['ArrowRight'], 'calendar', false, false),
+  def('goToPrevious', 'calendar', 'Back one day, week or month', ['ArrowLeft'], 'calendar', false, false),
+  def('goToNext', 'calendar', 'Forward one day, week or month', ['ArrowRight'], 'calendar', false, false),
   def(
     'goToPreviousHigherUnit',
     'calendar',
-    'Go to previous week, month, or year (depending on active view)',
+    'Back one week, month or year, by the current view',
     ['ArrowUp'],
     'calendar',
     false,
@@ -385,7 +385,7 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def(
     'goToNextHigherUnit',
     'calendar',
-    'Go to next week, month, or year (depending on active view)',
+    'Forward one week, month or year, by the current view',
     ['ArrowDown'],
     'calendar',
     false,
@@ -430,7 +430,7 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def('whiteboardFlipHorizontal', 'whiteboard', 'Flip horizontal', ['Shift-h'], 'whiteboard', false, false),
   def('whiteboardFlipVertical', 'whiteboard', 'Flip vertical', ['Shift-v'], 'whiteboard', false, false),
   def('whiteboardCycle', 'whiteboard', 'Cycle selected objects', ['Tab'], 'whiteboard', false, false),
-  def('whiteboardCycleBack', 'whiteboard', 'Cycle selected objects backward', ['Shift-Tab'], 'whiteboard', false, false),
+  def('whiteboardCycleBack', 'whiteboard', 'Select the previous item', ['Shift-Tab'], 'whiteboard', false, false),
   def('whiteboardPan', 'whiteboard', 'Pan', ['Space'], 'whiteboard', false, false),
   def('undo', 'whiteboard', 'Undo last change', ['Mod-z'], 'whiteboard', false, false),
   def('redo', 'whiteboard', 'Redo last change', ['Mod-Shift-z', 'Mod-y'], 'whiteboard', false, false),
@@ -450,14 +450,14 @@ export const M8_SHORTCUTS: ShortcutDef[] = [
   def('turnIntoObject', 'block', 'Turn into object', ['i'], 'editor', V, true),
   // No key: its only trigger is the markdown `()` + Space.
   def('turnIntoTask', 'block', 'Turn into task', [], 'editor', V, true),
-  def('turnBlockIntoTaskObject', 'block', 'Turn block into task object', ['Mod-Shift-t'], 'editor', V, true),
-  def('highlightText', 'text', 'Highlight text selection', ['Mod-Shift-h'], 'editor', V, true),
+  def('turnBlockIntoTaskObject', 'block', 'Make this block a task', ['Mod-Shift-t'], 'editor', V, true),
+  def('highlightText', 'text', 'Highlight the selected text', ['Mod-Shift-h'], 'editor', V, true),
   def('toggleFocusMode', 'global', 'Toggle focus mode', ['Mod-Shift-m'], 'global', V, true),
   // Ctrl+Alt+P on Windows, ⌃⌘P on macOS.
   def('openPresentationMode', 'page', 'Start presentation mode', ['Mod-AltCtrl-p'], 'global', V, true),
   def('exitPresentationMode', 'page', 'Exit presentation mode', ['Escape'], 'global', V, true),
   def('nextPresentationSlide', 'page', 'Next presentation slide', ['ArrowRight'], 'global', V, true),
-  def('previousPresentationSlide', 'page', 'Previous presentation slide', ['ArrowLeft'], 'global', V, true),
+  def('previousPresentationSlide', 'page', 'Back one slide in the presentation', ['ArrowLeft'], 'global', V, true),
   def(
     'whiteboardResize',
     'whiteboard',
@@ -470,7 +470,7 @@ export const M8_SHORTCUTS: ShortcutDef[] = [
   def(
     'whiteboardResizeLarge',
     'whiteboard',
-    'Resize selection farther',
+    'Resize the selection in bigger steps',
     ['Mod-Shift-ArrowUp', 'Mod-Shift-ArrowDown', 'Mod-Shift-ArrowLeft', 'Mod-Shift-ArrowRight'],
     'whiteboard',
     V,
@@ -506,7 +506,7 @@ export const PRESENTATION_ONLY_IDS: readonly string[] = ['exitPresentationMode',
  * `editor/handles/groupKey.ts`, with blocks selected only.
  */
 export const POLISH_SHORTCUTS: ShortcutDef[] = [
-  def('groupBlocks', 'block', 'Group selected blocks or ungroup selected group block', ['Mod-g'], 'editor', V, true),
+  def('groupBlocks', 'block', 'Group the selected blocks, or ungroup a selected group', ['Mod-g'], 'editor', V, true),
 ]
 
 /**
@@ -515,9 +515,9 @@ export const POLISH_SHORTCUTS: ShortcutDef[] = [
  * Mod-e and Mod-i (in the editor they stay code and italic).
  */
 export const OBJECT_MENU_SHORTCUTS: ShortcutDef[] = [
-  def('openExportMenu', 'page', 'Open export menu of current page', ['Mod-e'], 'global', V, false),
-  def('openImportMenu', 'page', 'Open import menu of current page', ['Mod-i'], 'global', V, false),
-  def('toggleFavorite', 'page', 'Add/remove current page to/from favorites', ['Mod-Shift-*'], 'global', V, false),
+  def('openExportMenu', 'page', 'Export this page', ['Mod-e'], 'global', V, false),
+  def('openImportMenu', 'page', 'Import into this page', ['Mod-i'], 'global', V, false),
+  def('toggleFavorite', 'page', 'Favorite or unfavorite this page', ['Mod-Shift-*'], 'global', V, false),
 ]
 
 /**
@@ -535,7 +535,7 @@ export const AI_SHORTCUTS: ShortcutDef[] = [
   def('aiCopyMessage', 'ai', 'Copy message', ['Mod-Alt-c'], 'aiChat', V, true),
   def('aiReplaceContext', 'ai', 'Replace context', [], 'aiChat', V, false),
   def('aiAppendMessage', 'ai', 'Append message', ['Mod-Alt-a'], 'aiChat', V, true),
-  def('aiAppendToDailyNote', 'ai', 'Append message to daily note', [], 'aiChat', V, false),
+  def('aiAppendToDailyNote', 'ai', 'Send a message to the daily note', [], 'aiChat', V, false),
   def('aiRetry', 'ai', 'Retry', ['Mod-Alt-r'], 'aiChat', V, true),
   def('aiCloseChat', 'ai', 'Close chat', ['Mod-Alt-x'], 'aiChat', V, true),
   def('aiRephrase', 'ai', 'Rephrase', ['Mod-Alt-u'], 'aiChat', V, true),

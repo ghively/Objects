@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ADD_PROPERTY_ITEMS, KIND_META, objectSelectTypes, type AddPropertyItem } from './kinds'
 import { addProperty, isSystemKind } from './typeEdits'
 
-export const BASIC_TYPE_INFO = 'Properties of basic object types cannot be edited.'
+export const BASIC_TYPE_INFO = 'The properties of basic types are fixed.'
 
 export interface AddPropertyMenuProps {
   type: TypeDef
@@ -82,10 +82,10 @@ export function AddPropertyMenu({ type, types, onSave, onClose }: AddPropertyMen
 
   if (step.kind === 'confirmContent') {
     return (
-      <div className="w-72 p-1 text-fg" role="alertdialog" aria-label="Add another content property?">
-        <h3 className="text-[15px] font-semibold">Add another content property?</h3>
+      <div className="w-72 p-1 text-fg" role="alertdialog" aria-label="Add a second content property?">
+        <h3 className="text-[15px] font-semibold">Add a second content property?</h3>
         <p className="mt-1 text-[13px] text-fg-muted">
-          You already have a content property. This is where all your notes are. Do you really want to add another?
+          This type already has a content property, which holds the body of your notes. Add a second one anyway?
         </p>
         <div className="mt-3 flex justify-end gap-2">
           <button type="button" className="rounded px-2 py-1 text-[13px] hover:bg-hover" onClick={() => setStep({ kind: 'list' })}>
@@ -160,7 +160,7 @@ export function AddPropertyMenu({ type, types, onSave, onClose }: AddPropertyMen
         </div>
         <textarea
           aria-label="Description"
-          placeholder="Give others an idea of what this property means"
+          placeholder="What is this property for?"
           value={d.description}
           onChange={(e) => set({ description: e.target.value })}
           rows={2}

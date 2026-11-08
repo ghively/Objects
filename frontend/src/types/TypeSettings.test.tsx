@@ -74,10 +74,10 @@ describe('TypeSettings', () => {
       'Encyclopedia',
     ])
     expect(within(config).getByRole('radio', { name: 'Standard' })).toHaveTextContent(
-      'Neutral default focused on functionality.',
+      'A plain, all-purpose layout.',
     )
     expect(
-      within(config).getByText('Customize how objects of this type look and behave across pages, cards, and the calendar.'),
+      within(config).getByText("Settings for how this type's objects appear and act on pages, on cards and in the calendar."),
     ).toBeInTheDocument()
     expect(within(config).getByRole('option', { name: 'Sans Serif' })).toBeInTheDocument()
     // No Calendar settings group (M13's Calendar layout is only an option of the default list view).
@@ -100,7 +100,7 @@ describe('TypeSettings', () => {
     await waitFor(() => expect(useLinkIndex.getState().types.find((t) => t.id === 'project')?.revision).toBe('r1+1'))
   })
 
-  test('test basic type shows "Properties of basic object types cannot be edited.", disables Add Property and Name, and hides Delete', () => {
+  test('test basic type shows "The properties of basic types are fixed.", disables Add Property and Name, and hides Delete', () => {
     render(<TypeSettings typeId="page" />)
     expect(screen.getByRole('note')).toHaveTextContent(BASIC_TYPE_INFO)
     expect(screen.getByRole('button', { name: 'Add Property' })).toBeDisabled()
@@ -179,11 +179,11 @@ describe('TypeSettings default list view', () => {
     const select = screen.getByRole('combobox', { name: 'Default list view' })
     expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual([
       'List',
-      'Gallery',
       'Wall',
+      'Kanban',
+      'Gallery',
       'Table',
       'Embed',
-      'Kanban',
       'Calendar',
       'Timeline',
       'Chart',

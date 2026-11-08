@@ -22,7 +22,7 @@ export type PageInspectorTab = 'outline' | 'stats'
 export const PAGE_INSPECTOR_TEXT = {
   outline: 'Outline',
   stats: 'Stats',
-  emptyOutline: 'No headings in this page',
+  emptyOutline: 'This page has no headings',
   pin: 'Pin',
   unpin: 'Unpin',
   /** Our string (as the whiteboard's toggle). */

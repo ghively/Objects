@@ -17,8 +17,8 @@ import { useGraphUi } from './useGraphUi'
 export const GRAPH_TEXT = {
   heading: 'Graph',
   emptyTitle: 'Nothing to show',
-  emptyDescription: 'There is nothing in this graph yet.',
-  emptyFiltered: 'The current filters are hiding everything in this graph.',
+  emptyDescription: 'This graph has no nodes yet.',
+  emptyFiltered: 'Your filters hide every node in this graph.',
 }
 
 export interface GraphPageProps {

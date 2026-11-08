@@ -1,6 +1,6 @@
 /**
  * Whiteboard shortcut keys (the whiteboard shortcut table;
- * reference-check-2026-10-28 §1), the same as the `whiteboard*` entries of `lib/shortcuts.ts`.
+ * the behaviour catalog's Shortcuts sheet), the same as the `whiteboard*` entries of `lib/shortcuts.ts`.
  * Pen (D), highlighter (Shift+D) and eraser (E) are Object's own tools and keys; they avoid
  * P (Triangle) and M (move menu). Pure: `keyToCommand(e, ctx)` maps a key event to a
  * command, or null. Keys typed into an editor or input never reach the canvas. Letters match

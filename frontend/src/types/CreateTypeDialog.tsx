@@ -21,23 +21,23 @@ import { chipStyle, randomColor } from '@/theme/palette'
 export const CREATE_TYPE_TEXT = {
   galleryTitle: 'Add new object type',
   createYourOwn: 'Create your own',
-  createYourOwnCard: 'Start from a blank type and add the properties you need.',
+  createYourOwnCard: 'Begin empty and add just the properties you want.',
   // our choice: the heading of the gallery's first group
   useCases: 'Use cases',
   research: 'Research',
   media: 'Media',
   planningAndReflection: 'Planning and reflection',
   added: 'Added',
-  templateHint: 'Object types can be customized at any time in the object type settings.',
+  templateHint: "You can change a type's settings whenever you like.",
   properties: 'Properties',
   back: 'Back', // our string
   title: 'Create your object type',
-  description: 'Object types are categories for your content, like books, projects, or meeting notes.',
+  description: 'A type groups similar content, such as books, projects or meeting notes.',
   name: 'Name',
   pluralName: 'Plural of name',
   tipHeading: 'Do I need a new type?',
-  tip: 'Only if you have a distinct kind of note with its own details. A label property could be enough.',
-  hint: 'You can customize properties after creating the object type in the object type settings.',
+  tip: 'Make one only for a separate kind of note with its own details; often a label property is enough.',
+  hint: 'Once the type exists, change its properties in its settings.',
   action: 'Create object type',
 }
 

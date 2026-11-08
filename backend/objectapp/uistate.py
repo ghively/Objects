@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from .jsonstore import dump_json
+from .keycompat import upgrade_keys
 from .textfile import atomic_write
 from .typemodel import RevisionConflict
 
@@ -44,6 +45,7 @@ def _read(root: Path) -> tuple[dict[str, Any], str, str | None]:
         return {}, revision, f"ui.json is not valid JSON: {exc}"
     if not isinstance(data, dict):
         return {}, revision, "ui.json is not a JSON object"
+    upgrade_keys(data)  # older key names, renamed in memory only
     return data, revision, None
 
 

@@ -346,7 +346,7 @@ def plain(text: str) -> str:
 # HTML (printed to PDF)
 
 _STYLE_CSS = {
-    # "A PDF that matches the styling of the current page, including colors and embeds."
+    # "A PDF that looks like the page on screen, with its colors and embeds."
     "notes": """
 body{font-family:var(--font);font-size:15px;line-height:1.6;color:#1f2328}
 h1.title{font-size:34px;line-height:1.2;margin:0 0 4px}

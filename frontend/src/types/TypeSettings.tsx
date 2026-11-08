@@ -63,18 +63,18 @@ export const TYPE_SETTINGS_TEXT = {
   pluralName: 'Plural of name',
   color: 'Color',
   description: 'Description',
-  descriptionPlaceholder: 'Your description for this object type',
+  descriptionPlaceholder: 'Describe this type',
   properties: 'Properties',
-  propertiesExplanation: 'Add, remove, and customize the properties of this object type.',
+  propertiesExplanation: 'Choose which properties this type has and how each one works.',
   addProperty: 'Add Property',
   templates: 'Templates',
   configuration: 'Configuration',
-  configurationExplanation: 'Customize how objects of this type look and behave across pages, cards, and the calendar.',
+  configurationExplanation: "Settings for how this type's objects appear and act on pages, on cards and in the calendar.",
   page: 'Page',
   pageLayout: 'Page layout',
-  pageLayoutExplanation: 'Choose a page layout for this object type.',
+  pageLayoutExplanation: 'How pages of this type are laid out.',
   font: 'Font',
-  fontExplanation: 'Pick a font for this object type.',
+  fontExplanation: 'The typeface that pages of this type use.',
   wideLayout: 'Wide layout',
   wideLayoutExplanation:
     'Set the default layout mode for this object type. This will only affect the default page layout and will not make any difference for encyclopedia, profile, or index card designs.',
@@ -82,7 +82,7 @@ export const TYPE_SETTINGS_TEXT = {
   coverImageModeExplanation:
     'Choose whether cover images of objects of this type should be displayed as wide or small cover images by default. This setting only applies when the object type has a cover image property.',
   coverDisplay: 'Display of cover image',
-  coverDisplayExplanation: 'Set how the cover image should be displayed.',
+  coverDisplayExplanation: 'How the cover image fits its space.',
   // Polish item 20 (our wording for the explanation).
   defaultListView: 'Default list view',
   defaultListViewExplanation:
@@ -90,18 +90,18 @@ export const TYPE_SETTINGS_TEXT = {
   calendar: 'Calendar',
   calendarSettings: 'Calendar Settings',
   calendarExplanation:
-    'This object type has a date property. It is therefore integrated in the calendar. You can select your preferences here.',
-  createFromCalendar: 'Create object from calendar',
+    'Because this type has a date property, its objects show up in the calendar. Set how below.',
+  createFromCalendar: 'Quick-create from the calendar',
   createFromCalendarExplanation:
-    'If selected, you will see a button in your calendar allowing you to quickly create an object of this type populated with the date of that day.',
+    "Adds a button to each calendar day that creates an object of this type with that day's date filled in.",
   createShow: 'Show',
   createOnce: 'Show for one per day',
   createHide: 'Hide',
-  hideFromSidebar: 'Hide object in calendar sidebar',
+  hideFromSidebar: 'Keep out of the calendar sidebar',
   hideFromSidebarExplanation:
-    'The calendar sidebar shows objects and events on a day. You can choose to hide all objects of this type from the sidebar.',
+    "The calendar sidebar lists a day's objects and events. Turn this on to leave this type's objects out of it.",
   reviewing: 'Reviewing',
-  reviewingExplanation: 'Daily notes can be marked as reviewed. Hide this if you do not use reviewing.',
+  reviewingExplanation: "You can mark daily notes as reviewed. Hide the option if you don't need it.",
   hideReviewing: 'Hide reviewing',
   deleteHeading: 'Delete Object Type',
   // The saved-queries part is our string (see DeleteTypeDialog).
@@ -551,7 +551,7 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
                   label={TYPE_SETTINGS_TEXT.coverDisplay}
                   value={type.cropCoverImage ? 'cover' : 'contain'}
                   options={[
-                    { value: 'cover', name: 'Crop to fill available space' },
+                    { value: 'cover', name: 'Crop to fill the area' },
                     { value: 'contain', name: 'Display full image' },
                   ]}
                   onChange={(v) => patch({ cropCoverImage: v === 'cover' })}

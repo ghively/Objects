@@ -30,7 +30,7 @@ export const STATUS_SECTIONS: readonly { category: StatusCategory; name: string 
 ]
 
 const MAX_TEXT = 100
-const DUPLICATE = 'A label with this name already exists. The name of label has to be unique.'
+const DUPLICATE = 'That label name is taken. Each label needs a name of its own.'
 const SECTION_PREFIX = 'section:'
 /** Our string: shown in the menu when the type save behind a new option failed. */
 const CREATE_FAILED = 'The label could not be created.'

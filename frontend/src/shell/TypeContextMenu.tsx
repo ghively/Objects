@@ -133,7 +133,7 @@ export function TypeContextMenu({ type, onOpenTarget, onOpenTypeSettings, onDele
       </ContextMenuItem>
       <PinTypeItem type={type} />
       <ContextMenuSeparator />
-      <ContextMenuItem data-structure-setting="" onSelect={() => onOpenTypeSettings?.(type)}>
+      <ContextMenuItem data-type-setting="" onSelect={() => onOpenTypeSettings?.(type)}>
         <Icon name="ph-gear" size={14} />
         {TYPE_MENU_TEXT.settings}
       </ContextMenuItem>

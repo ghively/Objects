@@ -31,7 +31,7 @@ import { AI_ICON, AI_TEXT, openBlocksAi } from '../aiEntries'
 
 export type SlashView = 'icon' | 'bookmark' | 'button'
 
-export type SectionId = 'blocks' | 'structure' | 'dates' | 'reuse'
+export type SectionId = 'blocks' | 'types' | 'dates' | 'reuse'
 
 export interface SlashItem {
   id: string
@@ -57,16 +57,16 @@ export interface SlashSection {
 
 export const SLASH_TEXT = {
   blocks: 'Create a block',
-  structure: 'Create an object',
+  types: 'Create an object',
   dates: 'Link to a date',
   reuse: 'Reuse any content',
   noResults: 'No results',
   pasteUrl: 'Paste URL',
   /** M14 (our string): insert a button block without an automation yet. */
   buttonLater: 'Choose the automation later',
-  withEmptyTitle: (structureTitle: string) => `Create ${structureTitle}`,
-  withPotentialTitle: (structureTitle: string, potentialTitle: string) =>
-    `Create ${structureTitle} with title "${potentialTitle}"`,
+  withEmptyTitle: (typeTitle: string) => `Create ${typeTitle}`,
+  withPotentialTitle: (typeTitle: string, potentialTitle: string) =>
+    `Create ${typeTitle} with title "${potentialTitle}"`,
 }
 
 export interface SlashContext {
@@ -116,39 +116,39 @@ const list = (type: ListType) => (e: Editor) => {
  * before Record audio.
  */
 export const BLOCK_ITEMS: readonly SlashItem[] = [
-  block('Base', 'Standard', 'Turn block into a standard text block', 'ph-text-t', hierarchy('Base'), 'normal'),
-  block('S', 'Small', 'Turn block into a small text block', 'ph-text-aa', hierarchy('S'), 'small'), // block_S
-  block('H1', 'Heading 1', 'Block with a heading level 1', 'ph-text-h', hierarchy('H1'), 'h1'), // block_H1
-  block('H2', 'Heading 2', 'Block with a heading level 2', 'ph-text-h-two', hierarchy('H2'), 'h2'),
-  block('H3', 'Heading 3', 'Block with a heading level 3', 'ph-text-h-three', hierarchy('H3'), 'h3'),
-  block('H4', 'Heading 4', 'Block with a heading level 4', 'ph-text-h-four', hierarchy('H4'), 'h4'),
-  block('bullet', 'Bullet list', 'Add a bullet list to this block', 'ph-list-bullets', list('bullet'), 'list'), // block_bullet
-  block('alphabetical', 'Alphabetical list', 'Add an alphabetical list to this block', 'ph-list-numbers', list('alphabetical')),
-  block('numerical', 'Numbered list', 'Add a numbered list to this block', 'ph-list-numbers', list('numerical')),
-  block('roman', 'Roman list', 'Add a roman list to this block', 'ph-list-numbers', list('roman')),
-  block('quote', 'Quote block', 'Turn block into a quote block', 'ph-quotes', (e) => {
+  block('Base', 'Standard', 'Show this block as ordinary text', 'ph-text-t', hierarchy('Base'), 'normal'),
+  block('S', 'Small', 'Show this block in smaller type', 'ph-text-aa', hierarchy('S'), 'small'), // block_S
+  block('H1', 'Heading 1', 'Biggest heading', 'ph-text-h', hierarchy('H1'), 'h1'), // block_H1
+  block('H2', 'Heading 2', 'Large heading', 'ph-text-h-two', hierarchy('H2'), 'h2'),
+  block('H3', 'Heading 3', 'Medium heading', 'ph-text-h-three', hierarchy('H3'), 'h3'),
+  block('H4', 'Heading 4', 'Small heading', 'ph-text-h-four', hierarchy('H4'), 'h4'),
+  block('bullet', 'Bullet list', 'Turn this block into a bulleted item', 'ph-list-bullets', list('bullet'), 'list'), // block_bullet
+  block('alphabetical', 'Alphabetical list', 'Turn this block into a lettered item', 'ph-list-numbers', list('alphabetical')),
+  block('numerical', 'Numbered list', 'Turn this block into a numbered item', 'ph-list-numbers', list('numerical')),
+  block('roman', 'Roman list', 'Turn this block into a roman-numeral item', 'ph-list-numbers', list('roman')),
+  block('quote', 'Quote block', 'Show this block as a quotation', 'ph-quotes', (e) => {
     setQuote(e, true) // block_quote
   }),
-  block('todo', 'To-do', 'Add a To-do box to this block', 'ph-check-square', list('todo'), 'todo'), // block_todo
-  block('toggle', 'Toggle', 'Add a toggle to this block', 'ph-caret-right-fill', (e) => {
+  block('todo', 'To-do', 'Turn this block into a checkbox item', 'ph-check-square', list('todo'), 'todo'), // block_todo
+  block('toggle', 'Toggle', 'Make this block collapsible', 'ph-caret-right-fill', (e) => {
     e.chain().focus().wrapInToggle().run() // block_toggle
   }),
-  block('icon', 'Icon', 'Add an icon to this block', 'ph-smiley', () => 'icon', 'emoji'), // block_icon
-  block('group', 'Group', 'A layout element to group multiple blocks into one container', 'ph-rectangle', (e) => {
+  block('icon', 'Icon', 'Put an icon in front of this block', 'ph-smiley', () => 'icon', 'emoji'), // block_icon
+  block('group', 'Group', 'Keep several blocks together in one box', 'ph-rectangle', (e) => {
     e.chain().focus().wrapInGroup().run() // block_group
   }),
-  block('recordAudio', 'Record audio', 'Record audio and embed it at the cursor.', 'ph-microphone', (e) => {
+  block('recordAudio', 'Record audio', 'Record from the microphone and drop the clip here.', 'ph-microphone', (e) => {
     void recordAudio(e).catch((err) => {
       if (err instanceof NotBuiltYet) showToast(NOT_AVAILABLE)
     })
   }),
-  block('math', 'Math', 'A display style math block', 'ph-function', (e) => {
+  block('math', 'Math', 'An equation on its own line', 'ph-function', (e) => {
     e.chain().focus().insertMathBlock().run()
   }),
   block('code', 'Code', 'A code block', 'ph-code', (e) => {
     e.chain().focus().setCodeBlock().run()
   }),
-  block('hr', 'Horizontal line', 'A horizontal line to separate different sections', 'ph-minus', (e) => {
+  block('hr', 'Horizontal line', 'A divider line between parts of the page', 'ph-minus', (e) => {
     // Horizontal line: below the block (in place of it when empty).
     e.chain()
       .focus()
@@ -158,10 +158,10 @@ export const BLOCK_ITEMS: readonly SlashItem[] = [
       })
       .run()
   }),
-  block('columns', 'Two Columns', 'Multiple blocks groups next to each other', 'ph-columns', (e) => {
+  block('columns', 'Two Columns', 'Lay groups of blocks out side by side', 'ph-columns', (e) => {
     e.chain().focus().insertColumns(2).run()
   }),
-  block('table', 'Table', 'A simple block for tabular content', 'ph-table', (e) => {
+  block('table', 'Table', 'Rows and columns of cells', 'ph-table', (e) => {
     e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
   }),
   block('bookmark', 'Create bookmark', undefined, 'ph-bookmark-simple', () => 'bookmark'), // pasteInput.bookmark (ours in this menu)
@@ -296,10 +296,10 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
       ],
     },
     {
-      id: 'structure',
-      label: SLASH_TEXT.structure,
+      id: 'types',
+      label: SLASH_TEXT.types,
       items: creatableTypes(ctx.types).map((t) => ({
-        id: `structure:${t.id}`,
+        id: `type:${t.id}`,
         name: title ? SLASH_TEXT.withPotentialTitle(t.name, title) : SLASH_TEXT.withEmptyTitle(t.name),
         icon: t.icon?.type === 'iconify' ? t.icon.val : 'ph-file-plus',
         run: (e: Editor) => createAndLink(e, t, title),
@@ -310,11 +310,11 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
       label: SLASH_TEXT.dates,
       items: [
         ...typedDateItems(ctx.query, today()),
-        block('today', 'Today', "Add a link to today's daily note", 'ph-calendar-blank', (e) => insertLink(e, today())),
-        block('tomorrow', 'Tomorrow', "Add a link to tomorrow's daily note", 'ph-calendar-plus', (e) =>
+        block('today', 'Today', "Link today's daily note here", 'ph-calendar-blank', (e) => insertLink(e, today())),
+        block('tomorrow', 'Tomorrow', "Link tomorrow's daily note here", 'ph-calendar-plus', (e) =>
           insertLink(e, addDayStr(today(), 1)),
         ),
-        block('yesterday', 'Yesterday', "Add a link to yesterday's daily note", 'ph-calendar-minus', (e) =>
+        block('yesterday', 'Yesterday', "Link yesterday's daily note here", 'ph-calendar-minus', (e) =>
           insertLink(e, addDayStr(today(), -1)),
         ),
         // Seen in the live app (v1.72.7); the descriptions are ours.
@@ -324,10 +324,10 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
         block('aWeekAgo', 'A week ago', 'Add a link to the daily note of a week ago', 'ph-calendar-minus', (e) =>
           insertLink(e, addDayStr(today(), -7)),
         ),
-        block('dateLink', 'Today - date link', "Add a link to today's date.", 'ph-calendar-check', (e) =>
+        block('dateLink', 'Today - date link', "Insert today's date as a link.", 'ph-calendar-check', (e) =>
           insertDateToken(e, today()),
         ),
-        block('timestamp', 'Now – timestamp', 'Add a timestamp with the current time', 'ph-clock', (e) => {
+        block('timestamp', 'Now – timestamp', 'Insert the time right now', 'ph-clock', (e) => {
           e.chain().focus().insertContent(timestampText(now(), ctx.twentyFourHourTime)).run()
         }),
       ],
@@ -373,7 +373,7 @@ export function filterSections(sections: SlashSection[], query: string): SlashSe
   if (!q) return sections
   return sections
     .map((s) => {
-      if (s.id === 'structure') return s
+      if (s.id === 'types') return s
       const pinned = s.items.filter((item) => item.pinned)
       const scored = s.items
         .filter((item) => !item.pinned)
@@ -389,5 +389,5 @@ export function filterSections(sections: SlashSection[], query: string): SlashSe
 export function hasRealMatch(sections: SlashSection[], query: string, now: Date = new Date()): boolean {
   // M8: a phrase that is (or may still become) a date keeps the menu open.
   if (couldBeDate(query, dailyNoteTitle(now))) return true
-  return filterSections(sections, query).some((s) => s.id !== 'structure' && s.items.length > 0)
+  return filterSections(sections, query).some((s) => s.id !== 'types' && s.items.length > 0)
 }

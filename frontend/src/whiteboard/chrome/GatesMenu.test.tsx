@@ -8,7 +8,7 @@ test('test gates menu lists the gates then I/O', async () => {
   render(<GatesMenu onPick={onPick} />)
   const menu = screen.getByRole('menu', { name: 'Gates' })
   const items = within(menu).getAllByRole('menuitem')
-  expect(items.map((i) => i.textContent?.replace(/^.{2}/, ''))).toEqual(['NOT', 'AND', 'NAND', 'OR', 'NOR', 'XOR', 'XNOR', 'HIGH', 'LOW'])
+  expect(items.map((i) => i.textContent?.replace(/^.{2}/, ''))).toEqual(['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR', 'HIGH', 'LOW'])
   const text = menu.textContent ?? ''
   expect(text.indexOf('I/O')).toBeGreaterThan(text.indexOf('XNOR'))
   expect(text.indexOf('I/O')).toBeLessThan(text.indexOf('HIGH'))

@@ -3,7 +3,7 @@
 What Object does, or is meant to do: labels, menus, shortcuts, options and their order. This is the reference
 for fidelity work; when a label, an order or a shortcut is in question, this file and the design spec
 (`docs/superpowers/specs/2026-10-23-object-design.md`) settle it. Every feature is available; nothing is gated.
-Items that need an account or a cloud service are listed for completeness and marked **(out of scope)** or
+Items that would need an account or a cloud service are marked **(out of scope)** or
 **(later)**, following the ground rules in `CLAUDE.md`.
 
 Companion: `docs/superpowers/plans/polish-audit-2026-11-02.md` (where Object differed from this catalog and what
@@ -20,14 +20,14 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 | Sidebar footer: Shortcuts panel (section 2), Add Section, type gallery | specified (sections 2-3) |
 | Sidebar rest, top bar, search, New menu | specified (sections 4, 8) |
 | Calendar Month and Week views, backlinks, Export dialog | specified (section 10) |
-| Unlinked mentions | built in Object (section 11); its look is Object's own |
-| Brain dump, Work agent | Object's own (section 10b) |
-| Import: Source line, Files source, scan, proposal, trial, normalise, Import inbox | Object's own (section 10c); the strings are ours, not catalogued |
+| Unlinked mentions | specified (section 11) |
+| Brain dump, Work agent | specified (section 10b) |
+| Import: Source line, Files source, scan, proposal, trial, normalise, Import inbox | specified (section 10c); the exact strings live in the code |
 | Tab and sidebar context menus, Overview tab, collection page, outline | specified (section 9) |
 | Views: layouts, toolbar, Overview | specified (sections 8, 9); the inner screens of the filter, sort and group editors and Customize are not specified yet |
 | Object page: header, properties, side panel | specified (section 5); outline and stats in section 9; backlinks in section 10; unlinked mentions in section 11 |
 | Editor: block menu, selection toolbar, slash, @ | specified (section 6); the default table in section 10; the look of Two Columns, Code, Math, Toggle, Group and Horizontal line blocks is not specified yet |
-| Graph, Trash, Explore panel, shortcuts | specified (section 7); export dialog in section 10 (PDF, Markdown; Word and LaTeX options not specified yet); the original app's import dialog is not specified; Object's own import dialog is described in section 10c |
+| Graph, Trash, Explore panel, shortcuts | specified (section 7); export dialog in section 10 (PDF, Markdown; Word and LaTeX options not specified yet); the import dialog is described in section 10c |
 
 ## 1. Settings
 
@@ -133,7 +133,7 @@ Left/Right | Toggle calendar sidebar Ctrl+Alt+S.
 **AI Assistant**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; append to daily
 note; retry Ctrl+Alt+R; close chat Ctrl+Alt+X; rephrase Ctrl+Alt+U.
 
-**Work** (Object's own, M23; on the Work page only, never while typing in a field or editor): Search work / |
+**Work** (M23; on the Work page only, never while typing in a field or editor): Search work / |
 Brain dump B | Go to Now, Flow, Projects map, Today, On the floor, Your queues, Agent queue, Stuck, Wins,
 Alerts, Everything: G then N, W, P, T, O, Q, H, S, Y, L, E (within 1.5 s; in Just one thing only G then N) |
 Next row J | Previous row K | Open Enter | Peek Space | Previous item [ | Next item ] | Close Esc (the work item
@@ -150,7 +150,7 @@ page | **Weblink**: search.
 ## 3. "Add new object type" gallery (the `+` next to "Object Types")
 
 A popover: "Add new object type", "Create your own", then template groups with a one-line description each.
-- Meetings (Capture conversations with attendees and a date), People, Projects (status, collaborators, meetings).
+- Meetings (who attended, and when), People, Projects (status, collaborators, meetings).
 - Research: Atomic notes, Definitions.
 - Media: Books (authors, rating, genre), Films, TV series, Podcasts.
 - Planning and reflection: Days (energy, mood, what stood out), Weeks, Months.
@@ -163,9 +163,9 @@ Each starter template pre-fills the new type's properties.
   current one, a divider, "+ Create space".
 - Object Types header: fold chevron, count, a `...` menu (Sort Manually with a check, Sort Alphabetically) and
   a `+` (the gallery above) on hover.
-- "Add Section" opens a small form: "Group pages and collections under a named heading in your space
-  overview." with an Icon picker, Section Name and Create.
-- Work (Object's own, M23): one entry directly below the Agents section, above All notes, opening the Work
+- "Add Section" opens a small form (a one-line explanation that a section is a named heading for pages
+  and collections in the sidebar) with an Icon picker, Section Name and Create.
+- Work (M23): one entry directly below the Agents section, above All notes, opening the Work
   page; it shows while AI features are hidden.
 - Bottom row: settings gear, theme toggle, Shortcuts icon. (A profile menu with account and plan is
   **(out of scope)**.)
@@ -269,8 +269,8 @@ Each starter template pre-fills the new type's properties.
 - **Month view**: header "Nov 2026" at the left, the view switcher (Month, Week, Three days, Day) centered,
   "< Today >" at the right; below, a strip Jan to Dec with the current month highlighted; then one card per
   existing daily note of that month (type label, title, Reviewed checkbox, Tags row, then the note's content:
-  to-dos, bullets, code/time rows), and a "+ New Object" row. An empty month shows "No daily notes created for
-  this month. You can change this by creating a new object." Clicking a month in the strip jumps there; the tab
+  to-dos, bullets, code/time rows), and a "+ New Object" row. An empty month shows a short
+  empty-state line saying the month has no daily notes yet. Clicking a month in the strip jumps there; the tab
   title becomes the month's first day.
 - **Week view**: a single column of days. Each day: the weekday name colored by weekday (Sunday red, Monday amber
   with a red "Today" pill, Tuesday pink, Wednesday green, Thursday orange, Friday blue), the date as a large
@@ -294,7 +294,7 @@ Each starter template pre-fills the new type's properties.
 - **Delete** of a page from the list or the peek `...` menu uses the same confirmation as before and the object
   goes to Trash.
 
-## 10b. Brain dump and the Work agent (Object's own, M24)
+## 10b. Brain dump and the Work agent (M24)
 
 - **Brain-dump bar** (Work page, key B): Enter saves a **Capture** object at once (type "Capture", Status New
   | Filed | Needs you; properties Text, Captured at, From view, Linked item, Filed to, Question). `Question about
@@ -313,7 +313,7 @@ Each starter template pre-fills the new type's properties.
   ("The run didn't finish within 30 minutes.", "The agent finished without marking the step done.", "Object closed
   during this run.") or asks Gene one question (a Question step is inserted before the step).
 
-## 10c. Import and migration (Object's own, M15 and M25-M27)
+## 10c. Import and migration (M15 and M25-M27)
 
 The catalog has no import dialog (only the Import menu entries in sections 4 and 9), so everything here is Object's
 own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` and `import/agent/text.ts`.
@@ -360,7 +360,7 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   (write), the prompt `migrate_a_source` and the resource `object://skills/migrate-a-source` let an outside agent run the
   same workflow; `start_import` refuses a mapping that creates types outside an approved proposal (for the open space or a trial copy; a brand-new space is not checked).
 
-## 11. Unlinked mentions (kept in Object)
+## 11. Unlinked mentions
 
 An "Unlinked Mentions" section sits under Backlinks on an object's page; it lists text elsewhere that matches
 this object's title or an alias without being a link ("Unlinked name matches", section label "Mentions"; an

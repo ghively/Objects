@@ -1,10 +1,10 @@
 /**
  * The floating inspector (M8), top right over the canvas:
  * - "Outline": the headings in the board's text blocks, in reading order; a click zooms to the
- *   block. Empty: "No headings in this page".
+ *   block. Empty: "This page has no headings".
  * - "Frames": the frames in reading order; a click zooms to the frame; dragging a row (or
  *   Alt+ArrowUp/Down on it, our choice) reorders them and writes the board's `readingOrder`.
- *   Empty: "No frames on this whiteboard".
+ *   Empty: "This whiteboard has no frames".
  * - "Stats": counts of nodes by kind, connectors, words and ink strokes (our choice of stats).
  * - "Pin" / "Unpin": a pinned inspector opens with the board (kept per viewer in localStorage).
  * The toggle button and its placement are our choice.

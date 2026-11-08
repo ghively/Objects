@@ -23,7 +23,7 @@ describe('AppearanceSection', () => {
     const user = userEvent.setup()
     render(<AppearanceSection />)
     expect(screen.getByRole('heading', { level: 2, name: 'Appearance' })).toBeInTheDocument()
-    expect(screen.getByText('Adjust the appearance of the app.')).toBeInTheDocument()
+    expect(screen.getByText('Themes, fonts and colors.')).toBeInTheDocument()
 
     // Theme mode: Light / Dark.
     const mode = screen.getByRole('radiogroup', { name: 'Theme' })
@@ -35,7 +35,7 @@ describe('AppearanceSection', () => {
     // The light and dark themes, with their descriptions.
     const light = screen.getByRole('radiogroup', { name: 'Light theme' })
     expect(within(light).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Light', 'Light Dimmed'])
-    expect(within(light).getByText('A light theme with a dimmed contrast')).toBeInTheDocument()
+    expect(within(light).getByText('Light, with softer contrast')).toBeInTheDocument()
     await user.click(within(light).getByRole('radio', { name: 'Light Dimmed' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ lightTheme: 'lightDimmed' }, expect.anything())
 
@@ -47,7 +47,7 @@ describe('AppearanceSection', () => {
     // Font.
     const font = screen.getByRole('radiogroup', { name: 'Font' })
     expect(within(font).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Sans Serif', 'Serif', 'Monospace'])
-    expect(within(font).getByText('Georgia – a classic serif typeface with good readability.')).toBeInTheDocument()
+    expect(within(font).getByText('Georgia, an easy-to-read serif face.')).toBeInTheDocument()
     await user.click(within(font).getByRole('radio', { name: 'Monospace' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ font: 'monospace' }, expect.anything())
 

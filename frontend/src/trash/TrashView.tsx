@@ -30,11 +30,11 @@ export const TRASH_TEXT = {
   deletePermanently: 'Delete permanently',
   emptyTrash: 'Empty Trash',
   emptyConfirmDescription: (count: number) =>
-    `Are you sure you want to permanently delete all ${count} object(s) in trash? This action cannot be undone.`,
+    `Delete all ${count} object(s) in the trash for good? You won't be able to get them back.`,
   purgeConfirmTitle: 'Permanently delete',
   purgeConfirmDescription: (count: number) =>
-    `Are you sure you want to permanently delete ${count} object(s)? This action cannot be undone.`,
-  typeToConfirm: 'Type "Delete" to confirm',
+    `Delete ${count} object(s) for good? You won't be able to get them back.`,
+  typeToConfirm: 'Enter "Delete" to go ahead',
   confirmWord: 'Delete',
   objectType: 'Object type',
   collection: 'Collection',

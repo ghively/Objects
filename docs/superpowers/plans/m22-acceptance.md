@@ -49,7 +49,7 @@ The script's checks, all `[ok]`:
 5. Over `objectapp-mcp` with the read-write token "Work": all eight work tools listed (63 tools); `step_action(complete)` writes `Work completed step 2: Spooler restarted, queue flowing`; Gene's reopen of that done Approve step is 422 "A done Approve step never reopens."; the agent's approve of step 3 fails with "Only you can do this to a step." and writes nothing; `--read-only` lists only `work_items` and `work_item` of the work tools.
 6. Badge reader (CRLF + BOM): `done` on its Do step keeps the BOM and every CRLF; `ticketId` set to `OPS-124` through `PUT /api/object/properties` writes `system: Jira`; CRLF and BOM still kept.
 7. `PUT /api/object/properties` with `steps` is 422 "Steps change with the step actions." and writes nothing.
-8. Add work fields on Project: 200, 26 fields added; Scanner rollout becomes a work item (turn approve); the Tickets view's structures are `project` and `task`.
+8. Add work fields on Project: 200, 26 fields added; Scanner rollout becomes a work item (turn approve); the Tickets view's types are `project` and `task`.
 9. Close Printer: status Done, `completed` 2026-11-05T10:00:00.000Z, the close notes hold "Verification: Spooler restarted, 20 test prints clean".
 10. Clock at 2026-11-20: Printer leaves the active list and stays in `scope=all`.
 11. Changed files: `.object/types/project.json`, `Tasks/Badge reader audit.md`, `Tasks/Parked thing.md`, `Tasks/Printer jams on line 3.md`; nothing under `.object/queries`; no work file in the state dir.

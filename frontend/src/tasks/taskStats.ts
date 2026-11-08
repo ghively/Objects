@@ -10,7 +10,7 @@ export const STATS_TEXT = {
   bestStreak: 'Best',
   completions: 'Completions',
   completionRate: 'Completion rate',
-  completionRateSubtitle: 'Completed vs skipped or missed',
+  completionRateSubtitle: 'Done out of all occurrences due',
   allTime: 'All-time',
   atRisk: 'At risk',
   keepGoing: 'Keep it up',

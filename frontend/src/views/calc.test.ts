@@ -24,11 +24,11 @@ describe('calculations', () => {
     expect(calculate([R({ qty: 2 }), R({ qty: 4 })], 'qty', 'sum', c).value).toBe(6)
   })
 
-  test("a calculation's own structureId picks its type's definition over the view's", () => {
+  test("a calculation's own typeId picks its type's definition over the view's", () => {
     const other = typeDef({ id: 'other', propertyDefinitions: [propertyDef({ id: 'qty', type: 'text' })] })
     const c: FilterCtx = { ...ctx, types: [other, page], viewTypeIds: ['other'] }
     expect(calculate([R({ qty: 2 }), R({ qty: 4 })], 'qty', 'sum', c, 'page').value).toBe(6)
-    // A structure without the property falls back to the view's types.
+    // A type without the property falls back to the view's types.
     expect(calculate([R({ qty: 2 }), R({ qty: 4 })], 'qty', 'sum', { ...c, viewTypeIds: ['page'] }, 'gone').value).toBe(6)
   })
 

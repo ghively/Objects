@@ -1,96 +1,53 @@
 /* Code syntax tokens (M8 Task 29): the `code` group (`code-keyword` … `code-punctuation`)
    for the four themes. `editor/nodes/codeBlock.css` maps highlight.js's
    `hljs-*` classes onto these. Dark is the default.
-   `text-subtle` is our `--text-muted` (theme/themes.css header). */
-:root {
-  --code-keyword: oklch(0.8268 0.1083 306.36);
-  --code-bool: oklch(0.8366 0.1165 66.28);
-  --code-regex: oklch(0.6867 0.1727 49.09);
-  --code-literal: oklch(0.7845 0.1325 181.94);
-  --code-string: oklch(0.9451 0.1242 101.55);
-  --code-number: oklch(0.8366 0.1165 66.28);
-  --code-string-2: oklch(0.8712 0.1363 154.48);
-  --code-variable-name: oklch(0.8091 0.0957 251.83);
-  --code-variable-name-local: oklch(0.7253 0.1752 349.74);
-  --code-variable-name-definition: oklch(0.7535 0.1391 232.68);
-  --code-variable-name-2: oklch(0.7845 0.1325 181.94);
-  --code-type-name: oklch(0.7463 0.1550 72.02);
-  --code-namespace: oklch(0.6587 0.1360 235.85);
-  --code-class-name: oklch(0.7577 0.1590 55.93);
-  --code-macro-name: oklch(0.6738 0.1149 183.05);
-  --code-property-name: var(--text-muted);
-  --code-operator: oklch(0.9014 0.0556 230.95);
-  --code-comment: var(--text-muted);
-  --code-meta: var(--text-muted);
-  --code-invalid: oklch(0.5506 0.1836 13.60);
-  --code-punctuation: oklch(0.9014 0.0556 230.95);
-}
-html[data-theme='light'] {
-  --code-keyword: oklch(0.4727 0.1688 305.54);
-  --code-bool: oklch(0.5068 0.1193 41.94);
-  --code-regex: oklch(0.6078 0.1566 44.53);
-  --code-literal: oklch(0.6738 0.1149 183.05);
-  --code-string: oklch(0.6219 0.1220 79.82);
-  --code-number: oklch(0.5068 0.1193 41.94);
-  --code-string-2: oklch(0.4780 0.1012 152.50);
-  --code-variable-name: oklch(0.4732 0.1411 266.08);
-  --code-variable-name-local: oklch(0.4779 0.1451 358.39);
-  --code-variable-name-definition: oklch(0.5414 0.1136 238.26);
-  --code-variable-name-2: oklch(0.3652 0.0444 191.00);
-  --code-type-name: oklch(0.7463 0.1550 72.02);
-  --code-namespace: oklch(0.5414 0.1136 238.26);
-  --code-class-name: oklch(0.6867 0.1727 49.09);
-  --code-macro-name: oklch(0.6738 0.1149 183.05);
-  --code-property-name: var(--text-muted);
-  --code-operator: oklch(0.3717 0.0575 234.22);
-  --code-comment: var(--text-muted);
-  --code-meta: var(--text-muted);
-  --code-invalid: oklch(0.5506 0.1836 13.60);
-  --code-punctuation: oklch(0.3717 0.0575 234.22);
-}
-html[data-theme='lightDimmed'] {
-  --code-keyword: oklch(0.4727 0.1688 305.54);
-  --code-bool: oklch(0.5068 0.1193 41.94);
-  --code-regex: oklch(0.6078 0.1566 44.53);
-  --code-literal: oklch(0.6738 0.1149 183.05);
-  --code-string: oklch(0.6219 0.1220 79.82);
-  --code-number: oklch(0.5068 0.1193 41.94);
-  --code-string-2: oklch(0.4780 0.1012 152.50);
-  --code-variable-name: oklch(0.4732 0.1411 266.08);
-  --code-variable-name-local: oklch(0.4779 0.1451 358.39);
-  --code-variable-name-definition: oklch(0.5414 0.1136 238.26);
-  --code-variable-name-2: oklch(0.3652 0.0444 191.00);
-  --code-type-name: oklch(0.7463 0.1550 72.02);
-  --code-namespace: oklch(0.5414 0.1136 238.26);
-  --code-class-name: oklch(0.6867 0.1727 49.09);
-  --code-macro-name: oklch(0.6738 0.1149 183.05);
-  --code-property-name: var(--text-muted);
-  --code-operator: oklch(0.3717 0.0575 234.22);
-  --code-comment: var(--text-muted);
-  --code-meta: var(--text-muted);
-  --code-invalid: oklch(0.5506 0.1836 13.60);
-  --code-punctuation: oklch(0.3717 0.0575 234.22);
-}
+   Each role has a Tailwind CSS v3 hue (MIT; theme/tailwindPalette.ts): step 300 in the dark
+   themes, step 700 in the light ones. Property names, comments and meta use --text-muted. */
+:root,
 html[data-theme='darkDimmed'] {
-  --code-keyword: oklch(0.8268 0.1083 306.36);
-  --code-bool: oklch(0.8366 0.1165 66.28);
-  --code-regex: oklch(0.6867 0.1727 49.09);
-  --code-literal: oklch(0.7845 0.1325 181.94);
-  --code-string: oklch(0.9451 0.1242 101.55);
-  --code-number: oklch(0.8366 0.1165 66.28);
-  --code-string-2: oklch(0.8712 0.1363 154.48);
-  --code-variable-name: oklch(0.8091 0.0957 251.83);
-  --code-variable-name-local: oklch(0.7253 0.1752 349.74);
-  --code-variable-name-definition: oklch(0.7535 0.1391 232.68);
-  --code-variable-name-2: oklch(0.7845 0.1325 181.94);
-  --code-type-name: oklch(0.7463 0.1550 72.02);
-  --code-namespace: oklch(0.6587 0.1360 235.85);
-  --code-class-name: oklch(0.7577 0.1590 55.93);
-  --code-macro-name: oklch(0.6738 0.1149 183.05);
+  --code-keyword: #c4b5fd;
+  --code-bool: #fcd34d;
+  --code-regex: #fca5a5;
+  --code-literal: #67e8f9;
+  --code-string: #bef264;
+  --code-number: #fcd34d;
+  --code-string-2: #6ee7b7;
+  --code-variable-name: #7dd3fc;
+  --code-variable-name-local: #f9a8d4;
+  --code-variable-name-definition: #93c5fd;
+  --code-variable-name-2: #67e8f9;
+  --code-type-name: #fde047;
+  --code-namespace: #a5b4fc;
+  --code-class-name: #fdba74;
+  --code-macro-name: #f0abfc;
   --code-property-name: var(--text-muted);
-  --code-operator: oklch(0.9014 0.0556 230.95);
+  --code-operator: #cbd5e1;
   --code-comment: var(--text-muted);
   --code-meta: var(--text-muted);
-  --code-invalid: oklch(0.5506 0.1836 13.60);
-  --code-punctuation: oklch(0.9014 0.0556 230.95);
+  --code-invalid: #fda4af;
+  --code-punctuation: #cbd5e1;
+}
+html[data-theme='light'],
+html[data-theme='lightDimmed'] {
+  --code-keyword: #6d28d9;
+  --code-bool: #b45309;
+  --code-regex: #b91c1c;
+  --code-literal: #0e7490;
+  --code-string: #4d7c0f;
+  --code-number: #b45309;
+  --code-string-2: #047857;
+  --code-variable-name: #0369a1;
+  --code-variable-name-local: #be185d;
+  --code-variable-name-definition: #1d4ed8;
+  --code-variable-name-2: #0e7490;
+  --code-type-name: #a16207;
+  --code-namespace: #4338ca;
+  --code-class-name: #c2410c;
+  --code-macro-name: #a21caf;
+  --code-property-name: var(--text-muted);
+  --code-operator: #334155;
+  --code-comment: var(--text-muted);
+  --code-meta: var(--text-muted);
+  --code-invalid: #be123c;
+  --code-punctuation: #334155;
 }

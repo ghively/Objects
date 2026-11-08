@@ -43,10 +43,10 @@ describe('palette', () => {
         expect(css.match(new RegExp(`${token}:`, 'g'))?.length, token).toBe(1)
       }
     }
-    expect(css).toMatch(/--label-bg-blue: #334069;/)
-    expect(css).toMatch(/--label-text-blue: #4f93f3;/)
-    expect(css).toMatch(/--label-bg-gray: #28282b;/)
-    expect(css).toMatch(/--label-text-gray: #7b7776;/)
+    expect(css).toMatch(/--label-bg-blue: #181f38;/)
+    expect(css).toMatch(/--label-text-blue: #60a5fa;/)
+    expect(css).toMatch(/--label-bg-gray: #27272a;/)
+    expect(css).toMatch(/--label-text-gray: #a1a1aa;/)
     expect(lineColor('red')).toBe('var(--line-red)')
   })
 })

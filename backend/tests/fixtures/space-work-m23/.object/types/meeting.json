@@ -10,7 +10,7 @@
     "val": "ph-users-three"
   },
   "color": "orange",
-  "description": "Capture conversations with attendees and a date.",
+  "description": "Notes from a meeting: who came, when, and what was said.",
   "basic": false,
   "propertyDefinitions": [
     {
@@ -18,7 +18,7 @@
       "key": "title",
       "name": "Title",
       "type": "entity_title",
-      "description": "The title serves as the main identifier for any entry",
+      "description": "The name of the object, shown wherever it appears",
       "icon": {
         "type": "iconify",
         "val": "ph-text-t"
@@ -31,7 +31,7 @@
       "key": "collections",
       "name": "Collections",
       "type": "entity_collections",
-      "description": "Collections this content is included in",
+      "description": "The collections this object belongs to",
       "icon": {
         "type": "iconify",
         "val": "ph-cards-three"
@@ -44,7 +44,7 @@
       "key": "description",
       "name": "Description",
       "type": "entity_description",
-      "description": "Additional information to further describe an item",
+      "description": "A short summary of what the object is about",
       "icon": {
         "type": "iconify",
         "val": "ph-info"
@@ -57,7 +57,7 @@
       "key": "createdAt",
       "name": "Created at",
       "type": "entity_createdAt",
-      "description": "Date and time of creation",
+      "description": "When the object was made",
       "icon": {
         "type": "iconify",
         "val": "ph-calendar-blank"
@@ -70,7 +70,7 @@
       "key": "lastUpdated",
       "name": "Last updated",
       "type": "entity_lastUpdated",
-      "description": "Date and time of last edit",
+      "description": "When the object last changed",
       "icon": {
         "type": "iconify",
         "val": "ph-clock-clockwise"
@@ -83,7 +83,7 @@
       "key": "tags",
       "name": "Tags",
       "type": "entity_tags",
-      "description": "General tags of this content",
+      "description": "Tags attached to the object",
       "icon": {
         "type": "iconify",
         "val": "ph-tag"
@@ -101,7 +101,7 @@
       "key": "icon",
       "name": "Icon",
       "type": "entity_icon",
-      "description": "A quick visual identifier",
+      "description": "An emoji or icon shown beside the title",
       "icon": {
         "type": "iconify",
         "val": "ph-smiley"
@@ -114,7 +114,7 @@
       "key": "aliases",
       "name": "Aliases",
       "type": "entity_aliases",
-      "description": "Additional names for this content",
+      "description": "Other names the object goes by",
       "icon": {
         "type": "iconify",
         "val": "ph-cards"

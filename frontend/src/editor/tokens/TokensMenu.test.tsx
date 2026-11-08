@@ -97,8 +97,8 @@ describe('TokensMenu', () => {
       'Code',
       'Formula',
       'Highlight text',
-      'Create object from text selection.',
-      'Link existing object with text selection.',
+      'Make a new object out of the selected text.',
+      'Point the selected text at an object you already have.',
       'AI', // M10
     ])
 

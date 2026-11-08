@@ -39,7 +39,7 @@ The saved copies are reference versions: edit the plan paths and milestone list 
 
 ## On-disk format
 
-A space keeps its metadata in `.object/` (types, collections, queries, UI state, trash) and its rebuildable cache in `.object-cache/`. Spaces made before 2026-11-04 used older folder names; they are renamed to these once, automatically, on open, and no `.md` file is changed.
+A space keeps its metadata in `.object/` (types, collections, queries, UI state, trash) and its rebuildable cache in `.object-cache/`.
 
 ## Out of scope (by design)
 

@@ -22,13 +22,13 @@ describe('view model', () => {
     expect(LAYOUTS.kanban.icon).toBe('ph-kanban')
     expect(LAYOUTS.embed.icon).toBe('ph-text-indent')
     expect(LAYOUTS.gallery.label).toBe('Gallery strip')
-    expect(LAYOUTS.list.requiresGroupByEntity).toBe(true)
-    expect(LAYOUTS.grid.hasSeparateBlocksGroup).toBe(true)
     for (const list of [STANDARD_LAYOUTS, FULL_VIEW_LAYOUTS, ALL_NOTES_LAYOUTS]) {
       expect(list).not.toContain('gallery')
     }
-    expect(FULL_VIEW_LAYOUTS).toEqual(['list', 'grid', 'wall', 'table', 'embed', 'kanban', 'calendar', 'timeline', 'chart'])
-    expect(ALL_NOTES_LAYOUTS).toEqual(['list', 'grid', 'wall', 'embed'])
+    // The behaviour catalog's order, then Object's own layouts.
+    expect(FULL_VIEW_LAYOUTS).toEqual(['list', 'wall', 'kanban', 'grid', 'table', 'embed', 'calendar', 'timeline', 'chart'])
+    expect(STANDARD_LAYOUTS).toEqual(['list', 'wall', 'grid', 'table', 'embed'])
+    expect(ALL_NOTES_LAYOUTS).toEqual(['list', 'wall', 'grid', 'embed'])
   })
 
   test('columnCount', () => {

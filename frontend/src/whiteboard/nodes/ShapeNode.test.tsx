@@ -39,10 +39,10 @@ describe('ShapeNode', () => {
       expect(el.style.transform).toBe('rotate(30deg)')
       expect(el).toHaveAttribute('data-flip-x')
       // Border: the ring custom property carries the theme colour (dark mode value).
-      expect(el.style.getPropertyValue('--whiteboard-node-color-ring')).toBe('#F87171')
+      expect(el.style.getPropertyValue('--whiteboard-node-color-ring')).toBe('#f87171')
       const path = el.querySelector('svg path')!
       expect(path.getAttribute('d')).toBe(shapePath(shape, 120, 90, { flipX: true, flipY: false }))
-      expect(path.getAttribute('fill')).toBe('#263956')
+      expect(path.getAttribute('fill')).toBe('#1a2647')
     }
     const plain = surface(nodeEl('plain')!)
     expect(plain.querySelector('svg path')!.getAttribute('fill')).toBe(DEFAULT_SHAPE_FILL)

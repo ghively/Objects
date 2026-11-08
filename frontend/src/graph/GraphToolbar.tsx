@@ -1,10 +1,10 @@
-// The graph toolbar: "Search for a note in the graph" (Enter focuses the best visible match),
+// The graph toolbar: "Find a note in this graph" (Enter focuses the best visible match),
 // "Fit graph to view", "Export view as PNG", and the "Customize" popover passed in by the page.
 import { useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 
 export const TOOLBAR_TEXT = {
-  search: 'Search for a note in the graph',
+  search: 'Find a note in this graph',
   fit: 'Fit graph to view',
   exportPng: 'Export view as PNG',
 }

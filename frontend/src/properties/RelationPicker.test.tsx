@@ -129,7 +129,7 @@ describe('RelationPicker', () => {
       />,
     )
     expect(
-      screen.getByText('Nothing to select in this set. Search the whole database to add objects to the set.'),
+      screen.getByText('This set has nothing to pick from. Search everything to add objects to it.'),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Property' })).not.toBeInTheDocument()
   })

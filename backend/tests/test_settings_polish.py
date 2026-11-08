@@ -15,7 +15,7 @@ POLISH_DEFAULTS = {
     # Editor settings.
     "spellCheckLang": None,
     "alwaysCreateInlineLinks": False,
-    "hideStructureSettings": False,
+    "hideTypeSettings": False,
     "highlightStyle": "default",
 }
 
@@ -64,7 +64,7 @@ def test_spellcheck_language_rejects_non_tags(state: Path, value):
         settings.patch({"spellCheckLang": value}, "")
 
 
-@pytest.mark.parametrize("key", ["alwaysCreateInlineLinks", "hideStructureSettings"])
+@pytest.mark.parametrize("key", ["alwaysCreateInlineLinks", "hideTypeSettings"])
 def test_editor_switches_are_bools(state: Path, key):
     merged, _ = settings.patch({key: True}, "")
     assert merged[key] is True

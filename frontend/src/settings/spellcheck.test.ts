@@ -7,10 +7,11 @@ describe('normalizeLanguageTag', () => {
     expect(normalizeLanguageTag('de-ch')).toBe('de-CH')
     expect(normalizeLanguageTag(' en_GB ')).toBe('en-GB')
     expect(normalizeLanguageTag('es-419')).toBe('es-419')
+    expect(normalizeLanguageTag('de-ch-1996')).toBe('de-CH-1996')
   })
 
   test('test non-tags are refused', () => {
-    for (const bad of ['', 'english', 'e', 'en-', 'de CH', 'en-Latn', null, undefined]) {
+    for (const bad of ['', 'english', 'e', 'en-', 'de CH', 'en-Latn', 'en-GB-x-test', 'zh-Hant-TW', null, undefined]) {
       expect(normalizeLanguageTag(bad), String(bad)).toBeUndefined()
     }
   })

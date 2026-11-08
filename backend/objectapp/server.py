@@ -87,7 +87,7 @@ Routes (all JSON):
   ``201 {path, version}``; ``422`` (a type without templates), ``423``, ``404``. Announces
   ``created`` and ``types``.
 - ``POST /api/object/apply-template`` ``{path, templateId, baseVersion, clientId?}`` ->
-  ``{version}``; ``409 {currentVersion}``, ``422 {detail}`` ("Could not apply the template"),
+  ``{version}``; ``409 {currentVersion}``, ``422 {detail}`` ("The template couldn't be applied"),
   ``423``, ``404``. Announces ``changed``. ``POST /api/objects`` applies the type's default
   template unless ``templateId`` is ``"none"``; ``DELETE /api/object`` on a template also
   drops it from its type's ``templates`` (announcing ``types``).
@@ -216,6 +216,7 @@ from .alertwatch import AlertWatch
 from .apictx import ApiContext
 from .computed import Computer, Obj, has_computed
 from .curator import ActivityMiddleware, Curator, IdleClock
+from .keycompat import KeyCompatMiddleware
 from .appstate import state_dir
 from .automations import AutomationEngine
 from .collections import CollectionDef
@@ -521,7 +522,7 @@ _UI_PATCH_KEYS = frozenset(
     }
 )  # fmt: skip
 # The graph view customisation keys.
-_GRAPH_LIST_KEYS = ("filterStructureIds", "excludeStructureIds")
+_GRAPH_LIST_KEYS = ("filterTypeIds", "excludeTypeIds")
 _GRAPH_BOOL_KEYS = (
     "showCompletedTasks",
     "showMinimalNodes",
@@ -997,6 +998,7 @@ def create_app(
     # Level 1, not Starlette's 9: on the 9 MB all-rows answer level 9 cost 465 ms of
     # CPU for 1.5 MB on the wire, level 1 under 40 ms for 1.9 MB.
     app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=1)
+    app.add_middleware(KeyCompatMiddleware)  # request bodies with older key names
     app.add_middleware(ActivityMiddleware, idle=idle)  # M18: inside LocalOnlyMiddleware
     app.add_middleware(LocalOnlyMiddleware)  # added last: the outermost, so it checks first
     app.state.space = space

@@ -3,7 +3,7 @@
  * selection, in the live app's order (catalog section 6): Bold, Italic,
  * Strikethrough, Underline, Bullet list, To-do, Link, Code, Formula,
  * "Highlight text" (the colour panel, `ColorMenu`), `+` ("Create object from
- * text selection."), `@` ("Link existing object with text selection.") and the
+ * text selection."), `@` ("Point the selected text at an object you already have.") and the
  * AI sparkle ("AI", M10; gone while "Hide AI features" is on). The two list buttons turn the block
  * into that list and back to text (the catalog read the second icon as
  * numbered or to-do; To-do is our choice).
@@ -67,8 +67,8 @@ export const TOKENS_MENU_TEXT = {
   todo: 'To-do',
   link: 'Link',
   highlight: COLOR_MENU_TEXT.title,
-  create: 'Create object from text selection.',
-  reuse: 'Link existing object with text selection.',
+  create: 'Make a new object out of the selected text.',
+  reuse: 'Point the selected text at an object you already have.',
   ai: AI_TEXT.ai,
   searchTypes: 'Search Object Types',
   searchObjects: 'Search objects', // our string
@@ -131,7 +131,7 @@ export function linkSelectionTo(editor: Editor, title: string, label?: string | 
     .run()
 }
 
-/** "Create object from text selection.": the selection becomes `[[Title]]` and a new object of `typeId` gets that title. */
+/** "Make a new object out of the selected text.": the selection becomes `[[Title]]` and a new object of `typeId` gets that title. */
 export async function createObjectFromSelection(editor: Editor, typeId: string, mods: OpenMods = {}): Promise<boolean> {
   const text = selectionText(editor)
   if (text === null) return false
@@ -143,7 +143,7 @@ export async function createObjectFromSelection(editor: Editor, typeId: string, 
   return true
 }
 
-/** "Link existing object with text selection.": the selection becomes a link to `object` (by path when its title cannot be a target). */
+/** "Point the selected text at an object you already have.": the selection becomes a link to `object` (by path when its title cannot be a target). */
 export function linkSelectionToObject(editor: Editor, object: Pick<ObjectSummary, 'title' | 'path'>): boolean {
   const text = selectionText(editor)
   if (text === null) return false

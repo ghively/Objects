@@ -103,12 +103,12 @@ describe('TypePage', () => {
     await waitFor(() => expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['task'], preview: false }))
     await user.click(screen.getByRole('button', { name: 'Layout' }))
     const items = (await screen.findAllByRole('menuitemcheckbox')).map((i) => i.textContent)
-    expect(items).toEqual(['List', 'Gallery', 'Wall', 'Table', 'Embed', 'Kanban', 'Calendar', 'Timeline', 'Chart'])
+    expect(items).toEqual(['List', 'Wall', 'Kanban', 'Gallery', 'Table', 'Embed', 'Calendar', 'Timeline', 'Chart'])
     expect(items).not.toContain('Gallery strip')
   })
 
   test('test full-view sections become header tabs', async () => {
-    const q = query({ id: 'q1', name: 'Open tasks', definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'task' }] } })
+    const q = query({ id: 'q1', name: 'Open tasks', definition: { ...query({ id: 'x' }).definition, types: [{ id: 'task' }] } })
     const c = collection({ id: 'c1', name: 'Reading', typeIds: ['task'] })
     mocked.queries.mockResolvedValue([q])
     mocked.collections.mockResolvedValue([c])
@@ -201,7 +201,7 @@ describe('TypePage', () => {
     expect(screen.getByText('Hidden Sections')).toBeInTheDocument()
     const hidden = await screen.findAllByTestId('hidden-section')
     expect(hidden.map((e) => e.querySelector('.truncate')?.textContent)).toEqual(['Backlog', 'Not in any collection', 'Not tagged', 'No backlinks'])
-    expect(within(hidden[3]).getByText('All objects that are not linked in any other content.')).toBeInTheDocument()
+    expect(within(hidden[3]).getByText('Objects that nothing else links to.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Show No backlinks' }))
     await waitFor(() => expect(lastSaved()[1].dashboard.sections.at(-1)).toEqual({ key: 'noBacklinks', collapsed: false }))
   })
@@ -218,7 +218,7 @@ describe('TypePage', () => {
 
   test('Add a section lists the queries of the type under "Queries & Views"', async () => {
     const user = userEvent.setup()
-    const q = query({ id: 'q1', name: 'Open tasks', definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'task' }] } })
+    const q = query({ id: 'q1', name: 'Open tasks', definition: { ...query({ id: 'x' }).definition, types: [{ id: 'task' }] } })
     mocked.queries.mockResolvedValue([q])
     load(views({ activeTab: 'overview' }))
     render(<TypePage type={TASK} />)
@@ -249,8 +249,8 @@ describe('TypePage', () => {
   test('the recently opened section is empty without recent objects of the type', async () => {
     load(views({ activeTab: 'overview' }, ['recentlyAccessed']))
     render(<TypePage type={TASK} />)
-    expect(await screen.findByText('No recently accessed content')).toBeInTheDocument()
-    expect(screen.getByText('Objects you recently accessed will appear here.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing opened recently')).toBeInTheDocument()
+    expect(screen.getByText('Objects you open show up here.')).toBeInTheDocument()
   })
 
   test('an uncustomised query shows its automatic title in the Queries section and as a tab', async () => {
@@ -258,7 +258,7 @@ describe('TypePage', () => {
       id: 'q1',
       name: 'New Query',
       titleIsCustom: false,
-      definition: { ...query({ id: 'x' }).definition, structures: [{ id: 'task' }] },
+      definition: { ...query({ id: 'x' }).definition, types: [{ id: 'task' }] },
     })
     mocked.queries.mockResolvedValue([q])
     load(views({ activeTab: 'overview' }, ['queries', 'query:q1']))
@@ -271,10 +271,10 @@ describe('TypePage', () => {
     load(views({ activeTab: 'overview' }, ['collections', 'queries']))
     render(<TypePage type={TASK} />)
     expect(await screen.findByText('No collections')).toBeInTheDocument()
-    expect(screen.getByText('You can change this by creating a new collection.')).toBeInTheDocument()
+    expect(screen.getByText('Create a collection to see it here.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create collection' })).toBeEnabled()
     expect(screen.getByText('No queries')).toBeInTheDocument()
-    expect(screen.getByText('Queries you create in this database will appear here.')).toBeInTheDocument()
+    expect(screen.getByText('Queries you save show up here.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create query' })).toBeInTheDocument()
   })
 
@@ -287,7 +287,7 @@ describe('TypePage', () => {
     await waitFor(() => expect(mocked.createQuery).toHaveBeenCalled())
     expect(mocked.createQuery.mock.calls[0][0]).toMatchObject({
       name: 'Task · Done · Checked',
-      definition: { structures: [{ id: 'task' }] },
+      definition: { types: [{ id: 'task' }] },
     })
     await waitFor(() => expect(lastSaved()[1].dashboard.sections.at(-1)).toEqual({ key: 'query:new-query', collapsed: false }))
   })
@@ -309,7 +309,7 @@ describe('TypePage', () => {
       filterGroup: {
         type: 'filterGroup',
         operator: 'and',
-        elements: [{ type: 'filter', propertyId: 'done', option: 'isChecked', structureId: 'task' }],
+        elements: [{ type: 'filter', propertyId: 'done', option: 'isChecked', typeId: 'task' }],
       },
     }
     load(v)
@@ -325,7 +325,7 @@ describe('TypePage', () => {
     const filterGroup = {
       type: 'filterGroup' as const,
       operator: 'and' as const,
-      elements: [{ type: 'filter' as const, propertyId: 'done', option: 'isChecked', structureId: 'task' }],
+      elements: [{ type: 'filter' as const, propertyId: 'done', option: 'isChecked', typeId: 'task' }],
     }
     v.all = { ...v.all, filterGroup, sorts: [{ propertyId: 'title', option: 'ascending' }] }
     load(v)
@@ -336,7 +336,7 @@ describe('TypePage', () => {
     await waitFor(() => expect(mocked.createQuery).toHaveBeenCalled())
     expect(mocked.createQuery.mock.calls[0][0]).toMatchObject({
       definition: {
-        structures: [{ id: 'task' }],
+        types: [{ id: 'task' }],
         filterGroup,
         sorts: [{ propertyId: 'title', option: 'ascending' }],
         groupBy: null,

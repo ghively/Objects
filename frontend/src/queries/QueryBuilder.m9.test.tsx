@@ -25,7 +25,7 @@ const BOOK = typeDef({ id: 'book', name: 'Book', pluralName: 'Books', revision: 
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', revision: 'r1', propertyDefinitions: [TITLE] })
 
 const def = (ids: string[]): QueryDefinition => ({
-  structures: ids.map((id) => ({ id })),
+  types: ids.map((id) => ({ id })),
   filterGroup: { type: 'filterGroup', operator: 'and', elements: [] },
   sorts: [],
   groupBy: null,
@@ -77,7 +77,7 @@ describe('type-constrained query tabs', () => {
     expect(within(builder).queryByRole('button', { name: 'Remove Book' })).toBeNull()
     expect(within(lock).getByRole('button', { name: BUILDER_TEXT.releaseConstraint })).toHaveAttribute(
       'title',
-      'Turn into a normal query and remove the single type constraint. Opens the query as a page and removes this tab from the type dashboard.',
+      'Makes this a regular query that can cover any type. It opens as its own page and leaves the dashboard of this type.',
     )
   })
 
@@ -113,7 +113,7 @@ describe('type-constrained query tabs', () => {
     render(<TypePage type={BOOK} />)
     await user.click(await screen.findByRole('button', { name: 'Edit query' }))
     await user.click(await screen.findByRole('button', { name: 'Remove Page' }))
-    await waitFor(() => expect(useDefs.getState().queries[0].definition.structures).toEqual([{ id: 'book' }]))
+    await waitFor(() => expect(useDefs.getState().queries[0].definition.types).toEqual([{ id: 'book' }]))
     // Now single-type: locked.
     expect(await screen.findByTestId('query-type-lock')).toBeInTheDocument()
   })

@@ -34,9 +34,9 @@ def test_the_gallery_has_the_starter_templates_in_order():
     assert [c["name"] for c in cat][:3] == ["Meeting", "Person", "Project"]
     day = next(c for c in cat if c["key"] == "day")
     assert day["pluralName"] == "Days"
-    assert day["description"] == "Log a day with energy, mood, and what stood out."
+    assert day["description"] == "One entry per day: energy, mood and a highlight."
     assert [p["name"] for p in day["properties"]] == [
-        "Date", "Energy", "Mood", "Highlight of the day", "Grateful For", "Content",
+        "Date", "Energy", "Mood", "Highlight", "Gratitude", "Content",
     ]  # fmt: skip
     assert {c["section"] for c in cat} == {"useCases", "research", "media", "planningAndReflection", None}
 
@@ -147,10 +147,10 @@ def test_template_creates_one_valid_query(tmp_path: Path, key: str):
     [q] = _queries(space_dir)
     assert q["name"] == TEMPLATE_QUERIES[key].name and q["titleIsCustom"] is True
     d = q["definition"]
-    assert d["structures"] == [{"id": t.id}]
+    assert d["types"] == [{"id": t.id}]
     props = {p.key: p for p in t.propertyDefinitions}
     for f in d["filterGroup"]["elements"]:
-        assert f["type"] == "filter" and f["structureId"] == t.id
+        assert f["type"] == "filter" and f["typeId"] == t.id
         p = props[f["propertyId"]]  # only properties the template created
         assert f["option"] in _OPS[p.type], (p.type, f["option"])
         if p.type == "label":
@@ -240,7 +240,7 @@ def test_re_adding_a_deleted_template_type_does_not_duplicate_its_query(tmp_path
     # A query of that name already over the id (here: a file put back by hand) is not made twice.
     sp.delete_type(again.id, confirm=True)
     (space_dir / ".object" / "queries" / "by-hand.json").write_text(
-        json.dumps({"name": "Currently reading", "definition": {"structures": [{"id": t.id}]}}),
+        json.dumps({"name": "Currently reading", "definition": {"types": [{"id": t.id}]}}),
         encoding="utf-8",
     )
     sp.create_type("", "", template="book")
@@ -251,7 +251,7 @@ def test_a_same_named_query_of_another_type_does_not_block_the_template_query(tm
     space_dir = tmp_path / "s"
     space_dir.mkdir()
     sp = Space(space_dir)
-    sp.create_query("Currently reading", {"structures": [{"id": "page"}]})
+    sp.create_query("Currently reading", {"types": [{"id": "page"}]})
     sp.create_type("", "", template="book")
     assert [q["name"] for q in _queries(space_dir)] == ["Currently reading"] * 2
 

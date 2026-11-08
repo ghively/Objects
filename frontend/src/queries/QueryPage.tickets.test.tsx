@@ -38,7 +38,7 @@ const TICKETS: Query = query({
   builtIn: 'tickets',
   revision: '',
   definition: {
-    structures: [{ id: 'task' }],
+    types: [{ id: 'task' }],
     filterGroup: { type: 'filterGroup', operator: 'and', elements: [{ type: 'filter', propertyId: 'ticketId', option: 'isNotEmpty' }] },
     sorts: [{ propertyId: 'deskUpdated', option: 'descending' }],
     groupBy: null,

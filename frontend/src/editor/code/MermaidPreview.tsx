@@ -4,7 +4,7 @@
  * that matches the app (`dark` for Dark and Dark Dimmed, `default` for the
  * light themes), and re-rendered whenever the text or the theme changes.
  *
- * Empty text shows "Write a Mermaid diagram to see the preview"; a failure shows
+ * Empty text shows "The preview appears once you type some Mermaid"; a failure shows
  * "Diagram rendering error" with Mermaid's message.
  *
  * M8 Task 29: a rendered diagram offers "Download as SVG" and "Download as PNG"
@@ -51,7 +51,7 @@ export function MermaidPreview({ text }: { text: string }) {
   }, [text, dark, baseId])
 
   if (state.status === 'empty') {
-    return <div className="code-preview-message">Write a Mermaid diagram to see the preview</div>
+    return <div className="code-preview-message">The preview appears once you type some Mermaid</div>
   }
   if (state.status === 'error') {
     return (

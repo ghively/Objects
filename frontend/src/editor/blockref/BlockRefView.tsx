@@ -20,7 +20,7 @@ import { blockClient, type BlockInfo } from './blockClient'
 import './blockref.css'
 
 export const BLOCK_REF_TEXT = {
-  recursive: 'This block reference seems to be referencing itself either directly or through another embedded object.',
+  recursive: 'This block reference loops back to itself, directly or through something it embeds.',
   notFound: 'Block not found.', // our string
 }
 

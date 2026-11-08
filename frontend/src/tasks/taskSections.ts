@@ -76,14 +76,14 @@ const scheduledPreset = () =>
 export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
   status: {
     title: 'Status',
-    description: 'All tasks grouped by their status',
+    description: 'Every task, grouped by status',
     icon: 'ph-kanban',
     preset: () => view('kanban', { groupBy: { groups: [{ propertyId: 'status', option: 'statusCategory' }] } }),
     match: () => true,
   },
   today: {
     title: 'Today',
-    description: 'All tasks relevant today',
+    description: 'Tasks that matter today',
     icon: 'ph-sun',
     preset: () => view('list', { sorts: [{ propertyId: 'date', option: 'ascending' }] }),
     match: (row, type, now) => {
@@ -93,7 +93,7 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
   },
   inbox: {
     title: 'Inbox',
-    description: 'All tasks that have no status or have not been scheduled',
+    description: 'Tasks with no status or no date yet',
     icon: 'ph-tray',
     preset: () => view('list'),
     match: (row, type) => statusText(row, type) === null || !asDate(row.values.date),
@@ -107,42 +107,42 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
   },
   deadline: {
     title: 'Deadline',
-    description: 'All open tasks with a deadline, sorted by the nearest deadline first',
+    description: 'Open tasks that have a deadline, soonest first',
     icon: 'ph-hourglass-medium',
     preset: () => view('list', { sorts: [{ propertyId: 'deadline', option: 'ascending' }] }),
     match: (row, type) => isOpen(row, type) && !!asDate(row.values.deadline),
   },
   scheduled: {
     title: 'Scheduled',
-    description: 'All upcoming tasks based on their date',
+    description: 'Tasks coming up, ordered by date',
     icon: 'ph-calendar',
     preset: scheduledPreset,
     match: (row, type) => isOpen(row, type) && !!asDate(row.values.date),
   },
   recurring: {
     title: 'Recurring',
-    description: 'All open tasks that repeat on a schedule, grouped by date',
+    description: 'Open repeating tasks, grouped by date',
     icon: 'ph-repeat',
     preset: scheduledPreset,
     match: (row, type) => isOpen(row, type) && hasRepeat(row),
   },
   reminders: {
     title: 'Reminders',
-    description: 'All open tasks with an active reminder, grouped by date',
+    description: 'Open tasks with a reminder set, grouped by date',
     icon: 'ph-bell',
     preset: scheduledPreset,
     match: (row, type) => isOpen(row, type) && hasReminder(row),
   },
   tags: {
     title: 'Tags',
-    description: 'All tasks grouped by their tags',
+    description: 'Every task, grouped by tag',
     icon: 'ph-hash',
     preset: () => view('list', { groupBy: { groups: [{ propertyId: 'tags', option: 'default' }] } }),
     match: () => true,
   },
   source: {
     title: 'Context',
-    description: 'Tasks organized by the objects they are mentioned in.',
+    description: 'Tasks grouped by the object that mentions them.',
     icon: 'ph-line-segment',
     // Grouped by the live backlinks: one group per object linking to the task, "Other" for none.
     preset: () => view('list', { groupBy: { groups: [{ propertyId: 'backlinks', option: 'default' }] } }),
@@ -150,14 +150,14 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
   },
   completed: {
     title: 'Completed',
-    description: 'All tasks marked as done',
+    description: 'Tasks that are finished',
     icon: 'ph-check-circle',
     preset: () => view('list', { sorts: [{ propertyId: 'completed', option: 'descending' }] }),
     match: (row, type) => !isOpen(row, type),
   },
   all: {
     title: 'All',
-    description: 'All objects of this object type with filter and sort options.',
+    description: 'Every object of this type, ready to filter and sort.',
     icon: 'ph-list-bullets',
     preset: () => view('list'),
     match: () => true,

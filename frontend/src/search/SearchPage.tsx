@@ -35,7 +35,7 @@ import './searchPage.css'
 /** The search page's strings. */
 export const SEARCH_PAGE_TEXT = {
   heading: 'Search',
-  emptyState: 'Enter a search keyword to show content from your space.',
+  emptyState: 'Type a word to find content in this space.',
   fullTextSearchOnly: 'Text matches only',
   openSearch: 'Open extended search',
   saveAsQuery: 'Save as Query',
@@ -67,12 +67,12 @@ export function searchDefinition(
   textOnly: boolean,
   filters: SearchFilters,
   tagIdOf: (name: string) => string | null,
-): Partial<QueryDefinition> & Pick<QueryDefinition, 'structures'> {
-  const def: Partial<QueryDefinition> & Pick<QueryDefinition, 'structures'> = {
-    structures: filters.types.map((id) => ({ id })),
+): Partial<QueryDefinition> & Pick<QueryDefinition, 'types'> {
+  const def: Partial<QueryDefinition> & Pick<QueryDefinition, 'types'> = {
+    types: filters.types.map((id) => ({ id })),
     search: { searchTerms: [{ text: q.trim() }], searchMode: textOnly ? 'fullText' : 'auto' },
   }
-  if (filters.excludeTypes.length > 0) def.excludeStructureIds = [...filters.excludeTypes]
+  if (filters.excludeTypes.length > 0) def.excludeTypeIds = [...filters.excludeTypes]
   const tagId = filters.tag !== null ? tagIdOf(filters.tag) : null
   if (tagId) def.tags = { ids: [tagId], operator: 'or' }
   return def

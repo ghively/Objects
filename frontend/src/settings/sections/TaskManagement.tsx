@@ -9,14 +9,14 @@ import { openTypeSettings, useSettingsTypes } from './ObjectTypes'
 
 export const TASK_MANAGEMENT_TEXT = {
   heading: 'Task management',
-  description: 'No need to switch context to work on your tasks.',
+  description: 'Plan and track tasks right next to your notes.',
   hide: 'Hide Task Management',
   hideDescription:
     "If you don't want to use tasks in Object, you can simply hide it. You are changing this setting for your active space, not for all spaces.", // our string
   hideInfo:
-    'If you also do not want to see the task you already created, you need to delete the task object type in your current space.',
-  customization: 'Task Object Customization',
-  customizationDescription: 'Fine-tune your preferences like color or link behavior.', // .taskObjectCustomization.description
+    'Tasks you already made stay put. To remove them too, delete the Task type from this space.',
+  customization: 'Task type settings',
+  customizationDescription: 'Set the color, how task links behave and more.', // .taskObjectCustomization.description
   openSettings: 'Open settings', // .taskObjectCustomization.button
 } as const
 

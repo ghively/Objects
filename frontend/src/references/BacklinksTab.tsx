@@ -4,7 +4,7 @@
  * through a property. A click peeks with the tab's objects as the pager list; Ctrl/Cmd+click
  * opens a new tab. Also holds the entry pieces the other tabs share.
  *
- * M8: a block nested in others (`ancestors` from the server) shows "Only block with backlink" or
+ * M8: a block nested in others (`ancestors` from the server) shows "Just the linking block" or
  * the "Full path above" (each parent's first line, muted, outermost first) as the setting says;
  * a small two-way toggle on the backlink switches it for that backlink only (our control, not
  * remembered). The block renders in the "Backlink content view": embed (the M5 box, the
@@ -206,7 +206,7 @@ export interface BacklinksTabProps {
   summaries: Record<string, ObjectSummary>
   /** "Backlink content view" (default embed). */
   view?: BacklinkContentView
-  /** "Default display of nested backlinks" (default only the block). */
+  /** "How nested backlinks show at first" (default only the block). */
   nestedView?: NestedBacklinkView
 }
 

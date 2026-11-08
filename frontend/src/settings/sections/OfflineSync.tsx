@@ -1,6 +1,6 @@
 // "Offline & Sync", keeping only its local part: Object stores everything as files on this
 // device and has no cloud, so the sync status, content download state, media loading, media cache
-// and cloud media storage have nothing to show. What stays is "Recalculate content index"
+// and cloud media storage have nothing to show. What stays is "Rebuild search index"
 // (`POST /api/search/reindex`), which lives here (M9 put it in Space Settings).
 import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
@@ -15,11 +15,11 @@ export const OFFLINE_SYNC_TEXT = {
   offline: 'Offline',
   // our string
   offlineDescription: 'Object reads your notes from the space folder and keeps an index of them for search, backlinks and views.',
-  reindexButton: 'Recalculate content index',
+  reindexButton: 'Rebuild search index',
   reindexDescription:
-    'If some of your views are inconsistent or search results are not returning content, you can reindex your notes. This is usually not needed, only use it if you are having issues.',
-  reindexingHeading: 'Content is being indexed',
-  reindexingDescription: 'Your notes are getting analyzed for search, backlinking, and your content views.',
+    'Rebuilds the search index from your notes. Try it only when search misses things or views look out of date; normally it is never needed.',
+  reindexingHeading: 'Rebuilding the index',
+  reindexingDescription: 'Object is reading your notes again for search, backlinks and views.',
 } as const
 
 const T = OFFLINE_SYNC_TEXT
@@ -30,9 +30,9 @@ export const OFFLINE_SYNC_SEARCH: string[] = [T.offline, T.reindexButton]
 export const REINDEX_POLL_MS = 1000
 
 /**
- * "Recalculate content index": drops and rebuilds the search index in the background. While
+ * "Rebuild search index": drops and rebuilds the search index in the background. While
  * search reports `partial` (the rebuild, or the start-up sync) the row shows the
- * "Content is being indexed" state and the button waits. It only reads and asks; it writes no file.
+ * "Rebuilding the index" state and the button waits. It only reads and asks; it writes no file.
  */
 function ReindexRow() {
   const [indexing, setIndexing] = useState(false)

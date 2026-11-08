@@ -25,6 +25,7 @@ from typing import Any
 from .aimodels import MODEL_PATTERN
 from .appstate import state_dir
 from .jsonstore import dump_json, parse_json_object
+from .keycompat import upgrade_keys
 from .textfile import atomic_write
 from .typemodel import RevisionConflict
 
@@ -82,7 +83,7 @@ DEFAULTS: dict[str, Any] = {
     # device's), the link and type-settings switches, and the highlight block style.
     "spellCheckLang": None,
     "alwaysCreateInlineLinks": False,
-    "hideStructureSettings": False,
+    "hideTypeSettings": False,
     "highlightStyle": "default",
     # M10: the AI assistant ("Hide AI features", where the Claude Code CLI is, its model).
     "aiHidden": False,
@@ -277,9 +278,11 @@ def _load() -> tuple[dict[str, Any], str, str | None]:
         return {}, "", f"settings.json can't be read: {exc}"
     revision = hashlib.sha256(raw).hexdigest()
     try:
-        return parse_json_object(raw), revision, None
+        data = parse_json_object(raw)
     except (ValueError, UnicodeDecodeError) as exc:
         return {}, revision, f"settings.json is not a valid JSON object: {exc}"
+    upgrade_keys(data)  # older key names, renamed in memory only
+    return data, revision, None
 
 
 def _merged(data: dict[str, Any]) -> dict[str, Any]:

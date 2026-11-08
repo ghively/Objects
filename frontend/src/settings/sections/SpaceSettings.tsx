@@ -1,7 +1,7 @@
 // "Space Settings": the space's name, icon and description, written to `.object/space.json`
 // through `PUT /api/space` (nothing else changes: no folder rename). M8: a "Delete space" row,
 // always disabled here because this is the open space (delete other spaces from the spaces menu).
-// M9's "Recalculate content index" row moved to Offline & Sync (`OfflineSync.tsx`).
+// M9's "Rebuild search index" row moved to Offline & Sync (`OfflineSync.tsx`).
 import { useEffect, useState } from 'react'
 import type { Icon as IconValue } from '@/api/types'
 import { IconOrEmoji, isIconifyId } from '@/components/Icon'
@@ -16,12 +16,12 @@ export const SPACE_SETTINGS_TEXT = {
   heading: 'Space Settings',
   description: 'Modify global properties of your space.', // our string
   name: 'Name',
-  nameHeader: 'Set or update the name for this space.',
-  namePlaceholder: 'What you want to call this space',
+  nameHeader: 'The name shown for this space.',
+  namePlaceholder: 'Name of this space',
   icon: 'Icon',
-  iconHeader: 'Pick an icon to further identify this space.',
+  iconHeader: 'An icon that helps you tell this space apart.',
   description_: 'Description',
-  descriptionHeader: 'Describe the purpose of this space.',
+  descriptionHeader: 'A short note on what this space is for.',
   descriptionPlaceholder: 'Your description',
 } as const
 

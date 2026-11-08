@@ -2,18 +2,18 @@
  * The object's "Export" dialog (M9; polish item 23, catalog section 10): format tiles PDF, Markdown, Microsoft Word and Latex.
  *
  * - PDF: Style cards Notes, Essay and Academic (all available, nothing gated), Options
- *   (Include embedded content, Include outline, Hide empty properties on by default, Show type
+ *   (Include embeds, Include outline, Hide empty properties on by default, Show type
  *   labels), Format A4 | Letter and Properties (All properties plus one per property). The
  *   server builds a printable page (`format=html`); the dialog prints it from a hidden frame, so
  *   "Save as PDF" in the print dialog writes the file (our choice: no PDF library, no network).
- * - Markdown: Export folder containing all subpages (zip), Include media, Include title as
+ * - Markdown: Include subpages (as a folder) (zip), Include media, Include title as
  *   heading 1, Links as wikilinks (on by default: the file's own form; our choice).
  * - Microsoft Word (.docx) and Latex (.tex): they take the
  *   Properties list and Hide empty properties / Show type labels (our choice).
  *
  * Markdown is the format selected on open (our choice: Object's own file format).
  * "Export" saves pending body edits first, then downloads (or prints) and shows
- * "The export is ready and will be downloaded."
+ * "Export done. Your download is starting."
  */
 import { type ReactNode, useEffect, useId, useState } from 'react'
 import { api, type ExportProperty, type ExportUrlOptions } from '@/api/client'
@@ -35,35 +35,35 @@ export const EXPORT_TEXT = {
   latex: 'Latex',
   style: 'Style',
   notes: 'Notes',
-  notesDescription: 'A PDF that matches the styling of the current page, including colors and embeds.',
+  notesDescription: 'A PDF that looks like the page on screen, with its colors and embeds.',
   essay: 'Essay',
-  essayDescription: 'A single-column typeset PDF for reading and sharing. This is a layout, not a citation style.',
+  essayDescription: 'Clean one-column PDF that reads well on screen or paper. A page layout only, not a citation format.',
   academic: 'Academic',
   academicDescription:
-    'A compact two-column typeset PDF with numbered headings. This is a layout, not a journal submission format.',
+    "Dense two-column PDF, headings numbered. A page layout only, not any journal's template.",
   options: 'Options',
-  includeEmbedded: 'Include embedded content',
-  includeEmbeddedDescription: "Embeds are included. Tags, queries, and collections aren't (PDF).",
+  includeEmbedded: 'Include embeds',
+  includeEmbeddedDescription: "PDF only: embedded objects come along; tags, queries and collections are left out.",
   includeOutline: 'Include outline',
-  includeOutlineDescription: 'Adds an outline of all headings at the top.',
+  includeOutlineDescription: 'Puts a list of the headings before the content.',
   hideEmptyProperties: 'Hide empty properties',
   showTypeLabels: 'Show type labels',
-  includeTreedown: 'Export folder containing all subpages',
-  includeTreedownDescription: 'Also exports linked subpages as a zip.',
+  includeTreedown: 'Include subpages (as a folder)',
+  includeTreedownDescription: 'Packs the linked subpages into a zip as well.',
   includeMedia: 'Include media',
-  includeMediaDescription: 'Adds files and images to the zip.',
-  includeTitleAsHeading: 'Include title as heading 1',
-  includeTitleAsHeadingDescription: 'Starts each item with its title as H1.',
+  includeMediaDescription: 'Puts attached files and pictures in the zip too.',
+  includeTitleAsHeading: 'Add the title as a top heading',
+  includeTitleAsHeadingDescription: 'Each exported note opens with its title as a top-level heading.',
   asWikiLink: 'Links as wikilinks',
-  asWikiLinkDescription: 'Export links as [[title]] instead of [title](path).',
+  asWikiLinkDescription: 'Writes links as [[title]] rather than [title](path).',
   paper: 'Format', // the A4 | Letter row
   a4: 'A4', // our string
   letter: 'Letter', // our string
   properties: 'Properties',
-  propertiesDescription: 'Deselect properties to hide them from the export.',
+  propertiesDescription: 'Untick a property to leave it out.',
   allProperties: 'All properties',
   button: 'Export',
-  success: 'The export is ready and will be downloaded.',
+  success: 'Export done. Your download is starting.',
 } as const
 
 export type ExportFormat = 'pdf' | 'md' | 'docx' | 'latex'

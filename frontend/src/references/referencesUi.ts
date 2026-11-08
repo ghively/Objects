@@ -27,7 +27,7 @@ export const REFERENCES_TEXT = {
   /** our string */
   via: (property: string) => `via ${property}`,
   backlinksEmptyTitle: 'No backlinks yet',
-  backlinksEmptyDescription: 'Link to this object from another page to create a backlink.',
+  backlinksEmptyDescription: 'Backlinks show up here once another page links to this one.',
   link: 'Link',
   linkCreated: 'Link created',
   /** our string (as M3) */
@@ -45,11 +45,11 @@ export const REFERENCES_TEXT = {
   /** our string */
   relatedTagsEmpty: 'No related tags',
   /** The per-backlink toggle's group name */
-  nestedView: 'Default display of nested backlinks',
-  showBlockContainingBacklink: 'Only block with backlink',
+  nestedView: 'How nested backlinks show at first',
+  showBlockContainingBacklink: 'Just the linking block',
   showFullPathAbove: 'Full path above',
   backlinksNoSupportTitle: 'Backlinks not available',
-  backlinksNoSupportDescription: 'This content type does not support backlinks.',
+  backlinksNoSupportDescription: "Backlinks aren't shown for this kind of content.",
   /** The side-panel entry's title */
   backlinksPanelTitle: 'Backlinks',
 } as const
@@ -186,7 +186,7 @@ export const SECTION_OF: Partial<Record<ReferencesTab, keyof SectionDefaults>> =
 
 /**
  * The tabs shown for an object: the server's, minus sections set to "Hidden" and minus Related
- * Content for the types listed in "Hide related content for object types". With nothing but
+ * Content for the types listed in "Types without related content". With nothing but
  * "All" left there is no section.
  */
 export function visibleTabs(tabs: ReferencesTab[], settings: ReferencesSettings, typeId: string | null | undefined): ReferencesTab[] {

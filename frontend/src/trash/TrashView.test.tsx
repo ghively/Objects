@@ -102,7 +102,7 @@ describe('TrashView', () => {
     const dialog = await screen.findByRole('alertdialog')
     const confirm = within(dialog).getByRole('button', { name: 'Empty Trash' })
     expect(confirm).toBeDisabled()
-    await user.type(within(dialog).getByRole('textbox', { name: 'Type "Delete" to confirm' }), 'delete')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Enter "Delete" to go ahead' }), 'delete')
     expect(confirm).toBeDisabled()
     await user.clear(within(dialog).getByRole('textbox'))
     await user.type(within(dialog).getByRole('textbox'), 'Delete')
@@ -140,7 +140,7 @@ describe('TrashView', () => {
     await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
     const dialog = await screen.findByRole('alertdialog', { name: 'Permanently delete' })
     expect(dialog).toHaveTextContent(
-      'Are you sure you want to permanently delete 1 object(s)? This action cannot be undone.',
+      "Delete 1 object(s) for good? You won't be able to get them back.",
     )
     expect(mocked.purge).not.toHaveBeenCalled()
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
@@ -158,7 +158,7 @@ describe('TrashView', () => {
     const row = await screen.findByRole('listitem', { name: 'Book' })
     await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
     const dialog = await screen.findByRole('alertdialog', { name: 'Permanently delete' })
-    expect(dialog).toHaveTextContent('permanently delete 4 object(s)?')
+    expect(dialog).toHaveTextContent('Delete 4 object(s) for good?')
   })
 })
 

@@ -19,7 +19,7 @@
 **Spec:** `docs/superpowers/specs/2026-10-23-object-design.md` §3–§4.
 - Reference for behaviour and names: the behaviour catalog (`docs/behavior-catalog.md`) and the design spec.
 - **en-US UI strings:** the quoted strings below are the app's labels; take any others from the behaviour catalog.
-- Behaviour not in the strings (the Add property menu, the number-format menu, the progress ring, the basic structures and the number formatter) and layout sizes: as specified in the tasks below and the design spec.
+- Behaviour not in the strings (the Add property menu, the number-format menu, the progress ring, the basic types and the number formatter) and layout sizes: as specified in the tasks below and the design spec.
 
 ## Roadmap (one plan per milestone, written when the previous one is accepted)
 
@@ -31,7 +31,7 @@
 | 4 | calendar (day / three days / week / month, mini month), daily notes, tasks (status categories, priority, due, recurrence, reminders); type calendar options |
 | 5 | SQLite FTS index, Ctrl+K command palette, backlinks + unlinked mentions, global and local graph; per-property searchable |
 | 6 | whiteboards (blocks, 12 shapes, frames, circuits, connectors) + Wacom freehand ink |
-| 7 | remaining block options (toggles, colours, columns, math, media embeds), media objects (Image, PDF, Audio, Video, Weblink, File behaviour), light mode, side-by-side polish against the design spec |
+| 7 | remaining block options (toggles, colours, columns, math, media embeds), media objects (Image, PDF, Audio, Video, Weblink, File behaviour), light mode, polish against the design spec |
 
 ## Global Constraints
 
@@ -82,9 +82,9 @@
 - **System properties** are definitions whose id equals their key, in this order: `title, collections, description, createdAt, lastUpdated, tags, icon, aliases`, plus `type`, `backlinks` and `coverImage` when added, and `color` on Tag. Collections are display-only until M3; backlinks show a count until M5.
 - **Types.**
   - **Basic types:** Page, Tag, Task and DailyNote, plus the media types when the space has objects of them (`Weblink`, `File`, `Image`, `PDF`, `Audio`, `Video`, `Tweet`, matched by name case-insensitively). Their media fields become system definitions (read-only cells) and their media behaviour comes in M7.
-  - **On a basic type**, adding, removing or re-kinding a property, changing its key or `isArray`, renaming the type and deleting it are refused (422, "Properties of basic object types cannot be edited."). Allowed: label options (add, rename, recolour, re-icon, reorder, delete), property name, icon, description and visibility, number format, date constraints, type icon, colour and description, templates, and the layout settings.
+  - **On a basic type**, adding, removing or re-kinding a property, changing its key or `isArray`, renaming the type and deleting it are refused (422, "Built-in types keep their properties fixed."). Allowed: label options (add, rename, recolour, re-icon, reorder, delete), property name, icon, description and visibility, number format, date constraints, type icon, colour and description, templates, and the layout settings.
   - Page and Tag always exist. Tag: folder `Tags` (the folder is created by the first tag, never on open), icon `ph-tag`, no templates.
-  - **Status mode** exists only on Task's built-in `status` label (`isStatus: true`), part of the basic Task structure. Users cannot turn other labels into status labels.
+  - **Status mode** exists only on Task's built-in `status` label (`isStatus: true`), part of the basic Task type. Users cannot turn other labels into status labels.
   - An object finds its type through `type: '<Name>'`: matched against the type's name, then its id, then its `formerNames` (case-insensitively). Renaming a type rewrites the `type:` lines and keeps the old name in `formerNames`, so a skipped file still resolves.
   - `folder` is fixed when the type is created (from `pluralName`). Renaming the type or its plural never moves files or templates.
 - **File names.**
@@ -104,7 +104,7 @@
   - Names are capitalised, except sky = "Light blue".
   - New label options and tags get a random colour.
   - Numbers format as `en-US` by default; the per-property "Separators" (`isGroupingThousands`, default on; `isRadixComma`, which swaps `,` and `.`) are part of M2.
-- **Store-only fields.** Kept and round-tripped, with no UI and no effect in M2: the type's `structureViews`, `defaultViewType`, `defaultViewIds`, `defaultPageViewId`, `smallCardViewConfig` (M3/M7), `createInCalendarOption`, `hideFromCalendarSidebar` (M4), and the property's `hideCalendarEvents`, `supportsReminders` (M4) and `isNotSearchable` (M5). Collections likewise until M3.
+- **Store-only fields.** Kept and round-tripped, with no UI and no effect in M2: the type's `typeViews`, `defaultViewType`, `defaultViewIds`, `defaultPageViewId`, `smallCardViewConfig` (M3/M7), `createInCalendarOption`, `hideFromCalendarSidebar` (M4), and the property's `hideCalendarEvents`, `supportsReminders` (M4) and `isNotSearchable` (M5). Collections likewise until M3.
 
 ## API contract (M2): shared by both tracks
 
@@ -472,7 +472,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
 **Interfaces:**
 - Consumes: Tasks 2, 3 and 5.
 - Produces:
-  - `Space.change_property_kind(type_id, pid, to_type, base_revision) -> ChangeKindResult(type, newPropertyId, rewritten, skipped, lossy)`, as the dialog text says ("creates a new property of the new type and will match your existing property values as best as possible…"):
+  - `Space.change_property_kind(type_id, pid, to_type, base_revision) -> ChangeKindResult(type, newPropertyId, rewritten, skipped, lossy)`, as the dialog explains (a new property of the new kind is made and existing values are carried over where they convert):
     - `to_type` must be in `KIND_TRANSFORMS[from]`, else 422 with the "no transformations available" text.
     - A new definition is inserted right after the old one: same name, icon and description, a new id, and a new unique key (`budget` → `budget_`… by the key rule); entity → label builds the option set from the values.
     - Each object with a value gets the converted value under the new key (an unstamped rewrite; one added line). `lossy` counts values that converted lossily.
@@ -696,31 +696,10 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
 - [ ] **Step 1:** Run `npx shadcn@latest add input textarea popover command checkbox switch select context-menu alert-dialog`, then `npm i @dnd-kit/core @dnd-kit/sortable @iconify-json/vscode-icons`.
 - [ ] **Step 2:** Add these dark tokens to `tokens.css`:
   - `--tag-bg-<c>` and `--tag-text-<c>`
-  - `--label-border-<c>`, which also serves as `--line-<c>` (gray's line is `#5c5959`)
+  - `--label-border-<c>`, which also serves as `--line-<c>`
   - `--type-<c>-{fg,bg}` for the 9 colours M1 lacks: fg = tokenText, bg = blockBg
 
-  Values per colour:
-
-  | Colour | tagBg | tagText | border | blockBg | tokenText |
-  |---|---|---|---|---|---|
-  | gray | #333337 | #f5f4f3 | #636060 | #28282b | #7b7776 |
-  | rose | #742c40 | #fff1f2 | #ea4561 | #672d3d | #f45a73 |
-  | pink | #742f4b | #fdf2f8 | #e34d97 | #662f45 | #ec5fa7 |
-  | fuchsia | #632c67 | #fdf4ff | #d14be5 | #562c59 | #de62f0 |
-  | purple | #5c377a | #faf5ff | #a558ee | #513469 | #b26ef6 |
-  | violet | #573a85 | #f5f3ff | #8a5fed | #4f3773 | #9975f4 |
-  | indigo | #434078 | #eef2ff | #6568e8 | #3e3c67 | #7279f1 |
-  | blue | #35467d | #eff6ff | #3f80eb | #334069 | #4f93f3 |
-  | sky | #1d455a | #f0f9ff | #199dd9 | #1f3d4e | #26aeeb |
-  | cyan | #22434d | #ecfeff | #11a9c3 | #213a43 | #19bed8 |
-  | teal | #1f4644 | #f0fdfa | #1dad9d | #1f3e3c | #25c0af |
-  | emerald | #184739 | #ecfdf5 | #19ae7d | #183e33 | #26c18b |
-  | green | #265237 | #f0fdf4 | #2bbb60 | #254833 | #3ace70 |
-  | lime | #34451e | #f7fee7 | #7fbe1f | #2f3d1e | #92d22a |
-  | yellow | #5f4323 | #fefce8 | #daaa14 | #543c24 | #ecbc13 |
-  | amber | #704429 | #fffbeb | #e89a17 | #633f2a | #f2ad1d |
-  | orange | #733d2c | #fff7ed | #ec731f | #63392b | #f4832d |
-  | red | #723131 | #fef2f2 | #e54a4a | #643131 | #f05d5d |
+  The values for each of the 18 colours are in `frontend/src/theme/tokens.css`.
 - [ ] **Step 3: Write failing tests**
   - `test updateProperties sends clientId and emits local changed for path and each synced path`
   - `test renameObject emits local renamed and changed for each relinked path`
@@ -748,7 +727,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
 - Produces:
   - `KIND_META: Record<PropertyType, {name, description, icon}>`: names, descriptions and icons per kind, as listed in the design spec. `datetime` and `datetimeSimple` both read "Date time"; only `datetime` is ever created.
   - `ADD_PROPERTY_ITEMS`, the Add property menu's items in this order. That gives 15 items: Text (`textBlock`), Content (`blocks`), Tags, Label, **Object Select** (with a submenu, below), Checkbox, Date time, Number, Title, Description, **Cover Image**, Icon, Created at, Last updated, Aliases.
-    - "Object Select" ("Link to objects of a specific type.") opens "Search Object Types" listing the types allowed as relation targets: Page, Tag, the media types the space has, and custom types; not Task or DailyNote. Picking one creates a multi-select entity property bound to that type.
+    - "Object Select" ("Points at objects of one chosen type.") opens "Search Object Types" listing the types allowed as relation targets: Page, Tag, the media types the space has, and custom types; not Task or DailyNote. Picking one creates a multi-select entity property bound to that type.
     - "Single select" and the tag-multi kinds get no item.
     - Cover Image ("A single select image property.") adds the `coverImage` system property.
     - `text`, `url`, `simpleTableBlock` and `datetimeSimple` cannot be added; they come from migration, inference and "Change property type", and are fully editable.
@@ -844,7 +823,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
 - [ ] **Step 1: Write failing tests**
   - `test cellFor covers every PropertyType`
   - `test LabelMenu search shows "New 'x'" and creates option with random theme colour`
-  - `test duplicate label name warns "A label with this name already exists…"`
+  - `test duplicate label name warns "That label name is taken…"`
   - `test single-select closes, multi-select stays open`
   - `test status menu shows "Open" then Not started / In progress / Blocked / Done; empty section shows "Create"`
   - `test dragging a status option to Done sets statusCategory done`
@@ -852,7 +831,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
   - `test edit label submenu renames on blur and changes color`
   - `test RelationPicker lists only allowed type and fixed set ("Selection set") and disambiguates duplicate titles`
   - `test TagPicker placeholder "Search for tags or create one"; create calls onChange`
-  - `test AliasesCell 9th alias shows "You can only add up to 8 aliases."`
+  - `test AliasesCell 9th alias shows the 8-alias limit message`
   - `test IconPicker search "user" offers ph-user; colour row sets Icon.color`
   - `test ImagePicker upload calls importImage and selects the new path`
 - [ ] **Step 2:** Run `npx vitest run src/properties src/components`. Expected: FAIL.
@@ -956,7 +935,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
       - Relation: "Linked object type", "Single or Multi-Select", "Enable fixed set" (picking an object without an `id` calls `api.ensureId` first), "Two-way linking". Changes to the first three are collected and saved by "Apply changes" (its explanation text, then the 428 confirm). "Two-way linking" offers the linked type's eligible properties and 'Create property "X" for "Y"' (`setSync`); when not allowed it shows the explanation why instead.
       - Label: "Single or Multi-Select" (multi→single goes through the 428 confirm), "Label set".
     - Visibility.
-    - "Change property type": shows the explanation, offers only `allowedKindChanges` (or `noTransformations`), behind the checkbox "I understand the process and know that some data might be lost."; calls `changeKind` and then opens the new property.
+    - "Change property type": shows the explanation, offers only `allowedKindChanges` (or `noTransformations`), behind the checkbox "I accept that some values may not survive the change."; calls `changeKind` and then opens the new property.
     - "Delete property": the user types `delete`, or `delete-all-content` for blocks.
     - No "Searchable" control: `isNotSearchable` is kept and round-tripped, and M5 decides.
 
@@ -999,9 +978,9 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
   - `<CreateTypeDialog open onCreated />`:
     - Title "Create your object type".
     - Name and "Plural of name", both required.
-    - The tip "Do I need a new type?".
+    - The tip "When is a new type worth it?".
     - The button "Create object type".
-  - `<DeleteTypeDialog type />`: "Delete this object type?" / "Moves the type, all its objects and its templates to the Trash. You can restore them from there for 30 days." / "Delete object type". (No "This can't be undone.": our delete is restorable.)
+  - `<DeleteTypeDialog type />`: "Delete this object type?" / "Moves the type, all its objects and its templates to the Trash. You can restore them from there for 30 days." / "Delete object type". (No "cannot be undone" warning: the delete is restorable.)
   - `SidebarProps` adds `onNew`, `onCreateType`, `onOpenTypeSettings`, `onDeleteType` and `onOpenTrash`:
     - "+ New" is enabled.
     - "Object Types" gets a `+`.
@@ -1011,7 +990,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
 - [ ] **Step 1: Write failing tests**
   - `test section headings render in order and no Calendar or Card view group`
   - `test editing Name saves type on blur with baseRevision`
-  - `test basic type shows "Properties of basic object types cannot be edited.", disables Add Property and Name, and hides Delete`
+  - `test basic type shows "Built-in types keep their properties fixed.", disables Add Property and Name, and hides Delete`
   - `test Mark as Default sets templates.defaultTemplateId`
   - `test create button disabled until both fields filled; submit calls createType then opens typeSettings tab`
   - `test delete type dialog says it moves to the Trash and calls deleteType with confirm`
@@ -1031,7 +1010,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
 **Interfaces:**
 - Consumes: Tasks 11, 14 and 15.
 - Produces:
-  - `<PageLayout type summary header properties body />` applies the type's page settings. Class names, widths and heights are as follows, checked side by side in acceptance:
+  - `<PageLayout type summary header properties body />` applies the type's page settings. Class names, widths and heights are as follows, checked in acceptance:
     - `viewDesign`: Standard (null) puts the properties under the header; `indexCard` puts them in a bordered card under the header; `profile` shows the cover or icon as a large round image beside the title, with the properties in a side column; `encyclopedia` puts the properties in a right-hand infobox next to the body.
     - `wideLayoutMode` removes the content max-width.
     - `font` sets the title and body font family (sans-serif, serif, monospace).
@@ -1082,7 +1061,7 @@ scripts/m2_acceptance.py   backend/tests/fixtures/space-sample/{Projects,Tags,Te
   - `<TrashView>`: object and type entries (a type shows its object count); "Restore", "Delete permanently", "Empty Trash" (requires typing "Delete"), "Trash is empty", and the 30-day info. This is the app's trash, not the Windows Recycle Bin.
   - `<ChangeTypeDialog>`:
     - Title "Change object type?" with the "Property Mappings" rows and the lossy warning.
-    - The checkbox "I know that with this transformation all or parts of my notes will get lost." is required when anything is lossy.
+    - The checkbox "I accept that converting may drop some or all of these notes." is required when anything is lossy.
     - The button "Change type". On success the tab is retargeted to the new path.
   - `<TemplateMarker>`: "Template", a "Template Name" input, "Templates prefill new objects.", a "Make default" star, "Manage".
   - TypePage split button: "New {TypeName}", plus "New '{TemplateName}'" per template.

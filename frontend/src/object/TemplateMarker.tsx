@@ -1,6 +1,6 @@
 /**
  * The banner on a template object: "Template", its "Template Name" (the `template:` key),
- * "Templates prefill new objects.", a "Make default" star and "Manage" (Object Type Settings).
+ * "A template fills in new objects for you.", a "Make default" star and "Manage" (Object Type Settings).
  * M14: "Repeat" opens the template's Repeat dialog (an automation that makes an object from it on
  * a schedule).
  */
@@ -17,10 +17,10 @@ import type { TypeEditor } from './useTypeEditor'
 export const TEMPLATE_MARKER_TEXT = {
   label: 'Template',
   namePlaceholder: 'Template Name',
-  hint: 'Templates prefill new objects.',
+  hint: 'A template fills in new objects for you.',
   makeDefault: 'Make default',
   isDefault: 'Default',
-  defaultTooltip: 'Applied automatically when you create a new object of this type.',
+  defaultTooltip: 'Every new object of this type starts from this one.',
   manage: 'Manage',
 }
 

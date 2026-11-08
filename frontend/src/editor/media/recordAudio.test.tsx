@@ -143,7 +143,7 @@ describe('recordAudio', () => {
     await act(async () => {
       await recordAudio(editor)
     })
-    expect(screen.getByRole('status')).toHaveTextContent('Microphone access was denied.')
+    expect(screen.getByRole('status')).toHaveTextContent('No permission to use the microphone.')
     expect(screen.queryByTestId('audio-recorder')).toBeNull()
     expect(FakeRecorder.last).toBeNull()
     expect(mocked.uploadAttachment).not.toHaveBeenCalled()

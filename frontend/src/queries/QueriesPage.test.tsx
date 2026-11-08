@@ -20,7 +20,7 @@ const mocked = vi.mocked(api)
 const TITLE = propertyDef({ id: 'title', key: 'title', name: 'Title', type: 'entity_title' })
 const SERVER = typeDef({ id: 'server', name: 'Server', pluralName: 'Servers', revision: 'r1', propertyDefinitions: [TITLE] })
 const QUERIES = [
-  query({ id: 'zed', name: 'Zed list', revision: 'a', definition: { structures: [{ id: 'server' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: [], groupBy: null } }),
+  query({ id: 'zed', name: 'Zed list', revision: 'a', definition: { types: [{ id: 'server' }], filterGroup: { type: 'filterGroup', operator: 'and', elements: [] }, sorts: [], groupBy: null } }),
   query({ id: 'abc', name: 'Another', revision: 'b' }),
 ]
 
@@ -50,7 +50,7 @@ describe('QueriesPage', () => {
     mocked.queries.mockResolvedValue([])
     render(<QueriesPage />)
     expect(await screen.findByText('No queries')).toBeInTheDocument()
-    expect(screen.getByText('Queries you create in this database will appear here.')).toBeInTheDocument()
+    expect(screen.getByText('Queries you save show up here.')).toBeInTheDocument()
   })
 
   test('test Queries sidebar item opens QueriesPage listing every query; New creates and opens one', async () => {

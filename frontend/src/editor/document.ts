@@ -95,7 +95,7 @@ const REGISTRY_OWNED_KEYS: Record<string, (key: string) => boolean> = {
   taskList: (k) => k === 'Mod-Shift-9',
   listItem: (k) => k === 'Tab' || k === 'Shift-Tab',
   taskItem: (k) => k === 'Tab' || k === 'Shift-Tab',
-  // Not a registry action: Ctrl+Shift+B is reserved for "Show/hide shortcuts menu".
+  // Not a registry action: Ctrl+Shift+B is reserved for "Toggle the shortcuts list".
   blockquote: (k) => k === 'Mod-Shift-b' || k === 'Mod-Shift-B',
 }
 

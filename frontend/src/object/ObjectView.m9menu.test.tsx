@@ -153,7 +153,7 @@ describe('ObjectView … menu (M9)', () => {
     expect(within(dialog).getByText('Format')).toBeInTheDocument()
     expect(within(dialog).getByText('Markdown')).toBeInTheDocument()
     expect(within(dialog).getByText('Options')).toBeInTheDocument()
-    expect(within(dialog).getByText('Adds files and images to the zip.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Puts attached files and pictures in the zip too.')).toBeInTheDocument()
     const media = within(dialog).getByRole('switch', { name: 'Include media' })
     expect(media).toHaveAttribute('aria-checked', 'false')
     await user.click(within(dialog).getByRole('button', { name: 'Export' }))
@@ -162,7 +162,7 @@ describe('ObjectView … menu (M9)', () => {
     expect(clicked[0]).toEqual({ href: `/api/object/export?path=${encodeURIComponent(PATH)}&media=0`, download: 'Notes.md' })
     expect(clicked[0].href).not.toMatch(/^https?:/)
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('The export is ready and will be downloaded.')
+    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Export done. Your download is starting.')
 
     await user.click(screen.getByRole('button', { name: 'More' }))
     menu = await screen.findByRole('menu')

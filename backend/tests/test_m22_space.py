@@ -310,7 +310,7 @@ def test_tickets_view_virtual(space: Space):
     queries_dir = space.root / ".object" / "queries"
     q = _tickets(space)
     assert q is not None
-    assert q.name == "Tickets" and q.definition["structures"] == [{"id": "task"}]
+    assert q.name == "Tickets" and q.definition["types"] == [{"id": "task"}]
     assert q.definition["filterGroup"]["elements"] == [
         {"type": "filter", "propertyId": "ticketId", "option": "isNotEmpty"}
     ]
@@ -320,20 +320,20 @@ def test_tickets_view_virtual(space: Space):
 
     _add_work_fields_to_project(space)
     q = _tickets(space)
-    assert q.definition["structures"] == [{"id": "project"}, {"id": "task"}]
+    assert q.definition["types"] == [{"id": "project"}, {"id": "task"}]
     assert not (queries_dir / f"{TICKETS_ID}.json").exists()
 
-    # Saving with base "" creates the file, with empty structures.
+    # Saving with base "" creates the file, with empty types.
     q.view = {"viewDefinition": {"dataViewLayout": "table"}}
     saved, rev = space.save_query(q, "")
-    assert saved.definition["structures"] == [{"id": "project"}, {"id": "task"}]
+    assert saved.definition["types"] == [{"id": "project"}, {"id": "task"}]
     assert rev
     stored = json.loads((queries_dir / f"{TICKETS_ID}.json").read_text(encoding="utf-8"))
-    assert stored["definition"]["structures"] == []
+    assert stored["definition"]["types"] == []
     assert "builtIn" not in stored
     assert stored["view"]["viewDefinition"]["dataViewLayout"] == "table"
     again = _tickets(space)
-    assert again.definition["structures"] == [{"id": "project"}, {"id": "task"}]
+    assert again.definition["types"] == [{"id": "project"}, {"id": "task"}]
     assert again.view["viewDefinition"]["dataViewLayout"] == "table"
     # A later save is a normal one.
     again.name = "Tickets"
@@ -350,7 +350,7 @@ def test_tickets_default_shape():
     assert d["id"] == TICKETS_ID and d["name"] == "Tickets" and d["titleIsCustom"] is True
     assert d["icon"] == {"type": "iconify", "val": "ph-ticket"}
     assert d["description"] == "Every work item with a Ticket ID."
-    assert d["definition"]["structures"] == []
+    assert d["definition"]["types"] == []
     assert d["definition"]["sorts"] == [{"propertyId": "deskUpdated", "option": "descending"}]
     assert d["definition"]["groupBy"] == {"groups": [{"propertyId": "deskStatus", "option": "label"}]}
     assert d["view"] == {"viewDefinition": {"dataViewLayout": "list"}}

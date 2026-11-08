@@ -186,7 +186,7 @@ export const OBJECT_MENU_TEXT = {
   copyReference: 'Copy object reference',
   referenceCopied: 'Link to object copied',
   copyAsMarkdown: 'Copy as Markdown',
-  markdownCopied: 'Markdown export written to clipboard',
+  markdownCopied: 'Markdown copied',
 } as const
 
 /** Write `text` to the clipboard, then toast `done`. */
@@ -803,7 +803,7 @@ export function ObjectView({
     } catch (err) {
       if (err instanceof ConflictError) onConflict()
       else void editorRef.current?.resume(versionRef.current)
-      console.warn('Could not apply the template:', err)
+      console.warn("The template couldn't be applied:", err)
     }
   }
 
@@ -1180,7 +1180,7 @@ export function ObjectView({
               {isTag ? OBJECT_M8_TEXT.mergeTag : OBJECT_M8_TEXT.mergeObject}
             </DropdownMenuItem>
             {type && (
-              <DropdownMenuItem data-structure-setting="" onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
+              <DropdownMenuItem data-type-setting="" onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
                 <Icon name="ph-gear-six" size={14} />
                 Object Type Settings
               </DropdownMenuItem>

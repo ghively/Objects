@@ -58,7 +58,7 @@ describe('PageInspector', () => {
     unmount()
 
     render(<Harness html="<p>No headings</p>" markdown="No headings" />)
-    expect(screen.getByText('No headings in this page')).toBeInTheDocument()
+    expect(screen.getByText('This page has no headings')).toBeInTheDocument()
   })
 
   test('test outline follows edits', async () => {

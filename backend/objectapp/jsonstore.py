@@ -19,6 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from .keycompat import upgrade_keys
 from .textfile import atomic_write
 from .typedefs import slug
 from .typemodel import RevisionConflict, TypeDefinition
@@ -121,9 +122,11 @@ class JsonStore:
         if known is not None and revision == known:
             return None, revision, None
         try:
-            return parse_json_object(raw), revision, None
+            data = parse_json_object(raw)
         except (ValueError, UnicodeDecodeError) as exc:
             return None, revision, f"Not a valid JSON object: {exc}"
+        upgrade_keys(data)  # older key names, renamed in memory only
+        return data, revision, None
 
     def read(self, id: str) -> tuple[dict[str, Any] | None, str]:
         """(data, revision); ``(None, '')`` when missing. Raises `DefinitionUnreadable`."""

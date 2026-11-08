@@ -32,7 +32,7 @@ const GALLERY: TypeTemplate[] = [
     section: 'useCases',
     name: 'Meeting',
     pluralName: 'Meetings',
-    description: 'Capture conversations with attendees and a date.',
+    description: 'Notes from a meeting: who came, when, and what was said.',
     icon: { type: 'iconify', val: 'ph-users-three' },
     color: 'orange',
     properties: [{ name: 'Date', type: 'datetime' }, { name: 'Notes', type: 'blocks' }],
@@ -43,7 +43,7 @@ const GALLERY: TypeTemplate[] = [
     section: 'media',
     name: 'Film',
     pluralName: 'Films',
-    description: 'Collect films you watch and want to remember.',
+    description: 'Films you have seen, with director, genre and a rating.',
     icon: { type: 'iconify', val: 'ph-film-strip' },
     color: 'red',
     properties: [
@@ -78,7 +78,7 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     render(<CreateTypeDialog open onCreated={onCreated} />)
     await user.click(await screen.findByRole('button', { name: /Film/ }))
     expect(screen.getByRole('heading', { name: 'Film' })).toBeInTheDocument()
-    expect(screen.getByText('Collect films you watch and want to remember.')).toBeInTheDocument()
+    expect(screen.getByText('Films you have seen, with director, genre and a rating.')).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Properties' })).toHaveTextContent('Genre')
     await user.click(screen.getByRole('button', { name: 'Create object type' }))
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1))
@@ -134,7 +134,7 @@ describe('DeleteTypeDialog', () => {
     const onDeleted = vi.fn()
     const onOpenChange = vi.fn()
     render(<DeleteTypeDialog type={typeDef({ id: 'book', name: 'Book' })} open onOpenChange={onOpenChange} onDeleted={onDeleted} />)
-    expect(screen.getByRole('heading', { name: 'Delete this object type?' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Move this type to the trash?' })).toBeInTheDocument()
     expect(
       screen.getByText(
         'Moves the type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',

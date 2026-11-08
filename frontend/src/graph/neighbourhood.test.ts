@@ -31,7 +31,7 @@ describe('neighbourhood', () => {
     expect(filterGraph(DATA, { showSpaceTagsNetwork: true }, { kind: 'local', center: 4, hops: 1 }).nodes).toEqual([4])
 
     // The centre stays even when a filter would hide it; its hidden neighbours don't.
-    const hidden = filterGraph(DATA, { excludeStructureIds: ['page'] }, { kind: 'local', center: 1, hops: 1 })
+    const hidden = filterGraph(DATA, { excludeTypeIds: ['page'] }, { kind: 'local', center: 1, hops: 1 })
     expect(hidden.nodes).toEqual([1])
   })
 
@@ -49,7 +49,7 @@ describe('neighbourhood', () => {
     expect(neighbourhood(withDone, 0, 3, false, { showCompletedTasks: true }).size).toBe(4)
   })
 
-  test('with "Hide objects with many links" the walk does not go on from a large node', () => {
+  test('with "Hide heavily linked objects" the walk does not go on from a large node', () => {
     // 0 — hub(1) — 21 leaves; the hub links each leaf.
     const leaves = LARGE_NODE_LIMIT + 1
     const data: GraphData = {

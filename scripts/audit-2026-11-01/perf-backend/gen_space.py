@@ -253,7 +253,7 @@ def make_space(root: Path, objects: int = 5000, seed: int = 7) -> dict:
         (cap / "queries" / f"{qid}.json").write_text(json.dumps({
             "schemaVersion": 1, "id": qid, "name": f"Query {i:02d}", "titleIsCustom": True,
             "icon": None, "description": "",
-            "definition": {"structures": [{"id": rng.choice(["task", "page", "project"])}],
+            "definition": {"types": [{"id": rng.choice(["task", "page", "project"])}],
                            "filterGroup": {"type": "filterGroup", "operator": "and", "elements": []},
                            "sorts": [], "groupBy": None},
             "view": {"viewDefinition": {"dataViewLayout": "list"}},

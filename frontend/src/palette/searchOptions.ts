@@ -7,7 +7,7 @@ import type { TypeDef } from '@/api/types'
 /** The palette's strings (the typo in `onlyPartialResults` kept on purpose). */
 export const PALETTE_TEXT = {
   /** The palette's one input (content and actions). */
-  placeholder: 'Search for content and actions, or paste from clipboard',
+  placeholder: 'Find objects and commands, or paste',
   /** The extended search page's input. */
   placeholderSearch: 'Search content',
   /** The recent objects' groups. */
@@ -18,17 +18,17 @@ export const PALETTE_TEXT = {
   /** Our string: the info icon's tooltip beside the input. */
   info: 'Type to search your content and actions. Type a type or tag name to filter; Ctrl+Shift+Enter opens extended search.',
   emptyRecentsTitle: 'Nothing here yet',
-  emptyRecentsDescription: 'Objects you open will show up here for quick access.',
+  emptyRecentsDescription: 'Recently opened objects appear here.',
   emptyTitle: (query: string) => `No results for "${query}"`,
-  emptyDescription: 'Try a different term, or remove filters to widen the search.',
-  onlyPartialResults: 'Your content in not fully indexed yet. Search results might not return all matches.',
+  emptyDescription: 'Try other words, or clear a filter to see more.',
+  onlyPartialResults: 'Indexing is still running, so some matches may be missing.',
   clearFilter: 'Clear filter',
   inNewTab: 'in new tab',
   inSidePanel: 'in side panel',
-  createNewWithTitle: (structureTitle: string, title: string) => `Create new ${structureTitle} with title "${title}"`,
-  structureFilter: (structureName: string) => `Only search for type "${structureName}"`,
-  structureFilterExclude: (structureName: string) => `Exclude type "${structureName}"`,
-  tagFilter: (tagName: string) => `Only search content tagged with "${tagName}"`,
+  createNewWithTitle: (typeTitle: string, title: string) => `Create new ${typeTitle} with title "${title}"`,
+  typeFilter: (typeName: string) => `Only search for type "${typeName}"`,
+  typeFilterExclude: (typeName: string) => `Exclude type "${typeName}"`,
+  tagFilter: (tagName: string) => `Limit results to the tag "${tagName}"`,
   /** The dialog's accessible title. */
   searchTitle: 'Search this space',
 } as const
@@ -128,8 +128,8 @@ export function buildSearchOptions(
     if (taken.has(t.id)) continue
     const rest = typeMatch(title, t)
     if (rest === null) continue
-    out.push({ kind: 'includeType', typeId: t.id, rest, label: PALETTE_TEXT.structureFilter(t.name) })
-    out.push({ kind: 'excludeType', typeId: t.id, rest, label: PALETTE_TEXT.structureFilterExclude(t.name) })
+    out.push({ kind: 'includeType', typeId: t.id, rest, label: PALETTE_TEXT.typeFilter(t.name) })
+    out.push({ kind: 'excludeType', typeId: t.id, rest, label: PALETTE_TEXT.typeFilterExclude(t.name) })
   }
   if (filters.tag === null) {
     const seen = new Set<string>()

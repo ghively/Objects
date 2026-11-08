@@ -25,11 +25,11 @@ import { TypeChip } from '@/shell/Sidebar'
 export const SELECTION_TEXT = {
   /** After the count. */
   selected: 'selected',
-  changeType: 'Change type of selected objects',
-  openInSidepanel: 'Open selected objects in side panel',
+  changeType: 'Change the type of the selection',
+  openInSidepanel: 'Open the selection in the side panel',
   delete: 'Delete objects',
   deleteHeading: 'Delete?',
-  deleteDescription: 'Review the items below, then confirm.',
+  deleteDescription: 'Check the list below before you confirm.',
   /** Our string. */
   clear: 'Clear selection',
 }

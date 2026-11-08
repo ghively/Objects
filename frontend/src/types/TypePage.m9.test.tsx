@@ -99,7 +99,7 @@ describe('TypePage Import CSV (Task 19)', () => {
     const items = (await screen.findAllByRole('menuitem')).map((m) => m.textContent)
     expect(items.indexOf('Import CSV')).toBe(items.indexOf('Create collection') + 1)
     await user.click(screen.getByRole('menuitem', { name: 'Import CSV' }))
-    expect(await screen.findByText('Batch import to collection')).toBeInTheDocument()
+    expect(await screen.findByText('Bulk import from CSV')).toBeInTheDocument()
   })
 
   test('Ctrl+I (openImportMenu) opens the CSV import, as the tab menu says, but not while typing', async () => {
@@ -110,11 +110,11 @@ describe('TypePage Import CSV (Task 19)', () => {
     document.body.appendChild(field)
     field.focus()
     await user.keyboard('{Control>}i{/Control}')
-    expect(screen.queryByText('Batch import to collection')).toBeNull()
+    expect(screen.queryByText('Bulk import from CSV')).toBeNull()
     field.remove()
     document.body.focus()
     await user.keyboard('{Control>}i{/Control}')
-    expect(await screen.findByText('Batch import to collection')).toBeInTheDocument()
+    expect(await screen.findByText('Bulk import from CSV')).toBeInTheDocument()
   })
 
   test('Ctrl+I does nothing on a type that takes no CSV', async () => {
@@ -123,7 +123,7 @@ describe('TypePage Import CSV (Task 19)', () => {
     render(<TypePage type={daily} />)
     await screen.findByRole('button', { name: 'More' })
     await user.keyboard('{Control>}i{/Control}')
-    expect(screen.queryByText('Batch import to collection')).toBeNull()
+    expect(screen.queryByText('Bulk import from CSV')).toBeNull()
   })
 
   test('test no import csv for daily notes', async () => {

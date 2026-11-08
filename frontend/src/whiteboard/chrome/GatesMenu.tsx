@@ -1,14 +1,14 @@
 /**
- * The Gates menu (Engineering mode only): the logic gates, then "I/O" with HIGH and LOW. A gate
- * persists as a rectangle whose text block is exactly its label (`model.ts`).
+ * The Gates menu, shown in Engineering mode: the logic gates first, then the fixed inputs under
+ * "I/O". Picking one arms that gate; how a gate is stored is described in `model.ts`.
  */
 import type { WhiteboardCircuitLabel, WhiteboardTool } from '@/api/whiteboardTypes'
-import { CIRCUIT_TEXT } from '../model'
+import { CIRCUIT_IO, CIRCUIT_LABELS, CIRCUIT_TEXT } from '../model'
 import { WB } from '../strings'
 import { MenuHeading, MenuRow, MenuSeparator, toolLabel } from './controls'
 
-export const GATE_TOOLS = ['not', 'and', 'nand', 'or', 'nor', 'xor', 'xnor'] as const satisfies readonly WhiteboardCircuitLabel[]
-export const IO_TOOLS = ['high', 'low'] as const satisfies readonly WhiteboardCircuitLabel[]
+export const IO_TOOLS = CIRCUIT_IO
+export const GATE_TOOLS = CIRCUIT_LABELS.filter((g) => !IO_TOOLS.includes(g))
 
 export interface GatesMenuProps {
   value?: WhiteboardTool

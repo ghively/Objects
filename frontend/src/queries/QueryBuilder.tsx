@@ -14,12 +14,12 @@ import { MAX_TERMS, MIN_TERM, PAUSED_HINT, isSearching, searchTermsOf } from './
 export const BUILDER_TEXT = {
   types: 'Types',
   allTypes: 'All',
-  allTypesTooltip: 'Do not filter by object type',
+  allTypesTooltip: 'Include every type',
   addType: 'Add object type',
   moreTypes: (n: number) => `+${n} more`,
   excludeTypes: 'Exclude object types',
-  excludeTypesHint: 'Add a search term or tag to exclude object types.',
-  excludeTypesInactive: 'Has no effect when specific types are selected.',
+  excludeTypesHint: 'Excluding types needs a search term or a tag first.',
+  excludeTypesInactive: 'Ignored while particular types are picked.',
   clear: 'Clear',
   collectionAll: 'All',
   inAnyCollection: 'In any collection',
@@ -28,22 +28,22 @@ export const BUILDER_TEXT = {
   tags: 'Tags or backlinks',
   anyOf: 'Any of',
   allOf: 'All of',
-  allOfHint: 'An object has one type, so All of is not available.',
+  allOfHint: 'Each object has just one type, so All of does not apply here.',
   addTag: 'Add tag or backlink',
-  excludeTags: 'Exclude tags or backlinks',
-  excludeTagsDisabled: 'Excluding tags requires a search term or an included tag.',
+  excludeTags: 'Leave out tags or backlinks',
+  excludeTagsDisabled: 'To exclude tags, first add a search term or include a tag.',
   search: 'Search',
   searchPlaceholder: 'Search terms…',
-  searchHint: 'Press Enter to add',
-  termCount: 'Use at least 2 characters',
-  addTerm: 'Add another term, and a result can match any of them.',
+  searchHint: 'Enter adds the term',
+  termCount: 'Type 2 or more characters',
+  addTerm: 'With more than one term, a result needs to match only one.',
   mode: 'Mode',
   modeNote: 'Works like Auto until full-text search arrives.',
   limit: 'Limit',
   noLimit: 'No limit',
   paused: PAUSED_HINT,
   releaseConstraintTooltip:
-    'Turn into a normal query and remove the single type constraint. Opens the query as a page and removes this tab from the type dashboard.',
+    'Makes this a regular query that can cover any type. It opens as its own page and leaves the dashboard of this type.',
   /** Our string: the release button's accessible name (the tooltip is the visible hint). */
   releaseConstraint: 'Release type constraint',
 }
@@ -54,7 +54,7 @@ export const BUILDER_TEXT = {
  * changed there until it is released.
  */
 export function isSingleTypeQuery(def: QueryDefinition, typeId: string): boolean {
-  return def.structures.length === 1 && def.structures[0].id === typeId
+  return def.types.length === 1 && def.types[0].id === typeId
 }
 
 /** The lock of a constrained query: its type, and what "release" does (the type page's). */
@@ -66,10 +66,10 @@ export interface QueryConstraint {
 type SearchMode = NonNullable<QueryDefinition['search']>['searchMode']
 
 export const SEARCH_MODES: { key: SearchMode; label: string; tooltip: string; note?: boolean }[] = [
-  { key: 'auto', label: 'Auto', tooltip: 'Combines search modes to find most relevant matches.' },
-  { key: 'fullText', label: 'Exact', tooltip: 'Searches all content and matches exact terms.', note: true },
-  { key: 'semantic', label: 'Semantic', tooltip: 'Returns semantically related content to the search terms.', note: true },
-  { key: 'title', label: 'Title', tooltip: 'Searches only title and matches exact terms.' },
+  { key: 'auto', label: 'Auto', tooltip: 'Mixes the other modes for the best results.' },
+  { key: 'fullText', label: 'Exact', tooltip: 'Looks for the exact words anywhere in the object.', note: true },
+  { key: 'semantic', label: 'Semantic', tooltip: 'Finds objects about the same idea, even in other words.', note: true },
+  { key: 'title', label: 'Title', tooltip: 'Looks for the exact words in titles only.' },
 ]
 
 export const LIMIT_SIZES = [1, 3, 5, 10, 25, 50] as const
@@ -121,19 +121,19 @@ function Chip({ children, onRemove, label }: { children: ReactNode; onRemove?():
 
 // ---- Types ----
 
-type Structure = QueryDefinition['structures'][number]
+type TypeEntry = QueryDefinition['types'][number]
 
-/** The collection filter of one structure, as the label the chip shows. */
-export function collectionFilterLabel(s: Structure): string {
+/** The collection filter of one type entry, as the label the chip shows. */
+export function collectionFilterLabel(s: TypeEntry): string {
   if (s.inNoCollection) return BUILDER_TEXT.inNoCollection
   if (s.inAnyCollection) return BUILDER_TEXT.inAnyCollection
   if (s.collectionIds?.length) return BUILDER_TEXT.collectionsSelected(s.collectionIds.length)
   return BUILDER_TEXT.collectionAll
 }
 
-function CollectionFilter({ s, type, collections, edit }: { s: Structure; type: TypeDef; collections: Collection[]; edit(next: Structure): void }) {
+function CollectionFilter({ s, type, collections, edit }: { s: TypeEntry; type: TypeDef; collections: Collection[]; edit(next: TypeEntry): void }) {
   const mine = collections.filter((c) => c.typeIds.includes(type.id))
-  const clean: Structure = { id: s.id }
+  const clean: TypeEntry = { id: s.id }
   const mode = s.inNoCollection ? 'none' : s.inAnyCollection ? 'any' : s.collectionIds?.length ? 'some' : 'all'
   return (
     <Popover>
@@ -173,7 +173,7 @@ function CollectionFilter({ s, type, collections, edit }: { s: Structure; type: 
 }
 
 function ConstrainedTypes({ def, constraint, collections, onChange }: { def: QueryDefinition; constraint: QueryConstraint; collections: Collection[]; onChange(e: Edit): void }) {
-  const s = def.structures[0] ?? { id: constraint.type.id }
+  const s = def.types[0] ?? { id: constraint.type.id }
   return (
     <Section title={BUILDER_TEXT.types}>
       <div data-testid="query-type-lock" className="flex flex-wrap items-center gap-1.5">
@@ -185,7 +185,7 @@ function ConstrainedTypes({ def, constraint, collections, onChange }: { def: Que
             s={s}
             type={constraint.type}
             collections={collections}
-            edit={(next) => onChange((d) => ({ ...d, structures: [next] }))}
+            edit={(next) => onChange((d) => ({ ...d, types: [next] }))}
           />
         </Chip>
         <button
@@ -203,13 +203,13 @@ function ConstrainedTypes({ def, constraint, collections, onChange }: { def: Que
 }
 
 function TypesSection({ def, types, collections, onChange }: { def: QueryDefinition; types: TypeDef[]; collections: Collection[]; onChange(e: Edit): void }) {
-  const selected = def.structures
-  const excluded = def.excludeStructureIds ?? []
+  const selected = def.types
+  const excluded = def.excludeTypeIds ?? []
   const [showAll, setShowAll] = useState(false)
   const canExclude = isSearching(def) || (def.tags?.ids.length ?? 0) > 0
   const shown = showAll ? selected : selected.slice(0, VISIBLE_TYPES)
   const inactive = selected.length > 0
-  const setExcluded = (ids: string[]) => onChange((d) => ({ ...d, excludeStructureIds: ids.length > 0 ? ids : undefined }))
+  const setExcluded = (ids: string[]) => onChange((d) => ({ ...d, excludeTypeIds: ids.length > 0 ? ids : undefined }))
 
   return (
     <Section title={BUILDER_TEXT.types} hint={BUILDER_TEXT.allOfHint}>
@@ -218,7 +218,7 @@ function TypesSection({ def, types, collections, onChange }: { def: QueryDefinit
           type="button"
           title={BUILDER_TEXT.allTypesTooltip}
           aria-pressed={selected.length === 0}
-          onClick={() => onChange((d) => ({ ...d, structures: [] }))}
+          onClick={() => onChange((d) => ({ ...d, types: [] }))}
           className={cn(BTN, selected.length === 0 && 'bg-hover')}
         >
           {BUILDER_TEXT.allTypes}
@@ -229,7 +229,7 @@ function TypesSection({ def, types, collections, onChange }: { def: QueryDefinit
             <Chip
               key={s.id}
               label={t?.name ?? s.id}
-              onRemove={() => onChange((d) => ({ ...d, structures: d.structures.filter((x) => x.id !== s.id) }))}
+              onRemove={() => onChange((d) => ({ ...d, types: d.types.filter((x) => x.id !== s.id) }))}
             >
               {t ? <TypeChip type={t} size={18} /> : <Icon name="ph-warning" size={14} />}
               <span>{t?.name ?? 'Invalid'}</span>
@@ -238,7 +238,7 @@ function TypesSection({ def, types, collections, onChange }: { def: QueryDefinit
                   s={s}
                   type={t}
                   collections={collections}
-                  edit={(next) => onChange((d) => ({ ...d, structures: d.structures.map((x) => (x.id === s.id ? next : x)) }))}
+                  edit={(next) => onChange((d) => ({ ...d, types: d.types.map((x) => (x.id === s.id ? next : x)) }))}
                 />
               )}
             </Chip>
@@ -260,7 +260,7 @@ function TypesSection({ def, types, collections, onChange }: { def: QueryDefinit
             {types
               .filter((t) => !selected.some((s) => s.id === t.id))
               .map((t) => (
-                <Check key={t.id} checked={false} onClick={() => onChange((d) => ({ ...d, structures: [...d.structures, { id: t.id }] }))}>
+                <Check key={t.id} checked={false} onClick={() => onChange((d) => ({ ...d, types: [...d.types, { id: t.id }] }))}>
                   <TypeChip type={t} size={18} />
                   {t.name}
                 </Check>

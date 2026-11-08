@@ -146,25 +146,25 @@ def whiteboard_type_json() -> dict[str, Any]:
         "propertyDefinitions": [
             _system_prop(
                 "title", "entity_title", "Title",
-                "The title serves as the main identifier for any entry", "ph-text-t",
+                "The name of the object, shown wherever it appears", "ph-text-t",
             ),
             _system_prop(
                 "description", "entity_description", "Description",
-                "Additional information to further describe an item", "ph-info",
+                "A short summary of what the object is about", "ph-info",
             ),
             _system_prop(
-                "icon", "entity_icon", "Icon", "A quick visual identifier", "ph-smiley"
+                "icon", "entity_icon", "Icon", "An emoji or icon shown beside the title", "ph-smiley"
             ),
             _system_prop(
-                "tags", "entity_tags", "Tags", "General tags of this content", "ph-tag",
+                "tags", "entity_tags", "Tags", "Tags attached to the object", "ph-tag",
                 isArray=True, allowedTypes=["tag"],
             ),
             _system_prop(
                 "lastUpdated", "entity_lastUpdated", "Last updated",
-                "Date and time of last edit", "ph-clock-clockwise",
+                "When the object last changed", "ph-clock-clockwise",
             ),
             _system_prop(
-                "createdAt", "entity_createdAt", "Created at", "Date and time of creation",
+                "createdAt", "entity_createdAt", "Created at", "When the object was made",
                 "ph-calendar-blank",
             ),
         ],

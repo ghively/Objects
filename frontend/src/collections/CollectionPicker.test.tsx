@@ -34,7 +34,7 @@ describe('CollectionPicker', () => {
     render(<CollectionPicker value={[]} typeId="server" onChange={onChange} />)
     expect(await screen.findByRole('option', { name: /Tooling/ })).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: /Reading/ })).not.toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Search collections or create one')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Find or create a collection')).toBeInTheDocument()
     expect(screen.getByText('No Collection')).toBeInTheDocument()
 
     await user.type(screen.getByRole('textbox'), 'Gear')

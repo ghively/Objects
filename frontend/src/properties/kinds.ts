@@ -11,31 +11,31 @@ export interface KindMeta {
 }
 
 export const KIND_META: Readonly<Record<PropertyType, KindMeta>> = {
-  text: { name: 'Text', description: 'Simple plain text', icon: 'ph-text-align-left' },
+  text: { name: 'Text', description: 'Unformatted text', icon: 'ph-text-align-left' },
   textBlock: {
     name: 'Text',
-    description: 'A single paragraph that allows formatting and linking.',
+    description: 'One paragraph, with formatting and links.',
     icon: 'ph-text-align-left',
   },
   simpleTableBlock: { name: 'Table', description: '', icon: 'ph-table' },
-  number: { name: 'Number', description: 'A number with various formatting options', icon: 'ph-hash' },
-  boolean: { name: 'Checkbox', description: 'True or false value', icon: 'ph-check-square' },
-  url: { name: 'URL', description: 'A plain web url', icon: 'ph-link' },
+  number: { name: 'Number', description: 'A number you can format in several ways', icon: 'ph-hash' },
+  boolean: { name: 'Checkbox', description: 'A yes-or-no tick box', icon: 'ph-check-square' },
+  url: { name: 'URL', description: 'A web address', icon: 'ph-link' },
   // Both read "Date time"; only `datetime` is ever created.
-  datetime: { name: 'Date time', description: 'Time and date together', icon: 'ph-calendar' },
+  datetime: { name: 'Date time', description: 'A date, with an optional time', icon: 'ph-calendar' },
   datetimeSimple: { name: 'Date time', description: '', icon: 'ph-calendar-blank' },
-  entity: { name: 'Object', description: 'Link to other objects', icon: 'ph-file-text' },
+  entity: { name: 'Object', description: 'Points to one or more objects', icon: 'ph-file-text' },
   label: {
     name: 'Label',
-    description: 'A simple label to categorize an object. Can be single or multi-select.',
+    description: 'Pick one or more options from a list you define.',
     icon: 'ph-caret-circle-down',
   },
   blocks: {
     name: 'Content',
-    description: 'The main notes area of an object — rich text with formatting and linking.',
+    description: 'The body of an object, where you write notes with formatting and links.',
     icon: 'ph-list-dashes',
   },
-  coverImage: { name: 'Cover Image', description: 'A single select image property.', icon: 'ph-image' },
+  coverImage: { name: 'Cover Image', description: 'One picture shown at the top of the object.', icon: 'ph-image' },
   color: { name: 'Color', description: '', icon: 'ph-palette' },
   // M12: our kinds, names and descriptions (our strings)
   formula: { name: 'Formula', description: 'A value calculated from other properties.', icon: 'ph-function' },
@@ -50,30 +50,30 @@ export const KIND_META: Readonly<Record<PropertyType, KindMeta>> = {
   files: { name: 'Files', description: 'Attached files.', icon: 'ph-paperclip' },
   entity_title: {
     name: 'Title',
-    description: 'The title serves as the main identifier for any entry',
+    description: 'The name of the object, shown wherever it appears',
     icon: 'ph-text-t',
   },
-  entity_icon: { name: 'Icon', description: 'A quick visual identifier', icon: 'ph-smiley' },
+  entity_icon: { name: 'Icon', description: 'An emoji or icon shown beside the title', icon: 'ph-smiley' },
   entity_description: {
     name: 'Description',
-    description: 'Additional information to further describe an item',
+    description: 'A short summary of what the object is about',
     icon: 'ph-info',
   },
-  entity_aliases: { name: 'Aliases', description: 'Additional names for this content', icon: 'ph-cards' },
-  entity_tags: { name: 'Tags', description: 'General tags of this content', icon: 'ph-tag' },
-  entity_type: { name: 'Object type', description: 'The type of this content', icon: 'ph-notebook' },
+  entity_aliases: { name: 'Aliases', description: 'Other names the object goes by', icon: 'ph-cards' },
+  entity_tags: { name: 'Tags', description: 'Tags attached to the object', icon: 'ph-tag' },
+  entity_type: { name: 'Object type', description: 'What kind of object this is', icon: 'ph-notebook' },
   entity_collections: {
     name: 'Collections',
-    description: 'Collections this content is included in',
+    description: 'The collections this object belongs to',
     icon: 'ph-cards-three',
   },
-  entity_createdAt: { name: 'Created at', description: 'Date and time of creation', icon: 'ph-calendar-blank' },
+  entity_createdAt: { name: 'Created at', description: 'When the object was made', icon: 'ph-calendar-blank' },
   entity_lastUpdated: {
     name: 'Last updated',
-    description: 'Date and time of last edit',
+    description: 'When the object last changed',
     icon: 'ph-clock-clockwise',
   },
-  entity_backlinks: { name: 'Context', description: 'Objects linking to this one', icon: 'ph-line-segment' },
+  entity_backlinks: { name: 'Context', description: 'Where other objects mention this one', icon: 'ph-line-segment' },
   // M14 (our strings): a button that runs an automation on its object.
   button: { name: 'Button', description: 'Run an automation on this object with one click', icon: 'ph-cursor-click' },
   // M22 (our strings): Steps and Floor items come only from "Add work fields"; List is addable.
@@ -110,22 +110,22 @@ export interface AddPropertyItem {
   icon: string
 }
 
-// The Add Property menu order list. `structure_tag_single` and `property_tag` are in it,
+// The Add Property menu order list. `type_tag_single` and `property_tag` are in it,
 // but no item is built for them.
 const MENU_ORDER = [
   'property_textBlock',
   'property_blocks',
   'property_entity_tags',
   'property_label',
-  'structure_tag_single',
-  'structure_tag_multi',
+  'type_tag_single',
+  'type_tag_multi',
   'property_boolean',
   'property_tag',
   'property_datetime',
   'property_number',
   'property_entity_title',
   'property_entity_description',
-  'structure_image_single',
+  'type_image_single',
   'property_entity_icon',
   'property_entity_createdAt',
   'property_entity_lastUpdated',
@@ -172,19 +172,19 @@ const ADDABLE_KINDS: readonly PropertyType[] = [
 function buildItems(): AddPropertyItem[] {
   const items: AddPropertyItem[] = [
     {
-      key: 'structure_tag_multi',
+      key: 'type_tag_multi',
       action: 'objectSelect',
       type: 'entity',
       name: 'Object Select',
-      description: 'Link to objects of a specific type.',
+      description: 'Points to objects of one chosen type.',
       icon: 'ph-link',
     },
     {
-      key: 'structure_image_single',
+      key: 'type_image_single',
       action: 'coverImage',
       type: 'coverImage',
       name: 'Cover Image',
-      description: 'A single select image property.',
+      description: 'One picture shown at the top of the object.',
       icon: 'ph-image',
     },
     ...ADDABLE_KINDS.map(

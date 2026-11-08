@@ -80,6 +80,7 @@ from pydantic import BaseModel, ValidationError
 from pydantic.fields import FieldInfo
 
 from .apictx import ApiContext
+from .keycompat import upgrade_keys
 from .tokens import TokenRecord, TokenStore
 from .v1guard import V1Guard, error, guarded
 
@@ -285,6 +286,7 @@ def _call(route: Any, body: dict[str, Any] | None = None, /, **params: Any) -> t
     except Exception:  # noqa: BLE001 - a hint that can't be resolved: no body model
         hints = {}
     kwargs: dict[str, Any] = {}
+    upgrade_keys(body)  # older key names, as `KeyCompatMiddleware` does for HTTP
     for name, param in inspect.signature(endpoint).parameters.items():
         hint = hints.get(name)
         if name in params:

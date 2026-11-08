@@ -24,7 +24,7 @@ describe('MermaidPreview', () => {
     expect(mermaid.render).toHaveBeenLastCalledWith(expect.stringMatching(/^mermaid-/), 'graph TD; A-->B')
 
     rerender(<MermaidPreview text="   " />)
-    expect(await screen.findByText('Write a Mermaid diagram to see the preview')).toBeInTheDocument()
+    expect(await screen.findByText('The preview appears once you type some Mermaid')).toBeInTheDocument()
 
     mermaid.render.mockRejectedValueOnce(new Error('Parse error on line 1'))
     rerender(<MermaidPreview text="nonsense" />)

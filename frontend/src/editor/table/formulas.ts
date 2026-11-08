@@ -29,25 +29,25 @@ import { formatNumber } from '@/properties/format'
 /** The formula statements, in catalog order. */
 export const FORMULA_STATEMENTS: ReadonlyArray<{ name: string; description: string }> = [
   { name: 'ABS', description: 'Get absolute value' },
-  { name: 'AVG', description: 'Calculate average of values' },
-  { name: 'CEIL', description: 'Round up to nearest integer' },
+  { name: 'AVG', description: 'Mean of the values' },
+  { name: 'CEIL', description: 'Raise to the next whole number' },
   { name: 'COUNT', description: 'Count number of values' },
-  { name: 'E', description: "Mathematical constant Euler's number" },
-  { name: 'FLOOR', description: 'Round down to nearest integer' },
-  { name: 'LN', description: 'Calculate the natural logarithm' },
-  { name: 'LOG', description: 'Calculate the natural logarithm' },
+  { name: 'E', description: "The number e (about 2.718)" },
+  { name: 'FLOOR', description: 'Drop the fraction, rounding toward minus infinity' },
+  { name: 'LN', description: 'Logarithm to base e' },
+  { name: 'LOG', description: 'Logarithm to base e' },
   { name: 'MAX', description: 'Find maximum value' },
   { name: 'MEDIAN', description: 'Find median value' },
   { name: 'MIN', description: 'Find minimum value' },
-  { name: 'PHI', description: 'Mathematical constant Golden ratio' },
-  { name: 'PI', description: 'Mathematical constant Pi' },
-  { name: 'PRODUCT', description: 'Calculate product of values' },
-  { name: 'RAND', description: 'Generate a random number' },
-  { name: 'ROUND', description: 'Round to nearest integer' },
+  { name: 'PHI', description: 'The golden ratio φ (about 1.618)' },
+  { name: 'PI', description: 'The number π (about 3.14159)' },
+  { name: 'PRODUCT', description: 'Multiply the values together' },
+  { name: 'RAND', description: 'Random number between 0 and 1' },
+  { name: 'ROUND', description: 'Round to the closest whole number' },
   { name: 'SIGN', description: 'Get sign of value' },
   { name: 'SQRT', description: 'Calculate square root' },
   { name: 'SUM', description: 'Calculate sum of values' },
-  { name: 'TAU', description: 'Mathematical constant Tau' },
+  { name: 'TAU', description: 'The number τ, 2π (about 6.283)' },
 ]
 
 /** The statements that take no arguments. */
@@ -67,12 +67,12 @@ export const FORMULA_ERROR_TITLES: Record<FormulaErrorKind, string> = {
 
 /** The error messages, plus `invalidExpression` (our string). */
 export const FORMULA_ERROR_MESSAGES = {
-  circularReference: 'The formula contains a circular reference.',
-  expressionIsEmpty: 'The formula expression is empty.',
-  invalidCellReference: 'The formula contains a reference to an invalid cell.',
-  invalidRangeReference: 'The formula contains invalid range references.',
-  valueNotANumber: 'The value returned from the formula is not a number.',
-  valueNotFinite: 'The value returned from the formula is not finite.',
+  circularReference: 'This formula ends up depending on its own cell.',
+  expressionIsEmpty: "There's no formula to work out.",
+  invalidCellReference: "This formula points at a cell that doesn't exist.",
+  invalidRangeReference: "A cell range in this formula isn't valid.",
+  valueNotANumber: "This formula didn't give a number.",
+  valueNotFinite: "This formula's result is infinite or undefined.",
   /** Our string: a syntax error, an unknown function or a wrong argument count. */
   invalidExpression: 'The formula expression is invalid.',
 } as const

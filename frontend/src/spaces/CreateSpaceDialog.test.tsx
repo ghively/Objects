@@ -101,11 +101,11 @@ describe('CreateSpaceDialog', () => {
 
   test('test create dialog offers basic setup', async () => {
     const user = await openDialog()
-    expect(screen.getByText('How do you want to start?')).toBeInTheDocument()
-    expect(screen.getByText('Includes people, meetings, projects, and books.')).toBeInTheDocument()
-    expect(screen.getByText('Add object types when you need them.')).toBeInTheDocument()
+    expect(screen.getByText('Pick a starting point')).toBeInTheDocument()
+    expect(screen.getByText('Comes with types for people, meetings, projects and books.')).toBeInTheDocument()
+    expect(screen.getByText('Starts with no extra types; create them as you go.')).toBeInTheDocument()
     const basic = screen.getByRole('radio', { name: 'Start with basic setup' })
-    const blank = screen.getByRole('radio', { name: 'Start with a blank space' })
+    const blank = screen.getByRole('radio', { name: 'Empty space' })
     expect(blank).toBeChecked()
     expect(basic).not.toBeChecked()
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Location' })).toHaveValue('/home/gene/Spaces'))
@@ -119,7 +119,7 @@ describe('CreateSpaceDialog', () => {
     // Reopening starts from a blank space again.
     act(() => useCreateSpaceDialog.getState().close())
     act(() => useCreateSpaceDialog.getState().open())
-    expect(await screen.findByRole('radio', { name: 'Start with a blank space' })).toBeChecked()
+    expect(await screen.findByRole('radio', { name: 'Empty space' })).toBeChecked()
   })
 
   test('test import from closes the dialog and opens the import dialog with the name and location (M15)', async () => {

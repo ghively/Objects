@@ -89,10 +89,10 @@ describe('MergeDialog', () => {
     render(<MergeDialog />)
     act(() => useMerge.getState().open('Pages/Source.md'))
     fireEvent.click(await screen.findByText('Target'))
-    expect(screen.getByText('Are you sure you want to merge “Source” into “Target”?')).toBeTruthy()
+    expect(screen.getByText('Merge “Source” into “Target”?')).toBeTruthy()
     expect(
       screen.getByText(
-        'Single values already set on “Target” stay. Lists are combined with “Source”, and empty properties are filled from there. Content is added on.',
+        '“Target” keeps the single values it already has, picks up the list items from “Source”, which also fills any properties that are blank. Its content goes at the end.',
       ),
     ).toBeTruthy()
     expect(mocked.mergeObject).not.toHaveBeenCalled()
@@ -107,7 +107,7 @@ describe('MergeDialog', () => {
     await act(async () => finish())
     await waitFor(() => expect(useMerge.getState().source).toBeNull())
     expect(open).toHaveBeenCalledWith({ kind: 'object', path: 'Pages/Target.md' })
-    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Object successfully merged')
+    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Objects merged')
   })
 
   test('tag confirm uses the tag strings', async () => {
@@ -116,10 +116,10 @@ describe('MergeDialog', () => {
     render(<MergeDialog />)
     act(() => useMerge.getState().open('Tags/Old.md'))
     fireEvent.click(await screen.findByText('New'))
-    expect(screen.getByText('References to this tag will be merged into “New”.')).toBeTruthy()
+    expect(screen.getByText('Anything tagged here moves to “New”.')).toBeTruthy()
     fireEvent.click(screen.getByText('Merge'))
     await waitFor(() => expect(useMerge.getState().source).toBeNull())
-    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Tag successfully merged')
+    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Tags merged')
   })
 
   test('test errors use the expected strings', async () => {
@@ -129,10 +129,10 @@ describe('MergeDialog', () => {
 
     mocked.mergeObject.mockRejectedValueOnce(new ApiError(413, 'too large'))
     fireEvent.click(screen.getByText('Merge'))
-    expect(await screen.findByText('This object is too large to merge')).toBeTruthy()
+    expect(await screen.findByText('Too many references to merge this object')).toBeTruthy()
     expect(
       screen.getByText(
-        `Merging is limited to ${MERGE_LIMIT} references. You can still merge a smaller object into this one, or remove some references first.`,
+        `A merge can move at most ${MERGE_LIMIT} references. Pick a smaller object to merge here, or drop some of its links before trying again.`,
       ),
     ).toBeTruthy()
     expect(MERGE_LIMIT).toBe(5000)
@@ -147,10 +147,10 @@ describe('MergeDialog', () => {
     fireEvent.click(await screen.findByText('New'))
     mocked.mergeObject.mockRejectedValueOnce(new ApiError(413, 'too large'))
     fireEvent.click(screen.getByText('Merge'))
-    expect(await screen.findByText('This tag is too large to merge')).toBeTruthy()
+    expect(await screen.findByText('Too many references to merge this tag')).toBeTruthy()
     expect(
       screen.getByText(
-        'Merging is limited to 5000 references. You can still merge a smaller tag into this one, or remove some uses of this tag first.',
+        'A merge can move at most 5000 references. Pick a smaller tag to merge here, or untag some objects before trying again.',
       ),
     ).toBeTruthy()
     mocked.mergeObject.mockRejectedValueOnce(new Error('boom'))

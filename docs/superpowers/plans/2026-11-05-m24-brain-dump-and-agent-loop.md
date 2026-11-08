@@ -50,7 +50,7 @@ No separate inbox process: every run is an M17 agent run built by `agentrun.buil
 - The server binds `127.0.0.1` only.
 - Fixtures are synthetic (`INC0012345`, `OPS-123`, "Printer jams on line 3", `PRN-TEST-01`). Tests set `OBJECT_STATE_DIR` to a temp folder, use a temp `home` for the change-reviewer lookup, and never touch `~/.claude` or the real state dir.
 - Everything is unlocked: no badge, upsell or limit beyond the caps named here.
-- Never name the original notes app or the open-source agent whose patterns the agents design adopts, in code, strings, fixtures, prompts or docs. Prompts ported from the old dashboard are rewritten with "the work agent" / the agent's name.
+- Never name the open-source agent whose patterns the agents design adopts, in code, strings, fixtures, prompts or docs. Prompts ported from the old dashboard are rewritten with "the work agent" / the agent's name.
 - No success pop-ups: problems get a toast; success just happens.
 - Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 

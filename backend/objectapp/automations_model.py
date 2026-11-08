@@ -103,13 +103,13 @@ class FilterModel(_Strict):
     propertyId: str
     option: str
     referenceValue: Any = None
-    structureId: str | None = None
+    typeId: str | None = None
 
     @model_serializer(mode="wrap")
     def _omit_absent(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
-        # As the view JSON writes a filter: no `referenceValue`/`structureId` when unset.
+        # As the view JSON writes a filter: no `referenceValue`/`typeId` when unset.
         out = handler(self)
-        for key in ("referenceValue", "structureId"):
+        for key in ("referenceValue", "typeId"):
             if out.get(key) is None:
                 out.pop(key, None)
         return out

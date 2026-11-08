@@ -70,10 +70,10 @@ describe('QuickCreateChips', () => {
     const user = userEvent.setup()
     render(<QuickCreateChips day={TODAY} calendarDay={calendarDay()} summaries={{}} />)
     expect(screen.getByRole('group').getAttribute('title')).toBe(
-      'Create an object with the date property set to this day. You can remove an object type from this list in the settings of that object type.',
+      "Makes an object dated this day. To take a type off this list, change that type's settings.",
     )
-    const hide = screen.getByRole('button', { name: 'Click to hide these buttons.' })
-    expect(hide).toHaveAttribute('title', 'Click to hide these buttons.')
+    const hide = screen.getByRole('button', { name: 'Hide the quick-create buttons.' })
+    expect(hide).toHaveAttribute('title', 'Hide the quick-create buttons.')
     await user.click(hide)
     await waitFor(() =>
       expect(mocked.patchUi).toHaveBeenCalledWith(
@@ -82,8 +82,8 @@ describe('QuickCreateChips', () => {
       ),
     )
     expect(chipNames()).toEqual([])
-    const show = screen.getByRole('button', { name: 'Click to show options to create objects for this day.' })
-    expect(show).toHaveAttribute('title', 'Click to show options to create objects for this day.')
+    const show = screen.getByRole('button', { name: 'Show buttons that create objects on this day.' })
+    expect(show).toHaveAttribute('title', 'Show buttons that create objects on this day.')
     expect(useUiStore.getState().ui.calendar?.daily.hideCreateObjects).toBe(true)
     await user.click(show)
     expect(chipNames()).toEqual(['task', 'meeting', 'journal'])

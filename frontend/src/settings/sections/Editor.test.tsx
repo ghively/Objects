@@ -35,9 +35,9 @@ describe('EditorSection', () => {
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ toggleStyle: 'bullet' }, expect.anything())
 
     for (const [label, key] of [
-      ['Disable automatic detection of numbered lists', 'disableNumberedListTransformation'],
+      ['Turn off automatic numbered lists', 'disableNumberedListTransformation'],
       ['Disable spellcheck', 'disableSpellcheck'],
-      ['Always open as full page', 'alwaysOpenAsFullPage'],
+      ['Open objects as a full page', 'alwaysOpenAsFullPage'],
       ['Hide outliner lines', 'hideOutlinerLines'],
     ] as const) {
       const sw = screen.getByRole('switch', { name: label })
@@ -47,7 +47,7 @@ describe('EditorSection', () => {
     }
 
     // "Show object type icon…" is on while the icons are not hidden; turning it off hides them.
-    const icons = screen.getByRole('switch', { name: 'Show object type icon for inline object links' })
+    const icons = screen.getByRole('switch', { name: 'Type icons on inline links' })
     expect(icons).toHaveAttribute('aria-checked', 'true')
     await user.click(icons)
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ hideEntityIconsOnInlineLinks: true }, expect.anything())
@@ -104,9 +104,9 @@ describe('EditorSection', () => {
       loaded: true,
     })
     render(<EditorSection />)
-    expect(screen.getByRole('heading', { name: 'Default state for backlink sections' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Backlink sections start as' })).toBeInTheDocument()
     expect(
-      screen.getByText('Choose whether these sections should start open or closed on object pages. You can still change them per object.'),
+      screen.getByText('Whether each section is expanded or collapsed when an object page opens. Each object can still override it.'),
     ).toBeInTheDocument()
     for (const name of ['Backlinks', 'Related Content', 'Unlinked Mentions']) {
       const g = screen.getByRole('radiogroup', { name })
@@ -135,7 +135,7 @@ describe('EditorSection', () => {
     await user.click(within(view).getByRole('radio', { name: 'Small card' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ backlinkContentView: 'smallCard' }, expect.anything())
 
-    const hidden = screen.getByRole('group', { name: 'Hide related content for object types' })
+    const hidden = screen.getByRole('group', { name: 'Types without related content' })
     const clear = screen.getByRole('button', { name: 'Clear all' })
     expect(clear).toBeDisabled()
     await user.click(within(hidden).getByRole('checkbox', { name: 'Books' }))
@@ -150,10 +150,10 @@ describe('EditorSection', () => {
   test('test nested backlink mode saves', async () => {
     const user = userEvent.setup()
     render(<EditorSection />)
-    expect(screen.getByRole('heading', { name: 'Default display of nested backlinks' })).toBeInTheDocument()
-    const g = screen.getByRole('radiogroup', { name: 'Default display of nested backlinks' })
-    expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Only block with backlink', 'Full path above'])
-    expect(within(g).getByRole('radio', { name: 'Only block with backlink' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('heading', { name: 'How nested backlinks show at first' })).toBeInTheDocument()
+    const g = screen.getByRole('radiogroup', { name: 'How nested backlinks show at first' })
+    expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Just the linking block', 'Full path above'])
+    expect(within(g).getByRole('radio', { name: 'Just the linking block' })).toHaveAttribute('aria-checked', 'true')
     await user.click(within(g).getByRole('radio', { name: 'Full path above' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ nestedBacklinkView: 'showFullPathAbove' }, expect.anything())
   })
@@ -162,8 +162,8 @@ describe('EditorSection', () => {
     const user = userEvent.setup()
     render(<EditorSection />)
     for (const [label, key] of [
-      ['Always create inline links', 'alwaysCreateInlineLinks'],
-      ['Hide object type settings outside of settings', 'hideStructureSettings'],
+      ['Insert links inline by default', 'alwaysCreateInlineLinks'],
+      ['Keep type settings inside Settings only', 'hideTypeSettings'],
     ] as const) {
       const sw = screen.getByRole('switch', { name: label })
       expect(sw).toHaveAttribute('aria-checked', 'false')
@@ -171,7 +171,7 @@ describe('EditorSection', () => {
       expect(mocked.patchSettings).toHaveBeenLastCalledWith({ [key]: true }, expect.anything())
     }
     expect(
-      screen.getByText('With this setting, linking to other objects will always default to creating an inline link, even at the start of an empty block.'),
+      screen.getByText('Linking to an object always makes an inline link, even at the start of an empty block.'),
     ).toBeInTheDocument()
   })
 
@@ -181,7 +181,7 @@ describe('EditorSection', () => {
     const g = screen.getByRole('radiogroup', { name: 'Highlight Style' })
     expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Default', 'Minimal'])
     expect(within(g).getByRole('radio', { name: 'Default' })).toHaveAttribute('aria-checked', 'true')
-    expect(within(g).getByText('No rail — the highlight blends in as plain text.')).toBeInTheDocument()
+    expect(within(g).getByText('No rail; the highlight reads as ordinary text.')).toBeInTheDocument()
     await user.click(within(g).getByRole('radio', { name: 'Minimal' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ highlightStyle: 'minimal' }, expect.anything())
   })

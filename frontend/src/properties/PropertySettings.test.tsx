@@ -98,7 +98,7 @@ describe('PropertySettings', () => {
     await user.click(screen.getByRole('button', { name: 'Single' }))
     // Relation rule changes wait for "Apply changes".
     expect(api.saveType).not.toHaveBeenCalled()
-    expect(screen.getByText(/Links will get removed if they don't follow/)).toBeInTheDocument()
+    expect(screen.getByText(/Links that no longer fit the rules above/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Apply changes' }))
     expect(await screen.findByText('3 objects will change.')).toBeInTheDocument()
     expect(screen.getByText('Links that break the rules will be removed.')).toBeInTheDocument()
@@ -112,7 +112,7 @@ describe('PropertySettings', () => {
   test('test two-way linking shows multiSelectOnly info for a single-select relation', () => {
     open('p-lead')
     expect(screen.getByText('Two-way linking')).toBeInTheDocument()
-    expect(screen.getByText(/Synced properties are only available for multi-select properties/)).toBeInTheDocument()
+    expect(screen.getByText(/Syncing needs multi-select properties/)).toBeInTheDocument()
   })
 
   describe('two-way linking of a single-sided pair (sub-items)', () => {
@@ -138,7 +138,7 @@ describe('PropertySettings', () => {
 
     test('"Parent item" shows its synced partner, not the multi-select notice', () => {
       openTask('p-parent')
-      expect(screen.queryByText(/Synced properties are only available for multi-select properties/)).toBeNull()
+      expect(screen.queryByText(/Syncing needs multi-select properties/)).toBeNull()
       expect(screen.getByRole('button', { name: 'Sub-items', pressed: true })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'No Property', pressed: false })).toBeInTheDocument()
     })
@@ -170,11 +170,11 @@ describe('PropertySettings', () => {
       lossy: 0,
     })
     const onOpenProperty = open('p-note')
-    expect(screen.getByText(/a new property of the new type is created/)).toBeInTheDocument()
+    expect(screen.getByText(/makes a new property of the chosen kind/)).toBeInTheDocument()
     await user.click(screen.getByRole('radio', { name: /^Number/ }))
     const change = screen.getByRole('button', { name: 'Change type' })
     expect(change).toBeDisabled()
-    await user.click(screen.getByRole('checkbox', { name: 'I understand the process and know that some data might be lost.' }))
+    await user.click(screen.getByRole('checkbox', { name: 'I know some values may be lost.' }))
     await user.click(change)
     await waitFor(() => expect(onOpenProperty).toHaveBeenCalledWith('p-new'))
     expect(api.changePropertyKind).toHaveBeenCalledWith('project', 'p-note', 'number', 'r1')
@@ -190,11 +190,11 @@ describe('PropertySettings', () => {
     open('p-b')
     expect(screen.getByText(/This property type cannot be changed/)).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Type "delete-all-content" to confirm' })).toBeInTheDocument()
-    expect(screen.getByRole('note')).toHaveTextContent('This is the only content property present in this object type.')
-    expect(screen.getByText(/This action cannot be reverted\./)).toBeInTheDocument()
+    expect(screen.getByRole('note')).toHaveTextContent('This type has no other content property.')
+    expect(screen.getByText(/and it cannot be undone\./)).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Description' })).toHaveAttribute(
       'placeholder',
-      'Give others an idea of what this property means',
+      'What is this property for?',
     )
   })
 
@@ -211,7 +211,7 @@ describe('PropertySettings', () => {
       ],
     })
     open('p-b')
-    expect(screen.getByRole('note')).toHaveTextContent('A content property generally is the main body of an object.')
+    expect(screen.getByRole('note')).toHaveTextContent('A content property usually holds the body of an object;')
   })
 
   test('test date Default Custom writes startTimeDefault', async () => {

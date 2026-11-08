@@ -27,7 +27,7 @@ through ``/api/integrations/tokens`` (state dir only). Then it checks:
     ``ticketId`` to ``OPS-124`` through ``PUT /api/object/properties`` infers System Jira;
  7. ``PUT /api/object/properties`` with ``steps`` is 422 "Steps change with the step actions.";
  8. ``POST /api/types/project/work-fields`` makes Scanner rollout a work item; the Tickets
-    view's structures include ``project``;
+    view's types include ``project``;
  9. ``POST /api/work/close`` on Printer: status Done, ``completed`` stamped, the close notes
     hold ``Verification: Spooler restarted, 20 test prints clean``;
 10. the clock moves to 2026-11-20: Printer (closed 15 days earlier) leaves the active list and
@@ -353,8 +353,8 @@ class M22:
                         f"Scanner rollout is a work item: turn {scanner and scanner['turn']}")
         _, queries = self.http("GET", "/queries")
         tickets = next((q for q in queries if q["id"] == "work-tickets"), None)
-        structures = sorted(s["id"] for s in tickets["definition"]["structures"]) if tickets else []
-        self.run.report("project" in structures, f"the Tickets view's structures: {structures}")
+        types = sorted(s["id"] for s in tickets["definition"]["types"]) if tickets else []
+        self.run.report("project" in types, f"the Tickets view's types: {types}")
         commit(self.root, "check 8")
 
     # 9 ---------------------------------------------------------------------------------

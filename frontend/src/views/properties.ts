@@ -9,7 +9,7 @@ export interface PropChoice {
   kind: PropertyType
   def: Pick<PropertyDef, 'type' | 'options'> & Partial<PropertyDef>
   /** A type id when only one of several types in the view defines the key. */
-  structureId?: string
+  typeId?: string
 }
 
 const SYSTEM: { key: string; name: string; kind: PropertyType }[] = [
@@ -25,7 +25,7 @@ const SYSTEM: { key: string; name: string; kind: PropertyType }[] = [
   { key: 'sourceModified', name: 'Source modified', kind: 'text' },
 ]
 
-/** One choice per key across `viewTypes`; a key found in only one of several types carries its `structureId`. */
+/** One choice per key across `viewTypes`; a key found in only one of several types carries its `typeId`. */
 export function propertyChoices(viewTypes: TypeDef[]): PropChoice[] {
   const out: PropChoice[] = []
   const seen = new Map<string, { choice: PropChoice; count: number; typeId: string }>()
@@ -48,7 +48,7 @@ export function propertyChoices(viewTypes: TypeDef[]): PropChoice[] {
   }
   if (viewTypes.length > 1) {
     for (const { choice, count, typeId } of seen.values()) {
-      if (count === 1) choice.structureId = typeId
+      if (count === 1) choice.typeId = typeId
     }
   }
   return out

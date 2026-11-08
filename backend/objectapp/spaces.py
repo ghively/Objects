@@ -31,7 +31,6 @@ from typing import Any
 
 from .appstate import state_dir
 from .jsonstore import dump_json
-from .legacy import has_legacy_metadata
 from .space import safe_filename
 from .spaceconfig import MAX_NAME_LENGTH, space_fields
 from .textfile import atomic_write
@@ -253,7 +252,7 @@ class Registry:
 def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     """Create ``<location>/<safe_filename(name)>`` holding only ``.object/space.json``.
 
-    `setup` is M8's "How do you want to start?": ``'blank'`` is the behaviour above;
+    `setup` is M8's "Pick a starting point": ``'blank'`` is the behaviour above;
     ``'basic'`` also writes the Person, Meeting, Project and Book types
     (``.object/types/{person,meeting,project,book}.json``, see `basicsetup`).
 
@@ -329,10 +328,8 @@ def _is_space_folder(path: Path) -> bool:
         return (
             path.is_dir()
             and not path.is_symlink()
-            and (
-                ((path / ".object").is_dir() and not (path / ".object").is_symlink())
-                or has_legacy_metadata(path)
-            )
+            and (path / ".object").is_dir()
+            and not (path / ".object").is_symlink()
         )
     except OSError:  # a path the OS can't even stat (too long) is no space folder
         return False

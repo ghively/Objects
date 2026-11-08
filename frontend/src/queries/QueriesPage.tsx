@@ -22,7 +22,7 @@ export const QUERIES_TEXT = {
   heading: 'Queries',
   new: 'New',
   emptyTitle: 'No queries',
-  emptyBody: 'Queries you create in this database will appear here.',
+  emptyBody: 'Queries you save show up here.',
   open: 'Open',
   pin: 'Pin to Sidebar',
   delete: 'Delete',
@@ -51,7 +51,7 @@ export function QueriesPage() {
           q,
           title: queryTitle(q, ctx),
           subtitle: titleIsCustom(q) ? autoTitle(q.definition, ctx) : '',
-          typeNames: q.definition.structures.map((s) => types.find((t) => t.id === s.id)?.pluralName).filter((n): n is string => !!n),
+          typeNames: q.definition.types.map((s) => types.find((t) => t.id === s.id)?.pluralName).filter((n): n is string => !!n),
         }))
         .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })),
     [queries, ctx, types],

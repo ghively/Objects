@@ -17,13 +17,13 @@ const TABLE: Record<string, [string, string, string, string[]]> = {
   copyBlockReference: ['block', 'editor', 'Copy block reference', ['Mod-AltCtrl-l']],
   turnIntoObject: ['block', 'editor', 'Turn into object', ['i']],
   turnIntoTask: ['block', 'editor', 'Turn into task', []],
-  turnBlockIntoTaskObject: ['block', 'editor', 'Turn block into task object', ['Mod-Shift-t']],
-  highlightText: ['text', 'editor', 'Highlight text selection', ['Mod-Shift-h']],
+  turnBlockIntoTaskObject: ['block', 'editor', 'Make this block a task', ['Mod-Shift-t']],
+  highlightText: ['text', 'editor', 'Highlight the selected text', ['Mod-Shift-h']],
   toggleFocusMode: ['global', 'global', 'Toggle focus mode', ['Mod-Shift-m']],
   openPresentationMode: ['page', 'global', 'Start presentation mode', ['Mod-AltCtrl-p']],
   exitPresentationMode: ['page', 'global', 'Exit presentation mode', ['Escape']],
   nextPresentationSlide: ['page', 'global', 'Next presentation slide', ['ArrowRight']],
-  previousPresentationSlide: ['page', 'global', 'Previous presentation slide', ['ArrowLeft']],
+  previousPresentationSlide: ['page', 'global', 'Back one slide in the presentation', ['ArrowLeft']],
   whiteboardResize: [
     'whiteboard',
     'whiteboard',
@@ -33,7 +33,7 @@ const TABLE: Record<string, [string, string, string, string[]]> = {
   whiteboardResizeLarge: [
     'whiteboard',
     'whiteboard',
-    'Resize selection farther',
+    'Resize the selection in bigger steps',
     ['Mod-Shift-ArrowUp', 'Mod-Shift-ArrowDown', 'Mod-Shift-ArrowLeft', 'Mod-Shift-ArrowRight'],
   ],
 }
@@ -48,7 +48,7 @@ describe('M8 shortcuts', () => {
       expect(d?.category, id).toBe(category)
       expect(d?.scope, id).toBe(scope)
       expect(d?.name, id).toBe(name)
-      // Every key is checked against the shortcut table (reference-check-2026-10-28 §1).
+      // Every key is checked against the shortcut table (the behaviour catalog's Shortcuts sheet).
       expect(d?.provisional, id).toBe(false)
       expect(d?.bound, id).toBe(true)
       expect(keysFor(id)).toEqual(keys)

@@ -137,23 +137,23 @@ export const WB = {
   weblinkInvalid: s('Invalid URL format'),
 
   // Empty and lost states
-  emptyStateDescription: s('You can change this by creating a new node.'),
+  emptyStateDescription: s('Add a block or object to get started.'),
   lostTitle: s('Nothing in this view'),
-  lostDescription: s("But don't worry, we can just take you back."),
+  lostDescription: s("Jump back to the content to carry on."),
   lostBackToContent: s('Back to content'),
 
   // Clear Whiteboard
   clearWhiteboard: s('Clear Whiteboard'),
   clearWhiteboardHeading: s('Clear this whiteboard?'),
   clearWhiteboardExplanation: s(
-    'This removes every object and connector from the canvas. You can undo it.',
+    'Everything on the canvas, objects and connectors, will be removed. Undo brings it back.',
   ),
   clearWhiteboardConfirm: s('Clear Whiteboard'),
 
   // The Whiteboard type
   typeName: s('Whiteboard'),
   typePluralName: s('Whiteboards'),
-  typeDescription: s('An infinite canvas for arranging blocks and objects'),
+  typeDescription: s('A boundless board for laying out blocks and objects'),
   typeCreate: s('Create whiteboard'),
   propCanvas: s('Canvas'),
   propNotes: s('Notes'),
@@ -175,8 +175,8 @@ export const WB = {
   shortcutFitAll: s('Zoom to fit'),
   shortcutFitSelection: s('Zoom to selection'),
   shortcutDuplicate: s('Duplicate selection'),
-  shortcutDuplicateDrag: s('Duplicate while dragging'),
-  shortcutDisableSnap: s('Disable snapping while dragging'),
+  shortcutDuplicateDrag: s('Drag out a copy'),
+  shortcutDisableSnap: s('Turn off snapping as you drag'),
   shortcutNudge: s('Nudge selection'),
   shortcutNudgeLarge: s('Nudge selection farther'),
   shortcutBringToFront: s('Bring to front'),
@@ -187,10 +187,10 @@ export const WB = {
   shortcutFlipVertical: s('Flip vertical'),
   shortcutWrapInFrame: s('Wrap in frame'),
   shortcutResize: s('Resize selection'),
-  shortcutResizeDescription: s('Grows or shrinks from the right or bottom edge'),
-  shortcutResizeLarge: s('Resize selection farther'),
+  shortcutResizeDescription: s('The right and bottom edges move; the top-left corner stays put'),
+  shortcutResizeLarge: s('Resize the selection in bigger steps'),
   shortcutCycle: s('Cycle selected objects'),
-  shortcutCycleBack: s('Cycle selected objects backward'),
+  shortcutCycleBack: s('Select the previous item'),
   shortcutUndo: s('Undo last change'),
   shortcutRedo: s('Redo last change'),
 
@@ -206,8 +206,8 @@ export const WB = {
   inspectorOutline: s('Outline'),
   inspectorFrames: s('Frames'),
   inspectorStats: s('Stats'),
-  inspectorEmptyOutline: s('No headings in this page'),
-  inspectorEmptyFrames: s('No frames on this whiteboard'),
+  inspectorEmptyOutline: s('This page has no headings'),
+  inspectorEmptyFrames: s('This whiteboard has no frames'),
   inspectorPin: s('Pin'),
   inspectorUnpin: s('Unpin'),
   statText: s('Text'),

@@ -35,7 +35,7 @@ describe('TaskManagementSection', () => {
     useSettingsModal.getState().open('taskManagement')
     render(<TaskManagementSection />)
     expect(screen.getByRole('heading', { level: 2, name: 'Task management' })).toBeInTheDocument()
-    expect(screen.getByText(/delete the task object type in your current space/)).toBeInTheDocument()
+    expect(screen.getByText(/delete the Task type from this space/)).toBeInTheDocument()
     await waitFor(() => expect(useSpaceInfo.getState().space).not.toBeNull())
     const sw = screen.getByRole('switch', { name: 'Hide Task Management' })
     expect(sw).toHaveAttribute('aria-checked', 'false')
@@ -43,7 +43,7 @@ describe('TaskManagementSection', () => {
     await waitFor(() => expect(mocked.patchSpace).toHaveBeenCalledWith({ hideTaskManagement: true }, { baseRevision: 's1' }))
     expect(useSpaceInfo.getState().space?.hideTaskManagement).toBe(true)
 
-    expect(screen.getByRole('heading', { name: 'Task Object Customization' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Task type settings' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Open settings' }))
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'typeSettings', typeId: 'task' })
     expect(useSettingsModal.getState().isOpen).toBe(false)

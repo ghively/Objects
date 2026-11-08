@@ -283,8 +283,8 @@ const ACCEPTED_EXTRA: Partial<Record<PropertyType, string[]>> = { entity_backlin
 
 /** Whether the filter names a property and an operator that still exist; an invalid one is ignored. */
 export function filterIsValid(filter: Filter, typesById: Record<string, TypeDef>, viewTypeIds?: string[]): boolean {
-  if (filter.structureId && !typesById[filter.structureId]) return false
-  const def = findDef(Object.values(typesById), filter.propertyId, filter.structureId, viewTypeIds)
+  if (filter.typeId && !typesById[filter.typeId]) return false
+  const def = findDef(Object.values(typesById), filter.propertyId, filter.typeId, viewTypeIds)
   if (!def) return false
   return filterOptionsFor(def).some((x) => x.key === filter.option) || !!ACCEPTED_EXTRA[def.type]?.includes(filter.option)
 }
@@ -484,11 +484,11 @@ const passFor = (ctx: FilterCtx): Pass => ({ byId: typeMap(ctx.types), dayOf: da
  */
 function compileFilter(f: Filter, ctx: FilterCtx, pass: Pass): Test | null {
   if (!filterIsValid(f, pass.byId, ctx.viewTypeIds)) return null
-  const fallback = findDef(ctx.types, f.propertyId, f.structureId, ctx.viewTypeIds)
+  const fallback = findDef(ctx.types, f.propertyId, f.typeId, ctx.viewTypeIds)
   const owns = new Map<string, DefLike | undefined>()
   let range: DayRange | null | undefined
   return (row) => {
-    if (f.structureId && row.summary.type !== f.structureId) return true
+    if (f.typeId && row.summary.type !== f.typeId) return true
     let own = owns.get(row.summary.type)
     if (own === undefined && !owns.has(row.summary.type)) {
       own = defIn(pass.byId[row.summary.type], f.propertyId)
@@ -546,7 +546,7 @@ function matchComputed(value: unknown, f: Filter, range: DayRange | null, dayOf:
   return matchText('text', computedText(value), f)
 }
 
-/** Whether a row passes one filter. An invalid filter passes; so does a row of another type than `structureId`. */
+/** Whether a row passes one filter. An invalid filter passes; so does a row of another type than `typeId`. */
 export function matchFilter(row: Row, f: Filter, ctx: FilterCtx): boolean {
   return compileFilter(f, ctx, passFor(ctx))?.(row) ?? true
 }

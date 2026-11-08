@@ -101,13 +101,13 @@ describe('classifying', () => {
 
   test('offers by content kind', () => {
     expect(pasteActions({ kind: 'text', text: 'hello' }, TYPES).map((a) => a.label)).toEqual([
-      "Add to today's daily note",
-      'Create new page with content',
+      "Paste into today's daily note",
+      'Make a new page from the clipboard',
     ])
     expect(pasteActions({ kind: 'text', text: '# T\n\nbody' }, TYPES).map((a) => a.label)).toEqual([
       'Create page',
-      "Add to today's daily note",
-      'Create new page with content',
+      "Paste into today's daily note",
+      'Make a new page from the clipboard',
     ])
     expect(pasteActions({ kind: 'text', text: 'https://example.com' }, TYPES)[0].label).toBe('Create Page')
     expect(pasteActions({ kind: 'files', files: [new File(['x'], 'a.png')] }, TYPES).map((a) => a.label)).toEqual(['Upload'])
@@ -126,7 +126,7 @@ describe('running the offers', () => {
     await addToDailyNote('Buy milk', '2026-10-27')
     expect(mocked.createDailyNote).toHaveBeenCalledWith('2026-10-27')
     expect(mocked.saveBody).toHaveBeenCalledWith('DailyNotes/2026-10-27.md', 'Buy milk\n', 'v1')
-    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Added content to daily note')
+    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Sent to the daily note')
 
     // The note exists: append after its body.
     mocked.saveBody.mockClear()

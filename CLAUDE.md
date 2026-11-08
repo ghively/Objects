@@ -1,6 +1,6 @@
 # Object
 
-"Object" is a local, Markdown-backed notes app with its own object model (types, properties, collections, queries, daily notes, tasks, whiteboards), stored as a folder of `.md` files, with no cloud. A space keeps its metadata in `.object/` and its rebuildable cache in `.object-cache/`; spaces made before 2026-11-04 (under the old folder names) are migrated automatically on open. M1-M27 are all built and on `master` (2026-11-07). Read `HANDOFF.md` (where things stand and what to do first), then `CONTINUE.md` (how to resume work); the detailed status page is `docs/superpowers/plans/remaining-work.md`.
+"Object" is a local, Markdown-backed notes app with its own object model (types, properties, collections, queries, daily notes, tasks, whiteboards), stored as a folder of `.md` files, with no cloud. A space keeps its metadata in `.object/` and its rebuildable cache in `.object-cache/`. M1-M27 are all built and on `master` (2026-11-07). Read `HANDOFF.md` (where things stand and what to do first), then `CONTINUE.md` (how to resume work); the detailed status page is `docs/superpowers/plans/remaining-work.md`.
 
 ## Ground rules (set by Gene Hively, the owner)
 

@@ -69,7 +69,7 @@ describe('AddPropertyMenu', () => {
     expect(added).toMatchObject({ type: 'number', key: 'budget', name: 'Budget', description: 'In euros' })
   })
 
-  test('adding a second Content asks "Add another content property?"', async () => {
+  test('adding a second Content asks "Add a second content property?"', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
     const withBody = {
@@ -78,7 +78,7 @@ describe('AddPropertyMenu', () => {
     }
     render(<AddPropertyMenu type={withBody} types={TYPES} onSave={onSave} />)
     await user.click(screen.getByRole('menuitem', { name: 'Content' }))
-    expect(screen.getByText('Add another content property?')).toBeInTheDocument()
+    expect(screen.getByText('Add a second content property?')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Add another' }))
     await user.click(screen.getByRole('button', { name: 'Create' }))
     expect((onSave.mock.calls[0][0] as TypeDef).propertyDefinitions.at(-1)!.type).toBe('blocks')
@@ -96,7 +96,7 @@ describe('AddPropertyMenu', () => {
     })
     unmount()
     render(<AddPropertyMenu type={PAGE} types={TYPES} onSave={onSave} />)
-    expect(screen.getByText('Properties of basic object types cannot be edited.')).toBeInTheDocument()
+    expect(screen.getByText('The properties of basic types are fixed.')).toBeInTheDocument()
     for (const b of screen.getAllByRole('menuitem')) expect(b).toBeDisabled()
   })
 })

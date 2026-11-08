@@ -302,7 +302,7 @@ describe('Show as table: a group as a filter', () => {
 
   test('a property only one of the view types has adds a type filter', () => {
     const x = { ...resolveX(cfg(), [task, plain]) }
-    expect(x.structureId).toBe('task')
+    expect(x.typeId).toBe('task')
     const d = buildChartData(ROWS, cfg(), [task, plain], ctx({ viewTypeIds: ['task', 'plain'] }))
     const fs = filtersForGroup(d.x, d.categories[0].group, 'month', ctx({ viewTypeIds: ['task', 'plain'] }))!
     expect(fs[0]).toEqual({ type: 'filter', propertyId: 'type', option: 'contains', referenceValue: ['task'] })

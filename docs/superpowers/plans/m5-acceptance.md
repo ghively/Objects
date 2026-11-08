@@ -87,7 +87,7 @@ I served `frontend/dist` with `build_server_config` on a scratch copy of `space-
   - On Analytical Engine, clicking "Link" on the CRLF mention gave the `git diff` "the mention line plus `lastUpdated`", with CRLF kept.
 - **Find in page:** Ctrl+F, then Replace all "Ada" → "Augusta Ada" with match case off. The `git diff` showed only the matched text (in a paragraph and in a code block) plus `lastUpdated`. The `[[Ada Lovelace]]` link text was not touched.
 - **Action palette:** Ctrl+P opened it. "Open graph view" opened the local graph and "Open global graph" opened the global graph. The Customize popover showed every label.
-- **Tasks page:** the Context tab showed "Tasks organized by the objects they are mentioned in." No task in `space-links` is linked from another object, so both open tasks are under "Other".
+- **Tasks page:** the Context tab showed "Tasks, grouped by the object that mentions them." No task in `space-links` is linked from another object, so both open tasks are under "Other".
 
 Not walked in the browser: the global graph's pan and zoom and palette typing on a `--big` copy, a backlinks table column, filter and group, and "Create new … with title". The tests and the `--big` timings cover these, but Gene should still check them by hand (below).
 
@@ -122,11 +122,11 @@ Run `npm run build`, then `uv run objectapp --space <copy of backend/tests/fixtu
 
 Note what should differ, so a fix pass can follow.
 
-- [ ] Key bindings: Ctrl+P or Ctrl+K opens search (`reference-check-2026-10-28.md` §1; both also work while the peek is open). The shortcut table lists no key for the action palette, so it opens from the palette's switch button. Also the Enter / Ctrl+Enter / Shift+Enter variants, Ctrl+Enter in Replace doing "Replace all", and Esc in the find bar.
-- [ ] Search highlight colour, now settled (see `reference-check-2026-10-28.md` §3a): light themes `#fef08a4b` with yellow 900 text, dark themes `#fddf472c` with yellow 100 text; find in page `#facc1573` for every match and `#f97316b3` for the current one, text colour inherited; palette result titles in the 600-weight `search-highlights-bold` variant. Weight 500 and radius 1px.
+- [ ] Key bindings: Ctrl+P or Ctrl+K opens search (the Shortcuts sheet in `docs/behavior-catalog.md`; both also work while the peek is open). The sheet lists no key for the action palette, so it opens from the palette's switch button. Also the Enter / Ctrl+Enter / Shift+Enter variants, Ctrl+Enter in Replace doing "Replace all", and Esc in the find bar.
+- [ ] Search highlight colour, now settled: the search highlight tokens (a light yellow in light themes, a dimmer yellow in dark themes); find in page uses its own match and current-match tokens, text colour inherited; palette result titles in the 600-weight `search-highlights-bold` variant. Weight 500 and radius 1px.
 - [ ] Graph:
   - node sizes (`3 + 2·sqrt(degree)`, capped at 18) and colours (type colour; tags in their tag colour)
-  - now settled (`reference-check-2026-10-28.md` §3b): no synthesized indirect links and no neighbour cap; filtered-out objects (type filter, exclude, "Hide dates") stay as reduced nodes, edges between two reduced nodes are dropped, reduced nodes with one neighbour or none are pruned, and "Hide indirect links" removes them all. How reduced nodes are drawn is still our choice: smallest size, gray, unlabelled until hovered.
+  - now settled: no synthesized indirect links and no neighbour cap; filtered-out objects (type filter, exclude, "Hide dates") stay as reduced nodes, edges between two reduced nodes are dropped, reduced nodes with one neighbour or none are pruned, and "Hide indirect links" removes them all. How reduced nodes are drawn is still our choice: smallest size, gray, unlabelled until hovered.
   - now settled: `LARGE_NODE_LIMIT = 20` (links + backlinks); a large node stays but draws none of its own edges, and the local graph doesn't walk on from it. A tag with 10 or more backlinks doesn't draw its backlink edges (the API's `linkDirs` tells links from backlinks).
   - "Show tags network" offered on a local graph only when the centre is a Tag
 - [ ] The palette's type and tag option matching (prefix, word-prefix, or substring of 3+ characters), the cap of 5 tag options and 10 Recently Opened, and the way picking an option removes the words that named it.

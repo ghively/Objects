@@ -61,7 +61,7 @@ describe('SearchPage', () => {
   test('shows the empty state without a keyword', () => {
     render(<SearchPage />)
     expect(screen.getByRole('heading', { name: 'Search' })).toBeTruthy()
-    expect(screen.getByText('Enter a search keyword to show content from your space.')).toBeTruthy()
+    expect(screen.getByText('Type a word to find content in this space.')).toBeTruthy()
     expect(mocked.search).not.toHaveBeenCalled()
     expect((screen.getByRole('button', { name: /Save as Query/ }) as HTMLButtonElement).disabled).toBe(true)
   })
@@ -113,7 +113,7 @@ describe('SearchPage', () => {
     const init = mocked.createQuery.mock.calls[0][0]!
     expect(init.name).toBeUndefined()
     expect(init.definition).toMatchObject({
-      structures: [],
+      types: [],
       search: { searchTerms: [{ text: 'alpha' }], searchMode: 'fullText' },
     })
     resolve(query({ id: 'q-new', name: 'New Query' }))
@@ -130,7 +130,7 @@ describe('SearchPage', () => {
     await user.click(screen.getByRole('button', { name: /Save as Query/ }))
     await waitFor(() => expect(mocked.createQuery).toHaveBeenCalled())
     expect(mocked.createQuery.mock.calls[0][0]!.definition).toMatchObject({
-      structures: [{ id: 'page' }],
+      types: [{ id: 'page' }],
       search: { searchTerms: [{ text: 'alpha' }], searchMode: 'auto' },
     })
   })
@@ -138,8 +138,8 @@ describe('SearchPage', () => {
   test('search definition maps excluded types and a tag to its id', () => {
     const def = searchDefinition(' alpha ', false, { types: [], excludeTypes: ['tag'], tag: 'work' }, (n) => (n === 'work' ? 'tag-work' : null))
     expect(def).toEqual({
-      structures: [],
-      excludeStructureIds: ['tag'],
+      types: [],
+      excludeTypeIds: ['tag'],
       tags: { ids: ['tag-work'], operator: 'or' },
       search: { searchTerms: [{ text: 'alpha' }], searchMode: 'auto' },
     })

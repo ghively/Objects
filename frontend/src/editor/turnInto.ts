@@ -33,7 +33,7 @@ import { showToast } from './media/upload'
 
 export type TurnIntoOptions = { pos?: number }
 
-export const TURN_INTO_WHITEBOARD_FAILED = 'Could not create whiteboard'
+export const TURN_INTO_WHITEBOARD_FAILED = "The whiteboard wasn't created"
 
 const LISTS = new Set(['bulletList', 'orderedList', 'taskList'])
 const ITEMS = new Set(['listItem', 'taskItem'])

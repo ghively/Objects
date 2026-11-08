@@ -23,7 +23,7 @@
 | 4 | calendar (day / three days / week / month, mini month), daily notes, tasks (status categories, priority, due, recurrence, reminders) |
 | 5 | SQLite FTS index, Ctrl+K command palette, backlinks + unlinked mentions, global and local graph |
 | 6 | whiteboards (blocks, 12 shapes, frames, circuits, connectors) + Wacom freehand ink |
-| 7 | remaining block options (toggles, colours, columns, math, media embeds), light mode, side-by-side polish against the design spec |
+| 7 | remaining block options (toggles, colours, columns, math, media embeds), light mode, polish against the design spec |
 
 ## Global Constraints
 
@@ -36,7 +36,7 @@
   - `id`, a 26-character ULID, inserted as the first frontmatter key, only if absent
 - **Line endings** (LF or CRLF), a UTF-8 BOM and the presence or absence of a trailing newline are preserved exactly.
 - **Space app data** lives in `<space>/.object/`; the derived cache in `<space>/.object-cache/`. The scanner ignores both, plus any dot-folder.
-- **Theme tokens** (the design spec's dark theme): `--bg-app #0d0c10`, `--bg-panel #151418`, `--bg-raised #1a1a1d`, `--bg-raised-2 #212024`, `--bg-hover #232326`, `--bg-hover-2 #28272b`, `--border #2d2c31`, `--danger #cd1e46`. Font: Inter at a 15px base; radii 2/4/6/8/12/16/24px.
+- **Theme tokens** (the design spec's dark theme): `--bg-app`, `--bg-panel`, `--bg-raised`, `--bg-raised-2`, `--bg-hover`, `--bg-hover-2`, `--border`, `--danger`, with values in `frontend/src/theme/tokens.css`. Font: Inter at a 15px base; radii 2/4/6/8/12/16/24px.
 - **No real CPI data in the repo.** Test fixtures are synthetic. The manual acceptance space is a copy of the export **outside** the repo.
 
 ## Review Focus

@@ -1,4 +1,4 @@
-"""Structure roles and the M5 role lists (M5 Task 2)."""
+"""Type roles and the M5 role lists (M5 Task 2)."""
 
 from objectapp.roles import (
     CAN_BE_UNLINKED_MENTION,

@@ -301,7 +301,7 @@ def test_basic_type_options_editable_properties_locked(space_dir: Path):
     renamed = _edit(space, "task")
     renamed.name = "Todo"
     for t in (added, removed, multi, renamed):
-        with pytest.raises(InvalidValue, match="basic object types"):
+        with pytest.raises(InvalidValue, match="basic (object )?types"):
             _save(space, t)
 
 
@@ -624,7 +624,7 @@ def _query_file(space_dir: Path, query_id: str) -> Path:
 
 # Hand-written bytes (CRLF, odd spacing), so a restore that re-serialises would show.
 _SERVER_QUERY = (
-    b'{"name":  "My servers",\r\n "definition": {"structures": [{"id": "server"}],'
+    b'{"name":  "My servers",\r\n "definition": {"types": [{"id": "server"}],'
     b' "filterGroup": {"type": "filterGroup", "operator": "and", "elements": []},'
     b' "sorts": [], "groupBy": null}}\r\n'
 )
@@ -657,7 +657,7 @@ def test_delete_type_leaves_a_multi_type_query_without_it(space_dir: Path):
     both = {
         "name": "People and servers",
         "definition": {
-            "structures": [{"id": "person"}, {"id": "server"}],
+            "types": [{"id": "person"}, {"id": "server"}],
             "filterGroup": {"type": "filterGroup", "operator": "and", "elements": []},
             "sorts": [],
             "groupBy": None,
@@ -671,18 +671,18 @@ def test_delete_type_leaves_a_multi_type_query_without_it(space_dir: Path):
 
     item = space.delete_type("server", confirm=True)
     stored = json.loads(live.read_text(encoding="utf-8"))
-    assert stored["definition"]["structures"] == [{"id": "person"}]
+    assert stored["definition"]["types"] == [{"id": "person"}]
     assert stored["name"] == "People and servers"
-    assert everything.read_bytes() == before_everything  # no structures: not this type's
+    assert everything.read_bytes() == before_everything  # no types: not this type's
     assert space.trash.manifest(item.id)["queries"] == []
 
     space.restore(item.id)
     stored = json.loads(live.read_text(encoding="utf-8"))
-    assert stored["definition"]["structures"] == [{"id": "person"}, {"id": "server"}]
+    assert stored["definition"]["types"] == [{"id": "person"}, {"id": "server"}]
 
 
-def test_restore_brings_back_every_structure_of_a_type_listed_twice(space_dir: Path):
-    structures = [
+def test_restore_brings_back_every_entry_of_a_type_listed_twice(space_dir: Path):
+    entries = [
         {"id": "server", "label": "a"},
         {"id": "person"},
         {"id": "server", "label": "b"},
@@ -690,7 +690,7 @@ def test_restore_brings_back_every_structure_of_a_type_listed_twice(space_dir: P
     query = {
         "name": "Twice",
         "definition": {
-            "structures": structures,
+            "types": entries,
             "filterGroup": {"type": "filterGroup", "operator": "and", "elements": []},
             "sorts": [],
             "groupBy": None,
@@ -701,11 +701,11 @@ def test_restore_brings_back_every_structure_of_a_type_listed_twice(space_dir: P
 
     item = space.delete_type("server", confirm=True)
     stored = json.loads(live.read_text(encoding="utf-8"))
-    assert stored["definition"]["structures"] == [{"id": "person"}]
+    assert stored["definition"]["types"] == [{"id": "person"}]
 
     result = space.restore(item.id)
     stored = json.loads(live.read_text(encoding="utf-8"))
-    assert stored["definition"]["structures"] == structures
+    assert stored["definition"]["types"] == entries
     assert result["queryIds"] == ["twice"]
 
 

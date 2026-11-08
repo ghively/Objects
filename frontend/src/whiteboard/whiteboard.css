@@ -21,9 +21,6 @@
   --radius-base: 8px;
 
   /* Canvas sizes. */
-  --whiteboard-auto-min-width: 420px;
-  --whiteboard-auto-max-width: 480px;
-  --whiteboard-auto-max-height: 420px;
   --whiteboard-auto-text-min-height: 60px;
   --whiteboard-block-pad-x: 15px;
   --whiteboard-block-pad-y: 15px;

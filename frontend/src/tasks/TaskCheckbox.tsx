@@ -23,9 +23,9 @@ const SHORTCUT_HINT = 'Click to toggle between "Open" and "Done".\n\nCtrl-click 
 /** Skip and Excuse with their tooltips ("Excuse for {date}" is the overdue dialog's button). */
 export const RECURRENCE_MENU_TEXT = {
   skip: 'Skip',
-  skipTooltip: 'Move to the next occurrence without marking done. Resets your streak and counts as skipped in stats.',
+  skipTooltip: 'Jump to the next date without completing this one. Breaks your streak and counts as a skip.',
   excuse: 'Excuse',
-  excuseTooltip: "Move to the next occurrence without marking done. Keeps your streak; excused days don't affect completion rate.",
+  excuseTooltip: "Jump to the next date without completing this one. Your streak survives, and excused days are left out of the completion rate.",
 }
 
 /** Clicks and drags on the checkbox never reach the row or card around it (open, peek, drag). */

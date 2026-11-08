@@ -55,8 +55,8 @@ def test_ui_graph_key(links_space_dir: Path):
         assert r.status_code == 200
         rev = r.json()["revision"]
         graph = {
-            "filterStructureIds": ["person"],
-            "excludeStructureIds": [],
+            "filterTypeIds": ["person"],
+            "excludeTypeIds": [],
             "showCompletedTasks": True,
             "showMinimalNodes": False,
             "hideLargeNodes": True,
@@ -86,7 +86,7 @@ def test_ui_graph_key(links_space_dir: Path):
         assert bad.json()["detail"] == "graph.hideDates must be true or false."
         bad = c.put(
             "/api/ui",
-            json={"patch": {"graph": {"filterStructureIds": [1]}}, "baseRevision": rev},
+            json={"patch": {"graph": {"filterTypeIds": [1]}}, "baseRevision": rev},
         )
         assert bad.status_code == 422
         bad = c.put("/api/ui", json={"patch": {"graph": []}, "baseRevision": rev})

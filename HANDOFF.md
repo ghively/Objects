@@ -24,7 +24,7 @@ How Gene wants it built (2026-11-06): **parallel tracks by file ownership, a qui
 ## Decisions Gene made (2026-11-05 / 06)
 
 - Agents run only through the `claude` CLI under Gene's login. Never read `~/.claude/.credentials.json` or reuse a Claude token. Each agent is its own Claude Code project folder, loading only that folder's settings. **Agent runs get a `claudeMdExcludes` skip list** (Gene's `~/.claude/CLAUDE.md` and every ancestor folder's `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md`), because the M17 spike found those leaking in (`m17-cli-spike.md`).
-- Patterns from an open-source agent are adopted, but it is never named in the repo. The original notes app this project was modelled on is never named either.
+- Patterns from an open-source agent are adopted, but it is never named in the repo.
 - The Work agent has shell on (Gene's choice, warned); other agents have shell off and file tools fenced from space folders.
 - Editor: a page link can switch between a card and an inline link (`3bc8925`): the card's `…` menu has **Turn into inline link**, and the block menu has **Turn into card** on a line holding only a link. "Always create inline links" (Settings > Editor) already existed.
 - Import and migration design approved 2026-11-06 and built as M25-M27 (`specs/2026-11-06-import-migration-design.md`).

@@ -54,7 +54,7 @@ import { queryTitle, type TitleCtx } from '@/queries/autoTitle'
 import { useTitleCtx } from '@/queries/QueryPage'
 
 export const COLLECTION_PAGE_TEXT = {
-  empty: 'This collection is empty. Create a record or add existing content.',
+  empty: 'Nothing in this collection yet. Add a new record or existing content.',
   addExisting: 'Add existing',
   createEntry: 'Create entry',
   pinned: 'Pinned',
@@ -785,7 +785,7 @@ function QuerySection({
 }) {
   const { queries } = useDefinitions()
   const q = queries.find((x) => `query:${x.id}` === section.key)
-  const type = (q && types.find((t) => q.definition.structures.some((s) => s.id === t.id))) ?? types.find((t) => collection.typeIds.includes(t.id)) ?? types[0]
+  const type = (q && types.find((t) => q.definition.types.some((s) => s.id === t.id))) ?? types.find((t) => collection.typeIds.includes(t.id)) ?? types[0]
   if (!type) return <p className="py-4 text-[14px] text-fg-muted">{SECTION_TEXT.sectionEmpty}</p>
   return <SectionView type={type} section={section} search={search} heading={heading} onViewDefinition={onViewDefinition} />
 }

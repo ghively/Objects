@@ -3,7 +3,7 @@
 // the plan's "Graph semantics" lives here (and in `neighbourhood.ts` for the local scope).
 //
 // The graph build rules:
-// - Each object draws its own links and its backlinks. With "Hide objects with many links", an
+// - Each object draws its own links and its backlinks. With "Hide heavily linked objects", an
 //   object with more than `LARGE_NODE_LIMIT` links + backlinks stays in the graph but draws none
 //   of its own edges, and the local graph doesn't walk on from it.
 // - A tag with `TAG_BACKLINK_LIMIT` or more backlinks doesn't draw its backlink edges.
@@ -151,7 +151,7 @@ export function linkStats(data: GraphData): LinkStats {
   return stats
 }
 
-/** True when "Hide objects with many links" keeps node `i` but skips its own edges. */
+/** True when "Hide heavily linked objects" keeps node `i` but skips its own edges. */
 export function isLargeNode(data: GraphData, custom: GraphCustomization, i: number): boolean {
   return !!custom.hideLargeNodes && linkStats(data).weight[i] > LARGE_NODE_LIMIT
 }
@@ -169,8 +169,8 @@ export function excludedEntirely(data: GraphData, custom: GraphCustomization, i:
 /** True when a filter reduces node `i` (type filter, exclude, "Hide dates"). */
 export function reducedByFilters(data: GraphData, custom: GraphCustomization, i: number): boolean {
   const node = data.nodes[i]
-  const filter = custom.filterStructureIds ?? []
-  const exclude = custom.excludeStructureIds ?? []
+  const filter = custom.filterTypeIds ?? []
+  const exclude = custom.excludeTypeIds ?? []
   if (custom.hideDates && node.daily) return true
   if (exclude.includes(node.type)) return true
   if (filter.length > 0 && !filter.includes(node.type)) return true

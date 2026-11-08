@@ -176,9 +176,9 @@ const START_SUGGESTIONS: { label: string; days: number }[] = [
 /** The Task date's quick suggestions. */
 const SCHEDULE_SUGGESTIONS: { label: string; tooltip: string; pick(today: Date): Date }[] = [
   { label: 'Today', tooltip: 'Schedule task for today', pick: (t) => t },
-  { label: 'Tomorrow', tooltip: 'Schedule task for tomorrow', pick: (t) => addDays(t, 1) },
-  { label: 'Next week', tooltip: 'Schedule task for the next week', pick: (t) => addDays(t, 7) },
-  { label: 'Next month', tooltip: 'Schedule task for the next month', pick: addMonth },
+  { label: 'Tomorrow', tooltip: 'Set the date to tomorrow', pick: (t) => addDays(t, 1) },
+  { label: 'Next week', tooltip: 'Set the date one week ahead', pick: (t) => addDays(t, 7) },
+  { label: 'Next month', tooltip: 'Set the date one month ahead', pick: addMonth },
 ]
 
 /** The same day next month, clamped to the month's last day. */
@@ -267,7 +267,7 @@ function PointInput({
       aria-label={label}
       value={text}
       placeholder={placeholder}
-      title='This field supports natural language like "next week at 3 pm"'
+      title='Type a date in plain words, e.g. "next week at 3 pm"'
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
@@ -452,7 +452,7 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
         <div role="alertdialog" aria-label="Remove date?" className="flex flex-col gap-2 px-2 py-1">
           <h2 className="text-[15px] font-semibold">Remove date?</h2>
           <p className="text-[13px] text-fg-muted">
-            This recurring task already has completed or skipped occurrences. Removing the date will discard its history.
+            Some repeats of this task are already done or skipped. Clearing the date throws that history away.
           </p>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setConfirmingRemove(false)} className="rounded-md px-3 py-1 text-[14px] hover:bg-hover">

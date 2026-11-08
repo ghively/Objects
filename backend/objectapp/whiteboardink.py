@@ -57,11 +57,11 @@ _FOREIGN_MARKUP = re.compile(rb"<!--|<\?(?!xml\s)")
 # as copied by the client's inkModel.ts); used to name a stroke's colour when the client
 # didn't send `colorName`.
 _HEX_TO_THEME = {
-    "#5c5959": "gray", "#ea4561": "rose", "#e34d97": "pink", "#d14be5": "fuchsia",
-    "#a558ee": "purple", "#8a5fed": "violet", "#6568e8": "indigo", "#3f80eb": "blue",
-    "#199dd9": "sky", "#11a9c3": "cyan", "#1dad9d": "teal", "#19ae7d": "emerald",
-    "#2bbb60": "green", "#7fbe1f": "lime", "#daaa14": "yellow", "#e89a17": "amber",
-    "#ec731f": "orange", "#e54a4a": "red",
+    "#71717a": "gray", "#f43f5e": "rose", "#ec4899": "pink", "#d946ef": "fuchsia",
+    "#a855f7": "purple", "#8b5cf6": "violet", "#6366f1": "indigo", "#3b82f6": "blue",
+    "#0ea5e9": "sky", "#06b6d4": "cyan", "#14b8a6": "teal", "#10b981": "emerald",
+    "#22c55e": "green", "#84cc16": "lime", "#eab308": "yellow", "#f59e0b": "amber",
+    "#f97316": "orange", "#ef4444": "red",
 }
 
 

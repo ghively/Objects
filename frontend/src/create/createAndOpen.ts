@@ -1,6 +1,6 @@
 /**
  * Create an object and open it where the modifier keys say:
- * - plain: the current tab (a Task opens in the peek, unless "Always open as full page" is on),
+ * - plain: the current tab (a Task opens in the peek, unless "Open objects as a full page" is on),
  * - Ctrl or Meta: a new tab,
  * - Alt+Shift: the peek,
  * - Shift: the side panel (area 1).
@@ -23,7 +23,7 @@ export interface OpenMods {
 export type OpenMode = 'current' | 'newTab' | 'peek' | 'sidepanel'
 
 /**
- * Tasks open in the peek by default; with "Always open as full page"
+ * Tasks open in the peek by default; with "Open objects as a full page"
  * they open as a page.
  */
 function opensInPeek(typeId: string | null | undefined): boolean {

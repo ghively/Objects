@@ -14,7 +14,7 @@ function respond(status: number, body: unknown) {
 }
 
 const strokes: InkStroke[] = [
-  { id: 's1', tool: 'pen', color: '#3f80eb', width: 4, points: [[0, 0, 0.5]], d: 'M 0 0 Z', colorName: 'blue' },
+  { id: 's1', tool: 'pen', color: '#3b82f6', width: 4, points: [[0, 0, 0.5]], d: 'M 0 0 Z', colorName: 'blue' },
 ]
 
 afterEach(() => {
