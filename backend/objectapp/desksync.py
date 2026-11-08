@@ -87,7 +87,7 @@ def apply_ticket_fields(service: WorkService, path: str, version: str, values: d
     clean: dict[str, Any] = {}
     for key, value in values.items():
         if key not in TICKET_KEYS:
-            raise InvalidValue(f"{key} isn't a ticket field.")
+            raise InvalidValue(f'The field "{key}" isn'"'"'t a ticket field.')
         if key in _DAY_KEYS and isinstance(value, str):
             value = {"start": value.strip()[:10], "resolution": "day"}
         clean[key] = value

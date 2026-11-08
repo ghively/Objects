@@ -59,7 +59,6 @@ from .apictx import ApiContext
 from .apiquery import (
     Matcher,
     append_to_section,
-    is_excluded,
     outline,
     parse_since,
     read_section,

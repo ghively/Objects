@@ -34,6 +34,8 @@ export const SETTINGS_TEXT = {
   shortcuts: SHORTCUTS_TEXT.heading,
   /** The nav footer's version line (catalog section 1): "Object 0.1.0". */
   version: (v: string) => `Object ${v}`,
+  /** The nav footer's Reload row (catalog section 1): reloads the app. */
+  reload: 'Reload',
 } as const
 
 export interface SettingsSectionDef {
@@ -214,6 +216,7 @@ export function SettingsModal() {
           </div>
           <div className="border-t border-line pt-2">
             <NavRow icon="ph-keyboard" label={SETTINGS_TEXT.shortcuts} onClick={() => useSettingsModal.getState().openShortcuts()} />
+            <NavRow icon="ph-arrow-clockwise" label={SETTINGS_TEXT.reload} onClick={() => window.location.reload()} />
             {version !== null && (
               <p data-app-version={version} className="px-2 pt-1.5 pb-0.5 text-[12px] text-fg-muted">
                 {SETTINGS_TEXT.version(version)}

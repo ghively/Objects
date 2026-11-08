@@ -3120,7 +3120,7 @@ class Space:
         if not new_title:
             raise InvalidValue("The title can't be empty")
         if self._is_title_locked(rel):
-            raise InvalidValue("A daily note's title is its date and can't be changed")
+            raise InvalidValue("A daily note's title is its date and can't be changed.")
         with self._lock:
             summary = self._summaries.get(rel)
         if summary is None:
@@ -3319,9 +3319,9 @@ class Space:
         if src is None:
             raise KeyError(rel)
         if type_category(src) not in CHANGE_FROM_ALLOWED:
-            raise InvalidValue(f"The type of a {src.name} object can't be changed")
+            raise InvalidValue(f"The type of a {src.name} object can't be changed.")
         if type_category(dst) not in CHANGE_TO_ALLOWED:
-            raise InvalidValue(f"An object can't be changed to a {dst.name}")
+            raise InvalidValue(f"An object can't be changed to a {dst.name}.")
         if src.id == dst.id:
             raise InvalidValue(f"The object already is a {dst.name}")
         return src, dst

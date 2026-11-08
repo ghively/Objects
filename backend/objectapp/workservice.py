@@ -97,7 +97,7 @@ def in_work_write() -> bool:
 NOTE_NEEDS_TEXT = "A note needs text."
 ALREADY_DONE = "This item is already done."
 NO_DONE_STATUS = "This type has no done status."
-NOT_A_FIELD = "{key} isn't a work field."
+NOT_A_FIELD = 'The field "{key}" isn'"'"'t a work field.'
 NOTE_TOO_LONG = f"Keep it to {MAX_NOTE} characters."
 FLOOR_NEEDS = "A floor item needs a place or what to collect."  # as `workvalues.floor_from_api`
 _FIELD_WRITE_KEYS = FIELD_KEYS - {"steps", "floorItems"}
