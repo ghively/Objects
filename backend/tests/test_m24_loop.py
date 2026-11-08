@@ -509,3 +509,104 @@ def test_no_agent_set(env: Env) -> None:
     assert env.loop.settings_status()["problem"] is None
     env.idle()
     assert env.entries()[0]["state"] != "pending"
+
+
+def test_wait_idle_is_not_fooled_by_a_run_that_starts_between_its_checks() -> None:
+    """Audit 46: the worker woke between `wait_idle`'s two checks and claimed the only due entry, so
+    the first check saw it idle and the second saw nothing pending, while a run was in progress."""
+    import types
+    calls: list[int] = []
+
+    class Wake:
+        def set(self) -> None:  # the next poll comes after the run has finished
+            stub._busy = False
+
+    stub = types.SimpleNamespace(_busy=False, _passes=0, _wake=Wake())
+
+    def can_start() -> bool:
+        calls.append(1)
+        if len(calls) == 1:  # the worker wakes now and claims the entry: busy, nothing left pending
+            stub._busy = True
+            stub._passes += 1
+        return False
+
+    stub._can_start = can_start
+    assert WorkLoop.wait_idle(stub, 2)  # type: ignore[arg-type]
+    assert len(calls) >= 2
+
+
+def test_an_approved_step_moved_away_and_back_is_queued_again(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Audit 10: moving an approved step (or a no-op edit) must not strand it with no queue entry."""
+    actions(monkeypatch, {"approve": [step_call("complete", "Change review: PASS. Done.")]})
+    env.setting(workAutoRun=False)
+    env.step(P, STEP, "approve")
+    # a no-op edit (the same text) keeps the entry
+    step = next(s for s in env.service.item(P)["steps"] if s["id"] == STEP)
+    env.service.edit_steps(P, [{"op": "edit", "stepId": STEP, "stepRev": step["rev"], "text": step["text"]}], GENE)
+    assert [x["state"] for x in env.entries()] == ["pending"]
+    # moved to the end it isn't current, so the claim withdraws the entry
+    step = next(s for s in env.service.item(P)["steps"] if s["id"] == STEP)
+    env.service.edit_steps(P, [{"op": "move", "stepId": STEP, "stepRev": step["rev"], "before": None}], GENE)
+    env.acts()
+    env.idle()
+    assert [(x["state"], x["reason"]) for x in env.entries()] == [("withdrawn", WITHDRAWN_CHANGED)]
+    assert not env.runs()
+    # moved back, it is current and approved again: queued and run
+    steps = env.service.item(P)["steps"]
+    step = next(s for s in steps if s["id"] == STEP)
+    agent = next(s for s in steps if s["kind"] == "agent")
+    env.service.edit_steps(P, [{"op": "move", "stepId": STEP, "stepRev": step["rev"], "before": agent["id"]}], GENE)
+    env.idle()
+    approve = [x for x in env.entries() if x["kind"] == "approve"]
+    assert [x["state"] for x in approve] == ["withdrawn", "done"]
+    assert approve[1]["purpose"] == "work" and approve[1]["by"] == "Gene"
+    assert next(s for s in env.service.item(P)["steps"] if s["id"] == STEP)["state"] == "done"
+    assert len(env.runs()) == 1
+
+
+def test_auto_run_whose_write_failed_is_tried_again(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Audit 32: the auto-run key was recorded before the step write, so a failed write (read-only
+    space, disk error) meant the step never auto-ran again until its text changed."""
+    env.setting(workAgentActs=True)
+    real = env.service.step
+    calls: list[str] = []
+
+    def failing(path, step_id, rev, action, actor, **kw):
+        if action == "run" and not calls:
+            calls.append(step_id)
+            raise OSError("disk full")
+        return real(path, step_id, rev, action, actor, **kw)
+
+    monkeypatch.setattr(env.service, "step", failing)
+    steps = env.service.item(P)["steps"]
+    agent = next(s for s in steps if s["kind"] == "agent")
+    # make the Agent step current: the Approve step before it goes after it
+    approve = next(s for s in steps if s["id"] == STEP)
+    env.service.edit_steps(P, [{"op": "move", "stepId": STEP, "stepRev": approve["rev"], "before": None}], GENE)
+    assert calls == [agent["id"]]  # the auto-run was tried, and its write failed
+    assert not [e for e in env.entries() if e["kind"] == "run"]
+    assert env.loop.scan_auto_runs() == 1  # not given up on
+    assert [e["auto"] for e in env.entries() if e["kind"] == "run"] == [True]
+
+
+def test_a_run_whose_cli_errs_after_completing_the_step_is_done() -> None:
+    """Audit 35: the agent completed the step through the tools, then the CLI died: the entry was
+    failed and retryable, and Retry answered 409."""
+    from objectapp.headless import HeadlessResult
+    from objectapp.workloop import outcome
+    from objectapp.workservice import WorkNotice
+
+    def note(event: str, step: str = STEP, text: str = "Spooler restarted.") -> WorkNotice:
+        return WorkNotice(path=P, object_id="o1", event=event, step_id=step, n=2, kind="approve",
+                          step_text="Restart", before="approved", after="done", by=Actor("agent", "Work"),
+                          text=text, not_before=None, at=NOW, version="v")
+
+    entry = {"kind": "approve", "stepId": STEP}
+    died = HeadlessResult(chat_id="c", state="error", text="", session_id=None, model=None, error="CLI exited 1")
+    assert outcome(entry, died, [note("complete")], False, timed_out=False, withdrawn=False) == (
+        "done", "Spooler restarted.", None)
+    # no complete notice for this step: still failed with the CLI's error
+    assert outcome(entry, died, [note("complete", step="other")], False, timed_out=False, withdrawn=False) == (
+        "failed", None, "CLI exited 1")
+    assert outcome(entry, died, [note("complete"), note("fail", text="no")], False, timed_out=False,
+                   withdrawn=False)[0] == "failed"

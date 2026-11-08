@@ -72,6 +72,8 @@ def plan_for_notice(notice: WorkNotice) -> QueuePlan | None:
         return None
     if event not in _STEP_EVENTS and event not in ("note", "request", "close"):
         return None
+    if event == "edit" and notice.before == "approved":
+        return None  # an approved step's text and kind can't change: the edit changed nothing
     step = notice.step_id if event in _STEP_EVENTS else None
     item = event == "close"
     create: dict[str, Any] | None = None
@@ -190,10 +192,12 @@ class QueueStore:
     def _save(self, data: dict[str, Any], now: datetime | None = None) -> None:
         self._settle(data, now)
         entries = data["entries"]
-        keep_ids = {e["id"] for e in entries if e.get("state") not in ("done", "withdrawn")}
-        finished = [e for e in entries if e["id"] not in keep_ids]
-        finished.sort(key=lambda e: (e.get("createdAt") or "", e["id"]))
-        drop = {e["id"] for e in finished[: max(0, len(finished) - KEEP_FINISHED)]}
+        drop: set[str] = set()
+        # done and withdrawn entries share one cap; failed ones (kept for Retry) have their own
+        for states in (("done", "withdrawn"), ("failed",)):
+            finished = [e for e in entries if e.get("state") in states]
+            finished.sort(key=lambda e: (e.get("createdAt") or "", e["id"]))
+            drop |= {e["id"] for e in finished[: max(0, len(finished) - KEEP_FINISHED)]}
         data["entries"] = [e for e in entries if e["id"] not in drop]
         data["autoRuns"] = data["autoRuns"][-KEEP_AUTO_RUNS:]
         path = self.file

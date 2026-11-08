@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -343,6 +345,39 @@ def test_trash_batch_complete_is_stamped(client, tmp_path):
     assert batches.load_batch(client.space_root, result["batch"])[0]["trashedAt"]
 
 
+def test_trash_batch_leaves_another_batchs_object_at_the_recorded_path(client, tmp_path):
+    """Audit 9: batch A created Pages/a.md, Gene trashed it, a re-run (batch B) created it again;
+    moving batch A to the Trash must not trash B's object. An object with no provenance at a recorded
+    path is never trashed either."""
+    from test_m25_provenance import run as run_import
+
+    from objectapp.importers import batches
+
+    src = tmp_path / "S"
+    src.mkdir()
+    (src / "a.md").write_text("# a\n\ntext\n", encoding="utf-8")
+    (src / "b.md").write_text("# b\n\ntext\n", encoding="utf-8")
+    root = client.space_root
+    first = run_import(client, src, kind="obsidian")["result"]
+    _d, items = batches.load_batch(root, first["batch"])
+    path_of = {i["title"]: i["path"] for i in items}
+    assert client.delete("/api/object", params={"path": path_of["a"]}).status_code == 200
+    (src / "b.md").unlink()
+    second = run_import(client, src, kind="obsidian")["result"]
+    _d, items_b = batches.load_batch(root, second["batch"])
+    assert [i["path"] for i in items_b if i["action"] == "created"] == [path_of["a"]]
+    # b: Gene trashed it and wrote a page of his own (no provenance) at the same path
+    assert client.delete("/api/object", params={"path": path_of["b"]}).status_code == 200
+    (root / path_of["b"]).write_text("# b\n\nmine\n", encoding="utf-8")
+    client.app.state.space.rescan_file(path_of["b"])
+
+    out = client.post(f"/api/import/batches/{first['batch']}/trash").json()
+    assert out["trashed"] == 0 and out["alreadyTrashed"] == 2, out
+    assert (root / path_of["a"]).exists() and (root / path_of["b"]).exists()
+    _d, items_b = batches.load_batch(root, second["batch"])
+    assert [i["action"] for i in items_b if i["path"] == path_of["a"]] == ["created"]
+
+
 # -- 9. a re-run adds no duplicate originals, images or File objects ---------------------------------
 
 
@@ -443,3 +478,103 @@ def test_take_source_keeps_the_files_crlf_and_bom(client, tmp_path):
     out = (root / page).read_bytes()
     assert b"version two" in out
     assert out.startswith(b"\xef\xbb\xbf") and b"\r\n" in out and b"\n" not in out.replace(b"\r\n", b"")
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="no FIFOs on this platform")
+def test_a_fifo_in_the_source_is_not_opened(tmp_path):
+    """Audit 11: a FIFO (or any non-regular file) in an import source made the scan block forever."""
+    import threading
+
+    from objectapp import readers
+    from objectapp.importscan import scan_file
+
+    src = tmp_path / "S"
+    src.mkdir()
+    (src / "ok.md").write_text(f"# ok\n\nkey {AWS}\n", encoding="utf-8")
+    os.mkfifo(src / "pipe.md")
+    os.mkfifo(src / "pipe.docx")
+    os.mkfifo(tmp_path / "lone.zip")
+    got: dict = {}
+
+    def work() -> None:
+        got["tree"] = scan_tree(src)
+        got["file"] = scan_file(src / "pipe.md")
+        got["zip"] = scan_tree(tmp_path / "lone.zip")
+        got["read"] = [readers.read_file(src / n) for n in ("pipe.md", "pipe.docx")]
+
+    t = threading.Thread(target=work, daemon=True)
+    t.start()
+    t.join(15)
+    if t.is_alive():  # unblock the stuck open so the thread can end
+        for n in ("pipe.md", "pipe.docx"):
+            with contextlib.suppress(OSError):
+                fd = os.open(src / n, os.O_WRONLY | os.O_NONBLOCK)
+                os.close(fd)
+        pytest.fail("the scan opened a FIFO and blocked")
+    assert list(got["tree"].findings) == ["ok.md"] and got["tree"].scanned == 1
+    assert got["file"] == []
+    assert got["zip"].scanned == 0
+    assert all(r.original_only and r.markdown == "" for r in got["read"])
+
+
+def _save_between(path: Path, text: str):
+    """A user save landing on ``path`` right after the call it wraps."""
+
+    def wrap(fn):
+        def inner(*a, **k):
+            out = fn(*a, **k)
+            path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
+            return out
+
+        return inner
+
+    return wrap
+
+
+def test_a_save_between_the_check_and_the_rerun_write_is_changed_in_both(client, tmp_path, monkeypatch):
+    """Audit 34: a re-run update wrote with no base version, so a save between its edited-since
+    check and its write was overwritten (and not in version history)."""
+    from test_m25_provenance import blocks
+    from test_m25_provenance import run as run_import
+
+    from objectapp.importers import writer
+
+    src = tmp_path / "S"
+    src.mkdir()
+    (src / "a.md").write_text("# a\n\nversion one\n", encoding="utf-8")
+    root = client.space_root
+    run_import(client, src, kind="obsidian")
+    pa = next(r for r, b in blocks(root).items() if b["id"] == "a.md")
+    (src / "a.md").write_text("# a\n\nversion two\n", encoding="utf-8")
+    monkeypatch.setattr(writer, "_edited_since_import",
+                        _save_between(root / pa, "\nmy late words\n")(writer._edited_since_import))
+    res = run_import(client, src, kind="obsidian")["result"]
+    text = (root / pa).read_text(encoding="utf-8")
+    assert "my late words" in text and "version two" not in text
+    assert res["changedInBoth"] == 1 and res["updated"] == 0
+
+
+def test_take_source_does_not_overwrite_a_save_made_meanwhile(client, tmp_path, monkeypatch):
+    """Audit 34: Take source wrote with no base version: a save after it read the file was lost."""
+    from test_m25_provenance import blocks
+    from test_m25_provenance import run as run_import
+
+    from objectapp.importers import batches
+
+    src = tmp_path / "S"
+    src.mkdir()
+    (src / "a.md").write_text("# a\n\nversion one\n", encoding="utf-8")
+    root = client.space_root
+    run_import(client, src, kind="obsidian")
+    pa = next(r for r, b in blocks(root).items() if b["id"] == "a.md")
+    _of, _fm, version = Space(root).read(pa)
+    r = client.put("/api/object/body", json={"path": pa, "body": "# edited\n\nmy words\n", "baseVersion": version})
+    assert r.status_code == 200, r.text
+    (src / "a.md").write_text("# a\n\nversion two\n", encoding="utf-8")
+    res = run_import(client, src, kind="obsidian")["result"]
+    assert res["changedInBoth"] == 1
+    monkeypatch.setattr(batches, "snapshot", _save_between(root / pa, "\nmy late words\n")(batches.snapshot))
+    out = client.post(f"/api/import/batches/{res['batch']}/resolve", json={"action": "take"}).json()
+    assert out["failed"] == [pa] and out["resolved"] == [] and out["pending"] == 1
+    text = (root / pa).read_text(encoding="utf-8")
+    assert "my late words" in text and "version two" not in text

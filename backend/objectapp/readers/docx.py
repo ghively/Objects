@@ -10,7 +10,7 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 
 from .model import ExtractedImage, ReadResult
-from .util import cell_text, iso, table_md
+from .util import cell_text, check_unpacked_size, iso, link_kind, table_md
 
 _EXT = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/bmp": "bmp", "image/tiff": "tif"}
 _A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
@@ -19,6 +19,7 @@ _W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 
 def read(path: Path) -> ReadResult:
+    check_unpacked_size(path)
     doc = Document(str(path))
     images: list[ExtractedImage] = []
     notes: list[str] = []
@@ -46,7 +47,8 @@ def read(path: Path) -> ReadResult:
 
                 link = Hyperlink(child, p)
                 text = link.text
-                out.append(f"[{text}]({link.url})" if link.url and text else text)
+                safe = link.url and link_kind(link.url) is not None  # never javascript:, file:, data:
+                out.append(f"[{text}]({link.url})" if safe and text else text)
             elif child.tag == f"{_W}r":
                 from docx.text.run import Run
 

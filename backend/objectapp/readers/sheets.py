@@ -4,41 +4,80 @@ from __future__ import annotations
 
 import csv
 import io
+import re
+import zipfile
 from pathlib import Path
 
-from .model import ReadResult
+from .model import TABLE_MAX_ROWS, ReadResult
 from .textfiles import decode
-from .util import cell_text, fits, iso, table_md
+from .util import cell_text, check_unpacked_size, fits, iso, table_md
 
 
-def _sheet_md(name: str | None, rows: list[list[str]], notes: list[str], label: str) -> list[str]:
+def _sheet_md(name: str | None, rows: list[list[str]], notes: list[str], label: str,
+              size: tuple[int, int] | None = None) -> list[str]:
+    """``size``: (rows, columns) of the whole sheet when ``rows`` holds only its first rows."""
     head = [f"## {name}", ""] if name else []
     while rows and not any(rows[-1]):
         rows.pop()
     if not rows:
         return head + ["(empty sheet)", ""]
-    cols = max(len(r) for r in rows)
-    if not fits(len(rows), cols):
+    n_rows, cols = size or (len(rows), max(len(r) for r in rows))
+    if not fits(n_rows, cols):
         notes.append(f"{label} is larger than 200 rows x 20 columns: see the original")
-        return head + [f"{label} has {len(rows)} rows x {cols} columns, too large to show here. See the original file.", ""]
+        return head + [f"{label} has {n_rows} rows x {cols} columns, too large to show here. See the original file.", ""]
     return head + [table_md(rows), ""]
+
+
+def _stream_rows(ws) -> tuple[list[list[str]], tuple[int, int]]:
+    """The first rows a table can show (one more, to tell a larger sheet), and the sheet's size up
+    to its last non-blank row, read row by row."""
+    kept: list[list[str]] = []
+    n_rows = width = cols = 0
+    for i, r in enumerate(ws.iter_rows(values_only=True)):
+        cells = [cell_text(c) for c in r]
+        width = max(width, len(cells))
+        if any(cells):
+            n_rows, cols = i + 1, width
+        if i <= TABLE_MAX_ROWS:
+            kept.append(cells)
+    return kept[:n_rows], (n_rows, cols)
+
+
+_MERGE = re.compile(rb"<(?:[\w.-]+:)?mergeCell\b")
+
+
+def _has_merged_cells(path: Path) -> bool:
+    """A read-only workbook doesn't load merged ranges: look for them in the sheet parts, a chunk
+    at a time."""
+    with zipfile.ZipFile(path) as zf:
+        for name in zf.namelist():
+            if not (name.startswith("xl/worksheets/") and name.endswith(".xml")):
+                continue
+            tail = b""
+            with zf.open(name) as f:
+                while chunk := f.read(1 << 20):
+                    if _MERGE.search(tail + chunk):
+                        return True
+                    tail = chunk[-64:]
+    return False
 
 
 def read_xlsx(path: Path) -> ReadResult:
     from openpyxl import load_workbook
 
-    wb = load_workbook(str(path), data_only=True)
+    check_unpacked_size(path)
+    wb = load_workbook(str(path), data_only=True, read_only=True)
     notes: list[str] = []
     out: list[str] = []
-    merged = False
-    for ws in wb.worksheets:
-        if ws.merged_cells.ranges:
-            merged = True
-        rows = [[cell_text(c) for c in r] for r in ws.iter_rows(values_only=True)]
-        out += _sheet_md(ws.title if len(wb.worksheets) > 1 else None, rows, notes, f"Sheet {ws.title!r}")
-    if merged:
+    try:
+        for ws in wb.worksheets:
+            rows, size = _stream_rows(ws)
+            out += _sheet_md(ws.title if len(wb.worksheets) > 1 else None, rows, notes, f"Sheet {ws.title!r}", size)
+        p = wb.properties
+    finally:
+        wb.close()
+    if _has_merged_cells(path):
         notes.append("Merged cells flattened")
-    p = wb.properties
     return ReadResult(
         title=(p.title or "").strip() or path.stem,
         markdown="\n".join(out).strip() + "\n",

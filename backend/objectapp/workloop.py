@@ -152,9 +152,16 @@ def outcome(entry: dict, result: HeadlessResult, notices: list[WorkNotice], file
         return "failed", None, TIMED_OUT
     if result.state == "stopped":
         return "failed", None, STOPPED
-    if result.state == "error":
-        return "failed", None, one_line(result.error or "The run failed.", 500)
     kind = entry.get("kind")
+    if result.state == "error":
+        if kind in ("approve", "run"):
+            # The agent may have completed the step through the tools before the CLI erred: then
+            # the step is done, and a failed (retryable) entry would only answer 409 on Retry.
+            mine = [n for n in notices if n.step_id == entry.get("stepId") and n.by.role == "agent"
+                    and n.event in ("complete", "done", "fail")]
+            if mine and mine[-1].event in ("complete", "done"):
+                return "done", one_line(mine[-1].text, 500), None
+        return "failed", None, one_line(result.error or "The run failed.", 500)
     if kind in ("approve", "run"):
         mine = [n for n in notices if n.step_id == entry.get("stepId") and n.by.role == "agent"]
         for n in reversed(mine):
@@ -192,6 +199,7 @@ class WorkLoop:
         self._unsubscribe: Callable[[], None] | None = None
         self._lock = threading.RLock()
         self._busy = False
+        self._passes = 0  # counts the worker's passes, so wait_idle can tell one ran between its checks
         self._current: dict[str, Any] | None = None
         self._stops: dict[str, threading.Event] = {}
         self._notices: list[WorkNotice] = []
@@ -235,7 +243,10 @@ class WorkLoop:
         """True when nothing is running and nothing due could start (tests)."""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if not self._busy and not self._can_start():
+            # The worker can wake between the checks and claim the only due entry: then the first
+            # check sees it idle and `_can_start` sees nothing pending. Re-read both after.
+            passes = self._passes
+            if not self._busy and not self._can_start() and not self._busy and self._passes == passes:
                 return True
             self._wake.set()
             time.sleep(0.05)
@@ -306,11 +317,34 @@ class WorkLoop:
         except (KeyError, NotWorkItem, ValueError, OSError):
             return None
 
+    def _requeue_approved(self, item: dict) -> dict | None:
+        """Queue the current approved step again when its last entry was withdrawn while it stayed
+        approved (it was moved away and back, so the claim found it not current). Only a step Gene
+        approved, and only when its last entry was withdrawn: a failed one waits for Retry."""
+        step = next((s for s in item.get("steps", []) if s.get("current")), None)
+        if step is None or step.get("state") != "approved" or step.get("kind") not in ("approve", "agent"):
+            return None
+        kind = "approve" if step["kind"] == "approve" else "run"
+        mine = [e for e in self.store.entries()
+                if e.get("path") == item["path"] and e.get("stepId") == step["id"] and e.get("kind") == kind]
+        if not mine or mine[-1].get("state") != "withdrawn":
+            return None
+        last = mine[-1]
+        fields = {k: last.get(k) for k in ("kind", "path", "objectId", "title", "auto", "by")}
+        fields.update(stepId=step["id"], stepN=step.get("n"), stepKind=step.get("kind"),
+                      stepText=step.get("text"), notBefore=step.get("notBefore") or last.get("notBefore"))
+        entry = self.store.add(fields, now=self.clock())
+        self._event(entry["id"])
+        self.wake()
+        return entry
+
     def _auto_check(self, path: str) -> bool:
+        item = self._item(path)
+        if item is not None and not item.get("done"):
+            self._requeue_approved(item)
         settings = self.read_settings()
         if not settings.get("workAutoRun") or not settings.get("workAgentActs"):
             return False
-        item = self._item(path)
         if item is None or item.get("done"):
             return False
         step = next((s for s in item.get("steps", []) if s.get("current")), None)
@@ -319,12 +353,14 @@ class WorkLoop:
         key = auto_run_key(path, str(step["id"]), str(step.get("text") or ""))
         if self.store.has_auto_run(key):
             return False
-        self.store.record_auto_run(key)
         try:
             self.service.step(path, step["id"], step["rev"], "run", Actor("app", "Object"))
         except (StepChanged, IllegalMove):
             log.info("Auto-run of %s step %s was dropped", path, step["id"])
             return False
+        # Recorded only once the step is running: a write that failed (read-only, disk error) is
+        # tried again on the next change or scan.
+        self.store.record_auto_run(key)
         return True
 
     def scan_auto_runs(self) -> int:
@@ -443,6 +479,7 @@ class WorkLoop:
         while not self._quit.is_set():
             try:
                 self._busy = True
+                self._passes += 1
                 try:
                     self.scan_unqueued_captures()
                 except Exception:
@@ -481,6 +518,11 @@ class WorkLoop:
         if verdict == "withdraw":
             self.store.update(entry["id"], state="withdrawn", reason=reason, finishedAt=_iso(now))
             self._event(entry["id"])
+            if entry.get("kind") in ("approve", "run"):
+                # the step may have been moved back while this was decided: don't strand it
+                fresh = self._item(entry.get("path"))
+                if fresh is not None and not fresh.get("done"):
+                    self._requeue_approved(fresh)
             return True
         if verdict == "wait":
             step = _step_of(item, entry.get("stepId")) or {}
