@@ -215,9 +215,13 @@ def main(argv: list[str] | None = None) -> int:
         run.report({"Bash", "PowerShell"} <= disallowed and "mcp__object__write_body" in allowed,
                    "Bash/PowerShell disallowed, mcp__object__write_body allowed")
         config_text = json.dumps(cli.get("mcpConfig") or {})
+        servers_cfg = (cli.get("mcpConfig") or {}).get("mcpServers") or {}
+        others = json.dumps({k: v for k, v in servers_cfg.items() if k not in ("object", "object-agent")})
         run.report(cli.get("env", {}).get("CLAUDE_CONFIG_DIR") is False
-                   and cli.get("token") and cli["token"] not in config_text and "${OBJECT_API_TOKEN}" in config_text,
-                   "no CLAUDE_CONFIG_DIR; the MCP config names ${OBJECT_API_TOKEN}, never the secret")
+                   and cli.get("token") and cli.get("envToken") is False and cli["token"] not in others
+                   and all((servers_cfg.get(n) or {}).get("env", {}).get("OBJECT_API_TOKEN") == cli["token"]
+                           for n in ("object", "object-agent")),
+                   "no CLAUDE_CONFIG_DIR; the token only in Object's two servers' env blocks, not the CLI's env")
 
         print("\n3. The fence")
         deny = ((cli.get("runSettings") or {}).get("permissions") or {}).get("deny") or []

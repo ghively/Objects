@@ -18,8 +18,9 @@ every API answer, chat frame and ``/api/events`` frame is recorded. Checks:
  3. ``POST`` the URL server "fake-http" (HTTP, a bearer). Test on each lists ``echo``, ``add`` and
     ``whoami``; a wrong bearer makes Test fail with the 401 message; it is then set back;
  4. a chat turn with ``FAKE:mcp:fake-stdio:whoami``: ``--strict-mcp-config``; ``mcpServers`` holds
-    fake-stdio, fake-http, object and object-agent; both servers are allowed; the MCP config holds
-    ``${OBJECT_MCP_…}`` references and no secret; the tool result equals the secret (compared);
+    fake-stdio, fake-http, object and object-agent; both servers are allowed; the MCP config gives
+    each server only its own secret, and the CLI's environment holds none (audit 7); the tool result
+    equals the secret (compared);
  5. ``FAKE:mcp:fake-http:add:{"a":2,"b":3}`` answers 5;
  6. switches: Researcher's refresh lists both gateway groups with three tools; with fake-http's
     ``add`` and all of fake-stdio's tools off, ``add`` is denied, ``mcp__fake-http__add`` is
@@ -29,7 +30,7 @@ every API answer, chat frame and ``/api/events`` frame is recorded. Checks:
     the refresh lists its tools; a turn calling its ``whoami`` answers the value;
  9. a ``tagObject`` turn has no gateway server: only object, object-agent and folder-fake;
 10. no secret leaked into the state dir (but ``secrets.json``), an agent folder, the space copy,
-    the app log, the fake's log, an API answer or an SSE frame;
+    the app log, the fake's log (but the run's MCP config it records), an API answer or an SSE frame;
 11. deleting fake-stdio removes its ``mcp:<id>:`` secrets and the next turn has no fake-stdio;
 12. ``git status`` of the space copy is clean, and the reads, Tests and refreshes changed nothing
     in the state dir, the agent folders or the space.
@@ -144,6 +145,23 @@ def result_text(event: dict) -> str:
     if isinstance(result, list):
         return "".join(str(c.get("text", "")) if isinstance(c, dict) else str(c) for c in result)
     return str(result)
+
+
+def _without_config(log: Path) -> str:
+    """The fake's log without the run's MCP config it records (since audit 7 that config holds each
+    server's own secret, as the run's ``mcp.json`` in its user-only temp folder does)."""
+    if not log.exists():
+        return ""
+    lines = []
+    for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            lines.append(line)
+            continue
+        entry.pop("mcpConfig", None)
+        lines.append(json.dumps(entry))
+    return "\n".join(lines)
 
 
 def server_input(server: dict, **changes: Any) -> dict:
@@ -296,9 +314,12 @@ def main(argv: list[str] | None = None) -> int:
         run.report("--strict-mcp-config" in argv_ and {"fake-stdio", "fake-http", "object", "object-agent"} <= servers,
                    f"--strict-mcp-config; mcpServers {sorted(servers)}")
         run.report({"mcp__fake-stdio", "mcp__fake-http"} <= allowed, "mcp__fake-stdio and mcp__fake-http allowed")
-        config_text = json.dumps(cli.get("mcpConfig") or {})
-        run.report("${OBJECT_MCP_" in config_text and not any(s in config_text for s in SECRETS),
-                   "the MCP config holds ${OBJECT_MCP_…} references and no secret")
+        cfg = (cli.get("mcpConfig") or {}).get("mcpServers") or {}
+        owner = {STDIO_SECRET: "fake-stdio", HTTP_SECRET: "fake-http"}
+        run.report(all(s in json.dumps(cfg.get(n)) and s not in json.dumps({k: v for k, v in cfg.items() if k != n})
+                       for s, n in owner.items()) and FOLDER_SECRET not in json.dumps(cfg)
+                   and cli.get("envToken") is False,
+                   "the MCP config gives each server only its own secret; no token in the CLI's env")
         results = tool_results(evs)
         got = result_text(results[0]) if results else ""
         run.report(bool(results) and not results[0].get("isError") and got == STDIO_SECRET,
@@ -389,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
                      if not p.relative_to(root).as_posix().startswith((".", "Templates/"))), None)
         cli, evs = chat("FAKE:tags", mode="tagObject", paths=[page] if page else [], agent=rid)
         names = sorted(cli.get("mcpServers") or [])
-        env_refs = "OBJECT_MCP_" in json.dumps(cli.get("mcpConfig") or {})
+        env_refs = any(s in json.dumps(cli.get("mcpConfig") or {}) for s in (STDIO_SECRET, HTTP_SECRET))
         run.report(names == ["folder-fake", "object", "object-agent"] and not env_refs,
                    f"no gateway server: {names}")
 
@@ -414,7 +435,7 @@ def main(argv: list[str] | None = None) -> int:
         app_lines = [line for line in app_log.read_text(encoding="utf-8", errors="replace").splitlines()
                      if not ('"type": "tool"' in line and '__whoami"' in line)]
         for label, text in (("app log", "\n".join(app_lines)),
-                            ("fake's log", log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""),
+                            ("fake's log", _without_config(log)),
                             ("API answers", "\n".join(rec.bodies)),
                             ("chat frames", "\n".join(frames)),
                             ("event frames", "".join(events.frames))):

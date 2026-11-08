@@ -9,8 +9,11 @@ work); each registers its own order (the plan's registry of contributor orders).
 
 `build_run` runs the contributors and writes the run's files into a new temp folder outside
 every space and agent folder (``mcp.json``, ``run-settings.json``, ``append.md``); the caller
-removes that folder after the run. The token's secret goes only into the environment: the MCP
-config names ``${OBJECT_API_TOKEN}``, which the CLI expands from its own environment.
+removes that folder after the run (``mkdtemp``: readable by the user only). Secrets never go into
+the CLI's own environment, since the CLI hands its whole environment to every stdio MCP server:
+each server gets only its own secrets, filled into its own entry in ``mcp.json`` (`fill_refs`).
+The turn's token is in the ``env`` blocks of Object's two servers (``object``, ``object-agent``)
+only (audit 7).
 
 The fence: every run denies the file tools on every registered space folder, every other
 agent's folder and the agent trash (``Read(...)`` covers Read, Glob and Grep; ``Edit(...)``
@@ -66,6 +69,7 @@ __all__ = [
     "contributors",
     "fence_folders",
     "fence_rules",
+    "fill_refs",
     "nesting_problem",
     "rule_path",
 ]
@@ -182,6 +186,29 @@ def contributors() -> list[tuple[int, str, Contributor]]:
 
 
 SECRET_LOOKUP: Callable[[str], str | None] = lambda name: None  # noqa: E731 - M19 replaces it
+
+_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
+
+
+def fill_refs(value: Any, values: dict[str, str]) -> Any:
+    """`value` (a server entry, or any string, list or dict in it) with each ``${VAR}`` and
+    ``${VAR:-default}`` whose VAR is in `values` filled the way the CLI fills it
+    (``docs/superpowers/plans/m19-cli-spike.md``: the default when VAR is empty); a reference
+    to any other name is left as written. Dict keys are left alone."""
+    if isinstance(value, str):
+        def fill(m: re.Match[str]) -> str:
+            name, default = m.group(1), m.group(2)
+            if name not in values:
+                return m.group(0)
+            got = values[name]
+            return got if got or default is None else default
+
+        return _REF.sub(fill, value)
+    if isinstance(value, list):
+        return [fill_refs(v, values) for v in value]
+    if isinstance(value, dict):
+        return {k: fill_refs(v, values) for k, v in value.items()}
+    return value
 """A ``${VAR}``'s value for a folder ``.mcp.json`` server, or None (M19 supplies secrets)."""
 
 
@@ -318,7 +345,7 @@ def _object_server(module: str, scope: RunScope, extra: list[str] | None = None)
     return {
         "command": sys.executable,
         "args": ["-m", module, *(extra or [])],
-        "env": {"OBJECT_API_URL": scope.api_url, "OBJECT_API_TOKEN": "${OBJECT_API_TOKEN}"},
+        "env": {"OBJECT_API_URL": scope.api_url, "OBJECT_API_TOKEN": scope.token},
     }
 
 
@@ -350,8 +377,7 @@ def _folder_mcp(scope: RunScope, parts: RunParts) -> None:
                 f"The MCP server \"{name}\" was left out: it needs {', '.join(missing)}."
             )  # our string
             continue
-        parts.mcp_servers[name] = server
-        parts.env.update(values)
+        parts.mcp_servers[name] = fill_refs(server, values)  # its secrets, for it alone
 
 
 def _object_mcp(scope: RunScope, parts: RunParts) -> None:
@@ -469,8 +495,8 @@ def _run_settings(own: Path, parts: RunParts) -> dict[str, Any]:
 
 def _run_env(scope: RunScope, parts: RunParts) -> dict[str, str]:
     env = {k: v for k, v in os.environ.items() if not k.upper().startswith(RUN_ENV_DROP)}
+    env.pop("OBJECT_API_TOKEN", None)  # only Object's own servers get the token (their env blocks)
     env["OBJECT_API_URL"] = scope.api_url
-    env["OBJECT_API_TOKEN"] = scope.token
     env.update(parts.env)
     return env
 

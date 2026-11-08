@@ -180,13 +180,15 @@ def test_enabled_servers_join_the_run(env) -> None:
     allowed = _value(cmd.args, "--allowedTools")
     assert allowed.count("mcp__alpha") == 1 and allowed.count("mcp__beta") == 1
     assert "mcp__gamma" not in allowed
-    gateway_env = {k: v for k, v in cmd.env.items() if k.startswith("OBJECT_MCP_")}
-    assert sorted(gateway_env.values()) == sorted([ENV_SECRET, BEARER_SECRET])
-    assert servers["alpha"]["env"]["API_KEY"].startswith("${OBJECT_MCP_")
-    assert servers["beta"]["headers"]["Authorization"].startswith("Bearer ${OBJECT_MCP_")
+    assert not any(k.startswith("OBJECT_MCP_") for k in cmd.env)  # audit 7
+    assert servers["alpha"]["env"]["API_KEY"] == ENV_SECRET
+    assert servers["beta"]["headers"]["Authorization"] == "Bearer " + BEARER_SECRET
 
 
-def test_secret_values_never_in_files_args_or_logs(env, caplog) -> None:
+def test_secret_values_only_in_their_own_server(env, caplog) -> None:
+    """Each secret is only in its own server's entry of the run's ``mcp.json`` (a folder only the
+    user can read, removed after the run): never the CLI's environment, the arguments, the agent
+    folder, the notes or a log (audit 7)."""
     caplog.set_level(logging.DEBUG)
     store = McpStore()
     store.create(_cmd_server("alpha", env=[{"key": "API_KEY", "value": ENV_SECRET, "secret": True}]))
@@ -204,15 +206,70 @@ def test_secret_values_never_in_files_args_or_logs(env, caplog) -> None:
     assert {p.name for p in files} >= {"mcp.json", "run-settings.json", "append.md"}
     folder_files = [p for p in Path(agent.folder).rglob("*") if p.is_file()]
     assert any(p.name == "agent.json" for p in folder_files)
+    owner = {ENV_SECRET: "alpha", HEADER_SECRET: "beta", BEARER_SECRET: "beta", VAR_SECRET: "gh"}
+    servers = _servers(cmd)
     for secret in SECRETS:
         for p in [*files, *folder_files]:
-            assert secret not in p.read_text(encoding="utf-8", errors="replace"), p
+            if p.name != "mcp.json":
+                assert secret not in p.read_text(encoding="utf-8", errors="replace"), p
         assert not any(secret in a for a in cmd.args)
         assert not any(secret in n for n in parts.notes)
         assert secret not in caplog.text
-        assert secret not in json.dumps(cmd.mcp_config) and secret not in json.dumps(cmd.run_settings)
-        assert secret in cmd.env.values()
-    assert cmd.env["GH_TOKEN"] == VAR_SECRET
+        assert secret not in json.dumps(cmd.run_settings)
+        assert secret not in cmd.env.values()
+        assert secret in json.dumps(servers[owner[secret]])
+        assert secret not in json.dumps({k: v for k, v in servers.items() if k != owner[secret]})
+    assert VAR_SECRET not in cmd.env.values()
+    assert servers["gh"]["env"]["GH_TOKEN"] == VAR_SECRET
+
+
+def test_each_server_gets_only_its_own_secrets(env, tmp_path: Path) -> None:
+    """Audit 7: the CLI hands its whole environment to every stdio server, so neither the turn's
+    token nor another server's secret may be in it. Run with the fake ``claude`` (the reference
+    model) and the fake MCP server's ``whoami``."""
+    import os
+    import subprocess
+    import sys
+
+    from objectapp.mcpstore import cli_entry
+
+    fake_mcp = str(Path(fake_claude.__file__).with_name("fake_mcp_server.py"))
+    store = McpStore()
+    store.create(_cmd_server("alpha", command=sys.executable, args=[fake_mcp, "--require-env", "API_KEY"],
+                             env=[{"key": "API_KEY", "value": ENV_SECRET, "secret": True}]))
+    [alpha_var] = cli_entry(_record("alpha").data, store.secrets)[1]
+    store.create(_cmd_server("nosy", command=sys.executable, args=[fake_mcp, "--require-env", "OBJECT_API_TOKEN"]))
+    store.create(_cmd_server("nosier", command=sys.executable, args=[fake_mcp, "--require-env", alpha_var]))
+    SecretStore().set("var:GH_TOKEN", VAR_SECRET)
+    agent = _agent(mcp={"gh": {"command": sys.executable, "args": [fake_mcp, "--require-env", "GH_TOKEN"],
+                               "env": {"GH_TOKEN": "${GH_TOKEN}"}}})
+    cmd = _build(_scope(env, agent))
+    for secret in (TOKEN, ENV_SECRET, VAR_SECRET):
+        assert secret not in cmd.env.values()
+    assert "OBJECT_API_TOKEN" not in cmd.env and alpha_var not in cmd.env
+    servers = _servers(cmd)
+    for name in ("object", "object-agent"):
+        assert servers[name]["env"]["OBJECT_API_TOKEN"] == TOKEN
+    for name in ("alpha", "nosy", "nosier", "gh"):
+        assert TOKEN not in json.dumps(servers[name]), name
+    assert ENV_SECRET not in json.dumps({k: v for k, v in servers.items() if k != "alpha"})
+    assert VAR_SECRET not in json.dumps({k: v for k, v in servers.items() if k != "gh"})
+
+    log = tmp_path / "fake-log.jsonl"
+    prompt = "\n".join(f"FAKE:mcp:{n}:whoami" for n in ("alpha", "gh", "nosy", "nosier"))
+    res = subprocess.run([sys.executable, fake_claude.__file__, *cmd.args[1:]], input=prompt,
+                         capture_output=True, text=True, encoding="utf-8", cwd=cmd.cwd,
+                         env={**cmd.env, "FAKE_CLAUDE_LOG": str(log)}, timeout=120)
+    assert res.returncode == 0, res.stderr
+    blocks = [b for line in res.stdout.splitlines() if line.strip()
+              for e in [json.loads(line)] if e.get("type") == "user" for b in e["message"]["content"]]
+    texts = ["".join(c.get("text", "") for c in b["content"]) if isinstance(b.get("content"), list)
+             else str(b.get("content")) for b in blocks]
+    assert texts[0] == ENV_SECRET and texts[1] == VAR_SECRET  # each server still gets its own
+    assert blocks[2].get("is_error") and TOKEN not in texts[2]  # "missing OBJECT_API_TOKEN"
+    assert blocks[3].get("is_error") and ENV_SECRET not in texts[3]
+    if os.name != "nt":  # the run folder holding mcp.json is the user's alone
+        assert (cmd.tmp.stat().st_mode & 0o777) == 0o700
 
 
 def test_switches_filter_the_run(env) -> None:
@@ -313,11 +370,12 @@ def test_purposes_without_gateway(env) -> None:
     for purpose in ("proposal", "review", "curator"):
         cmd = _build(_scope(env, agent, purpose=purpose, write=False))
         assert "alpha" not in _servers(cmd), purpose
-        assert not any(k.startswith("OBJECT_MCP_") for k in cmd.env), purpose
+        assert ENV_SECRET not in json.dumps(cmd.mcp_config), purpose
     for purpose in ("chat", "delegate", "schedule"):
         cmd = _build(_scope(env, agent, purpose=purpose))
         assert "alpha" in _servers(cmd), purpose
-        assert any(k.startswith("OBJECT_MCP_") for k in cmd.env), purpose
+        assert _servers(cmd)["alpha"]["env"]["API_KEY"] == ENV_SECRET, purpose
+        assert not any(k.startswith("OBJECT_MCP_") for k in cmd.env), purpose  # audit 7
 
 
 def test_folder_vars_resolve_from_secrets(env, monkeypatch) -> None:
@@ -328,8 +386,8 @@ def test_folder_vars_resolve_from_secrets(env, monkeypatch) -> None:
     assert reg.get(agent.id).to_api({})["mcpServers"] == [{"name": "gh", "missingVars": [], "usable": True}]
     cmd = _build(_scope(env, reg.get(agent.id)))
     assert "gh" in _servers(cmd)
-    assert cmd.env["GH_TOKEN"] == VAR_SECRET
-    assert VAR_SECRET not in json.dumps(cmd.mcp_config)
+    assert _servers(cmd)["gh"]["env"]["GH_TOKEN"] == VAR_SECRET  # its own entry (audit 7)
+    assert VAR_SECRET not in cmd.env.values()
 
     home_var = "USERPROFILE"
     monkeypatch.setenv(home_var, str(env["tmp"]))

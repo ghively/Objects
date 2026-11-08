@@ -189,8 +189,9 @@ def main(argv: list[str] | None = None) -> int:
         tag_server = (tag_cli.get("mcpConfig") or {}).get("mcpServers", {}).get("object", {})
         run.report(server.get("args") == ["-m", "objectapp.mcp_server"]
                    and tag_server.get("args") == ["-m", "objectapp.mcp_server", "--read-only"]
-                   and server.get("env", {}).get("OBJECT_API_TOKEN") == "${OBJECT_API_TOKEN}",
-                   "MCP config: objectapp-mcp (--read-only for the tag turn), no secret in the file")
+                   and server.get("env", {}).get("OBJECT_API_TOKEN") == cli.get("token")
+                   and cli.get("envToken") is False,
+                   "MCP config: objectapp-mcp (--read-only for the tag turn); the token only in its env block")
 
         print("\n3. Nothing written, token gone")
         run.report(clean(root), "the turns changed no file (git status clean)", git(root, "status", "--short"))

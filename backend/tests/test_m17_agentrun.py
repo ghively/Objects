@@ -176,7 +176,8 @@ def test_run_env_drops_parent_session_vars(env, monkeypatch) -> None:
     assert not any(k.upper().startswith(RUN_ENV_DROP) for k in cmd.env)
     assert "PATH" in {k.upper() for k in cmd.env}
     assert cmd.env["OBJECT_API_URL"] == "http://127.0.0.1:8765"
-    assert cmd.env["OBJECT_API_TOKEN"] == SECRET
+    # Audit 7: every stdio server inherits the CLI's environment, so the token isn't in it.
+    assert "OBJECT_API_TOKEN" not in cmd.env and SECRET not in cmd.env.values()
 
 
 def test_cli_flags(env) -> None:
@@ -200,17 +201,18 @@ def test_mcp_config(env) -> None:
     assert servers["object-agent"]["args"] == ["-m", "objectapp.agent_mcp"]
     for name in ("object", "object-agent"):
         assert servers[name]["command"] == sys.executable
-        assert servers[name]["env"]["OBJECT_API_TOKEN"] == "${OBJECT_API_TOKEN}"
+        assert servers[name]["env"]["OBJECT_API_TOKEN"] == SECRET  # Object's own servers only (audit 7)
         assert servers[name]["env"]["OBJECT_API_URL"] == "http://127.0.0.1:8765"
     assert json.loads((cmd.tmp / "mcp.json").read_text(encoding="utf-8")) == cmd.mcp_config
     assert _value(cmd.args, "--mcp-config") == str(cmd.tmp / "mcp.json")
     ro = _build(_scope(env, write=False, purpose="proposal"))
     assert ro.mcp_config["mcpServers"]["object"]["args"] == ["-m", "objectapp.mcp_server", "--read-only"]
     for c in (cmd, ro):
-        assert c.env["OBJECT_API_TOKEN"] == SECRET
-        for f in c.tmp.rglob("*"):
-            if f.is_file():
-                assert SECRET not in f.read_text(encoding="utf-8"), f
+        assert "OBJECT_API_TOKEN" not in c.env
+        assert SECRET not in json.dumps({k: v for k, v in c.mcp_config["mcpServers"].items()
+                                          if k not in ("object", "object-agent")})
+        for name in ("run-settings.json", "append.md"):
+            assert SECRET not in (c.tmp / name).read_text(encoding="utf-8"), name
         assert SECRET not in " ".join(c.args)
 
 
@@ -235,9 +237,10 @@ def test_folder_servers(env, monkeypatch) -> None:
 
     monkeypatch.setattr(agentrun, "SECRET_LOOKUP", lambda name: "gh-value-9" if name == "GH_TOKEN" else None)
     cmd = _build(_scope(env))
-    assert cmd.mcp_config["mcpServers"]["gh"]["env"]["GH_TOKEN"] == "${GH_TOKEN}"
-    assert cmd.env["GH_TOKEN"] == "gh-value-9"
-    assert "gh-value-9" not in (cmd.tmp / "mcp.json").read_text(encoding="utf-8")
+    # Audit 7: the value is filled into the server's own entry, never the CLI's environment.
+    assert cmd.mcp_config["mcpServers"]["gh"]["env"]["GH_TOKEN"] == "gh-value-9"
+    assert "gh-value-9" not in cmd.env.values()
+    assert "gh-value-9" not in json.dumps(cmd.mcp_config["mcpServers"]["plain"])
     assert "mcp__gh" in _value(cmd.args, "--allowedTools").split(",")
 
 
