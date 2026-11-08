@@ -124,23 +124,42 @@ describe('#5 a nested list the editor would mis-nest', () => {
 })
 
 describe('#18 a GFM task item in an ordered list', () => {
+  // The editor has no ordered to-do: it would show `[ ] a` as text and save it
+  // escaped (`1. \[ \] aZ`), which drops the box for every other reader. Such a
+  // list loads raw (fix-pass L2), so an edit never rewrites a file's to-dos as text.
   const body = '1. [ ] a\n2. [x] b\n'
 
-  test('keeps its box when the item text is edited', () => {
+  test('keeps its boxes when the list is edited: the list loads raw', () => {
+    expect(topTypes(headless(body))).toEqual(['rawBlock'])
     expect(serializeBody(headless(body))).toBe(body)
-    expect(editAt(body, 0)).toBe('1. [ ] aZ\n2. [x] b\n')
-    expect(editAt(body, 1)).toBe('1. [ ] a\n2. [x] bZ\n')
     expectEveryEditLocal(body)
+    const around = 'para\n\n1. [ ] a\n2. [X] b\n'
+    expect(editAt(around, 0)).toBe('paraZ\n\n1. [ ] a\n2. [X] b\n')
   })
 
-  test('still loads as an editable ordered list', () => {
-    expect(topTypes(headless(body))).toEqual(['orderedList'])
+  test('a box in a nested ordered list loads the whole list raw', () => {
+    for (const nested of ['- a\n  1. [ ] b\n', '1. a\n   1. [x] b\n']) {
+      expect(topTypes(headless(nested))).toEqual(['rawBlock'])
+      expectEveryEditLocal(nested)
+    }
   })
 
-  test('an escaped box stays escaped: such a list loads raw', () => {
-    const escaped = '1. \\[ ] a\n2. b\n'
-    expect(topTypes(headless(escaped))).toEqual(['rawBlock'])
+  test('an escaped box (as the editor saves it) is text: the list stays editable', () => {
+    const escaped = '1. \\[ \\] a\n2. b\n'
+    expect(topTypes(headless(escaped))).toEqual(['orderedList'])
+    expect(editAt(escaped, 0)).toBe('1. \\[ \\] aZ\n2. b\n')
     expectEveryEditLocal(escaped)
+  })
+
+  test('`[ ] x` typed at the start of an ordered item stays text', () => {
+    const editor = headless('1. a\n2. b\n')
+    const tb = textblocks(editor)[0]
+    editor.view.dispatch(editor.state.tr.insertText('[ ] x', tb.pos + 1, tb.pos + tb.node.nodeSize - 1))
+    const saved = serializeBody(editor)
+    expect(saved).toBe('1. \\[ \\] x\n2. b\n')
+    const back = headless(saved)
+    expect(topTypes(back)).toEqual(['orderedList'])
+    expect(textblocks(back)[0].node.textContent).toBe('[ ] x')
   })
 
   test('a bullet item typed as `[ ] a` text stays text', () => {
