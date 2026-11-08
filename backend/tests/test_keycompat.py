@@ -223,3 +223,125 @@ def test_upgrade_keys_shapes_and_precedence():
     assert upgrade_body(raw) is raw
     assert upgrade_body(b"not json structure") == b"not json structure"
     assert json.loads(upgrade_body(b'{"structureId": "t"}')) == {"typeId": "t"}
+
+
+# -- a user's own property keys are not definition keys (sweep 2026-11-08) ------------------
+
+
+def _structure_props(c: TestClient) -> None:
+    """Give the Person type a text property "Structure ID" and a label "Structures"
+    (keys ``structureId`` and ``structures``, the older names of ``typeId`` and ``types``)."""
+    t = next(t for t in c.get("/api/space").json()["types"] if t["id"] == "person")
+    t["propertyDefinitions"] = t.get("propertyDefinitions", []) + [
+        # The keys the app derives from the names (`typeEdits.ts` ``camelCase``, `space.camel_key`).
+        {"id": "structureId", "key": "structureId", "name": "Structure ID", "type": "text"},
+        {
+            "id": "structures",
+            "key": "structures",
+            "name": "Structures",
+            "type": "label",
+            "options": {"set": [{"id": "a", "text": "a"}, {"id": "b", "text": "b"}]},
+        },
+    ]
+    res = c.put("/api/types/person", json={"type": t, "baseRevision": t["revision"]})
+    assert res.status_code == 200, res.text
+    page = next(t for t in c.get("/api/space").json()["types"] if t["id"] == "person")
+    keys = {p["name"]: p.get("key", p["id"]) for p in page["propertyDefinitions"]}
+    assert keys["Structure ID"] == "structureId" and keys["Structures"] == "structures"
+
+
+def _page(c: TestClient) -> tuple[str, str]:
+    page = "People/Ada Lovelace.md"
+    return page, c.get("/api/object", params={"path": page}).json()["version"]
+
+
+def _check_written(c: TestClient, space_dir: Path, page: str, sid: str) -> None:
+    fm = (space_dir / page).read_text(encoding="utf-8").split("---")[1]
+    assert f"structureId: {sid}" in fm, fm
+    assert "structures: a" in fm, fm  # a single label is written as a scalar
+    assert "typeId" not in fm and "types:" not in fm, fm
+    got = c.get("/api/object", params={"path": page}).json()["frontmatter"]
+    assert got["structureId"] == sid and got["structures"] in ("a", ["a"])
+    assert "typeId" not in got and "types" not in got
+
+
+def test_property_values_keep_the_users_own_keys(m8_space_dir: Path):
+    space = Space(m8_space_dir)
+    app = create_app(space, None, watch=False)
+    with TestClient(app) as c:
+        _structure_props(c)
+        page, ver = _page(c)
+        res = c.put(
+            "/api/object/properties",
+            json={"path": page, "updates": {"structureId": "S-7", "structures": ["a"]}, "baseVersion": ver},
+        )
+        assert res.status_code == 200, res.text
+        _check_written(c, m8_space_dir, page, "S-7")
+        rows = c.post("/api/rows", json={"paths": [page]}).json()["rows"][0]["values"]
+        assert rows["structureId"] == "S-7" and rows["structures"] == ["a"]
+
+
+def test_v1_property_values_keep_the_users_own_keys(m8_space_dir: Path, tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path / "state"))
+    space = Space(m8_space_dir)
+    app = create_app(space, None, watch=False)
+    with TestClient(app) as c:
+        _structure_props(c)
+        page, ver = _page(c)
+        made = c.post("/api/integrations/tokens", json={"name": "rw", "scope": "read-write"})
+        res = c.post(
+            "/api/v1/object/properties",
+            json={"path": page, "version": ver, "set": {"structureId": "S-8", "structures": ["a"]}},
+            headers={"Authorization": f"Bearer {made.json()['secret']}"},
+        )
+        assert res.status_code == 200, res.text
+        _check_written(c, m8_space_dir, page, "S-8")
+
+
+def test_in_process_tool_call_keeps_the_users_own_keys(m8_space_dir: Path):
+    from objectapp.api_v1_tools import _call, _walk
+
+    space = Space(m8_space_dir)
+    app = create_app(space, None, watch=False)
+    with TestClient(app) as c:
+        _structure_props(c)
+        page, ver = _page(c)
+        route = next(
+            r
+            for full, r in _walk(app.router.routes, "")
+            if full == "/api/object/properties" and "PUT" in (getattr(r, "methods", None) or ())
+        )
+        status, body = _call(
+            route, {"path": page, "updates": {"structureId": "S-9", "structures": ["a"]}, "baseVersion": ver}
+        )
+        assert status == 200, body
+        _check_written(c, m8_space_dir, page, "S-9")
+
+
+def test_definition_bodies_with_old_keys_still_upgrade():
+    def up(body: dict) -> dict:
+        return json.loads(upgrade_body(json.dumps(body).encode("utf-8")))
+
+    # Values under the user's maps stay; definition keys around them are renamed.
+    assert up({"values": {"structures": ["a"], "structureId": "x"}, "structureId": "page"}) == {
+        "values": {"structures": ["a"], "structureId": "x"},
+        "typeId": "page",
+    }
+    assert up({"path": "p", "set": {"structureId": "S"}, "add": {"structures": ["a"]}}) == {
+        "path": "p",
+        "set": {"structureId": "S"},
+        "add": {"structures": ["a"]},
+    }
+    assert up({"mapping": {"structureId": "other"}}) == {"mapping": {"structureId": "other"}}
+    # Query, view, ui and settings bodies.
+    assert up({"definition": {"structures": [{"id": "t"}], "excludeStructureIds": []}}) == {
+        "definition": {"types": [{"id": "t"}], "excludeTypeIds": []}
+    }
+    assert up({"views": {"all": {"sorts": [{"propertyId": "title", "structureId": "t"}]}}}) == {
+        "views": {"all": {"sorts": [{"propertyId": "title", "typeId": "t"}]}}
+    }
+    assert up({"patch": {"graph": {"filterStructureIds": ["page"]}}}) == {
+        "patch": {"graph": {"filterTypeIds": ["page"]}}
+    }
+    assert up({"patch": {"hideStructureSettings": True}}) == {"patch": {"hideTypeSettings": True}}
+    assert up({"type": {"structureViews": {"smallCard": {}}}}) == {"type": {"typeViews": {"smallCard": {}}}}
