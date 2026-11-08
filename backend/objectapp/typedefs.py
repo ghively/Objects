@@ -155,6 +155,14 @@ def iter_object_paths(root: Path) -> Iterator[str]:
     yield from sorted(found)
 
 
+def _lone_cr_endings(text: str) -> bool:
+    """Whether ``text`` (``\\r\\n`` already normalised) ends its lines with a lone ``\\r``:
+    mostly, or on its opening ``---`` fence."""
+    if "\r" not in text:
+        return False
+    return text.startswith("---\r") or text.count("\r") > text.count("\n")
+
+
 def read_raw(root: Path, rel: str, cache: bool = True) -> RawObject:
     """Read one object file. With ``cache``, the parsed frontmatter of an unchanged
     source comes from the space's `fmcache` (a file outside the space's objects).
@@ -197,6 +205,11 @@ def read_raw(root: Path, rel: str, cache: bool = True) -> RawObject:
         # Saving would have to re-encode bytes the editor never saw correctly.
         read_only = True
         reason = "The file is not valid UTF-8 text"
+    if not read_only and _lone_cr_endings(text):
+        # Its `---` fence isn't seen as one, so a property edit would put a second
+        # frontmatter block above it (bug audit 2026-11-07, 26).
+        read_only = True
+        reason = "The file's line endings are CR only, which can't be edited"
     return RawObject(
         path=rel,
         data=data,
