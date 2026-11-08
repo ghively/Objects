@@ -364,7 +364,7 @@ def test_fence_rules_shape(tmp_path: Path) -> None:
     rules = fence_rules([tmp_path / "S"], tmp_path / "A", tmp_path / "st", tmp_path / "h")
     s = rule_path((tmp_path / "S").resolve())
     assert rules[:2] == [f"Read({s}/**)", f"Edit({s}/**)"]
-    assert len(rules) == 2 + 5 + 3 + 3
+    assert len(rules) == 2 + 5 + 3 + 4 + 3  # + history and fake-trash (audit 3)
 
 
 def test_fake_write_to_own_server_and_local_files_is_denied(env) -> None:
@@ -409,6 +409,24 @@ def test_fence_covers_the_cache_dir_override(env, monkeypatch) -> None:
     monkeypatch.delenv("OBJECT_CACHE_DIR")
     deny = _build(_scope(env)).run_settings["permissions"]["deny"]
     assert f"Read({rp}/**)" not in deny
+
+
+def test_fence_covers_version_history_and_deleted_spaces(env) -> None:
+    """Audit 3: saved versions (``<state>/history``) and deleted spaces (``<state>/fake-trash``)
+    are fenced at every depth, while the agent's own folder under ``<state>/agents`` stays open."""
+    import fake_claude
+
+    state = env["state"].resolve()
+    deny = _build(_scope(env)).run_settings["permissions"]["deny"]
+    for target in (state / "history" / "0123abcd" / "Notes%2FSecret.md" / "20261107T120000Z.md",
+                   state / "history" / "0123abcd" / "index.json",
+                   state / "fake-trash" / "Old Space" / "Secret.md"):
+        assert fake_claude._denied("Read", str(target), deny), target
+        assert fake_claude._denied("Edit", str(target), deny), target
+        assert fake_claude._denied("Grep", str(target.parent), deny), target
+    mine = env["folder"].resolve() / "notes" / "draft.md"
+    assert not fake_claude._denied("Read", str(mine), deny)
+    assert not fake_claude._denied("Edit", str(mine), deny)
 
 
 def test_fence_folders(env) -> None:

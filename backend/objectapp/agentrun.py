@@ -262,6 +262,10 @@ def fence_rules(folders: list[Path], own: Path, state: Path, home: Path) -> list
     rules += [f"Edit({o}/{p})" for p in (*PROTECTED, *SELF_LOADED)]
     s = rule_path(Path(state).resolve())
     rules += [f"Read({s}/*)", f"Edit({s}/*)", f"Read({s}/automation-logs-*/**)"]
+    # Saved versions of every page (excluded ones too) and deleted spaces, at any depth. Not
+    # ``{s}/**``: agent folders live under ``{s}/agents``.
+    for sub in ("history", "fake-trash"):
+        rules += [f"Read({s}/{sub}/**)", f"Edit({s}/{sub}/**)"]
     h = rule_path(Path(home).resolve())
     rules += [f"Read({h}/.claude/.credentials.json)", f"Edit({h}/.claude/**)", f"Edit({h}/.claude.json)"]
     out: list[str] = []
