@@ -272,7 +272,7 @@ def test_ledger_reads_reuse_the_parse_of_an_unchanged_file(folder: Path, monkeyp
     assert again[0]["after"] == "one\n§\ntwo"
     assert ledger.get(folder, again[1]["id"])["after"] == "one" and len(calls) == parsed
     _add(folder, "three")  # the file grew: parsed again
-    assert [e["after"] for e in _ledger(folder)][0] == "one\n§\ntwo\n§\nthree"
+    assert _ledger(folder)[0]["after"] == "one\n§\ntwo\n§\nthree"
     assert len(calls) > parsed
 
 
