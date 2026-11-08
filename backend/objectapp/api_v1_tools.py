@@ -579,19 +579,19 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
     @r.post("/v1/import/scan")
     @run
     def import_scan(req: ScanRequest, request: Request):
+        from .api_importscan import NO_SOURCE, scan_root
         from .importers import batches
         from .importscan import scan_tree
 
         token = auth(request)
-        text = req.path.strip().strip('"')
-        if not text.strip():  # ``Path("")`` is the server's working folder (audit 2026-11-07 #12)
-            return error(404, "There is no file or folder at this path.")
-        refused = refuse_space_source(req.path)
+        # Absolute and present, never the working or home folder (audit 2026-11-07 #12,
+        # sweep 2026-11-08): the same rule as the app's scan routes.
+        root = scan_root(req.path)
+        if root is None:
+            return error(404, NO_SOURCE)
+        refused = refuse_space_source(str(root))
         if refused is not None:
             return refused
-        root = Path(text).expanduser()
-        if not root.exists():
-            return error(404, "There is no file or folder at this path.")
         scan = scan_tree(root, req.leaveOut).to_json()
         batch = None
         if token.scope == "read-write":

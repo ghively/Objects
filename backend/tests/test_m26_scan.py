@@ -101,7 +101,12 @@ def test_route(tmp_path, client_factory=None):
     assert body["defaultChoice"] == "excludeFromAi"
     assert AWS not in json.dumps(body) and "4111" not in json.dumps(body)
     assert before == sorted(p.name for p in root.rglob("*"))
-    assert c.post("/api/import/scan", json={"path": str(tmp_path / "nope"), "leaveOut": []}).status_code == 404
+    missing = c.post("/api/import/scan", json={"path": str(tmp_path / "nope"), "leaveOut": []})
+    assert missing.status_code == 404
+    # The same error shape as every other route (the UI's error reader shows `detail`).
+    assert missing.json() == {"detail": "There is no file or folder at this path."}
+    # A relative path is not the server's working folder.
+    assert c.post("/api/import/scan", json={"path": ".", "leaveOut": []}).status_code == 404
 
 
 def test_mounted_in_server():

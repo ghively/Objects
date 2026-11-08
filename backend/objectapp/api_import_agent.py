@@ -16,7 +16,6 @@ Reads write nothing. ``404`` unknown batch, ``409`` busy or not allowed now, ``4
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -24,6 +23,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from . import importfiling
+from .api_importscan import NO_SOURCE, scan_root
 from .apictx import ApiContext
 from .importers import batches, filing, proposal
 from .importers.jobs import Jobs
@@ -73,9 +73,9 @@ def router(ctx: ApiContext, jobs: Jobs, announce_resync) -> APIRouter:
 
     @r.post("/import/batches")
     def post_draft(req: DraftRequest):
-        root = Path(req.path.strip().strip('"')).expanduser()
-        if not root.exists():
-            return _error(404, "There is no file or folder at this path.")
+        root = scan_root(req.path)  # absolute and present; never the working or home folder
+        if root is None:
+            return _error(404, NO_SOURCE)
         batch = batches.create_draft(ctx.space.root, str(root), req.leaveOut)
         scan = scan_tree(root, req.leaveOut).to_json()
         batches.store_scan(ctx.space.root, batch, scan)

@@ -98,12 +98,56 @@ def test_blank_scan_path_is_not_the_working_directory(
     monkeypatch.chdir(cwd)
     r = client.post("/api/import/scan", json={"path": blank})
     assert r.status_code == 404, r.text
-    assert r.json() == {"error": "No such file or folder"}
+    assert r.json() == {"detail": NO_SOURCE}
     for scope in ("read", "read-write"):
         h = _bearer(space_dir, scope)
         r = client.post("/api/v1/import/scan", json={"path": blank}, headers=h)
         assert r.status_code in (403, 404), r.text  # 403: a read token may not scan (#24)
         assert "creds.txt" not in r.text
+    assert not (space_dir / ".object" / "imports").exists()
+
+
+NO_SOURCE = "There is no file or folder at this path."
+
+
+@pytest.mark.parametrize(
+    "relative", [".", "./", "relative.txt", "sub", "~", "~/", "x" * 300, "/" + "x" * 300]
+)
+def test_relative_scan_paths_are_not_the_working_or_home_folder(
+    client: TestClient, space_dir: Path, tmp_path: Path, monkeypatch, relative: str
+):
+    """Sweep 2026-11-08: a relative path, ``~`` (the whole home folder) and a path too long
+    for the OS answer 404 on every scan route, scan nothing and leave no draft batch."""
+    cwd = tmp_path / "cwd"
+    (cwd / "sub").mkdir(parents=True)
+    (cwd / "sub" / "creds.txt").write_text("password = hunter2\n")
+    (cwd / "relative.txt").write_text("password = hunter2\n")
+    monkeypatch.chdir(cwd)
+    monkeypatch.setenv("HOME", str(cwd))
+    monkeypatch.setenv("USERPROFILE", str(cwd))
+    r = client.post("/api/import/scan", json={"path": relative})
+    assert r.status_code == 404, r.text
+    assert r.json() == {"detail": NO_SOURCE}
+    r = client.post("/api/import/batches", json={"path": relative})
+    assert r.status_code == 404, r.text
+    assert r.json() == {"detail": NO_SOURCE}
+    for scope in ("read", "read-write"):
+        h = _bearer(space_dir, scope)
+        r = client.post("/api/v1/import/scan", json={"path": relative}, headers=h)
+        assert r.status_code in (403, 404), r.text
+        assert "creds" not in r.text and "relative.txt" not in r.text
+    assert not (space_dir / ".object" / "imports").exists()
+
+
+def test_post_draft_refuses_a_blank_path(client: TestClient, space_dir: Path, tmp_path: Path, monkeypatch):
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    (cwd / "creds.txt").write_text("password = hunter2\n")
+    monkeypatch.chdir(cwd)
+    for blank in ("", "   ", '""'):
+        r = client.post("/api/import/batches", json={"path": blank})
+        assert r.status_code == 404, r.text
+        assert "creds" not in r.text
     assert not (space_dir / ".object" / "imports").exists()
 
 
