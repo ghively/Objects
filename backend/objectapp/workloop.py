@@ -325,15 +325,11 @@ class WorkLoop:
         if step is None or step.get("state") != "approved" or step.get("kind") not in ("approve", "agent"):
             return None
         kind = "approve" if step["kind"] == "approve" else "run"
-        mine = [e for e in self.store.entries()
-                if e.get("path") == item["path"] and e.get("stepId") == step["id"] and e.get("kind") == kind]
-        if not mine or mine[-1].get("state") != "withdrawn":
+        fields = {"stepId": step["id"], "stepN": step.get("n"), "stepKind": step.get("kind"),
+                  "stepText": step.get("text"), "notBefore": step.get("notBefore")}
+        entry = self.store.requeue_withdrawn(item["path"], step["id"], kind, fields, now=self.clock())
+        if entry is None:
             return None
-        last = mine[-1]
-        fields = {k: last.get(k) for k in ("kind", "path", "objectId", "title", "auto", "by")}
-        fields.update(stepId=step["id"], stepN=step.get("n"), stepKind=step.get("kind"),
-                      stepText=step.get("text"), notBefore=step.get("notBefore") or last.get("notBefore"))
-        entry = self.store.add(fields, now=self.clock())
         self._event(entry["id"])
         self.wake()
         return entry
