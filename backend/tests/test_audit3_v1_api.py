@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -104,3 +105,55 @@ def test_blank_scan_path_is_not_the_working_directory(
         assert r.status_code in (403, 404), r.text  # 403: a read token may not scan (#24)
         assert "creds.txt" not in r.text
     assert not (space_dir / ".object" / "imports").exists()
+
+
+# -- 22: two TokenStores on the same file ---------------------------------------------------
+
+
+def test_token_stores_sharing_a_file_lose_nothing(tmp_path: Path, monkeypatch):
+    """Each router makes its own `TokenStore`; their writes must not overwrite each other."""
+    from objectapp import tokens as tk
+
+    real_load = tk.TokenStore._load
+
+    def slow_load(self):  # widen the read-modify-write window
+        out = real_load(self)
+        time.sleep(0.002)
+        return out
+
+    monkeypatch.setattr(tk.TokenStore, "_load", slow_load)
+    root, state = tmp_path / "space", tmp_path / "state"
+    root.mkdir()
+    keeper, keeper_secret = TokenStore(root, state).create("keeper", "read")
+    stores = [TokenStore(root, state) for _ in range(4)]
+    made: list[tuple[str, str]] = []
+    errors: list[BaseException] = []
+    lock = threading.Lock()
+
+    def churn(store: TokenStore, n: int) -> None:
+        try:
+            for i in range(n):
+                record, secret = store.create(f"t{id(store)}-{i}", "read-write")
+                if i % 2:
+                    assert store.revoke(record.id)
+                else:
+                    with lock:
+                        made.append((record.id, secret))
+                assert store.verify(keeper_secret) is not None
+        except BaseException as exc:  # noqa: BLE001 - reported below
+            errors.append(exc)
+
+    threads = [
+        threading.Thread(target=churn, args=(s, 10)) for s in stores
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    fresh = TokenStore(root, state)
+    ids = {t.id for t in fresh.list()}
+    assert ids == {keeper.id, *(i for i, _s in made)}
+    for _id, secret in made:
+        assert fresh.verify(secret) is not None
+    assert [p.name for p in state.iterdir()] == ["api-tokens.json"]  # no temp file left
