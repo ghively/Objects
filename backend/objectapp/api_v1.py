@@ -313,7 +313,9 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         types = [resolve_type(t).id for t in type if resolve_type(t) is not None]
         types = [t for t in types if t in known]
         hidden = hidden_paths()
-        found = ctx.search.search(q, types=types, limit=min(200, limit + len(hidden)), mode=mode)
+        # Hidden objects are left out before ranking, so `limit` visible results come back
+        # however many hidden ones match (sweep 2026-11-08).
+        found = ctx.search.search(q, types=types, limit=limit, mode=mode, exclude_paths=hidden)
         results = [x for x in found.get("results", []) if x.get("path") not in hidden][:limit]
         if hidden and results:
             # A properties snippet shows a relation's target by its title: leave it out for an

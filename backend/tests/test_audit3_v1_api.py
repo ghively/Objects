@@ -321,6 +321,38 @@ def test_activity_trim_needs_no_fixed_temp_name(tmp_path: Path, monkeypatch):
     assert [e["path"] for e in log.since(None)] == ["4.md", "5.md", "6.md"]
 
 
+# -- sweep 2026-11-08: a visible search hit behind more than 200 hidden ones ----------------
+
+
+def test_v1_search_finds_a_visible_match_behind_many_hidden_ones(
+    space_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _env(tmp_path, monkeypatch)
+    for i in range(205):
+        (space_dir / "Pages" / f"Hidden quokka {i}.md").write_text(
+            f"---\ntype: Page\ntitle: Hidden quokka {i}\nexcludeFromAI: true\n"
+            "lastUpdated: 2026-11-06T10:00:00.000Z\n---\nA quokka that stays out of the API.\n",
+            encoding="utf-8",
+        )
+    (space_dir / "Pages" / "Visible quokka.md").write_text(
+        "---\ntype: Page\ntitle: Visible quokka\nlastUpdated: 2026-11-06T10:00:00.000Z\n---\n"
+        "The one quokka the API may show.\n",
+        encoding="utf-8",
+    )
+    with TestClient(
+        create_app(Space(space_dir), watch=False), raise_server_exceptions=False
+    ) as c:
+        deadline = time.monotonic() + 30
+        while c.get("/api/search", params={"q": "zzz"}).json().get("partial"):
+            assert time.monotonic() < deadline, "the search index did not finish its sync"
+            time.sleep(0.05)
+        h = _bearer(space_dir, "read")
+        for mode in ("auto", "title", "fullText"):
+            r = c.get("/api/v1/search", params={"q": "quokka", "limit": 5, "mode": mode}, headers=h)
+            assert r.status_code == 200, r.text
+            assert [x["path"] for x in r.json()["results"]] == ["Pages/Visible quokka.md"], mode
+
+
 # -- sweep 2026-11-08: a saved query's label, tag and relation filters hold ids -------------
 
 
