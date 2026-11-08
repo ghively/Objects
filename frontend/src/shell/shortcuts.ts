@@ -10,10 +10,11 @@
  * with the tab shortcuts, so `App` binds them with the same call.
  */
 import { toggleCalendarSidebar } from '@/calendar/calendarUi'
+import { useCalendar } from '@/calendar/useCalendar'
 import { createAndOpen } from '@/create/createAndOpen'
 import { useLinkIndex } from '@/links/linkIndex'
 import { M7_SHORTCUTS, registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'
-import { useTabs } from '@/nav/tabs'
+import { currentTarget, useTabs } from '@/nav/tabs'
 import { useTabMenu } from '@/shell/TabMenu'
 
 export const TAB_SHORTCUT_IDS = ['closeTab', 'openNewTab', 'navigateTabs', 'openTabList', 'navigateBack', 'navigateForward'] as const
@@ -51,9 +52,23 @@ export function createNewTask(): void {
   void createAndOpen(id).catch((err: unknown) => console.warn('Could not create a task:', err))
 }
 
-/** The General keys of the 2026-11-08 sweep. Inside the editor Ctrl+Shift+T stays "Make this block a task". */
+/**
+ * "Go to Calendar" (Ctrl+Alt+H): open the Calendar in the current tab; pressed again while it is
+ * open, jump to today (the catalog: "press twice to jump to today").
+ */
+export function goToCalendar(): void {
+  const tabs = useTabs.getState()
+  if (currentTarget(tabs)?.kind === 'calendar') useCalendar.getState().today()
+  else tabs.open({ kind: 'calendar' })
+}
+
+/**
+ * The General keys of the 2026-11-08 sweep. Inside the editor Ctrl+Shift+T stays "Make this block
+ * a task"; Ctrl+Alt+H types nothing, so it works there too.
+ */
 export function useGeneralShortcuts(): void {
   useGlobalShortcut('createNewTask', createNewTask)
+  useGlobalShortcut('goToCalendar', goToCalendar, { allowInEditable: true })
 }
 
 export function useTabShortcuts(): void {

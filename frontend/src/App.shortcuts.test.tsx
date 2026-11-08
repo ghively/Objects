@@ -10,6 +10,8 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import { todayYmd } from '@/calendar/dates'
+import { useCalendar } from '@/calendar/useCalendar'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import App from './App'
@@ -101,6 +103,20 @@ describe('app shortcuts', () => {
     await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', {}))
     // A task opens in the peek (the New menu's rule for the Task type).
     await waitFor(() => expect(usePeek.getState().path).toBe('task/Untitled.md'))
+  })
+
+  // The 2026-11-08 sweep: Ctrl+Alt+H is "Go to Calendar (press twice to jump to today)" (catalog, General).
+  test('Ctrl+Alt+H opens the Calendar; pressed again while it is open, it jumps to today', async () => {
+    await openObjectPage()
+    useCalendar.getState().setAnchor('2001-02-03')
+    const notPrevented = fireEvent.keyDown(document.body, { key: 'h', ctrlKey: true, altKey: true })
+    expect(notPrevented).toBe(false)
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'calendar' }))
+    // The first press only opens the calendar, where it was.
+    expect(useCalendar.getState().anchor).toBe('2001-02-03')
+    fireEvent.keyDown(document.body, { key: 'h', ctrlKey: true, altKey: true })
+    await waitFor(() => expect(useCalendar.getState().anchor).toBe(todayYmd()))
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'calendar' })
   })
 
   test('Ctrl+Shift+T inside the editor keeps meaning "Make this block a task": no new task is created', async () => {

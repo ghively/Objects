@@ -217,6 +217,18 @@ describe('sweep 2026-11-08: catalogued keys', () => {
     expect(keysFor('pasteAsPlainText')).toEqual(['Mod-Shift-v'])
   })
 
+  test('Ctrl+Alt+H is "Go to Calendar" under General', () => {
+    const d = byId().get('goToCalendar')
+    expect(d).toBeTruthy()
+    expect(d?.category).toBe('global')
+    expect(d?.scope).toBe('global')
+    expect(d?.name).toBe('Go to Calendar')
+    expect(d?.provisional).toBe(false)
+    expect(d?.bound).toBe(true)
+    expect(keysFor('goToCalendar')).toEqual(['Mod-Alt-h'])
+    expect(formatKeys('Mod-Alt-h', false)).toBe('Ctrl+Alt+H')
+  })
+
   test('no two registered ids in one scope share a key, except the declared pairs', () => {
     for (const mac of [false, true]) {
       const seen = new Map<string, string>()
