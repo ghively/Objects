@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { Collection, SaveCollectionResult, Views } from '@/api/types'
+import { showToast } from '@/editor/media/upload'
 import { reloadDefinitions, useDefinitions, useDefs } from '@/types/useDefinitions'
 
 export interface UseCollections {
@@ -66,6 +67,9 @@ export function saveCollectionEdit(id: string, edit: (c: Collection) => Collecti
   })
 }
 
+/** The toast after a save of a collection's views failed ("Could not save …" form, as the graph's). */
+export const COLLECTION_VIEWS_SAVE_FAILED = 'Could not save the collection views'
+
 type ViewsEdit = (v: Views) => Views
 const pending = new Map<string, ViewsEdit[]>()
 const timers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -80,6 +84,8 @@ async function flushViews(id: string): Promise<void> {
     await saveCollectionEdit(id, (c) => ({ ...c, views: edits.reduce((v, e) => e(v), c.views) }))
   } catch (e) {
     console.warn('Could not save the collection views:', e)
+    // Audit 2026-11-07 #43: told, not only logged.
+    showToast(COLLECTION_VIEWS_SAVE_FAILED)
   }
 }
 
