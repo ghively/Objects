@@ -170,6 +170,19 @@ describe('#18 a GFM task item in an ordered list', () => {
   })
 })
 
+describe('fix-pass P1: a nested list with its own delimiter or bullet', () => {
+  for (const body of ['1) a\n   1. b\n   2. c\n2) d\n', '- a\n  * b\n  * c\n- d\n', '1. a\n   - b\n   - c\n2. d\n   + e\n']) {
+    test(`an edit keeps each depth's markers: ${JSON.stringify(body)}`, () => {
+      expect(topTypes(headless(body))).not.toContain('rawBlock')
+      expectEveryEditLocal(body)
+    })
+  }
+
+  test('editing the inner item keeps the inner delimiter (the repro)', () => {
+    expect(editWhere('1) a\n   1. b\n   2. c\n2) d\n', 'b')).toBe('1) a\n   1. bZ\n   2. c\n2) d\n')
+  })
+})
+
 describe('#17 an indented code block inside a list item', () => {
   const cases = [
     '- a\n\n      indented code in item\n- b\n',
