@@ -528,20 +528,24 @@ def test_quitting_drops_queued_runs_and_waits_only_so_long(root, monkeypatch, tm
 
 
 def test_this_week_in_a_sunday_start_space_is_the_views_week(root, monkeypatch, tmp_path):
-    # Review M14 #6 (our choice): a rule's "this week" runs Monday to Sunday, as views show it,
-    # whatever the space's week start.
+    # Weeks follow the "Start of the week" setting everywhere (2026-11-08): on a Sunday-start
+    # space, seen from Sunday 8 Nov, "this week" is 8-14 Nov, as the calendar and views show it.
     from datetime import UTC, datetime
 
     (root / ".object" / "ui.json").write_text(json.dumps({"calendar": {"weekStart": "sunday"}}), encoding="utf-8")
     sunday = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
     with served(root, monkeypatch, tmp_path, now=sunday) as s:
-        s.props(REPORT, {"date": {"start": "2026-11-04", "resolution": "day"}})  # Wednesday
+        s.props(REPORT, {"date": {"start": "2026-11-04", "resolution": "day"}})  # Wednesday: last week
         rule = s.create(button_rule(
             [{"kind": "setProperty", "key": "priority", "value": "High"}],
             conditions={"type": "filterGroup", "operator": "and", "elements": [
                 {"type": "filter", "propertyId": "date", "option": "is",
                  "referenceValue": {"relative": "thisWeek"}}]},
         ))  # fmt: skip
+        run = s.client.post(f"/api/automations/{rule['id']}/run", json={"path": REPORT}).json()
+        assert run["status"] != "ok", run
+        assert fm(s, REPORT).get("priority") != "High"
+        s.props(REPORT, {"date": {"start": "2026-11-10", "resolution": "day"}})  # Tuesday: this week
         run = s.client.post(f"/api/automations/{rule['id']}/run", json={"path": REPORT}).json()
         assert run["status"] == "ok", run
         assert fm(s, REPORT)["priority"] == "High"

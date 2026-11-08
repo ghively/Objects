@@ -68,6 +68,7 @@ from .apiquery import (
     sort_rows,
 )
 from .propvalues import InvalidValue
+from .recurrence import week_start_of
 from .space import Conflict, ReadOnly
 from .tokens import ActivityLog, TokenStore
 from .v1guard import V1Guard, guarded
@@ -355,7 +356,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         if tags:
             want = {t.casefold() for t in tags}
             rows = [x for x in rows if want & {t.casefold() for t in x.summary.tags}]
-        matcher = Matcher(group, space.clock().astimezone(space.tz).date())
+        matcher = Matcher(group, space.clock().astimezone(space.tz).date(), week_start_of(space.root))
         rows = [x for x in rows if matcher.matches(x.values)]
         if sort and isinstance(sort.get("propertyId"), str):
             rows = sort_rows(rows, sort["propertyId"], bool(sort.get("descending")))

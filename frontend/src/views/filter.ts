@@ -25,7 +25,7 @@ import {
 } from '@/properties/computed'
 import { parseRemind } from '@/tasks/remind'
 import { parseRepeat } from '@/tasks/repeat'
-import { dayRange, dayReader, daySpan, endOfDay, parseDay, resolveRelative, startOfDay, type DayRange } from './dates'
+import { dayRange, dayReader, daySpan, endOfDay, parseDay, resolveRelative, startOfDay, type DayRange, type WeekStart } from './dates'
 
 export interface FilterOption {
   key: string
@@ -38,6 +38,8 @@ export interface FilterCtx {
   /** Tag object id → title (tag values are titles). */
   tagIdsToTitles: Record<string, string>
   now: Date
+  /** The "Start of the week" setting (`ui.calendar.weekStart`): "this week" and the week groups start on it. Monday when absent. */
+  weekStart?: WeekStart
   /** Object id → path, to compare entity filters' object ids with the resolved links. */
   pathsById?: Record<string, string>
   /** Object path → title, for relations (groups and sorts read the linked object's title). */
@@ -389,10 +391,10 @@ function collectionIds(row: Row, collections: Collection[]): string[] {
 }
 
 /** A date filter's reference as days: a relative range (a day, a week, a month, a year) or an exact date; null without one. */
-function referenceRange(f: Filter, now: Date): DayRange | null {
+function referenceRange(f: Filter, now: Date, weekStart?: WeekStart): DayRange | null {
   const ref = f.referenceValue as { relative?: string; exactDate?: string } | undefined
   if (!ref || typeof ref !== 'object' || Array.isArray(ref)) return null
-  if (ref.relative) return dayRange(resolveRelative(ref.relative as never, now))
+  if (ref.relative) return dayRange(resolveRelative(ref.relative as never, now, weekStart))
   if (ref.exactDate) {
     const d = parseDay(ref.exactDate)
     return d ? dayRange({ start: startOfDay(d), end: endOfDay(d) }) : null
@@ -503,11 +505,11 @@ function compileFilter(f: Filter, ctx: FilterCtx, pass: Pass): Test | null {
     if (!def) return true
     if (def.type === 'datetime' || def.type === 'datetimeSimple' || def.type === 'entity_createdAt' || def.type === 'entity_lastUpdated') {
       if (TASK_DATE_KEYS.has(f.option)) return matchTaskDate(row, f, !!own)
-      if (range === undefined) range = referenceRange(f, ctx.now)
+      if (range === undefined) range = referenceRange(f, ctx.now, ctx.weekStart)
       return matchDate(own ? dateOf(row, f.propertyId) : null, f, range, pass.dayOf)
     }
     if (COMPUTED_KINDS.has(def.type)) {
-      if (range === undefined) range = computedOperand(f.option) === 'date' ? referenceRange(f, ctx.now) : null
+      if (range === undefined) range = computedOperand(f.option) === 'date' ? referenceRange(f, ctx.now, ctx.weekStart) : null
       return matchComputed(own ? rowValue(row, f.propertyId) : undefined, f, range, pass.dayOf)
     }
     return matchKind(row, f, def, !!own, ctx)

@@ -9,6 +9,7 @@ import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
 import { useZonedToday } from '@/lib/zonedShell'
+import { useWeekStart } from '@/calendar/useCalendar'
 import { ChangeTypeDialog } from '@/object/ChangeTypeDialog'
 import { DeleteObjectDialog } from '@/object/DeleteObjectDialog'
 import { TypeChip } from '@/shell/Sidebar'
@@ -398,6 +399,7 @@ export function DataView(props: DataViewProps) {
 
   // `now` matters by day (relative filters and groups): it refreshes when the zone's day changes.
   const today = useZonedToday()
+  const weekStart = useWeekStart()
   const ctx = useMemo<GroupCtx>(() => {
     const tagIdsToTitles: Record<string, string> = {}
     const pathsById: Record<string, string> = {}
@@ -413,9 +415,9 @@ export function DataView(props: DataViewProps) {
       if (o.createdAt) entityCreated[o.path] = o.createdAt
     }
     const viewTypeIds = viewTypes.map((t) => t.id)
-    return { types, viewTypeIds, collections, tagIdsToTitles, pathsById, entityTitles, entityCreated, now: new Date() }
+    return { types, viewTypeIds, collections, tagIdsToTitles, pathsById, entityTitles, entityCreated, now: new Date(), weekStart }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `now` is fixed per day (`today`)
-  }, [types, viewTypes, collections, objects, today])
+  }, [types, viewTypes, collections, objects, today, weekStart])
 
   const result = useMemo(() => (props.pipeline ?? defaultPipeline)(rows, state, ctx), [props.pipeline, rows, state, ctx])
   const flat = result.rows

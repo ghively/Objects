@@ -1,5 +1,5 @@
 {
-  "about": "Shared cases for the view filter engine (filter.ts) and its server port (automation_filter.py); both test suites run every case. Weeks start on Monday, also where a case names a Sunday-start space (spaceWeekStart): rules mean what views show.",
+  "about": "Shared cases for the view filter engine (filter.ts) and its server port (automation_filter.py); both test suites run every case. A case's weekStart is the Start of the week setting (monday when absent): relative weeks start on it; `now` is a Sunday evening in Chicago, so the two settings give different weeks.",
   "timeZone": "America/Chicago",
   "now": "2026-11-02T03:30:00.000Z",
   "types": [
@@ -943,8 +943,8 @@
       ]
     },
     {
-      "name": "this week in a Sunday-start space still runs Monday to Sunday",
-      "spaceWeekStart": "sunday",
+      "name": "this week on Monday-start weeks runs Monday to Sunday",
+      "weekStart": "monday",
       "filter": {
         "type": "filter",
         "propertyId": "due",
@@ -955,6 +955,21 @@
       },
       "matches": [
         "Tasks/Alpha.md",
+        "Tasks/Beta.md"
+      ]
+    },
+    {
+      "name": "this week on Sunday-start weeks runs Sunday to Saturday",
+      "weekStart": "sunday",
+      "filter": {
+        "type": "filter",
+        "propertyId": "due",
+        "option": "is",
+        "referenceValue": {
+          "relative": "thisWeek"
+        }
+      },
+      "matches": [
         "Tasks/Beta.md"
       ]
     },
