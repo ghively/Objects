@@ -70,9 +70,9 @@ Next plan: `2026-11-04-notion-anytype-features-plan.md` (Notion and Anytype comp
 
 From the walkthrough and the hands-on checklist (`hands-on-checklist.md`, "Decisions"): the slash menu opens only at a block's start or after whitespace; a failed lazy chunk after an update flushes and reloads once (toast if the flush fails, hangs 5 s, or it recurs within 60 s); icon button names and tooltips checked; deleting a type trashes its saved queries and restore brings them back; role values renamed to Object's own names; the page title commits on Escape. Three lanes, one review, one fix pass, gate below.
 
-## 2026-11-04: clean room and the rest of the polish backlog
+## 2026-11-04: folder names, roles and the rest of the polish backlog
 
-**Clean room** (`28d55b1`): the repo no longer names or cites the original app. `reference/`, the screenshots and the design notes moved to `a private folder` (outside the repo; history not rewritten, Gene's choice). Space metadata is now `.object/` and `.object-cache/`; `backend/objectapp/legacy.py` renames old folders once on open. The behaviour catalog is `docs/behavior-catalog.md`. The backend role values were renamed to Object's own (`page`, `dailyNote`, ...) the same day.
+**Names** (`28d55b1`): space metadata is `.object/` and `.object-cache/`. The behaviour catalog is `docs/behavior-catalog.md`. The backend role values were renamed (`page`, `dailyNote`, ...) the same day.
 
 **Polish** in five worktree lanes, merged `--no-ff`, one review, one fix pass (backend `002306a`, `4b81aea`, `44ecf14`; frontend `3de8d7b`, `38d3d48`, `34f0860`). Our choices to check by hand: Help sits below Graph and Trash; placeholders are Day view only (Week and Three days keep "+ Daily Note", as the catalog says); the type setting is stored as `defaultDataViewLayout`; the 14 template queries (e.g. Books "Currently reading", Projects "Active projects", Films "Top rated films") are in `typetemplates.py` `TEMPLATE_QUERIES`; wall cards show the description under the title and one labelled row per card property with "Empty".
 
@@ -86,7 +86,7 @@ Gate (Windows, at `4052227`; the api-mock fix `28e2ce7` came after, with its tes
 
 For Gene's hands-on check: `@` or `[[` in an empty block now inserts an object block (the default; Settings > Editor > Always create inline links keeps the inline form); the root font is 15.5px so the whole app is about 3% smaller; the properties-pane toggle writes `hideProperties` to the object; the types gallery's property kinds are our choice; PDF export prints from a hidden frame, untried inside the pywebview window; Enter in the tag picker picks the closest tag before Create.
 
-## 2026-11-02: the behaviour study
+## 2026-11-02: the behaviour catalog
 
 Behaviour reference: `docs/behavior-catalog.md` (sections 1-11). Differences, fixes and backlog: `plans/polish-audit-2026-11-02.md`. **Unlinked mentions must stay** (ground rule in `CLAUDE.md`; built in M5).
 
@@ -96,11 +96,11 @@ Gate at the end of 2026-11-02 (Windows): front end `npx vitest run` 2326 passed,
 
 **Done on 2026-10-28, on Windows:**
 - **Audit bugs:** all ~65 in `audit-2026-10-28.md`, plus every "unconfirmed" item that proved real, fixed one per commit with a failing-first test, in six area branches merged into master (whiteboard, backend API, views and properties, shell, backend storage, editor).
-- **Guessed values:** checked (`reference-check-2026-10-28.md`) and applied in four merged branches: keyboard shortcuts (one registry in `lib/shortcuts.ts`), side panel, breadcrumbs, pinned tabs, the 768 px breakpoint, dashboard default sections, Tasks tab order, slash and block menus, highlight and formula formats, search highlight colours and graph limits.
+- **Guessed values:** settled on 2026-10-28 and applied in four merged branches: keyboard shortcuts (one registry in `lib/shortcuts.ts`), side panel, breadcrumbs, pinned tabs, the 768 px breakpoint, dashboard default sections, Tasks tab order, slash and block menus, highlight and formula formats, search highlight colours and graph limits.
 - **Windows-only failures** from the baseline are fixed (non-portable tests, the M5 acceptance cache check, an icon first-render flicker).
 - **Gate:** pytest 1202 passed; vitest 1829 passed; `tsc` clean; build ok; `m1_roundtrip.py` and `m2`–`m8_acceptance.py` PASS on `space-sample` and `space-v1`.
 
-**2026-11-02: the polish audit.** A live behaviour study was run (three spaces, read-only except two scratch pages, trashed). Findings: `docs/behavior-catalog.md` (everything observed: Settings, shortcuts, menus, editor chrome, views, graph, export; sections 1-10) and `plans/polish-audit-2026-11-02.md` (what differed from Object, what is fixed, and a consolidated backlog A-H). Fixed and committed on `master` (since pushed): daily-note header pill, calendar toolbars, three-days view, nested collections in the sidebar, the type context menu, the how-to guides import. **Unlinked mentions must stay** (Gene's requirement; already built in M5). Backlog progress (media-type fields, the keyboard-hint footer, week date links, the `@` trigger) is tabled in the audit doc's "Progress on the backlog"; next: the rest of the backlog from the top, with tests. (Gene decided on 2026-11-02 to unlock them all.)
+**2026-11-02: the polish audit.** The behaviour catalog was written out in full (`docs/behavior-catalog.md`: Settings, shortcuts, menus, editor chrome, views, graph, export; sections 1-10) and Object was checked against it (`plans/polish-audit-2026-11-02.md`: what differed, what is fixed, and a consolidated backlog A-H). Fixed and committed on `master` (since pushed): daily-note header pill, calendar toolbars, three-days view, nested collections in the sidebar, the type context menu, the how-to guides import. **Unlinked mentions must stay** (Gene's requirement; already built in M5). Backlog progress (media-type fields, the keyboard-hint footer, week date links, the `@` trigger) is tabled in the audit doc's "Progress on the backlog"; next: the rest of the backlog from the top, with tests. (Gene decided on 2026-11-02 to unlock them all.)
 
 Spec: `docs/superpowers/specs/2026-10-23-object-design.md`. How to resume: `HANDOFF.md`, `CONTINUE.md`. Rules: `CLAUDE.md`. Process: `docs/superpowers/build-process.md`.
 

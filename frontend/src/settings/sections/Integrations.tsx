@@ -15,7 +15,7 @@ import { McpServersGroup } from '@/mcp/McpServersGroup'
 import { MCP_TEXT } from '@/mcp/mcpText'
 import { OptionCards, SaveError, SectionHeader, SettingGroup, errorText } from '../controls'
 
-// our strings (no counterpart in the original app)
+// the Integrations section's strings
 export const INTEGRATIONS_TEXT = {
   heading: 'Integrations',
   description: 'Let programs on this computer, like an AI assistant, use this space.',

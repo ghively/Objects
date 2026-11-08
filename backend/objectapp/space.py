@@ -70,7 +70,6 @@ from .collections import CollectionDef, SaveCollectionResult
 from . import fmcache
 from .dailynotes import FILE_NAME_TAKEN, DailyNoteExists, build_index, day_of, parse_day
 from .jsonstore import DefinitionUnreadable, JsonStore
-from .legacy import migrate_legacy_folders
 from .localtime import SystemTz, from_local, to_local
 from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
 from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
@@ -989,7 +988,6 @@ class Space:
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root).resolve()
-        migrate_legacy_folders(self.root)  # older folder names, renamed once
         self._space_json = os.fspath(self.root / SPACE_REL)
         self._name_cache: tuple[tuple | None, str] | None = None
         """(`space.json`'s stat key, the name read with it) for `name`."""

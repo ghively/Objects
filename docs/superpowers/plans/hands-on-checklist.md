@@ -14,9 +14,9 @@ A tag like `(M4 #7)` is the 7th unchecked box in `m4-acceptance.md`, counting ne
 2. In `frontend/`, run `npm run build`.
 3. From the repo root, run `uv run objectapp --space "<copy>"`. After each check, look at `git status` / `git diff` in the copy.
 
-Fixtures the original checks used: `space-sample` (M2, M3), `space-calendar` (M4), `space-links` plus a 5,000-object space made with `backend/tests/bigspace.py` (M5), `space-whiteboard` (M6), `space-blocks` (M7), `space-m8` (M8, M9). Items that say "CPI copy" need the work export copy.
+Fixtures the milestone checks used: `space-sample` (M2, M3), `space-calendar` (M4), `space-links` plus a 5,000-object space made with `backend/tests/bigspace.py` (M5), `space-whiteboard` (M6), `space-blocks` (M7), `space-m8` (M8, M9). Items that say "CPI copy" need the work export copy.
 
-Behaviour checks compare against the behaviour catalog (`docs/behavior-catalog.md`). Look checks compare side by side with the original app you're modelling.
+Behaviour checks compare against the behaviour catalog (`docs/behavior-catalog.md`). Look checks compare against the design spec (`docs/superpowers/specs/2026-10-23-object-design.md`) and the catalog.
 
 ## Decisions (settled by Gene, 2026-11-04, and built)
 
@@ -37,7 +37,6 @@ Settled and built the same day; check each by hand:
 - [ ] (Optional) `uv run python scripts/m1_roundtrip.py "<CPI copy>"`: PASS (it works on its own temporary copy). (M1 #3)
 - [ ] `uv run python scripts/m2_acceptance.py "<CPI copy>"`: paste its step-10 lists into `m2-acceptance.md`. (M2 #14)
 - [ ] `uv run objectapp --space "<copy>"`: a 1440x900 native window opens, and Ctrl+N reaches the page (isn't eaten by the window). (M1 #4, M2 #2)
-- [x] **(walkthrough)** **(new 2026-11-04)** A legacy-format space is migrated on open (old metadata folders renamed once), and its `.md` files stay byte-identical.
 - [ ] Open the CPI copy and scroll through every note: `git status` stays clean. (M6 #13, M7 #1, M8 #1)
 - [ ] Notes with HTML comments, Mermaid fences, `$` signs, `<span>`, `<mark>`, `<time>`, `^ids` or `![[…#^…]]` keep their bytes after opening and scrolling. (M7 #2, M8 #2)
 - [ ] Opening creates only `.object-cache/` (`git status` clean); deleting that folder loses nothing, and it comes back. (M5 #8)
@@ -186,7 +185,7 @@ Settled and built the same day; check each by hand:
 - [ ] The palette's type and tag matching (prefix, word-prefix, or 3+ character substring), the caps (5 tag options, 10 Recently Opened), and picking an option removes the words that named it. (M5 #15)
 - [ ] Find in page from the `…` menu and with Ctrl+F: match case, whole word, next/previous, replace, replace all, then `git diff`. (M5 #3)
 - [ ] Find bar icons: underlined "ab" for whole word, `ph-text-aa` for match case; Replace shows in read-only editors and does nothing. (M5 #16)
-- [ ] Search highlight colours: light `#fef08a4b` with yellow 900 text, dark `#fddf472c` with yellow 100 text; find in page `#facc1573`, current match `#f97316b3`; palette titles in the bold 600 variant; weight 500, radius 1px. (M5 #13)
+- [ ] Search highlight colours: the highlight tokens in light and dark themes, and the find-in-page match and current-match tokens; palette titles in the bold 600 variant; weight 500, radius 1px. (M5 #13)
 - [ ] On the CPI copy, search finds what you expect by title and text; snippets read well; `partial` disappears after the first indexing. (M5 #9)
 - [ ] The references section on Ada Lovelace (`space-links` copy): all five tabs, hiding it by clicking the active tab, linking a mention, then `git diff`. (M5 #4)
 - [ ] On the CPI copy, backlinks are right for a few objects you know; linking a mention changes only that text. (M5 #10)
@@ -258,11 +257,11 @@ Settled and built the same day; check each by hand:
 - [ ] Look: the entity node's caption and card. (M6 #40)
 - [ ] On `Network map`, the first "zoom to fit" against the title overlay: the title and "Frame 1" label shouldn't overlap the board text. (M6 #41)
 
-## Settings, themes & look side by side
+## Settings, themes & look
 
-Look checks: compare side by side with the original app you're modelling, in Light, Light Dimmed, Dark and Dark Dimmed where the source says "dark and light".
+Look checks: compare against the design spec and the behaviour catalog, in Light, Light Dimmed, Dark and Dark Dimmed where an item says "dark and light".
 
-- [ ] **(new 2026-11-03)** The root font is 15.5px, so the whole app is about 3 % smaller: it reads right next to the original.
+- [ ] **(new 2026-11-03)** The root font is 15.5px, so the whole app is about 3 % smaller and still reads comfortably.
 - [ ] Focus mode and its timer, Present, and the Language, Date & Time (time zone, decimal separator), Editor and Space settings. (M8 #39)
 - [ ] The focus presets (our choice). (M8 #16)
 - [ ] "Recalculate content index" runs, and the indexing state shows. (M9 #16)

@@ -1,17 +1,15 @@
 # UI polish audit, 2026-11-02
 
 Gene asked to check every button and interaction against the behaviour catalog
-(`docs/behavior-catalog.md`). Method: Claude read the target behaviour in Microsoft Edge (the CPI space,
-1912x901) through the browser tool's CDP attach, read-only: opened menus, popovers and views and closed
-them without choosing anything; nothing was created or changed, and the view was put back to Day
-afterwards. Object was then opened at the same width and compared control by control; the "Catalog"
-column below is the expected behaviour.
+(`docs/behavior-catalog.md`). Method: Object was opened at 1912x901 and compared with the catalog control by
+control (menus, popovers and views opened and closed without choosing anything); the "Catalog" column below
+is the expected behaviour.
 
 ## Fixed (commits on `master`)
 
 | Area | Catalog | Object before | Now |
 |---|---|---|---|
-| Empty daily note | one placeholder | two placeholders drawn over each other ("Start your daily note" + "Write your text or search for blocks...") | one; the editor can be told not to draw its own |
+| Empty daily note | one placeholder | two placeholders drawn over each other ("Start your daily note" + "Type, or / for blocks") | one; the editor can be told not to draw its own |
 | Section headings in narrow columns | heading intact, toolbar beside or below | toolbar overprinted the heading ("Task", "Cre...ay") | the heading row wraps; the toolbar drops to its own line |
 | Three days | day header + daily note only, no month sidebar | plus Tasks, Created, Backlinks sections in every column | daily notes only (as the catalog describes) |
 | Month sidebar and its switch | Day view only | every view | Day view only |
@@ -26,7 +24,7 @@ column below is the expected behaviour.
 1. **New menu**: the catalog has a popover anchored under the New button, with a "Search" field, the types
    in recent-use order, and a footer "up/down to navigate, Esc to abort, Enter to select". Object opens a
    centred modal with an alphabetical list.
-2. **Search palette**: placeholder "Search for content and actions, or paste from clipboard" with an info
+2. **Search palette**: placeholder "Search, run an action, or paste" with an info
    icon; recents grouped "Today" / "Earlier" with each item's type at the right; footer lists Ctrl+Enter
    (new tab) and Shift+Enter (side panel); content and actions are one list. Object has "Search content",
    an empty state until objects are opened, and a separate "Switch to actions" mode.
@@ -187,8 +185,8 @@ an editable scratch page; only rendered results were read.
 
 ## Sixth pass: the editor, driven on one scratch page
 
-One Page was created in the Personal space, typed in, and deleted (it is in Trash, kept 30 days; Trash says
-"Objects will be kept in trash for 30 days"; Empty Trash was not touched). Typing went through the browser
+One Page was created in the Personal space, typed in, and deleted (it is in Trash, kept 30 days; Trash shows
+its 30-day retention note; Empty Trash was not touched). Typing went through the browser
 debugger, which makes list shortcuts unreliable to judge, so treat "did not convert" below as unconfirmed.
 
 39. **New menu**: a popover under New with a Search field, types in recent-use order (Pro types show a rocket

@@ -101,7 +101,7 @@ These are known issues. Task 19 did not fix them, because they are in files othe
 2. **Fixed in the review fix pass:** `unwrapAt` now keeps the container's trailing blank line on its last child, for every container. **`unwrapToggle` loses the blank line after a container.** `nodes/containers.ts` `unwrapAt` has this problem, reported by Task 10. Groups use Task 10's own `ungroupAt`, but toggles still go through `unwrapAt`.
 3. **Fixed (2026-10-27): `fc0bff2`.** `editorExtensions` takes the registry-owned keys out of the built-in key maps (`withoutRegistryKeys` in `editor/document.ts`: StarterKit's mark and heading keys, the code block's Mod-Alt-c, the task list's Mod-Shift-9, the list items' Tab/Shift-Tab), and Tab/Shift-Tab in a list item go through the registry's `indentBlocks`/`unindentBlocks`; a changed registry key leaves no old key working (`editor/shortcuts.test.ts`). **StarterKit's own key bindings still fire** (Task 12). An example is Mod-Alt-1 for Heading 1. If the shortcut registry changes a key, the old StarterKit key keeps its action. Fixing this needs `document.ts` to configure StarterKit's keymaps off.
 4. **Fixed (2026-10-27): `cddb70e`.** Hierarchy, quote, standout, colour and icon run on every selected block (`forEachTargetBlock`), and List makes the selected blocks one list (`withTargetSelection`), as Turn Into does (`editor/menus/BlockStyleMenu.test.tsx`, multi-block cases). **The block style menu acts only on the block at the cursor** (Task 8's `BlockStyleMenu`). The block menu and the shortcuts act on every selected block.
-5. **The main column gets very narrow when the side panel opens** (seen in the walkthrough). With the property panel open, the editor column shrinks to about 150 px at a 1440 px window, because the side panel and the property panel both keep their widths. The intended behaviour here needs checking. Fixed (2026-10-27): 34693ce. The main column keeps 480 px, or 850 px (the 370 px property panel plus 480 px) while a Standard page shows its properties, never leaving the side panel under its 320 px minimum, so the side panel shrinks first. A Standard page narrower than 850 px puts its properties inline under the title (the card look). At 1440x900 with both panels open the content column went from 202 px to 752 px (side panel 500 to 320 px). No rule was specified for this, so the widths and the inline fallback are our choice, for Gene's check. Updated 2026-10-28 (reference-check sections 2a and 5): the 480 px main-column minimum is gone (there is none; the side panel is a 10–90 % share), and the properties go inline below the container md breakpoint, 768 px, for Standard, Profile and Encyclopedia. Whether Standard should have a property sidebar at all is still for Gene to check on screen.
+5. **The main column gets very narrow when the side panel opens** (seen in the walkthrough). With the property panel open, the editor column shrinks to about 150 px at a 1440 px window, because the side panel and the property panel both keep their widths. The intended behaviour here needs checking. Fixed (2026-10-27): 34693ce. The main column keeps 480 px, or 850 px (the 370 px property panel plus 480 px) while a Standard page shows its properties, never leaving the side panel under its 320 px minimum, so the side panel shrinks first. A Standard page narrower than 850 px puts its properties inline under the title (the card look). At 1440x900 with both panels open the content column went from 202 px to 752 px (side panel 500 to 320 px). No rule was specified for this, so the widths and the inline fallback are our choice, for Gene's check. Updated 2026-10-28: the 480 px main-column minimum is gone (there is none; the side panel is a 10–90 % share), and the properties go inline below the container md breakpoint, 768 px, for Standard, Profile and Encyclopedia. Whether Standard should have a property sidebar at all is still for Gene to check on screen.
 6. **Fixed (2026-10-27): `5e63ef1`.** Not toggle-specific: Tiptap's task-list tokenizer read one line per item, so any to-do with a lazy (or indented) continuation line, and any quote with a lazy line, loaded raw. The to-do list's tokenizer now takes the list and item extents from marked's GFM list tokenizer (`editor/extensions/taskListMarkdown.ts`), and the loose content check ignores quote markers; the lazy line is part of the item's paragraph, and the file round-trips byte for byte (`editor/document.blocks.test.ts`, "lazy continuation lines"). **Lazy continuation in a toggle shows as a raw block** (seen in the walkthrough). In "Every block", the open toggle's `- [ ] Patch the hosts` is followed by the lazy continuation line `Details in [[Embedded target]].`. They show as one raw (monospace) block. This is byte-safe, but the toggle's children look like source.
 7. **Fixed (2026-10-27): `b11a362`.** The math block renders each blank-line-separated part as its own KaTeX display row (`renderDisplayMath` in `editor/math/renderMath.ts`), except across an open `{` group or environment; the source bytes are unchanged. Nothing specifies this, so Gene compares it in the hand-check. **A math block with a blank line inside renders as one line.** `E = mc^2`, a blank line, then `a^2+b^2=c^2` shows as `E=mc²a²+b²=c²`. KaTeX ignores the blank line. Compare in the hand-check.
 
@@ -110,17 +110,17 @@ These are known issues. Task 19 did not fix them, because they are in files othe
 The lane agents chose these where nothing was specified:
 
 - **Tabs:**
-  - A pinned tab can never be closed: no close button, no right-click "Close tab", and Ctrl+W and middle click do nothing. Closing the active tab activates the most recently opened tab. Tabs are 60 to 200 px wide with a 5 px gap (reference: `wA`, `Jk(tabs)[0]`, `oW`/`aW`/`sW`, reference-check 2c).
+  - A pinned tab can never be closed: no close button, no right-click "Close tab", and Ctrl+W and middle click do nothing. Closing the active tab activates the most recently opened tab. Tabs are 60 to 200 px wide with a 5 px gap.
   - The "Calendar today" start-up option opens the Calendar's Day view on today.
   - `navigateTabs` only moves forward.
 - **Breadcrumbs:**
   - Following a link back to a page already on the trail cuts the trail at that page.
   - A link opened in a new tab carries the trail with it.
-  - At most 3 crumbs show inline counting the current page; every earlier crumb goes into a menu (256 px wide) behind a leading dots icon button, most recent first; crumbs are separated by `/` and earlier ones are at 80 % opacity (reference-check 2b). The button's aria-label "Show hidden breadcrumbs" is our string.
+  - At most 3 crumbs show inline counting the current page; every earlier crumb goes into a menu (256 px wide) behind a leading dots icon button, most recent first; crumbs are separated by `/` and earlier ones are at 80 % opacity. The button's aria-label "Show hidden breadcrumbs" is our string.
 - **Side panel:**
   - A plain click on a resolved wikilink inside an entry navigates the entry.
   - Swap works by click only; dragging an entry onto the main view is not built.
-  - The calendar sidebar is 26rem wide (reference-check 2a). The side panel is 45 % of the main column plus the panel, dragged between 10 % and 90 %, back to 45 % on a double click; areas 2 and 3 are 220 px high by default and every area at least 120 px (reference-check 2a).
+  - The calendar sidebar is 26rem wide. The side panel is 45 % of the main column plus the panel, dragged between 10 % and 90 %, back to 45 % on a double click; areas 2 and 3 are 220 px high by default and every area at least 120 px.
 - **Blocks:**
   - "Standout" is our label.
   - Small text is 0.9em.
@@ -132,7 +132,7 @@ The lane agents chose these where nothing was specified:
   - Mod-a selects the block's siblings first, then the top level.
 - **Look:**
   - The `--focus-ring` token is new.
-  - The current search match uses `#fef08a99`.
+  - The current search match has its own highlight token.
   - The settings nav icons are Phosphor icons we chose.
   - Numeric dates use dashes or slashes as the option labels show.
   - The space icon is stored as a plain string (an Iconify id or an emoji), and its colour is not kept.
@@ -157,7 +157,7 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 
 ### Shortcut keys
 
-- [x] The keys in Settings → Shortcuts were compared with the shortcut table (`reference-check-2026-10-28.md` §1) and corrected in `lib/shortcuts.ts`. Ids the table gives no key (headings, to-do, toggle, text alignment) have none and are left out of the sheet. "Unverified" now marks only Object's own keys (pen, highlighter, eraser).
+- [x] The keys in Settings → Shortcuts were compared with the Shortcuts sheet in the behaviour catalog and corrected in `lib/shortcuts.ts`. Ids the table gives no key (headings, to-do, toggle, text alignment) have none and are left out of the sheet. "Unverified" now marks only Object's own keys (pen, highlighter, eraser).
 - [ ] Hand-check the changed keys: side panel Ctrl+Shift+→, left sidebar Ctrl+Shift+←, calendar sidebar Ctrl+Alt+S, dark mode Ctrl+Shift+L, shortcuts menu Ctrl+Shift+B, tab menu Ctrl+Shift+↑, back/forward Ctrl+←/→ or Ctrl+[/], math Ctrl+M, code/math block Ctrl+E/Ctrl+M with blocks selected, move blocks Alt+↑/↓.
 
 ### Unverified designs, each against the behaviour catalog
@@ -190,9 +190,9 @@ Run these on his CPI copy outside the repo, with `git init` and a first commit d
 - [ ] the side panel (Shift+click, three areas, resizing, swap, the calendar sidebar inside the Calendar)
 - [ ] creating, renaming, switching and removing a space in the window (the launcher restarts on the same port)
 
-### The final side-by-side fidelity pass, in dark and in light
+### The final fidelity pass, in dark and in light
 
-Run every screen in Light and in Dark, and the shell and editor once each in Light Dimmed and Dark Dimmed. For each screen, note what differs (spacing, colour, label, behaviour) so one fix pass can follow.
+Run every screen in Light and in Dark, and the shell and editor once each in Light Dimmed and Dark Dimmed. For each screen, compare with the design spec and the behaviour catalog and note what differs (spacing, colour, label, behaviour) so one fix pass can follow.
 
 - [ ] the app shell and sidebar (section headings, "+ New" and search, footer)
 - [ ] the tab strip and tab menu

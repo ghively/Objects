@@ -34,7 +34,7 @@ Built on `feat/m22-m23` (worktree `C:\Git\object-work`, the second of the two pa
 - No agent runs in M23. Object never reads `~/.claude/.credentials.json` or any Claude token and never calls Anthropic's API. Tests use `OBJECT_STATE_DIR` in a temp folder and never touch `~/.claude`.
 - The server binds 127.0.0.1 only. No network at runtime (a ticket link opens in the browser only when Gene clicks it).
 - Fixtures are synthetic (`INC0012345`, `OPS-123`, "Printer jams on line 3", "Pat Example", `printer-watch`); no real ticket, host, person or monitoring job name. Never touch `C:\Git\wiki`.
-- Never name the original notes app, or the open-source agent whose patterns the agents design adopts, in code, strings, fixtures or docs.
+- Never name the open-source agent whose patterns the agents design adopts, in code, strings, fixtures or docs.
 - Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ## Review Focus

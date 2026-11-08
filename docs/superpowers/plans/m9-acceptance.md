@@ -127,4 +127,4 @@ On a copy of the CPI export outside the repo, with `git init` done there:
 - [ ] "Recalculate content index" runs and the indexing state shows.
 - [ ] Draw on a whiteboard: its "Last updated" moves, at most once a minute. The board's Notes still save.
 - [ ] Every rule in "Rules the build chose", against the behaviour catalog.
-- [ ] The side-by-side look of every M9 screen in Light and Dark.
+- [ ] The look of every M9 screen against the spec and catalog, in Light and Dark.

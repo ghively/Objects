@@ -70,7 +70,7 @@
   - A collection holds objects of the types in `typeIds`. Adding an object of another type returns 422 "This collection doesn't hold objects of this type." (our string).
   - The `collections:` names resolve to collections case-insensitively by name, then by `formerNames`. A name that doesn't resolve stays in the file and is ignored.
   - **Rename** rewrites the `collections:` items in every member (unstamped, `replace_in_value`, quote style kept) and appends the old name to `formerNames`.
-  - **Delete** follows the confirmation text ("By deleting a collection all entries will be removed as well. Entries that exist in other collections will be kept there."), but restorably. The collection goes to `.object/trash/collections/<ulid>/` (`collection.json` + `manifest.json {id, kind:'collection', collectionId, name, deletedAt, objectTrashIds, removedFrom, skipped}`).
+  - **Delete** follows the confirmation dialog (an entry is deleted with its collection unless it is also in another collection, where it stays), but restorably. The collection goes to `.object/trash/collections/<ulid>/` (`collection.json` + `manifest.json {id, kind:'collection', collectionId, name, deletedAt, objectTrashIds, removedFrom, skipped}`).
     - Members in no other collection become object trash entries with `collectionTrashId` (the files are moved as they are). A member is "in no other collection" only when every non-empty item of its `collections:` names this collection; an item that names another collection, an unreadable one or nothing known keeps the object, which only loses this collection's item.
     - For every other member, the item naming this collection is removed (unstamped) from its `collections:` list with `frontmatter.remove_from_list`. Each entry of `removedFrom` is `{path, index, versionAfter}` (the item's position in the list and the file's version after the removal), and the member's bytes before the removal are kept as `before/<n>.md` in the trash folder.
     - A member that is read-only or still conflicts after the one retry is left unchanged, listed in `skipped`, and returned by the route; its `collections:` still names the deleted collection, which then simply doesn't resolve.
@@ -110,7 +110,7 @@ ViewState   { viewDefinition: DataViewDefinition, filterGroup: FilterGroup, sort
 DashboardSection { key: 'allContent'|'recentlyAccessed'|'collections'|'queries'|'inNoCollection'|'notTagged'|'noBacklinks'|'pinned'
                         |`query:${id}`|`collection:${id}`,
               collapsed: boolean, viewDefinition?: DataViewDefinition, title?: string /* a tab rename; our addition */ }
-              /* Whether a section is also a header tab ("inFullView") is fixed per kind, not stored (reference entity):
+              /* Whether a section is also a header tab ("inFullView") is fixed per kind, not stored:
                  dashboard only: recentlyAccessed, collections, queries, pinned
                  dashboard and header tab: inNoCollection, notTagged, query:<id>, collection:<id> */
 Views       { activeTab: 'overview'|'all'|string /* a full-view section key */, all: ViewState,
@@ -246,7 +246,7 @@ frontend/src/properties/cells/{types.ts, SystemFieldCell.tsx}  (MOD: table densi
   - `Space.rows(type_ids=None, collection_ids=None, paths=None, search=None) -> list[Row]`, sorted by path.
     - Templates are excluded; read-only objects are included with `values` decoded leniently.
     - `collection_ids` keeps members of any of them (name resolution as in Global Constraints). Task 2 resolves names by reading `self.store('collections').list()` (`name` and `formerNames`) through a helper `_collection_names() -> {id: [names]}`; Task 3 rebases that helper on `Space.collections` without changing behaviour.
-    - `search` keeps objects where **any** term appears (as the hint says: "Add another term, and a result can match any of them."). Terms are case-insensitive substrings, at least 2 characters, at most 5 (a shorter or extra term is a 422). Places searched: mode `title`: the title or an alias; otherwise: the title, an alias, the description or the body.
+    - `search` keeps objects where **any** term appears (the builder's hint says a result may match any one term). Terms are case-insensitive substrings, at least 2 characters, at most 5 (a shorter or extra term is a 422). Places searched: mode `title`: the title or an alias; otherwise: the title, an alias, the description or the body.
   - `ObjectSummary.collections: list[str]`.
   - Route `POST /api/rows`.
 
@@ -403,7 +403,7 @@ frontend/src/properties/cells/{types.ts, SystemFieldCell.tsx}  (MOD: table densi
   - `test rows posts scope and returns rows`
   - `test createObject sends values`
   - `test patchUi sends baseRevision and emits ui event; 409 throws ConflictError`
-  - `test LAYOUTS labels and icons match reference`: `grid` → "Gallery" / `ph-grid-four`; `wall` → `ph-wall`; `table` → `ph-table`; no picker list contains `gallery`.
+  - `test LAYOUTS labels and icons match the catalog`: `grid` → "Gallery" / `ph-grid-four`; `wall` → `ph-wall`; `table` → `ph-table`; no picker list contains `gallery`.
   - `test columnCount`: 0 → 1, 216 → 1 (`floor(228/236)`, clamped), 236 → 1, 472 → 2, 1000 → 4 (`floor(1012/236)`), 3000 → 10 (capped); with `minCardWidth` 168: 360 → 2.
   - `test defaultSmallCard common and daily note`
 - [ ] **Step 2:** Run `cd frontend && npx vitest run src/api src/views/model.test.ts`. Expected: FAIL.
@@ -522,7 +522,7 @@ frontend/src/properties/cells/{types.ts, SystemFieldCell.tsx}  (MOD: table densi
     - "Show details" / "Hide details" toggles `ViewSummary` ("Filtered by …", "Sorted by …", "Grouped by …").
     - Groups render as collapsible headers with counts (`isClosed` persisted).
     - "Load more" (no count) pages by `LOAD_PAGE`.
-    - Shows "Loading results…" while loading, and the empty state "There's nothing here (yet)." / "You can change this by creating a new object." with "Create {name}".
+    - Shows "Loading results…" while loading, and the empty state "There's nothing here (yet)." / "Create an object to fill it." with "Create {name}".
     - Clicking an item peeks it with the view's current order as the pager list; Ctrl+click opens a new tab.
   - `<FilterEditor>`:
     - Row 0 is labelled "where", row 1 has the `and`/`or` dropdown, and rows 2+ have a static chip.
@@ -573,7 +573,7 @@ frontend/src/properties/cells/{types.ts, SystemFieldCell.tsx}  (MOD: table densi
   - **Column ids.** `TableColumn.id`, like `Filter.propertyId`, `Sort.propertyId` and `calculations[].propertyId`, is the property **key** (the frontmatter key, e.g. `status`, and the system ids `title`, `tags`, `collections`, `createdAt`…). M2's separate `PropertyDef.id` is never stored in view definitions; columns are matched to definitions by key, so a key rename (M2's cascade) is seen as delete + add.
   - `normalizeTableConfig(type, config?) -> TableViewConfig`: `wrapAllContent` defaults to true; new properties are appended; deleted ones are pruned; a missing or non-numeric `colWidth` takes the property's `tableColWidth`, else `DEFAULT_COL_WIDTH` for its kind; any width is then clamped to 2–50 rem; the title column can't be hidden and comes first.
   - `<TableLayout>`:
-    - One structure only. A view spanning several types shows "Table cannot be displayed for multiple object types."
+    - One structure only. A view spanning several types shows "A table needs a single object type."
     - Header cells resize by drag (rem, with a live preview, saved on release) and reorder by drag (dnd-kit).
     - Columns up to `pinnedColumnIndex` are `position: sticky` on the left.
     - Hidden columns are left out, and `wrapContent` (or `wrapAllContent`) switches truncation.
@@ -670,9 +670,9 @@ frontend/src/properties/cells/{types.ts, SystemFieldCell.tsx}  (MOD: table densi
     - **All:** a DataView over `api.rows({typeIds:[type.id]})` with `FULL_VIEW_LAYOUTS`, state saved to `.object/views/<id>.json`. Its `…` adds "Save as query", which creates a query with this type and the current filters/sorts/groupBy and opens it.
     - **New** from the All tab calls `createAndOpen(type.id, {values: matchingValues(...)}, mods)` with the view's filters.
   - `buildSections(type, views, ctx) -> RenderedSection[]` (visible, hidden, empty state; each with `inFullView` derived from its kind as in the contract), in the saved order. Sections not yet in `dashboard.sections` (a `collection:<id>` for each collection holding the type, unless in `removedSections`) are appended at the end. Task 12 reads collections and queries with `api.collections()` / `api.queries()` (reloaded on `collections` / `queries` events); Tasks 13 and 14 swap in `useCollections` / `useQueries`:
-    - `recentlyAccessed` ("Recently Opened", `ph-clock-clockwise`, gallery layout of up to 10 recent objects of the type; empty "No recently accessed content" / "Objects you recently accessed will appear here.")
-    - `collections` ("Collections": a grid of the type's collections; empty "No collections" / "You can change this by creating a new collection." with "Create collection")
-    - `queries` ("Queries": queries whose `structures` include the type; empty "No queries" / "Queries you create in this database will appear here." with "Create query")
+    - `recentlyAccessed` ("Recently Opened", `ph-clock-clockwise`, gallery layout of up to 10 recent objects of the type; empty "No recently accessed content" / "Recently opened objects show up here.")
+    - `collections` ("Collections": a grid of the type's collections; empty "No collections" / "Make a collection to fill it." with "Create collection")
+    - `queries` ("Queries": queries whose `structures` include the type; empty "No queries" / "Saved queries show up here." with "Create query")
     - `inNoCollection` ("Not in any collection", `ph-placeholder`)
     - `notTagged` ("Not tagged", `ph-tag`), only when the type has tags
     - `query:<id>` (a pinned query: its title and its own view)
@@ -682,8 +682,8 @@ frontend/src/properties/cells/{types.ts, SystemFieldCell.tsx}  (MOD: table densi
   - "Customize Overview" menu: "Visible Sections" / "Hidden Sections", "Add a section" (the removed built-ins, the type's collections and the queries of the type: "Queries & Views"), and drag reorder. Entries of dashboard-only sections are suffixed " (Overview only)".
   - `queryRecommendations(type) -> {title, definition, layout}[]`, shown as "Query Recommendations" when the Overview has no query sections: "Kanban by {propertyName}" for each label property; "Filter {propertyName} is empty"; "Filter {propertyName} by" with one item per option, titled "Type · Property · Option"; for booleans, "Checked" / "Unchecked"; picking one creates the query.
   - `<CardViewSettings typeId>` inside Type Settings' "Card view and linking" group:
-    - "Default link view" ("Set a default view to be used when linking or creating an object as a block somewhere in your content.") with Link block / Small card / Wide card / Embed → `defaultViewType`.
-    - "Default card view" ("Set which properties should be shown on the small card by default for this object type.") with Selected / Add Properties and a live SmallCard preview → `smallCardViewConfig`.
+    - "Default link view" ("How an object of this type looks when it is embedded as a block.") with Link block / Small card / Wide card / Embed → `defaultViewType`.
+    - "Default card view" ("Which properties a small card of this type shows by default.") with Selected / Add Properties and a live SmallCard preview → `smallCardViewConfig`.
     - Saved through `useTypeEditor`.
 
 - [ ] **Step 1: Write failing tests**
@@ -724,10 +724,10 @@ frontend/src/properties/cells/{types.ts, SystemFieldCell.tsx}  (MOD: table densi
     - The header: the icon (IconPicker) and name (editable inline; a rename saves through `saveCollection` and reports `skipped` as M2 does), `…`, and "New" (`createAndOpen(typeId, {values: {collections: [name]}, templateId: the collection's defaultTemplateId, else the type default}, mods)`, using Task 12's `values` extension).
     - The tabs: "Overview" (`ph-layout`), "All", then a tab per `query:<id>` section (same tab menu as Task 12). **Overview:** the sections of `views.dashboard`, defaulting to Task 3's `[pinned]`: the `pinned` section (a gallery of pinned objects; each card's menu has "Pin to collection" / "Unpin", our strings) and any `query:<id>` sections. "Customize Overview" offers "Add a section" with the space's queries (adding `query:<id>`), hide and reorder, as on type pages. **All:** a DataView over `api.rows({collectionIds:[id]})` with `FULL_VIEW_LAYOUTS` (no gallery); table only when the collection holds one type.
     - "Add existing" (a fuzzy object picker over the collection's types, writing `collections` on the picked object) and "Create entry".
-    - The empty state "This collection is empty. Create a record or add existing content."
+    - The empty state "Nothing in this collection yet. Add a new entry or an existing object."
     - `…` holds: "Rename", "Icon", "Types" (edit `typeIds`), "Templates" (the type templates, "Mark as Default" for this collection), "Pin to sidebar" (Task 15), "Delete collection".
-  - Removing an item from the card or row menu "Remove from collection" opens "Remove from collection?" / "Remove from this collection, or delete everywhere below." with "Remove from collection" and "Delete {count} object(s)" (the latter through M2's delete, to the Trash).
-  - `<DeleteCollectionDialog>`: title "Do you really want to delete this collection?"; body: the confirmation text above, plus our "Everything moves to the Trash, where you can restore it for 30 days."; it calls `deleteCollection(id, {confirm: true})` after the 428 count is shown. When the result's `skipped` is non-empty it shows the toast "{n} object(s) couldn't be updated and still list this collection." (our string) naming the paths.
+  - Removing an item from the card or row menu "Remove from collection" opens "Remove from collection?" / "Take it out of this collection, or delete it entirely below." with "Remove from collection" and "Delete {count} object(s)" (the latter through M2's delete, to the Trash).
+  - `<DeleteCollectionDialog>`: a delete confirmation title; body: the rule above, plus "Everything moves to the Trash, where you can restore it for 30 days."; it calls `deleteCollection(id, {confirm: true})` after the 428 count is shown. When the result's `skipped` is non-empty it shows the toast "{n} object(s) couldn't be updated and still list this collection." (our string) naming the paths.
   - `<CreateCollectionDialog typeId?>`: "Create collection", with its tooltip text, the name defaulting to "New Collection".
 
 - [ ] **Step 1: Write failing tests**
@@ -765,7 +765,7 @@ frontend/src/properties/cells/{types.ts, SystemFieldCell.tsx}  (MOD: table densi
     1. per structure: `collectionIds` / `excludeCollectionIds` / `inAnyCollection` / `inNoCollection`
     2. tags: each tag id compiles to a filter `tags contains`, joined with the operator
     3. `excludeTags`, only when a search term or an included tag is set (otherwise ignored, as the disabled builder control says)
-    4. when **not** searching: `filterGroup` (ANDed with step 2) through `applyFilters`, then `applySorts(def.sorts)`. When searching, the property filters and sorts **pause** (as the hint says: "Sort and property filters pause while searching."): step 2's tag filter still applies, `filterGroup` doesn't, and the order is `applySorts(rows, [])` (the createdAt fallback); `paused` is true. The stored `filterGroup`/`sorts` are kept unchanged.
+    4. when **not** searching: `filterGroup` (ANDed with step 2) through `applyFilters`, then `applySorts(def.sorts)`. When searching, the property filters and sorts **pause** (the builder says so in a hint): step 2's tag filter still applies, `filterGroup` doesn't, and the order is `applySorts(rows, [])` (the createdAt fallback); `paused` is true. The stored `filterGroup`/`sorts` are kept unchanged.
     5. `limit` (first N, or random N through `rng`), only when there is no groupBy
     6. `groupRows`
   - `autoTitle(def, ctx) -> string`: the type plural names joined with ", " (or "All notes" with no types), then " tagged {tags}", " not tagged {tags}" and ` "{term}"`. It is used while `titleIsCustom` is false; editing the title sets it true. A loaded query whose `titleIsCustom` is absent counts as custom when its name is non-empty (as the backend reads it).
@@ -776,15 +776,15 @@ frontend/src/properties/cells/{types.ts, SystemFieldCell.tsx}  (MOD: table densi
       - "Pin to dashboard" / "Unpin from dashboard": a submenu of the collections that hold at least one of the query's types (all collections when it has none), each checked when its views contain `query:<id>`; picking one adds or removes that section through `saveCollection`
       - "Delete"
     - "Edit query" (`ph-pencil-simple`) toggles the QueryBuilder ("Close editor").
-    - The results: a DataView with `FULL_VIEW_LAYOUTS` (kanban included, because the "Kanban by {propertyName}" recommendations of Task 12 create kanban queries; still no gallery), `pipeline = runQuery` and `pausedHint` set while `paused`; filter/sort/group are read from and saved to `definition`, and `view` holds only `viewDefinition` (layout, table, calculations, cards) and `showDataViewDetails`. While `paused`, the toolbar's Filter and Sort buttons show the pause hint "Sort and property filters pause while searching." as their tooltip and in `ViewSummary`.
-    - When `!isQueryReady`: "Query isn’t ready" (typographic apostrophe) / "This draft is saved, but returns no results until you add a search term, choose a tag, or select an object type.".
+    - The results: a DataView with `FULL_VIEW_LAYOUTS` (kanban included, because the "Kanban by {propertyName}" recommendations of Task 12 create kanban queries; still no gallery), `pipeline = runQuery` and `pausedHint` set while `paused`; filter/sort/group are read from and saved to `definition`, and `view` holds only `viewDefinition` (layout, table, calculations, cards) and `showDataViewDetails`. While `paused`, the toolbar's Filter and Sort buttons show the pause hint "Sorting and property filters are paused while a search term is set." as their tooltip and in `ViewSummary`.
+    - When `!isQueryReady`: "Query isn’t ready" (typographic apostrophe) with a hint that the saved draft returns nothing until it has a search term, a tag or a type.
     - When ready with no results: "No content found".
-  - `<QueriesPage>` (the `{kind:'queries'}` target): heading "Queries" with the RootQuery icon, a "New" button (`createQuery()` then open it), and a list of every query (icon, title, `autoTitle` as subtitle when the title is custom, its types), sorted by title; empty state "No queries" / "Queries you create in this database will appear here."; each row's menu has "Open", "Pin to sidebar" and "Delete".
+  - `<QueriesPage>` (the `{kind:'queries'}` target): heading "Queries" with the RootQuery icon, a "New" button (`createQuery()` then open it), and a list of every query (icon, title, `autoTitle` as subtitle when the title is custom, its types), sorted by title; empty state "No queries" / "Saved queries show up here."; each row's menu has "Open", "Pin to sidebar" and "Delete".
   - Sidebar: `SidebarProps` gains `onOpenTarget(target, {newTab})` (App wires it; Task 15 reuses it), and a "Queries" item (RootQuery icon) in the Object Types list, placed where a type named "Queries" would be in M2's by-name order, opening `{kind:'queries'}`. It has no type context menu and no count.
   - `<QueryBuilder>` sections:
-    - **"Types":** "All" with the tooltip "Do not filter by object type", type chips, "+{count} more", "Exclude object types", "Clear", and per type a collection filter ("All", "In any collection", "In no collection", "{count} collections selected"). "Exclude object types" is disabled with the hint "Add a search term or tag to exclude object types." until a search term or tag is set, and shows "Has no effect when specific types are selected." when types are selected.
-    - **"Tags or backlinks":** a tag picker over Tag objects (`ensureId` on pick), "Any of" / "All of", and the hint "An object has one type, so All of is not available." on the types row. "Exclude tags or backlinks" is disabled with "Excluding tags requires a search term or an included tag." until one is set.
-    - **"Search":** up to 5 terms of at least 2 characters (any of them may match: "Add another term, and a result can match any of them."), and the modes Auto, Exact, Semantic and Title with their descriptions. Exact and Semantic carry our note "Works like Auto until full-text search arrives.". With a term set, the builder shows "Sort and property filters pause while searching.".
+    - **"Types":** "All" with the tooltip "Do not filter by object type", type chips, "+{count} more", "Exclude object types", "Clear", and per type a collection filter ("All", "In any collection", "In no collection", "{count} collections selected"). "Exclude object types" is disabled, with a hint saying why, until a search term or tag is set, and a hint says it does nothing while specific types are selected.
+    - **"Tags or backlinks":** a tag picker over Tag objects (`ensureId` on pick), "Any of" / "All of", and a hint on the types row that "All of" cannot apply because an object has only one type. "Exclude tags or backlinks" is disabled, with a hint saying it needs a search term or an included tag, until one is set.
+    - **"Search":** up to 5 terms of at least 2 characters (any of them may match, as a hint says), and the modes Auto, Exact, Semantic and Title with their descriptions. Exact and Semantic carry our note "Works like Auto until full-text search arrives.". With a term set, a hint says the property filters and sorts are paused.
     - **"Limit":** "No limit", then "first N" (`ph-list-bullets`) for N in 1, 3, 5, 10, 25, 50, then "random N" (`ph-shuffle`) for the same N.
 
 - [ ] **Step 1: Write failing tests**
@@ -793,7 +793,7 @@ frontend/src/properties/cells/{types.ts, SystemFieldCell.tsx}  (MOD: table densi
   - `test excludeTags removes tagged rows`
   - `test limit first and random with seeded rng, ignored when grouped`; the Limit menu lists No limit, first 1…50, random 1…50.
   - `test search pauses filters and sorts`: a definition with a `filterGroup` that would drop row A and a title sort → with a search term, A is kept, the order is createdAt newest first and `paused` is true; without the term, A is dropped and the sort applies.
-  - `test excludeTags and excluded types ignored without search or tag; hints shown`: the builder shows "Excluding tags requires a search term or an included tag." and "Add a search term or tag to exclude object types."; with a type selected, "Has no effect when specific types are selected."
+  - `test excludeTags and excluded types ignored without search or tag; hints shown`: the builder shows both "needs a search term or tag" hints; with a type selected, the "no effect" hint
   - `test isQueryReady false for empty definition shows Query isn’t ready` (the exact string, with U+2019)
   - `test autoTitle types and tags, All notes without types; custom title sticks; absent titleIsCustom with a name counts as custom`
   - `test builder All clears structures; Exclude object types writes excludeStructureIds`
@@ -818,10 +818,10 @@ frontend/src/properties/cells/{types.ts, SystemFieldCell.tsx}  (MOD: table densi
 - Produces:
   - `usePinned() -> {pinned, sections, isPinned(ref), pin(ref, sectionId?), unpin(ref, sectionId?), move(sectionId|null, from, to), addSection(name), renameSection(id, name), deleteSection(id)}` (`null` = the Pinned section). Optimistic, saved with `api.patchUi({pinned} | {sections}, {baseRevision})`; on 409 it refetches, re-applies the same operation once and saves again (never a blind overwrite); reloaded on `ui` events. Pinning an object without an `id` calls `api.ensureId` first and pins by that id. A ref may be in Pinned and in custom sections at once, at most once per section.
   - `<PinnedSection>` replaces the static "Pinned" body: each pin renders by kind: an object with ObjectIcon and title; a type with TypeChip and plural name; a collection with its icon and name; a query with its icon (`ph-magnifying-glass` default) and title; items reorder by dnd-kit drag; a context menu has "Unpin from space"; a pin whose target no longer exists is shown dimmed with "Unpin from space" only; with no pins: "No pinned content".
-  - `<SidebarSections>`: the custom sections from `ui.sections` (such as "In Progress"), rendered above Pinned in their saved order, each with its icon (`ph-star` default) and name as heading, the same item rendering, drag reorder and dimmed dangling items as PinnedSection, and "No pinned content" when empty. An item's context menu has "Unpin from {section}". The heading's context menu has "Edit Section" (name via "Section Name", icon) and "Delete Section" (removes the section only; its items stay wherever else they are pinned). The sidebar's section area has "Add Section" (a "Section Name" field; the description "Group pages and collections under a named heading in your space overview." as its hint). The Pinned section itself is fixed and can't be deleted, so a last-section warning doesn't apply.
+  - `<SidebarSections>`: the custom sections from `ui.sections` (such as "In Progress"), rendered above Pinned in their saved order, each with its icon (`ph-star` default) and name as heading, the same item rendering, drag reorder and dimmed dangling items as PinnedSection, and "No pinned content" when empty. An item's context menu has "Unpin from {section}". The heading's context menu has "Edit Section" (name via "Section Name", icon) and "Delete Section" (removes the section only; its items stay wherever else they are pinned). The sidebar's section area has "Add Section" (a "Section Name" field; the description "A named heading that groups pages and collections in the sidebar." as its hint). The Pinned section itself is fixed and can't be deleted, so a last-section warning doesn't apply.
   - `<PinToMenu ref>`: the "Pin to..." submenu used by every `…` menu that has "Pin to sidebar": it lists "Pinned" and every custom section, each checked when the ref is in it; picking toggles membership.
   - The Sidebar adds an "All notes" item (`ph-note`) above Calendar, opened through Task 14's `onOpenTarget`.
-  - `<AllNotesView>`: the heading "All notes" and "All notes in this space, grouped by when they were created."; rows from every type except DailyNote and the basic Task; grouped by `createdAt` Relative, sorted newest first; layouts `ALL_NOTES_LAYOUTS`; the choice is saved to `ui.allNotesLayout`; empty state "No notes yet" / "Notes you create will appear here.".
+  - `<AllNotesView>`: the heading "All notes" and "Every note in the space, by creation date."; rows from every type except DailyNote and the basic Task; grouped by `createdAt` Relative, sorted newest first; layouts `ALL_NOTES_LAYOUTS`; the choice is saved to `ui.allNotesLayout`; empty state "No notes yet" / "Notes you create will appear here.".
   - `App.tsx`: `onOpenTarget` for pins and sections; `retarget` on `renamed` keeps working for pinned objects (pins are by id).
 
 - [ ] **Step 1: Write failing tests**

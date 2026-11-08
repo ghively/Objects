@@ -153,7 +153,7 @@ uv run objectapp --space /path/to/space            # opens its own window
 uv run objectapp --space /path/to/space --browser  # or in your browser
 ```
 
-The server listens on `http://127.0.0.1:8790` only (`--port` changes the port). Point `--space` at an empty folder to start fresh, or at an existing folder of Markdown files. A space keeps its metadata in `.object/` and a rebuildable search cache in `.object-cache/`; spaces made before 2026-11-04 are migrated to these folder names automatically on open, without touching any `.md` file.
+The server listens on `http://127.0.0.1:8790` only (`--port` changes the port). Point `--space` at an empty folder to start fresh, or at an existing folder of Markdown files. A space keeps its metadata in `.object/` and a rebuildable search cache in `.object-cache/`.
 
 AI features need the [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) CLI (`claude`) installed and signed in. Everything else works without it.
 

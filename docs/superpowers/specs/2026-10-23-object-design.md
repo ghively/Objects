@@ -96,11 +96,10 @@ Body = the object's blocks, as Markdown.
 - **Body blocks** that plain Markdown can express are written as plain Markdown. Block options Markdown can't express (toggles, colours, columns, standout quotes, embed view settings, alphabetical/roman lists) are kept with a small inline annotation, so the file still reads cleanly in any editor. The annotation syntax is the builder's choice.
 - **Links** are `[[Title]]`. Renaming an object renames its file and updates the links to it.
 - **Files outside the app:** if a file is edited elsewhere, the app picks up the change. Saving never rewrites parts of a file that weren't edited.
-- **Older spaces:** spaces made before 2026-11-04 keep their app data under an older folder name; the app renames it to `.object/` (and the cache to `.object-cache/`) once, automatically, on open, and changes no `.md` file. [amended 2026-11-04]
 
 ## 5. Look and feel
 
-- Match the behaviour catalog and the design tokens: Inter at a 15px base, the measured dark palette, radii, soft layered shadows, the Phosphor icons. Light mode is included.
+- Match the behaviour catalog and the design tokens: Inter at a 15px base, Object's dark palette, radii, soft layered shadows, the Phosphor icons. Light mode is included.
 - **Interactions to copy:**
   - the peek modal with its pager
   - the `…` menus and their groupings

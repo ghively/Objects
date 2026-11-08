@@ -29,7 +29,7 @@ Object is and how to run it.
 | [Handoff](../HANDOFF.md) | Where things stand and what to do first |
 | [Continue](../CONTINUE.md) | How to resume work and run a build |
 | [Bug audit, 2026-11-07](superpowers/plans/bug-audit-2026-11-07.md) | 46 findings, their fixes, the gate after, and the owner's decisions |
-| [Audits](superpowers/plans/) | `audit-2026-10-28.md`, `audit-2026-11-01.md`, `polish-audit-2026-11-02.md`, `reference-check-2026-10-28.md` |
+| [Audits](superpowers/plans/) | `audit-2026-10-28.md`, `audit-2026-11-01.md`, `polish-audit-2026-11-02.md` |
 | [Hands-on checklist](superpowers/plans/hands-on-checklist.md) | The M1-M9 checks merged into one list |
 
 ## Milestones

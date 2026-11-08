@@ -9,7 +9,7 @@
 - **Views and space:** the row context menu and multi-select on type and query pages; **Import CSV** on a type page; type-constrained query tabs with "release constraint"; the sidebar's `workspaceOrder`.
 - **App:** a "Recalculate content index" control; whiteboard edits bump the board's `lastUpdated`.
 
-**Two items are a confirmation, not a feature**, because the target behaviour has no such feature:
+**Two items are a confirmation, not a feature**, because the catalog has no such feature:
 - **Custom label as status:** a user cannot turn a label into a status. Task 15 confirms this and keeps today's behaviour.
 - **Default collection and `defaultPageViewId`:** there is no user-facing behaviour here that Object lacks. See "Coverage" and "Decisions for Gene".
 
@@ -28,7 +28,7 @@ Considered and not added: `papaparse` (the parser is small), `jszip`/`fflate` (t
 
 **Spec:** `docs/superpowers/specs/2026-10-23-object-design.md` §2 (in scope: everything the app does with objects and properties locally; out of scope: AI, sync, accounts, mobile, telemetry, network), §3, §4 (plain Markdown first, never write on read, edits change only their own lines), §5.
 
-**Labels and behaviour.** The behaviour catalog (`docs/behavior-catalog.md`) and the design spec. Every quoted label below is verbatim unless it is marked "our string".
+**Labels and behaviour.** The behaviour catalog (`docs/behavior-catalog.md`) and the design spec. Every quoted label below is as catalogued unless it is marked "our string".
 
 ## In-flight branches: start condition
 
@@ -112,7 +112,7 @@ Also carried forward:
    - A board save changes only the `lastUpdated` line of the `.md`, at most once a minute.
    - Import CSV only creates files.
    - Tests: Tasks 2, 3, 4, 5, 11 and 19 (named below); Task 22 runs the round-trip harness.
-2. **Fidelity.** The strings are verbatim. Every "our choice" is listed for Gene.
+2. **Fidelity.** The strings follow the catalog. Every "our choice" is listed for Gene.
 3. **No network.** Export and Import are local only. Task 22 extends `noNetwork.m8.test.ts` to M9 files.
 
 ## File structure
@@ -231,8 +231,8 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 - Object menu item "Export".
 - Dialog heading "Export", "Format", options heading "Options".
 - Format "Markdown".
-- Option "Include media", with the description "Adds files and images to the zip."
-- Success toast "The export is ready and will be downloaded."
+- Option "Include media", with the description "Puts attached files and images in the zip too."
+- Success toast "Export finished; the download starts now."
 - Other formats (PDF, Microsoft Word, LaTeX) and the options "Include title as heading 1", "Export folder containing all subpages", "Links as wikilinks" and "Include embedded content" are out of scope here. Object's file already **is** Markdown with wikilinks, so M9 offers Markdown with "Include media" only (our choice, listed).
 
 **Files:** Create `backend/objectapp/export.py` and `backend/tests/test_export.py`. Modify `backend/objectapp/server.py` (the route).
@@ -298,7 +298,7 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 ### Task 6: Text stats and the page Floating Inspector (lane O; item 4)
 
 **Target behaviour:**
-- The Encyclopedia design's description: "Side properties, with a table of contents, linked objects, and text stats."
+- The Encyclopedia design's description: "Properties at the side, plus outline, links and word counts."
 - **The current design has no such sidebar.** The old sidebar strings ("Table of contents", "Objects inside", "Text stats") are unused. The table of contents and the stats live in a Floating Inspector on every page:
   - tabs "Outline" and "Stats", empty state "No headings in this page", "Pin" / "Unpin".
 - The stats are computed on the page's plain text with math excluded:
@@ -328,7 +328,7 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 **Target behaviour:**
 - Wide layout:
   - "Wide layout" / "Normal layout" (icons `ph-arrows-out-simple` / `ph-arrows-in-simple`). Hidden for whiteboards and for the `indexCard` design.
-  - The type setting's description says entries can "override this default setting for individual entries".
+  - The type setting's description says each entry can still choose its own layout.
 - Wide cover:
   - "Toggle wide cover image".
   - Logic: when the object has no value, set it to the opposite of the type's mode; otherwise flip it.
@@ -377,7 +377,7 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
   - "Duplicate" just above "Merge"
   - Duplicate is hidden for daily notes, templates and whiteboards
   - Duplicate calls `api.duplicateObject`, then opens the copy
-- Create `frontend/src/object/TextStatsMenu.tsx` (uses `object/textStats.ts`), `frontend/src/object/ExportDialog.tsx` (Format: Markdown; Option "Include media"; button "Export"; on success the toast "The export is ready and will be downloaded."), `frontend/src/lib/download.ts` (`downloadUrl(url, filename)` through an `<a download>`), and `frontend/src/object/ObjectView.m9menu.test.tsx`.
+- Create `frontend/src/object/TextStatsMenu.tsx` (uses `object/textStats.ts`), `frontend/src/object/ExportDialog.tsx` (Format: Markdown; Option "Include media"; button "Export"; on success the toast "Export finished; the download starts now."), `frontend/src/lib/download.ts` (`downloadUrl(url, filename)` through an `<a download>`), and `frontend/src/object/ObjectView.m9menu.test.tsx`.
 
 **Tests:**
 - `test menu order export, text stats, duplicate`
@@ -391,7 +391,7 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 ### Task 9: `blocks` (Content) property uses the block editor (lane E; item 9)
 
 **Target behaviour:**
-- The property kind is named "Content", described as "The main notes area of an object — rich text with formatting and linking."
+- The property kind is named "Content", described as the object's main body of rich text
 - Its data type is `blocks`.
 - It uses the same block editor as the body.
 
@@ -417,7 +417,7 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 ### Task 10: Rich-text (`textBlock`) property with links (lane E; item 8; after Task 9)
 
 **Target behaviour:**
-- The property kind is named "Text", described as "A single paragraph that allows formatting and linking."
+- The property kind is named "Text", described as one paragraph of rich text
 - The value is one text block with inline tokens.
 - Links use the body's token editor.
 - No textBlock-specific picker string exists, so the `[[` picker is the body's.
@@ -469,7 +469,7 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 - Text and group blocks have a text alignment: `'left'|'center'|'right'`.
 - The editor panel renders an "Alignment" dropdown (icon `ph-text-align-left-bold`) with items "Align text left" / "Text align center" / "Text align right" (icons `ph-text-align-*-bold`).
 - **That dropdown is shown only when the selection contains a simple-table cell.**
-- The block menu (reference-check §2e) has **no** alignment item, and no keys are bound to these actions (reference-check §1).
+- The block menu (behaviour catalog section 6) has **no** alignment item, and no keys are bound to these actions (the Shortcuts sheet).
 
 **Decision for Gene:** the audit asked for a block-menu entry. Alignment is otherwise offered only for table cells. **Recommended:** an "Alignment" ▸ submenu with the three labels above in `BlockStyleMenu`, shown only for blocks that take the `align` option. This is a superset, since Object already aligns any block by key. **Alternative:** no menu entry at all.
 
@@ -537,8 +537,8 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 
 **Target behaviour:**
 - Button "Recalculate content index" (icon `ph-file-magnifying-glass`).
-- Description "If some of your views are inconsistent or search results are not returning content, you can reindex your notes. This is usually not needed, only use it if you are having issues."
-- While it runs: heading "Content is being indexed", description "Your notes are getting analyzed for search, backlinking, and your content views."
+- Description "Rebuilds the search and link index from the files. Use it only when search or views look wrong."
+- While it runs: heading "Content is being indexed", description "Reading your notes for search, links and views."
 - It would sit under an "Offline & Sync" › "Offline" settings section. Object has no such section, so it goes in the Space section (our choice).
 
 **Files:** Modify `frontend/src/settings/sections/SpaceSettings.tsx` (a row with the button calling `api.reindex()`; while search reports `partial`, it shows the indexing heading and description). Test in `frontend/src/settings/sections/SpaceSettings.m9.test.tsx`.
@@ -607,13 +607,13 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 **Target behaviour:**
 - Type or collection menu item "Import CSV" (icon `ph-file-csv`).
 - Dialog heading "Batch import to collection".
-- Description "You can upload a CSV that will be transformed into a collection. Every row will create one entity."
-- "Has a header row", described as "First row in CSV holds column names and is not itself a data row."
+- Description "Each row of the CSV becomes one object in a new collection."
+- "Has a header row", described as "Treat the first row as column names."
 - 'New collection "{title}"'.
-- Warning heading "Use this with caution", text ("…You can quickly spam your whole space if you import big tables.").
-- `.notSupported` ("…up to {rowLimit} rows"); the `rowLimit` value was not found, so it is **1000** (our choice).
+- Warning heading "Use this with caution", text ("…A large table creates a large number of objects at once.").
+- A size note ("…up to {rowLimit} rows"); `rowLimit` is **1000** (our choice).
 - `.errors.readingError`.
-- "Add {entriesLength} new {structurePlural} to"; heading "Property Mappings"; description "Multiple values can be mapped to the same property, but only the first transferred value is kept."
+- "Add {entriesLength} new {structurePlural} to"; heading "Property Mappings"; description "When several columns map to one property, the first one wins."
 
 **Files:**
 - Create `frontend/src/lib/csvParse.ts` (RFC 4180: quotes, doubled quotes, CRLF, a BOM; the inverse of `editor/table/csv.ts` `toCsv`), `frontend/src/lib/csvParse.test.ts`, `frontend/src/types/ImportCsvDialog.tsx` and `frontend/src/types/ImportCsvDialog.test.tsx`.
@@ -634,7 +634,7 @@ scripts/m9_acceptance.py docs/superpowers/plans/m9-acceptance.md remaining-work.
 ### Task 20: Type-constrained query tabs and "release constraint" (lane V; item 12)
 
 **Target behaviour:**
-- Release button tooltip: "Turn into a normal query and remove the single type constraint. Opens the query as a page and removes this tab from the type dashboard."
+- Release button tooltip: "Make this a stand-alone query without the type limit. It opens as its own page and leaves this type's tabs."
 - The constraint is computed, not stored: a query in `structures` mode with exactly one type. A query has no constraint field.
 
 **Files:**
@@ -710,7 +710,7 @@ On a copy of the CPI export outside the repo, with `git init` done there:
 - [ ] "Recalculate content index" runs and the indexing state shows.
 - [ ] Draw on a whiteboard: its "Last updated" moves, at most once a minute. The board's Notes still save.
 - [ ] Every "our choice" and "our string" in this plan: the 60 s bump throttle and no history snapshot for it; whiteboard Duplicate refused; Export only Markdown and media; the 1000-row CSV limit; Ctrl/Shift-click selection; the reindex control's place; the "Include in search" label; alignment as a block-menu superset; dropping `referenceImageId`.
-- [ ] The side-by-side look of every M9 screen in Light and Dark.
+- [ ] The look of every M9 screen against the spec and catalog, in Light and Dark.
 
 ## Coverage
 
