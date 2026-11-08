@@ -300,7 +300,7 @@ def test_outside_stdio_servers_dont_inherit_the_claude_sign_in(env, monkeypatch)
     """Review of audit 20: the CLI hands its environment (with how the user signs in to Claude
     Code) to every stdio server; each outside one gets those names set empty in its own env,
     unless its config sets the name itself. Object's own servers and remote ones are left alone."""
-    names = (*agentrun.RUN_ENV_KEEP, "ANTHROPIC_API_KEY")
+    names = (*agentrun.RUN_ENV_KEEP, "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
     for name in names:
         monkeypatch.setenv(name, "sign-in-7")
     mcp = {"mcpServers": {
