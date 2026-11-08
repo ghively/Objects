@@ -367,3 +367,30 @@ def test_resolution_note_follow_up_and_investigations():
     assert "Cause: [fill in: root cause; working idea on the page: Disk full]" in note["closeNotes"]
     long = WorkItemData(ticket_id="INC1", title="T", findings="y" * 500)
     assert "Findings: " + "y" * 399 + "…" in resolution_note(long, "")["workNotes"]
+
+
+def test_an_unclosed_fence_gets_one_activity_section_that_reads_back():
+    """Audit 29: a body that ends inside a code fence (a pasted log) made every write add another
+    ``## Activity`` section, inside the fence, and none read back."""
+    body = "# Printer\n\nPasted log:\n\n````\nERROR spooler died\n"
+    out = append_line(body, ACTIVITY, "2026-11-05 10:00 Gene added a note: first")
+    out = append_line(out, ACTIVITY, "2026-11-05 10:01 Gene added a note: second")
+    out = append_line(out, WORK_NOTES, "[2026-11-05] Gene: note: first")
+    assert out.startswith(body + "````\n\n## Activity\n\n")  # the fence is closed where it ran out
+    assert out.splitlines().count("## Activity") == 1 and out.splitlines().count("## Work notes") == 1
+    assert [a["text"] for a in activity_lines(out)] == ["Gene added a note: first", "Gene added a note: second"]
+    assert [n["text"] for n in work_note_lines(out)] == ["note: first"]
+    # a closed fence is left alone
+    closed = "```\ncode\n```\n"
+    assert append_line(closed, ACTIVITY, "x") == closed + "\n## Activity\n\n- x\n"
+
+
+def test_a_sub_heading_in_activity_does_not_hide_later_lines():
+    """Audit 29: new lines are appended at the end of the whole section, sub-headings included, so
+    they must read back from there."""
+    body = "## Activity\n\n- 2026-11-01 09:00 Gene a\n\n### Older\n\n- 2026-10-01 09:00 Gene old\n"
+    out = append_line(body, ACTIVITY, "2026-11-05 10:00 Gene b")
+    assert [a["text"] for a in activity_lines(out)] == ["Gene a", "Gene old", "Gene b"]
+    notes = "## Work notes\n\n- [2026-11-01] Gene: a\n\n### Earlier\n\n- [2026-10-01] Gene: old\n"
+    out = append_line(notes, WORK_NOTES, "[2026-11-05] Gene: b")
+    assert [n["text"] for n in work_note_lines(out)] == ["a", "old", "b"]
