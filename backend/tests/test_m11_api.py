@@ -115,6 +115,19 @@ def test_matcher_dates_and_unsupported() -> None:
     assert m.matches(row) and m.unsupported == {"frobnicate"}
 
 
+def test_matcher_this_week_follows_the_week_start() -> None:
+    # Sunday 8 Nov 2026: Monday weeks run 2-8 Nov, Sunday weeks 8-14 Nov.
+    sunday = date(2026, 11, 8)
+    wed = {"due": {"start": "2026-11-04", "resolution": "day"}}
+    tue = {"due": {"start": "2026-11-10", "resolution": "day"}}
+    this_week = _g(_f("due", "is", {"relative": "thisWeek"}))
+    assert Matcher(this_week, sunday).matches(wed)  # Monday by default
+    assert not Matcher(this_week, sunday).matches(tue)
+    assert Matcher(this_week, sunday, week_start="monday").matches(wed)
+    assert not Matcher(this_week, sunday, week_start="sunday").matches(wed)
+    assert Matcher(this_week, sunday, week_start="sunday").matches(tue)
+
+
 def test_parse_since() -> None:
     assert parse_since("2026-11-05") == "2026-11-05"
     assert parse_since("2026-11-05T10:00:00Z") == "2026-11-05T10:00:00"

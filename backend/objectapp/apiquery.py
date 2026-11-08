@@ -123,11 +123,16 @@ def _day(text: str | None) -> date | None:
 
 
 class Matcher:
-    """Matches rows against one filter group, relative to `today`."""
+    """Matches rows against one filter group, relative to `today`.
 
-    def __init__(self, group: dict | None, today: date) -> None:
+    ``week_start`` ('monday' or 'sunday') is the space's "Start of the week" setting
+    (``ui.json`` ``calendar.weekStart``, `recurrence.week_start_of`): "this week" starts on it.
+    """
+
+    def __init__(self, group: dict | None, today: date, week_start: str = "monday") -> None:
         self.group = group if isinstance(group, dict) else None
         self.today = today
+        self.week_start = week_start
         self.unsupported: set[str] = set()
 
     def matches(self, values: dict[str, Any]) -> bool:
@@ -164,7 +169,8 @@ class Matcher:
             if rel == "oneWeekFromNow":
                 return t + timedelta(days=7), t + timedelta(days=7)
             if rel == "thisWeek":
-                start = t - timedelta(days=t.weekday())
+                back = (t.weekday() + 1) % 7 if self.week_start == "sunday" else t.weekday()
+                start = t - timedelta(days=back)
                 return start, start + timedelta(days=6)
             if rel == "thisMonth":
                 start = t.replace(day=1)

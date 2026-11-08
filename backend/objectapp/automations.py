@@ -1242,6 +1242,7 @@ class AutomationEngine:
             tz=space.tz,
             paths_by_id=_LazyMap(ids),
             view_type_ids=[self._type_id_of(fm)] if fm is not None else None,
+            week_start=week_start_of(space.root),
         )
 
     # -- running a rule --
