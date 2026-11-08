@@ -569,7 +569,7 @@ function swapText(current: unknown, fromLabel: string | null, add: string, same:
 }
 
 /** Whether a long-text value has text past its first paragraph (what its group shows). */
-const hasLaterParagraphs = (v: unknown) =>
+export const hasLaterParagraphs = (v: unknown) =>
   typeof v === 'string' &&
   v
     .split(/\n\s*\n/)
