@@ -223,8 +223,9 @@ def test_cli_flags_config_and_cwd(api, fake, space_dir: Path) -> None:
     assert server["command"] == sys.executable
     assert server["args"] == ["-m", "objectapp.mcp_server"]
     assert server["env"]["OBJECT_API_URL"] == "http://testserver"
-    # The secret travels in the environment, never in the config file.
-    assert server["env"]["OBJECT_API_TOKEN"] == "${OBJECT_API_TOKEN}"
+    # Audit 7: the secret is in Object's own servers' env blocks, never the CLI's environment.
+    assert server["env"]["OBJECT_API_TOKEN"] == run["token"]
+    assert run["envToken"] is False
     assert run["mcpConfig"]["mcpServers"]["object-agent"]["args"] == ["-m", "objectapp.agent_mcp"]
     assert run["token"].startswith("obj_") and run["url"] == "http://testserver"
     cwd = Path(run["cwd"]).resolve()
