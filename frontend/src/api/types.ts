@@ -4,83 +4,44 @@ import type { WhiteboardSettings } from './whiteboardTypes'
 // (docs/superpowers/plans/2026-10-23-m2-types-properties.md, "API contract").
 // Field names match the Python side exactly.
 
-/** Every property kind, including the system kinds (`entity_*`). */
-export type PropertyType =
-  | 'text'
-  | 'textBlock'
-  | 'simpleTableBlock'
-  | 'number'
-  | 'boolean'
-  | 'url'
-  | 'datetime'
-  | 'datetimeSimple'
-  | 'entity'
-  | 'label'
-  | 'blocks'
-  | 'coverImage'
-  | 'color'
-  // M12 (our kinds)
-  | 'formula'
-  | 'rollup'
-  | 'uniqueId'
-  | 'email'
-  | 'phone'
-  | 'files'
-  | 'entity_title'
-  | 'entity_icon'
-  | 'entity_description'
-  | 'entity_aliases'
-  | 'entity_tags'
-  | 'entity_type'
-  | 'entity_collections'
-  | 'entity_createdAt'
-  | 'entity_lastUpdated'
-  | 'entity_backlinks'
-  /** M14: runs an automation on its object; holds no value (`options.ruleId`). */
-  | 'button'
-  // M22 (our kinds): a work item's steps, a list of short texts and its floor items.
-  | 'steps'
-  | 'textList'
-  | 'floorItems'
+/**
+ * Every property kind, by family. Each id is the `type` written in a type's `.object/types/*.json`
+ * and sent by the API, so ids never change.
+ */
+const PROPERTY_KIND_FAMILIES = {
+  /** One plain value. `email`, `phone` and `color` are M12's. */
+  value: ['text', 'number', 'boolean', 'url', 'email', 'phone', 'color'],
+  /** Dates: `datetime`, and `datetimeSimple` (the kind the Task date fields use). */
+  date: ['datetime', 'datetimeSimple'],
+  /** Choices and references: label options, linked objects, attached files (M12). */
+  choice: ['label', 'entity', 'files'],
+  /** Rich content stored in the body: blocks, a text block, a simple table, the cover image. */
+  content: ['blocks', 'textBlock', 'simpleTableBlock', 'coverImage'],
+  /** Worked out, not typed in: M12's formula, rollup and unique id; M14's button (runs an automation, `options.ruleId`). */
+  computed: ['formula', 'rollup', 'uniqueId', 'button'],
+  /** M22: a work item's steps, a list of short texts and its floor items. */
+  work: ['steps', 'textList', 'floorItems'],
+  /** The fields every object has (`entity_*`). */
+  system: [
+    'entity_title',
+    'entity_type',
+    'entity_icon',
+    'entity_description',
+    'entity_tags',
+    'entity_aliases',
+    'entity_collections',
+    'entity_backlinks',
+    'entity_createdAt',
+    'entity_lastUpdated',
+  ],
+} as const
+
+export type PropertyType = (typeof PROPERTY_KIND_FAMILIES)[keyof typeof PROPERTY_KIND_FAMILIES][number]
 
 /** @deprecated M1 name; use `PropertyType`. */
 export type PropertyKind = PropertyType
 
-export const PROPERTY_TYPES: readonly PropertyType[] = [
-  'text',
-  'textBlock',
-  'simpleTableBlock',
-  'number',
-  'boolean',
-  'url',
-  'datetime',
-  'datetimeSimple',
-  'entity',
-  'label',
-  'blocks',
-  'coverImage',
-  'color',
-  'formula',
-  'rollup',
-  'uniqueId',
-  'email',
-  'phone',
-  'files',
-  'entity_title',
-  'entity_icon',
-  'entity_description',
-  'entity_aliases',
-  'entity_tags',
-  'entity_type',
-  'entity_collections',
-  'entity_createdAt',
-  'entity_lastUpdated',
-  'entity_backlinks',
-  'button',
-  'steps',
-  'textList',
-  'floorItems',
-]
+export const PROPERTY_TYPES: readonly PropertyType[] = Object.values(PROPERTY_KIND_FAMILIES).flat()
 
 /**
  * The kinds a property can be changed to ("Change property type"). Changing the kind

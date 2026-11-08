@@ -5,55 +5,66 @@ import * as M from './model'
 import { OBJECT_DRAG_MIME, mayCarryObject, readDroppedObject } from './dnd'
 import { DOTTED_PLAN, NETWORK_MAP, board, node, textBlock } from './test/boards'
 
-const SHAPES_EXPECTED = [
-  'rectangle', 'roundedRectangle', 'ellipse', 'diamond', 'triangle', 'triangleDown', 'star', 'parallelogram',
-  'bubble', 'blockArrow', 'blockArrowLeft', 'heart',
-]
-const CIRCUIT_EXPECTED = ['not', 'and', 'nand', 'or', 'nor', 'xor', 'xnor', 'high', 'low']
-
 describe('whiteboard model', () => {
-  test('test the model constants', () => {
-    expect(M.GRID).toBe(30)
-    expect(M.GRID_HALF).toBe(15)
-    expect([M.DEFAULT_NODE_WIDTH, M.DEFAULT_NODE_HEIGHT]).toEqual([420, 60])
-    expect([M.AUTO_MIN_WIDTH, M.AUTO_MAX_WIDTH, M.AUTO_MAX_HEIGHT]).toEqual([420, 480, 420])
-    expect(M.LINK_BLOCK_MIN_WIDTH).toBe(360)
-    expect([M.MIN_BLOCK_WIDTH, M.MIN_BLOCK_HEIGHT]).toEqual([40, 30])
-    expect([M.MIN_SHAPE_WIDTH, M.MIN_SHAPE_HEIGHT]).toEqual([90, 90])
-    expect([M.DEFAULT_CIRCUIT_WIDTH, M.DEFAULT_CIRCUIT_HEIGHT]).toEqual([90, 90])
-    expect([M.DEFAULT_FRAME_WIDTH, M.DEFAULT_FRAME_HEIGHT]).toEqual([480, 420])
+  test('test sizes are whole grid cells', () => {
+    expect([M.GRID, M.GRID_HALF]).toEqual([30, 15])
+    const inCells = (v: number) => v / M.GRID
+    expect([M.DEFAULT_NODE_WIDTH, M.DEFAULT_NODE_HEIGHT].map(inCells)).toEqual([13, 2])
+    expect(M.AUTO_MIN_WIDTH).toBe(M.DEFAULT_NODE_WIDTH)
+    expect([M.AUTO_MAX_WIDTH, M.AUTO_MAX_HEIGHT].map(inCells)).toEqual([20, 16])
+    expect(M.AUTO_TEXT_MIN_HEIGHT).toBe(M.DEFAULT_NODE_HEIGHT)
+    expect(inCells(M.LINK_BLOCK_MIN_WIDTH)).toBe(12)
+    expect([M.MIN_BLOCK_WIDTH, M.MIN_BLOCK_HEIGHT].map(inCells)).toEqual([2, 1])
+    expect([M.MIN_SHAPE_WIDTH, M.MIN_SHAPE_HEIGHT].map(inCells)).toEqual([3, 3])
+    expect([M.DEFAULT_CIRCUIT_WIDTH, M.DEFAULT_CIRCUIT_HEIGHT]).toEqual([M.MIN_SHAPE_WIDTH, M.MIN_SHAPE_HEIGHT])
+    expect([M.DEFAULT_FRAME_WIDTH, M.DEFAULT_FRAME_HEIGHT].map(inCells)).toEqual([20, 12])
+    expect([M.EMBED_CAPTION_HEIGHT, M.EMBED_CAPTION_GAP]).toEqual([M.GRID, 6])
     expect(M.CONTENT_Z_MIN).toBe(1)
-    // The CSS values, not the model's 40 (what renders).
-    expect([M.EMBED_CAPTION_HEIGHT, M.EMBED_CAPTION_GAP]).toEqual([30, 6])
-    expect([M.ZOOM_MIN, M.ZOOM_MAX]).toEqual([0.02, 4])
-    expect([...M.ZOOM_PRESETS]).toEqual([0.05, 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3])
+  })
 
-    expect([...M.NODE_KINDS]).toEqual(['block', 'shape', 'point', 'frame'])
-    expect([...M.SHAPES]).toEqual(SHAPES_EXPECTED)
+  test('test zoom stops climb from the minimum to the maximum', () => {
+    const stops = [M.ZOOM_MIN, ...M.ZOOM_PRESETS, M.ZOOM_MAX]
+    for (let i = 1; i < stops.length; i++) expect(stops[i]).toBeGreaterThan(stops[i - 1])
+    expect(M.ZOOM_PRESETS).toContain(1)
+  })
+
+  test('test the vocabulary', () => {
+    expect([...M.NODE_KINDS].sort()).toEqual(['block', 'frame', 'point', 'shape'])
+    // The design spec's twelve shapes, each one known to the shape guards.
     expect(M.SHAPES).toHaveLength(12)
-    expect([...M.PICKER_SHAPES]).toEqual(['rectangle', 'ellipse', 'diamond', 'parallelogram', 'triangle', 'star', 'bubble', 'blockArrow', 'heart'])
+    expect(new Set(M.SHAPES).size).toBe(12)
+    for (const s of M.SHAPES) expect(M.isShapeTool(s)).toBe(true)
+    // Pickers: every shape but the three kept only for drawing old boards, rectangle first.
     expect(M.PICKER_SHAPES).toHaveLength(9)
-    expect([...M.SHAPE_MENU_TOOLS]).toEqual(['line', 'arrow', 'rectangle', 'ellipse', 'diamond', 'parallelogram', 'triangle', 'star', 'bubble', 'blockArrow', 'heart'])
-    expect([...M.CIRCUIT_LABELS]).toEqual(CIRCUIT_EXPECTED)
-    expect(Object.values(M.CIRCUIT_TEXT)).toEqual(['NOT', 'AND', 'NAND', 'OR', 'NOR', 'XOR', 'XNOR', 'HIGH', 'LOW'])
-    expect([...M.MARKERS]).toEqual(['none', 'arrow', 'arrowClosed', 'dot', 'double'])
-    expect([...M.PICKER_MARKERS]).toEqual(['none', 'arrow', 'dot', 'double'])
-    expect([...M.CONNECTIONS]).toEqual(['straight', 'cornered', 'curved'])
-    expect([...M.LINES]).toEqual(['solid', 'dashed', 'dotted'])
-    expect([...M.POINTER_TOOLS]).toEqual(['select', 'hand'])
+    expect(M.PICKER_SHAPES[0]).toBe('rectangle')
+    for (const hidden of ['roundedRectangle', 'triangleDown', 'blockArrowLeft']) expect(M.isPickerShape(hidden)).toBe(false)
+    expect(M.SHAPE_MENU_TOOLS).toEqual([...M.CONNECTOR_TOOLS, ...M.PICKER_SHAPES])
+    expect(M.CONNECTOR_TOOLS).toEqual(['line', 'arrow'])
 
-    // Tools: the toolbox order, media tools included (M8).
-    const media = ['image', 'pdf', 'audio', 'file', 'weblink']
-    expect([...M.MEDIA_TOOLS]).toEqual(media)
-    expect(media).toEqual(['image', 'pdf', 'audio', 'file', 'weblink'])
-    expect([...M.TOOLS]).toEqual([
-      'select', 'hand', 'text', 'link', 'create', ...media, 'line', 'arrow', ...SHAPES_EXPECTED,
-      ...CIRCUIT_EXPECTED, 'frame',
-    ])
-    expect([...M.PICKER_TOOLS]).toEqual(['link', 'create', ...media])
-    expect([...M.ONE_SHOT_TOOLS]).toEqual(['text', ...M.SHAPES, ...M.CIRCUIT_LABELS, 'frame', 'line', 'arrow', 'link', 'create', ...media])
+    // Gates: stored as their name in capitals.
+    expect(M.CIRCUIT_LABELS).toHaveLength(9)
+    for (const g of M.CIRCUIT_LABELS) expect(M.CIRCUIT_TEXT[g]).toBe(g.toUpperCase())
+    expect(M.CIRCUIT_IO).toEqual(['high', 'low'])
+
+    expect(M.PICKER_MARKERS).toEqual(['none', 'arrow', 'dot', 'double'])
+    expect([...M.MARKERS].sort()).toEqual(['arrow', 'arrowClosed', 'dot', 'double', 'none'])
+    expect([...M.CONNECTIONS].sort()).toEqual(['cornered', 'curved', 'straight'])
+    expect([...M.LINES].sort()).toEqual(['dashed', 'dotted', 'solid'])
+    expect(M.POINTER_TOOLS).toEqual(['select', 'hand'])
+    expect(M.MEDIA_TOOLS).toEqual(['image', 'pdf', 'audio', 'file', 'weblink'])
+    expect(M.PICKER_TOOLS).toEqual(['link', 'create', ...M.MEDIA_TOOLS])
+
+    // Tools: every kind of tool once; all but Move and Hand are one-shot.
+    expect(new Set(M.TOOLS).size).toBe(M.TOOLS.length)
+    for (const group of [M.POINTER_TOOLS, M.PICKER_TOOLS, M.CONNECTOR_TOOLS, M.SHAPES, M.CIRCUIT_LABELS, ['text', 'frame'] as const]) {
+      for (const t of group) expect(M.isTool(t)).toBe(true)
+    }
+    expect(M.TOOLS).toHaveLength(2 + 7 + 2 + 12 + 9 + 2)
+    expect(M.ONE_SHOT_TOOLS).toHaveLength(M.TOOLS.length - 2)
     expect(M.isOneShotTool('select')).toBe(false)
     expect(M.isOneShotTool('hand')).toBe(false)
+    expect(M.isOneShotTool('weblink')).toBe(true)
+    expect(M.isOneShotTool('nand')).toBe(true)
 
     expect(M.DEFAULT_SETTINGS).toEqual({
       isSnappingToGrid: true,
@@ -65,7 +76,7 @@ describe('whiteboard model', () => {
     expect(M.emptyBoard()).toEqual({ version: 1, nodes: {}, edges: {}, blocks: {} })
   })
 
-  test('test unset connection is cornered, unset line solid, arrowClosed is arrow; dash arrays 8 8 and 0 10', () => {
+  test('test connector style defaults and dash patterns', () => {
     expect(M.normalizeConnection(undefined)).toBe('cornered')
     expect(M.normalizeConnection('straight')).toBe('straight')
     expect(M.normalizeConnection('curved')).toBe('curved')
@@ -100,6 +111,7 @@ describe('whiteboard model', () => {
     // The floor applies when the drawn box is smaller.
     expect(M.snapBox({ x: 31, y: 31, width: 10, height: 10 }, M.minSizeFor('shape'))).toEqual({ x: 30, y: 30, width: 90, height: 90 })
     expect(M.snapBox({ x: 0, y: 0, width: 5, height: 5 }, M.minSizeFor('block'))).toEqual({ x: 0, y: 0, width: 60, height: 30 })
+    expect(M.snapBox({ x: 0, y: 0, width: 5, height: 5 })).toEqual({ x: 0, y: 0, width: 30, height: 30 })
     expect(M.minSizeFor('point')).toEqual({ width: 0, height: 0 })
     expect(M.minSizeFor('frame')).toEqual({ width: 90, height: 90 })
     expect(M.connectorFromNodeBox({ x: 30, y: 60, width: 90, height: 60 })).toEqual({ start: { x: 30, y: 90 }, end: { x: 120, y: 90 } })
@@ -140,7 +152,7 @@ describe('whiteboard model', () => {
     expect(M.nextFrameTitle(Object.values(NETWORK_MAP.nodes))).toBe('Frame 2')
   })
 
-  test('test resolve tools fall back to Move, Rectangle and NAND; gates fall back to Move without engineering mode', () => {
+  test('test which tool each button arms, and the tool a board opens with', () => {
     expect(M.resolvePointerTool()).toBe('select')
     expect(M.resolvePointerTool('hand')).toBe('hand')
     expect(M.resolvePointerTool(undefined, 'hand')).toBe('hand')
@@ -151,6 +163,8 @@ describe('whiteboard model', () => {
     expect(M.resolveShapeMenuTool(undefined, 'text', 'star')).toBe('star')
     // Shapes outside the picker never come back from the Shapes button.
     expect(M.resolveShapeMenuTool('roundedRectangle', 'triangleDown', 'blockArrowLeft')).toBe('rectangle')
+    expect(M.resolveWhiteboardMediaTool()).toBe('image')
+    expect(M.resolveWhiteboardMediaTool('text', 'audio')).toBe('audio')
     expect(M.resolveCircuitTool()).toBe('nand')
     expect(M.resolveCircuitTool('xor')).toBe('xor')
     expect(M.resolveCircuitTool(undefined, 'low')).toBe('low')

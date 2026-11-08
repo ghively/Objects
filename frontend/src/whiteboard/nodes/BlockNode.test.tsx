@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
+import { AUTO_MAX_HEIGHT, AUTO_MAX_WIDTH, AUTO_MIN_WIDTH, AUTO_TEXT_MIN_HEIGHT, MIN_BLOCK_HEIGHT, MIN_BLOCK_WIDTH } from '../model'
 import { board, node, textBlock } from '../test/boards'
 import { renderBoard } from './test/harness'
 
@@ -17,17 +18,17 @@ vi.mock('@xyflow/react', async (orig) => {
 })
 
 describe('BlockNode', () => {
-  test('test text node auto sizes until resized; resize respects the 40 × 30 floor', () => {
+  test('test text node auto sizes until resized; resize respects the block floor', () => {
     const auto = node({ id: 'auto', blockId: 'b1', position: { x: 0, y: 0 } })
     const pinned = node({ id: 'pinned', blockId: 'b2', position: { x: 0, y: 300 }, width: 300, height: 90 })
     const { nodeEl, store } = renderBoard(board([auto, pinned], [], { b1: textBlock('Hello'), b2: textBlock('Pinned') }))
 
     const autoFrame = nodeEl('auto')!.querySelector('[data-testid="whiteboard-text-node"]') as HTMLElement
     expect(autoFrame).toHaveAttribute('data-auto-size')
-    expect(autoFrame.style.minWidth).toBe('420px')
-    expect(autoFrame.style.maxWidth).toBe('480px')
-    expect(autoFrame.style.minHeight).toBe('60px')
-    expect(autoFrame.style.maxHeight).toBe('420px')
+    expect(autoFrame.style.minWidth).toBe(`${AUTO_MIN_WIDTH}px`)
+    expect(autoFrame.style.maxWidth).toBe(`${AUTO_MAX_WIDTH}px`)
+    expect(autoFrame.style.minHeight).toBe(`${AUTO_TEXT_MIN_HEIGHT}px`)
+    expect(autoFrame.style.maxHeight).toBe(`${AUTO_MAX_HEIGHT}px`)
     expect(autoFrame.style.width).toBe('max-content')
 
     const pinnedFrame = nodeEl('pinned')!.querySelector('[data-testid="whiteboard-text-node"]') as HTMLElement
@@ -40,8 +41,8 @@ describe('BlockNode', () => {
     expect(screen.queryByTestId('node-resizer')).toBeNull()
     act(() => store.getState().actions.select(['auto']))
     const resizer = screen.getByTestId('node-resizer')
-    expect(resizer).toHaveAttribute('data-min-width', '40')
-    expect(resizer).toHaveAttribute('data-min-height', '30')
+    expect(resizer).toHaveAttribute('data-min-width', String(MIN_BLOCK_WIDTH))
+    expect(resizer).toHaveAttribute('data-min-height', String(MIN_BLOCK_HEIGHT))
 
     // A resize pins the size: the node no longer hugs its content.
     act(() =>

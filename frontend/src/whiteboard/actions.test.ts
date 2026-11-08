@@ -1,7 +1,20 @@
 import { describe, expect, test } from 'vitest'
 import type { WhiteboardData, WhiteboardNode } from '@/api/whiteboardTypes'
 import * as A from './actions'
-import { CIRCUIT_LABELS, CIRCUIT_TEXT, GRID, SHAPES, isCircuitNode, type Box } from './model'
+import {
+  CIRCUIT_LABELS,
+  CIRCUIT_TEXT,
+  DEFAULT_FRAME_HEIGHT,
+  DEFAULT_FRAME_WIDTH,
+  DEFAULT_NODE_HEIGHT,
+  DEFAULT_NODE_WIDTH,
+  GRID,
+  MIN_BLOCK_HEIGHT,
+  MIN_BLOCK_WIDTH,
+  SHAPES,
+  isCircuitNode,
+  type Box,
+} from './model'
 import { board, edge, node, textBlock } from './test/boards'
 
 const onGrid = (v: number) => Math.abs(v % GRID) === 0
@@ -19,10 +32,10 @@ describe('newId', () => {
 describe('createFromTool', () => {
   test('create from each tool uses defaults and snapping', () => {
     const empty = board()
-    // Text: 420 × 60 centred on the click, snapped; an empty text block
+    // Text: the default text size centred on the click, snapped; an empty text block
     const text = A.createFromTool(empty, 'text', { x: 100, y: 100 }, { id: 't' })
     const t = text.nodes.t
-    expect(t).toMatchObject({ kind: 'block', width: 420, height: 60, z: 1 })
+    expect(t).toMatchObject({ kind: 'block', width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT, z: 1 })
     expect(onGrid(t.position.x) && onGrid(t.position.y)).toBe(true)
     expect(text.blocks[t.blockId!]).toEqual({ type: 'text', markdown: '' })
 
@@ -42,7 +55,7 @@ describe('createFromTool', () => {
     expect(reversed.nodes.r).toMatchObject({ position: { x: 150, y: 150 }, width: 150, height: 150 })
     // Snapping off (Ctrl held) keeps the drawn box, with the floor
     const free = A.createFromTool(empty, 'text', box(14, 16, 20, 10), { id: 'f', snap: false })
-    expect(free.nodes.f).toMatchObject({ position: { x: 14, y: 16 }, width: 40, height: 30 })
+    expect(free.nodes.f).toMatchObject({ position: { x: 14, y: 16 }, width: MIN_BLOCK_WIDTH, height: MIN_BLOCK_HEIGHT })
 
     // Shape colours and the remembered size from the tool memory
     const coloured = A.createFromTool(empty, 'star', { x: 0, y: 0 }, {
@@ -53,9 +66,9 @@ describe('createFromTool', () => {
     })
     expect(coloured.nodes.c).toMatchObject({ fillColor: 'bg-blue', borderColor: 'red', width: 120, height: 150 })
 
-    // Frame: 480 × 420, behind content, "Frame 1"
+    // Frame: the default frame size, behind content, "Frame 1"
     const frame = A.createFromTool(text, 'frame', { x: 0, y: 0 }, { id: 'fr' })
-    expect(frame.nodes.fr).toMatchObject({ kind: 'frame', width: 480, height: 420, title: 'Frame 1' })
+    expect(frame.nodes.fr).toMatchObject({ kind: 'frame', width: DEFAULT_FRAME_WIDTH, height: DEFAULT_FRAME_HEIGHT, title: 'Frame 1' })
     expect(frame.nodes.fr.z!).toBeLessThan(1)
 
     // Pointer and picker tools make nothing

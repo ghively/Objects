@@ -179,11 +179,11 @@ describe('TypeSettings default list view', () => {
     const select = screen.getByRole('combobox', { name: 'Default list view' })
     expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual([
       'List',
-      'Gallery',
       'Wall',
+      'Kanban',
+      'Gallery',
       'Table',
       'Embed',
-      'Kanban',
       'Calendar',
       'Timeline',
       'Chart',
