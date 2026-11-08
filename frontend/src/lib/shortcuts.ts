@@ -462,8 +462,10 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def('whiteboardCycle', 'whiteboard', 'Cycle selected objects', ['Tab'], 'whiteboard', false, false),
   def('whiteboardCycleBack', 'whiteboard', 'Select the previous item', ['Shift-Tab'], 'whiteboard', false, false),
   def('whiteboardPan', 'whiteboard', 'Pan', ['Space'], 'whiteboard', false, false),
-  def('undo', 'whiteboard', 'Undo last change', ['Mod-z'], 'whiteboard', false, false),
-  def('redo', 'whiteboard', 'Redo last change', ['Mod-Shift-z', 'Mod-y'], 'whiteboard', false, false),
+  // The catalog lists Undo and Redo under General: display-only, the editor (its history) and the
+  // whiteboard (`whiteboard/shortcuts.ts`) handle the keys themselves.
+  def('undo', 'global', 'Undo', ['Mod-z'], 'global', false, false),
+  def('redo', 'global', 'Redo', ['Mod-Shift-z', 'Mod-y'], 'global', false, false),
 ]
 
 /**
@@ -516,6 +518,8 @@ export const SHARED_KEY_IDS: readonly (readonly string[])[] = [
   ['codeToken', 'toggleCodeBlock'],
   ['mathToken', 'toggleMathBlock'],
   ['toggleTodoInBlockWithCursor', 'toggleToggleInBlockWithCursor'],
+  // Ctrl+Shift+T: a new task outside the editor (the window), the block made a task inside it.
+  ['createNewTask', 'turnBlockIntoTaskObject'],
   ['moveSelectedBlocksUp', 'moveUpBlockWithCursor'],
   ['moveSelectedBlocksDown', 'moveDownBlockWithCursor'],
   ['moveSelectedBlocksUpOnSameLevel', 'moveUpBlockWithCursorOnSameLevel'],
@@ -572,9 +576,26 @@ export const AI_SHORTCUTS: ShortcutDef[] = [
   def('aiRephrase', 'ai', 'Rephrase', ['Mod-Alt-u'], 'aiChat', V, true),
 ]
 
+/**
+ * The 2026-11-08 sweep: catalogued keys Object had not bound ("bind the easy ones", Gene).
+ * `createNewTask` (General, Ctrl+Shift+T) is bound by `shell/shortcuts.ts` outside editable
+ * targets; inside the editor the key stays `turnBlockIntoTaskObject` (a shared pair).
+ * `pasteAsPlainText` (Text editing, Ctrl+Shift+V) is bound by `editor/shortcuts.ts` through
+ * `editor/extensions/pasteAsPlainText.ts`. `goToCalendar` (General, Ctrl+Alt+H: "press twice to
+ * jump to today") is bound by `shell/shortcuts.ts` anywhere in the window. `toggleAllToggles`
+ * (Block editing, Ctrl+O) is bound by `editor/shortcuts.ts` through `editor/extensions/toggleAll.ts`.
+ */
+export const SWEEP_SHORTCUTS: ShortcutDef[] = [
+  def('createNewTask', 'global', 'Create new task', ['Mod-Shift-t'], 'global', V, true),
+  def('pasteAsPlainText', 'text', 'Paste as plain text', ['Mod-Shift-v'], 'editor', V, true),
+  def('goToCalendar', 'global', 'Go to Calendar', ['Mod-Alt-h'], 'global', V, true),
+  def('toggleAllToggles', 'block', 'Open or close all toggles on the page', ['Mod-o'], 'editor', V, true),
+]
+
 registerShortcuts(EXISTING_SHORTCUTS)
 registerShortcuts(M7_SHORTCUTS)
 registerShortcuts(M8_SHORTCUTS)
 registerShortcuts(POLISH_SHORTCUTS)
 registerShortcuts(OBJECT_MENU_SHORTCUTS)
 registerShortcuts(AI_SHORTCUTS)
+registerShortcuts(SWEEP_SHORTCUTS)
