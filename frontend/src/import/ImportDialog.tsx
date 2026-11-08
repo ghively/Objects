@@ -406,7 +406,9 @@ export function ImportDialog() {
     useImportDialog.getState().close()
     openObject(result.reportPath)
   }
-  const offerSwitch = startedInto === 'newSpace' && !!finalPath && !lost
+  // A job that failed before writing anything has no folder to switch to; a result means one was made.
+  const madeSpace = job?.phase !== 'failed' || !!result
+  const offerSwitch = startedInto === 'newSpace' && !!finalPath && !lost && madeSpace
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => (o ? useImportDialog.getState().open(preset) : close())}>

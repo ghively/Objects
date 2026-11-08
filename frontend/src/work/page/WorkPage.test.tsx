@@ -179,6 +179,21 @@ describe('WorkPage', () => {
     expect(mocked.generalFloor).toHaveBeenCalled()
   })
 
+  test('test the page reloads the day once the clock passes midnight in the board zone', async () => {
+    // The board (fixture) says today is 2026-11-05 in UTC; the clock is just after midnight on the 6th.
+    vi.setSystemTime(new Date('2026-11-06T00:01:00.000Z'))
+    await show()
+    await act(async () => {})
+    expect(mocked.workBoard).toHaveBeenCalledTimes(2)
+    expect(mocked.workToday).toHaveBeenCalledTimes(2)
+    expect(mocked.workFocus).toHaveBeenCalledTimes(2)
+    expect(mocked.workCaptures).toHaveBeenCalledTimes(2)
+    // The server (mock) still answers yesterday: the page asks once, it does not loop.
+    await act(async () => {})
+    await act(async () => {})
+    expect(mocked.workBoard).toHaveBeenCalledTimes(2)
+  })
+
   test('test WorkPage lists Captures (M24 registers it through the glob)', () => {
     expect(registeredAtImport).toContainEqual({ id: 'captures', label: 'Captures', key: null })
   })

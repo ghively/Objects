@@ -145,12 +145,36 @@ export function TimelineLayout(props: LayoutProps) {
   const writes = useMemo(() => createRowWrites(), [])
   const [notice, setNotice] = useState<string | null>(null)
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Removes the document listeners of the bar, link or tray drag under way (as TableLayout.endResize). */
+  const endDrag = useRef<(() => void) | null>(null)
   useEffect(
     () => () => {
       if (noticeTimer.current) clearTimeout(noticeTimer.current)
+      // Unmounted mid-drag, the drag stops and its release writes nothing.
+      endDrag.current?.()
     },
     [],
   )
+  /** Starts a drag's document listeners; `detach` ends them and makes a later `up` a no-op. */
+  const attachDrag = (move: (ev: MouseEvent) => void, up: (ev: MouseEvent) => void): void => {
+    let ended = false
+    const detach = () => {
+      if (ended) return false
+      ended = true
+      document.removeEventListener('mousemove', move)
+      document.removeEventListener('mouseup', onUp)
+      if (endDrag.current === detach) endDrag.current = null
+      return true
+    }
+    const onUp = (ev: MouseEvent) => {
+      if (!detach()) return
+      up(ev)
+    }
+    endDrag.current?.()
+    endDrag.current = detach
+    document.addEventListener('mousemove', move)
+    document.addEventListener('mouseup', onUp)
+  }
   const say = useCallback((text: string) => {
     setNotice(text)
     if (noticeTimer.current) clearTimeout(noticeTimer.current)
@@ -389,15 +413,12 @@ export function TimelineLayout(props: LayoutProps) {
       setDrag(cur)
     }
     const up = () => {
-      document.removeEventListener('mousemove', move)
-      document.removeEventListener('mouseup', up)
       setDrag(null)
       if (!cur.moved) return
       markDragged()
       if (cur.delta !== 0) void writeDrag(row, mode, cur.delta)
     }
-    document.addEventListener('mousemove', move)
-    document.addEventListener('mouseup', up)
+    attachDrag(move, up)
   }
 
   const overlayPoint = (clientX: number, clientY: number) => {
@@ -435,15 +456,12 @@ export function TimelineLayout(props: LayoutProps) {
       setLink((l) => (l ? { ...l, x: cur.x, y: cur.y } : l))
     }
     const up = () => {
-      document.removeEventListener('mousemove', move)
-      document.removeEventListener('mouseup', up)
       const target = linkTarget.current ? latest.current.byPath.get(linkTarget.current) : undefined
       linkTarget.current = null
       setLink(null)
       if (target && target.summary.path !== row.summary.path) void latest.current.writeDependency(row, target)
     }
-    document.addEventListener('mousemove', move)
-    document.addEventListener('mouseup', up)
+    attachDrag(move, up)
   }
   // The bar under the pointer while linking (set by the bars' mouseenter).
   const linkTarget = useRef<string | null>(null)
@@ -463,16 +481,13 @@ export function TimelineLayout(props: LayoutProps) {
       setTrayDrag(cur)
     }
     const up = (ev: MouseEvent) => {
-      document.removeEventListener('mousemove', move)
-      document.removeEventListener('mouseup', up)
       setTrayDrag(null)
       if (!cur.moved) return
       markDragged()
       const p = overlayPoint(ev.clientX, ev.clientY)
       if (p?.inside && onVisibleAxis(ev.clientX, ev.clientY)) void latest.current.writeStart(row, dayAt(latest.current.axis, p.x))
     }
-    document.addEventListener('mousemove', move)
-    document.addEventListener('mouseup', up)
+    attachDrag(move, up)
   }
 
   const open = (row: Row, e: ReactMouseEvent) => {

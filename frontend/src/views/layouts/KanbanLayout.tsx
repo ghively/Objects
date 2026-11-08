@@ -10,13 +10,18 @@ import { usePeek } from '@/nav/tabs'
 import { LabelPill } from '@/properties/LabelMenu'
 import { cn } from '@/lib/utils'
 import type { LayoutProps } from '../DataView'
-import { findDef } from '../filter'
-import { canDropRow, groupRows, valueForGroup, type Group } from '../group'
+import { findDef, rowValue } from '../filter'
+import { canDropRow, groupRows, hasLaterParagraphs, valueForGroup, type Group } from '../group'
 import { matchingValues } from '../matching'
 import { LOAD_PAGE } from '../model'
 import { propertyChoices } from '../properties'
 import { createRowWrites } from '../rowWrites'
 import { CardItem } from './CardItem'
+
+/** Said when a drop is refused: the card's type can't take the column's value, or the value can't be set. */
+const CANT_MOVE = "This card can't be moved here."
+/** Said when a long-text card with more than one paragraph is dropped (its column is only the first). */
+const LONG_TEXT_STAYS = "This card has more than one paragraph, so it can't be moved to another column."
 
 /** The grouping a kanban uses: the view's own, else the first label property of its types. */
 export function kanbanGroupBy(groupBy: GroupBy | null, props: Pick<LayoutProps, 'viewTypes'>): GroupBy | null {
@@ -26,12 +31,12 @@ export function kanbanGroupBy(groupBy: GroupBy | null, props: Pick<LayoutProps, 
   return label ? { groups: [{ propertyId: label.key, option: 'default', typeId: label.typeId }] } : null
 }
 
-function Card({ props, row, hide, groupId }: { props: LayoutProps; row: Row; hide: string[]; groupId: string }) {
+function Card({ props, row, hide, groupId, disabled }: { props: LayoutProps; row: Row; hide: string[]; groupId: string; disabled: boolean }) {
   // A card with several values shows in several columns: the id names the column it is in.
   const d = useDraggable({
     id: `${groupId}\n${row.summary.path}`,
     data: { path: row.summary.path, groupId },
-    disabled: row.summary.readOnly,
+    disabled: row.summary.readOnly || disabled,
   })
   return (
     <div
@@ -52,6 +57,7 @@ function Column({
   group,
   rows,
   droppable,
+  canMove,
   props,
   hide,
   title,
@@ -62,6 +68,8 @@ function Column({
   /** The cards shown (a page of the group's rows); the header counts them all. */
   rows: Row[]
   droppable: boolean
+  /** Whether a card's own value lets it move to another column (a long text with more paragraphs can't). */
+  canMove(row: Row): boolean
   props: LayoutProps
   hide: string[]
   title: React.ReactNode
@@ -82,7 +90,7 @@ function Column({
         <span className="text-fg-muted">{group.rows.length}</span>
       </div>
       {rows.map((r) => (
-        <Card key={r.summary.path} props={props} row={r} hide={hide} groupId={group.id} />
+        <Card key={r.summary.path} props={props} row={r} hide={hide} groupId={group.id} disabled={!canMove(r)} />
       ))}
       {group.rows.length > rows.length && (
         <button type="button" onClick={onMore} className="mx-auto rounded-lg px-3 py-1 text-[14px] text-fg-muted hover:bg-hover">
@@ -123,6 +131,9 @@ export function KanbanLayout(props: LayoutProps) {
     [flat, groupBy, state.viewDefinition.groupByConfig, ctx],
   )
   const update = (g: Group) => (groupBy && groupDef ? valueForGroup(groupBy, g, groupDef) : null)
+  // A card whose own value can't be written by a drop (a long text past its first paragraph) never
+  // starts a drag, so no column lights up for it.
+  const canMove = (g: Group, row: Row) => !!groupBy && !!groupDef && valueForGroup(groupBy, g, groupDef, { row, from: g }) !== null
   const hide = entry ? [entry.propertyId] : []
   // How many cards each column shows (`LOAD_PAGE` until its "Load more").
   const [shown, setShown] = useState<Record<string, number>>({})
@@ -162,10 +173,16 @@ export function KanbanLayout(props: LayoutProps) {
     const target = groups.find((g) => `col:${g.id}` === e.over?.id)
     if (!row || !target || target.rows.some((r) => r.summary.path === row.summary.path)) return
     // A row whose type has the key as another kind (text under a label grouping) can't take the value.
-    if (!entry || !groupDef || !canDropRow(row, entry, groupDef, props.types)) return
+    if (!entry || !groupDef || !canDropRow(row, entry, groupDef, props.types)) {
+      say(CANT_MOVE)
+      return
+    }
     const from = groups.find((g) => g.id === data?.groupId) ?? groups.find((g) => g.rows.some((r) => r.summary.path === path))
     const change = groupBy && groupDef ? valueForGroup(groupBy, target, groupDef, { row, from }) : null
-    if (!change) return
+    if (!change) {
+      say(groupDef.type === 'textBlock' && hasLaterParagraphs(rowValue(row, entry.propertyId)) ? LONG_TEXT_STAYS : CANT_MOVE)
+      return
+    }
     try {
       // Writes to one row run in turn, each from the newest version (the rows may lag behind).
       const result = await writes.run(row, (version, cur) => {
@@ -206,6 +223,7 @@ export function KanbanLayout(props: LayoutProps) {
               group={g}
               rows={rows}
               droppable={update(g) !== null}
+              canMove={(r) => canMove(g, r)}
               props={props}
               hide={hide}
               onAdd={() => void add(g)}

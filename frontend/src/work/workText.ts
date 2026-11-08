@@ -5,6 +5,8 @@
  * M22's `settings/sections/Work.tsx` exports its own `WORK_TEXT` (the settings section's strings):
  * a file that needs both imports this one under another name.
  */
+const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`
+
 export const WORK_TEXT = {
   // ---- the section ----
   work: 'Work',
@@ -64,7 +66,7 @@ export const WORK_TEXT = {
   hypothesis: 'Hypothesis',
   confidenceOf: (confidence: string) => `${confidence} confidence`,
   whereYouLeftOff: 'Where you left off',
-  lastTouchedDays: (n: number) => `Last touched ${n} days ago`, // ported
+  lastTouchedDays: (n: number) => `Last touched ${days(n)} ago`, // ported
   stepOf: (n: number, total: number) => `Step ${n} of ${total}`,
   startTogether: 'Start together',
   makeItSmaller: 'Make it smaller',
@@ -79,7 +81,7 @@ export const WORK_TEXT = {
   parkedDumps: 'Parked dumps need you',
   nextMeeting: 'Next meeting',
   deadlines: 'Deadlines',
-  daysLeft: (n: number) => `${n} days`,
+  daysLeft: (n: number) => days(n),
   alerts: 'Alerts',
   wins: 'Wins',
 
@@ -113,7 +115,7 @@ export const WORK_TEXT = {
   youDoing: (n: number, limit: number) => `You: ${n} / ${limit}`,
   overloaded: 'Overloaded',
   allAreas: 'All areas', // ported
-  daysQuiet: (n: number) => `${n} days quiet`, // ported
+  daysQuiet: (n: number) => `${days(n)} quiet`, // ported
   noArea: 'No area', // ours
 
   // ---- Projects map ----

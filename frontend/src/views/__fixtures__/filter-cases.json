@@ -415,13 +415,80 @@
       ]
     },
     {
-      "name": "an unknown label id is dropped: passes",
+      "name": "an unknown label id beside a known one is dropped",
+      "filter": {
+        "type": "filter",
+        "propertyId": "status",
+        "option": "contains",
+        "referenceValue": [
+          "gone",
+          "done"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md"
+      ]
+    },
+    {
+      "name": "a label id that no longer exists matches nothing",
       "filter": {
         "type": "filter",
         "propertyId": "status",
         "option": "contains",
         "referenceValue": [
           "gone"
+        ]
+      },
+      "matches": []
+    },
+    {
+      "name": "a label id that no longer exists: does not include matches everything",
+      "filter": {
+        "type": "filter",
+        "propertyId": "status",
+        "option": "notContains",
+        "referenceValue": [
+          "gone"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md",
+        "Pages/Gamma.md"
+      ]
+    },
+    {
+      "name": "a tag id that no longer exists matches nothing",
+      "filter": {
+        "type": "filter",
+        "propertyId": "tags",
+        "option": "contains",
+        "referenceValue": [
+          "T9"
+        ]
+      },
+      "matches": []
+    },
+    {
+      "name": "a relation id that no longer exists matches nothing",
+      "filter": {
+        "type": "filter",
+        "propertyId": "owner",
+        "option": "contains",
+        "referenceValue": [
+          "P9"
+        ]
+      },
+      "matches": []
+    },
+    {
+      "name": "a relation id that no longer exists: does not include matches everything",
+      "filter": {
+        "type": "filter",
+        "propertyId": "owner",
+        "option": "notContains",
+        "referenceValue": [
+          "P9"
         ]
       },
       "matches": [
@@ -792,19 +859,18 @@
       ]
     },
     {
-      "name": "an unknown object id is dropped: passes",
+      "name": "an unknown object id beside a known one is dropped",
       "filter": {
         "type": "filter",
         "propertyId": "owner",
         "option": "contains",
         "referenceValue": [
-          "P9"
+          "P9",
+          "P1"
         ]
       },
       "matches": [
-        "Tasks/Alpha.md",
-        "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Tasks/Alpha.md"
       ]
     },
     {

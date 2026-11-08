@@ -31,7 +31,7 @@ export const IMPORT_TEXT = {
   summaryHeading: 'What will be imported',
   /** The preview's summary line. */
   summary: (objects: number, types: number, attachments: number) =>
-    `${objects} objects, ${types} types, ${attachments} attachments`,
+    `${plural(objects, 'object', 'objects')}, ${plural(types, 'type', 'types')}, ${plural(attachments, 'attachment', 'attachments')}`,
   sourceLine: (app: string, container: 'zip' | 'folder', detected: boolean) =>
     `${app} export, ${container === 'zip' ? 'a .zip file' : 'a folder'}${detected ? ' (detected)' : ''}`,
   properties: (n: number) => plural(n, 'property', 'properties'),

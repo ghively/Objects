@@ -38,6 +38,15 @@ describe('ScanStep', () => {
     })
   })
 
+  test('files that could not be checked are counted and said to import unmarked', async () => {
+    const user = userEvent.setup()
+    const report = { ...REPORT, counts: { ...REPORT.counts, unscanned: 3 } }
+    render(<ScanStep sourcePath="/src" scan={async () => report} onDone={() => {}} />)
+    await user.click(screen.getByRole('button', { name: 'Scan' }))
+    expect(await screen.findByText('5 files scanned, 2 flagged, 1 left out, 3 could not be checked.')).toBeInTheDocument()
+    expect(screen.getByText('Files that could not be checked are imported without "Exclude from AI".')).toBeInTheDocument()
+  })
+
   test('a per-file Leave out choice is passed on', async () => {
     const onDone = vi.fn()
     const user = userEvent.setup()

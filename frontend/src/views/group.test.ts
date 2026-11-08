@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { Row, TypeDef } from '@/api/types'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { collection, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 import { GROUP_OPTIONS, GROUP_SORT_OPTIONS, canDropRow, groupRows, isGroupable, valueForGroup, type GroupCtx } from './group'
 
@@ -104,6 +105,18 @@ describe('groupRows', () => {
     const rows = [R('today', { due: d(23) }), R('yest', { due: d(22) }), R('tom', { due: d(24) }), R('lastw', { due: d(15) }), R('nextw', { due: d(28) }), R('old', { due: d(1) }), R('none', {})]
     const { groups } = groupRows(rows, by('due', 'relative'), undefined, ctx())
     expect(labels(groups)).toEqual(['Earlier', 'Last week', 'Yesterday', 'Today', 'Tomorrow', 'Next week', 'Other'])
+  })
+
+  test('By Hour labels follow the Time format setting', () => {
+    const rows = [R('a', { due: { start: '2026-11-08T14:05:00.000Z', resolution: 'time' } })]
+    try {
+      useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'UTC' } })
+      expect(labels(groupRows(rows, by('due', 'hour'), undefined, ctx()).groups)).toEqual(['Nov 8, 2026, 2 PM'])
+      useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'UTC', twentyFourHourTime: true } })
+      expect(labels(groupRows(rows, by('due', 'hour'), undefined, ctx()).groups)).toEqual(['Nov 8, 2026, 14:00'])
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 
   test('hideEmptyGroups drops empty label options', () => {

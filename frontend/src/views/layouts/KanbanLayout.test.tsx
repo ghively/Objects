@@ -162,9 +162,40 @@ describe('KanbanLayout', () => {
     dragEnd?.({ active: { id: 'Notes/N1.md', data: { current: { path: 'Notes/N1.md', groupId: 'other' } } }, over: { id: `col:${done}` } })
     await new Promise((r) => setTimeout(r, 50))
     expect(mocked.updateProperties).not.toHaveBeenCalled()
+    // The refusal is said, not silent.
+    expect(screen.getAllByRole('status').map((e) => e.textContent)).toContain("This card can't be moved here.")
     // A task's drop still writes the label.
     dragEnd?.({ active: { id: 'Tasks/T1.md' }, over: { id: `col:${done}` } })
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/T1.md', { status: ['Done'] }, 'v7'))
+  })
+
+  test('a long-text card with a second paragraph is not draggable, and a drop of it says why and writes nothing', async () => {
+    const PAGE = typeDef({
+      id: 'page',
+      name: 'Page',
+      pluralName: 'Pages',
+      propertyDefinitions: [propertyDef({ id: 'title', type: 'entity_title', name: 'Title' }), propertyDef({ id: 'body', type: 'textBlock', name: 'Body' })],
+    })
+    const rows = [
+      row({ summary: objectSummary({ path: 'Pages/A.md', type: 'page' }), values: { body: 'First\n\nSecond paragraph' }, version: 'v2' }),
+      row({ summary: objectSummary({ path: 'Pages/B.md', type: 'page' }), values: { body: 'Other' }, version: 'v3' }),
+    ]
+    const state = kanban({ groupBy: { groups: [{ propertyId: 'body', option: 'default' }] } })
+    render(<DataView rows={rows} types={[PAGE]} scope={{ typeIds: ['page'] }} state={state} onState={vi.fn()} layouts={['kanban']} />)
+    const card = (path: string) => screen.getAllByTestId('kanban-card').find((c) => c.getAttribute('data-path') === path)!
+    expect(card('Pages/A.md')).toHaveAttribute('aria-disabled', 'true')
+    expect(card('Pages/B.md')).toHaveAttribute('aria-disabled', 'false')
+    const other = columns().find((c) => within(c).queryByText('Other'))!.getAttribute('data-group')
+    const first = columns().find((c) => within(c).queryByText('First'))!.getAttribute('data-group')
+    dragEnd?.({ active: { id: 'Pages/A.md', data: { current: { path: 'Pages/A.md', groupId: first } } }, over: { id: `col:${other}` } })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mocked.updateProperties).not.toHaveBeenCalled()
+    expect(screen.getAllByRole('status').map((e) => e.textContent)).toContain(
+      "This card has more than one paragraph, so it can't be moved to another column.",
+    )
+    // The one-paragraph card still moves.
+    dragEnd?.({ active: { id: 'Pages/B.md', data: { current: { path: 'Pages/B.md', groupId: other } } }, over: { id: `col:${first}` } })
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Pages/B.md', { body: 'First' }, 'v3'))
   })
 
   test("the group definition follows the grouping's typeId", async () => {

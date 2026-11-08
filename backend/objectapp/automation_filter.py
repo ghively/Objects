@@ -301,13 +301,19 @@ def _match_number(value: Any, f: Mapping[str, Any]) -> bool:
     return True
 
 
-def _match_set(have: list[Any], want: list[Any], f: Mapping[str, Any]) -> bool:
+def _match_set(have: list[Any], want: list[Any], f: Mapping[str, Any], configured: int | None = None) -> bool:
+    """Includes (any of ``want``) / does not include (none).
+
+    A filter with no configured values (``configured`` 0) is inactive and passes; one whose
+    values all resolve to nothing (an option, tag or object that no longer exists) matches
+    nothing for includes and everything for does not include, as its values are gone.
+    """
     option = f.get("option")
     if option == "isEmpty":
         return not have
     if option == "isNotEmpty":
         return bool(have)
-    if not want:
+    if (len(want) if configured is None else configured) == 0:
         return True
     hit = any(w in have for w in want)
     return not hit if option == "notContains" else hit
@@ -565,8 +571,9 @@ def _match_kind(
             for o in label_set:
                 if isinstance(o, Mapping):
                     by_id.setdefault(o.get("id"), o.get("text"))  # the first wins, as `find`
-            want = [t for t in (by_id.get(i) for i in _ref_ids(f)) if t]
-            return _match_set(have, want, f)
+            ids = _ref_ids(f)
+            want = [t for t in (by_id.get(i) for i in ids) if t]
+            return _match_set(have, want, f, len(ids))
         case "entity" | "entity_backlinks":
             option = f.get("option")
             if option == "isEmpty":
@@ -574,11 +581,13 @@ def _match_kind(
             if option == "isNotEmpty":
                 return has and _entity_count(row, pid) > 0
             paths = _entity_paths(row, pid) if has else []
-            want = [p for p in (ctx.paths_by_id.get(i) for i in _ref_ids(f)) if p]
-            return _match_set(paths, want, f)
+            ids = _ref_ids(f)
+            want = [p for p in (ctx.paths_by_id.get(i) for i in ids) if p]
+            return _match_set(paths, want, f, len(ids))
         case "entity_tags":
-            want = [t for t in (ctx.tag_titles.get(i) for i in _ref_ids(f)) if t]
-            return _match_set(list(s.get("tags") or []), want, f)
+            ids = _ref_ids(f)
+            want = [t for t in (ctx.tag_titles.get(i) for i in ids) if t]
+            return _match_set(list(s.get("tags") or []), want, f, len(ids))
         case "entity_collections":
             return _match_set(_collection_ids(row, ctx.collections), _ref_ids(f), f)
         case "entity_type":

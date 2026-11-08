@@ -9,8 +9,11 @@ export const SCAN_TEXT = {
   back: 'Back',
   continue: 'Continue',
   noFindings: 'Nothing sensitive was found.',
-  summary: (scanned: number, flagged: number, leftOut: number) =>
-    `${scanned} file${scanned === 1 ? '' : 's'} scanned, ${flagged} flagged, ${leftOut} left out.`,
+  /** The counts line; files the scan could not read (binaries, over-size, nested zips) are never counted as clean. */
+  summary: (scanned: number, flagged: number, leftOut: number, unscanned = 0) =>
+    `${scanned} file${scanned === 1 ? '' : 's'} scanned, ${flagged} flagged, ${leftOut} left out` +
+    `${unscanned > 0 ? `, ${unscanned} could not be checked` : ''}.`,
+  uncheckedNote: 'Files that could not be checked are imported without "Exclude from AI".',
   flaggedHeading: 'Flagged files',
   choiceLabel: (file: string) => `What to do with ${file}`,
   excludeFromAi: 'Import, excluded from AI',
