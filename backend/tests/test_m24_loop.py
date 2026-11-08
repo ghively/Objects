@@ -533,3 +533,32 @@ def test_wait_idle_is_not_fooled_by_a_run_that_starts_between_its_checks() -> No
     stub._can_start = can_start
     assert WorkLoop.wait_idle(stub, 2)  # type: ignore[arg-type]
     assert len(calls) >= 2
+
+
+def test_an_approved_step_moved_away_and_back_is_queued_again(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Audit 10: moving an approved step (or a no-op edit) must not strand it with no queue entry."""
+    actions(monkeypatch, {"approve": [step_call("complete", "Change review: PASS. Done.")]})
+    env.setting(workAutoRun=False)
+    env.step(P, STEP, "approve")
+    # a no-op edit (the same text) keeps the entry
+    step = next(s for s in env.service.item(P)["steps"] if s["id"] == STEP)
+    env.service.edit_steps(P, [{"op": "edit", "stepId": STEP, "stepRev": step["rev"], "text": step["text"]}], GENE)
+    assert [x["state"] for x in env.entries()] == ["pending"]
+    # moved to the end it isn't current, so the claim withdraws the entry
+    step = next(s for s in env.service.item(P)["steps"] if s["id"] == STEP)
+    env.service.edit_steps(P, [{"op": "move", "stepId": STEP, "stepRev": step["rev"], "before": None}], GENE)
+    env.acts()
+    env.idle()
+    assert [(x["state"], x["reason"]) for x in env.entries()] == [("withdrawn", WITHDRAWN_CHANGED)]
+    assert not env.runs()
+    # moved back, it is current and approved again: queued and run
+    steps = env.service.item(P)["steps"]
+    step = next(s for s in steps if s["id"] == STEP)
+    agent = next(s for s in steps if s["kind"] == "agent")
+    env.service.edit_steps(P, [{"op": "move", "stepId": STEP, "stepRev": step["rev"], "before": agent["id"]}], GENE)
+    env.idle()
+    approve = [x for x in env.entries() if x["kind"] == "approve"]
+    assert [x["state"] for x in approve] == ["withdrawn", "done"]
+    assert approve[1]["purpose"] == "work" and approve[1]["by"] == "Gene"
+    assert next(s for s in env.service.item(P)["steps"] if s["id"] == STEP)["state"] == "done"
+    assert len(env.runs()) == 1

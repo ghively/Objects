@@ -72,6 +72,8 @@ def plan_for_notice(notice: WorkNotice) -> QueuePlan | None:
         return None
     if event not in _STEP_EVENTS and event not in ("note", "request", "close"):
         return None
+    if event == "edit" and notice.before == "approved":
+        return None  # an approved step's text and kind can't change: the edit changed nothing
     step = notice.step_id if event in _STEP_EVENTS else None
     item = event == "close"
     create: dict[str, Any] | None = None

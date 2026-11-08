@@ -310,11 +310,34 @@ class WorkLoop:
         except (KeyError, NotWorkItem, ValueError, OSError):
             return None
 
+    def _requeue_approved(self, item: dict) -> dict | None:
+        """Queue the current approved step again when its last entry was withdrawn while it stayed
+        approved (it was moved away and back, so the claim found it not current). Only a step Gene
+        approved, and only when its last entry was withdrawn: a failed one waits for Retry."""
+        step = next((s for s in item.get("steps", []) if s.get("current")), None)
+        if step is None or step.get("state") != "approved" or step.get("kind") not in ("approve", "agent"):
+            return None
+        kind = "approve" if step["kind"] == "approve" else "run"
+        mine = [e for e in self.store.entries()
+                if e.get("path") == item["path"] and e.get("stepId") == step["id"] and e.get("kind") == kind]
+        if not mine or mine[-1].get("state") != "withdrawn":
+            return None
+        last = mine[-1]
+        fields = {k: last.get(k) for k in ("kind", "path", "objectId", "title", "auto", "by")}
+        fields.update(stepId=step["id"], stepN=step.get("n"), stepKind=step.get("kind"),
+                      stepText=step.get("text"), notBefore=step.get("notBefore") or last.get("notBefore"))
+        entry = self.store.add(fields, now=self.clock())
+        self._event(entry["id"])
+        self.wake()
+        return entry
+
     def _auto_check(self, path: str) -> bool:
+        item = self._item(path)
+        if item is not None and not item.get("done"):
+            self._requeue_approved(item)
         settings = self.read_settings()
         if not settings.get("workAutoRun") or not settings.get("workAgentActs"):
             return False
-        item = self._item(path)
         if item is None or item.get("done"):
             return False
         step = next((s for s in item.get("steps", []) if s.get("current")), None)
@@ -486,6 +509,11 @@ class WorkLoop:
         if verdict == "withdraw":
             self.store.update(entry["id"], state="withdrawn", reason=reason, finishedAt=_iso(now))
             self._event(entry["id"])
+            if entry.get("kind") in ("approve", "run"):
+                # the step may have been moved back while this was decided: don't strand it
+                fresh = self._item(entry.get("path"))
+                if fresh is not None and not fresh.get("done"):
+                    self._requeue_approved(fresh)
             return True
         if verdict == "wait":
             step = _step_of(item, entry.get("stepId")) or {}
