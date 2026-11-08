@@ -200,17 +200,17 @@ function TabItem({ tab, active, space }: { tab: Tab; active: boolean; space: Spa
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="border-line bg-raised text-fg">
-        {/* A type tab: Pin to Sidebar, Pin Tab, Object Type Settings, Import (Ctrl I). */}
+        {/* A type tab: Pin to sidebar, Pin tab, Object type settings, Import (Ctrl I). */}
         {tabType && <PinTypeItem type={tabType} />}
         {tab.pinned ? (
           <ContextMenuItem onSelect={() => unpin(tab.id)}>
             <Icon name="ph-push-pin-slash" size={15} />
-            Unpin Tab
+            Unpin tab
           </ContextMenuItem>
         ) : (
           <ContextMenuItem onSelect={() => pin(tab.id)}>
             <Icon name="ph-push-pin" size={15} />
-            Pin Tab
+            Pin tab
           </ContextMenuItem>
         )}
         {tabType && (

@@ -67,10 +67,10 @@ describe('Sidebar', () => {
     expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
       'Open',
       'Create Server',
-      'New from Template',
-      'New Collection',
-      'Pin to Sidebar',
-      'Object Type Settings',
+      'New from template',
+      'New collection',
+      'Pin to sidebar',
+      'Object type settings',
       'Import CSV',
       'Delete object type',
     ])
@@ -81,7 +81,7 @@ describe('Sidebar', () => {
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Pages' }))
     menu = await screen.findByRole('menu')
     expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).not.toContain('Delete object type')
-    await user.click(within(menu).getByRole('menuitem', { name: 'Object Type Settings' }))
+    await user.click(within(menu).getByRole('menuitem', { name: 'Object type settings' }))
     expect(onOpenTypeSettings).toHaveBeenCalledWith(expect.objectContaining({ id: 'page' }))
   })
 

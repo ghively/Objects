@@ -5,7 +5,7 @@
  * - sentences: sentence segments
  * - paragraphs: the lines of the plain text (`split(/\n/)`), 0 when it is empty
  * - characters: graphemes, whitespace included
- * The page inspector's "Stats" tab and the `…` menu's "Text Stats" show the same rows: words,
+ * The page inspector's "Stats" tab and the `…` menu's "Text stats" show the same rows: words,
  * sentences, paragraphs, characters, then "Created at" (not for daily notes) and "Last updated".
  * Object's page is Markdown, so `plainText` first strips the Markdown syntax: one line per
  * non-empty block line (one line per block of plain text).

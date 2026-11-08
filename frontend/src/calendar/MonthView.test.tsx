@@ -86,14 +86,14 @@ describe('MonthView', () => {
     expect(screen.getByRole('navigation', { name: 'Months' })).toBeInTheDocument()
   })
 
-  test('test month + New Object row creates the daily note and opens it', async () => {
+  test('test month + New object row creates the daily note and opens it', async () => {
     const user = userEvent.setup()
     addNote('2026-10-02')
     render(<MonthView anchor={TODAY} weekStart="sunday" />)
     await waitFor(() => expect(screen.getByTestId('grid').children).toHaveLength(1))
     const calls = mocked.calendar.mock.calls.length
     // Under the cards.
-    const row = screen.getByRole('button', { name: 'New Object' })
+    const row = screen.getByRole('button', { name: 'New object' })
     expect(screen.getByTestId('grid').compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     await user.click(row)
     // Today, when the month shown is this month.
@@ -102,12 +102,12 @@ describe('MonthView', () => {
     await waitFor(() => expect(mocked.calendar.mock.calls.length).toBeGreaterThan(calls))
   })
 
-  test('test month + New Object in another month uses its first day and opens an existing note', async () => {
+  test('test month + New object in another month uses its first day and opens an existing note', async () => {
     const user = userEvent.setup()
     mocked.createDailyNote.mockRejectedValueOnce(new DailyNoteExistsError('exists', 'DailyNotes/2026-03-01.md'))
     render(<MonthView anchor="2026-03-15" weekStart="sunday" />)
     expect(await screen.findByText('This month has no daily notes yet.', { exact: false })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'New Object' }))
+    await user.click(screen.getByRole('button', { name: 'New object' }))
     expect(mocked.createDailyNote).toHaveBeenCalledWith('2026-03-01')
     await waitFor(() => expect(usePeek.getState().path).toBe('DailyNotes/2026-03-01.md'))
   })

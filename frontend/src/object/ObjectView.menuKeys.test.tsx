@@ -72,12 +72,12 @@ describe('object … menu key hints, Import and Copy', () => {
     expect(keysFor('toggleFavorite')).toEqual(['Mod-Shift-*'])
   })
 
-  test('Export, Import and Pin to Sidebar show their keys; Import follows Export', async () => {
+  test('Export, Import and Pin to sidebar show their keys; Import follows Export', async () => {
     const user = userEvent.setup()
     const menu = await openMenu(user)
     expect(row(menu, 'Export')).toHaveTextContent('Ctrl E')
     expect(row(menu, 'Import')).toHaveTextContent('Ctrl I')
-    expect(row(menu, 'Pin to Sidebar')).toHaveTextContent('Ctrl Shift *')
+    expect(row(menu, 'Pin to sidebar')).toHaveTextContent('Ctrl Shift *')
     const n = within(menu).getAllByRole('menuitem').map((i) => i.textContent ?? '')
     expect(n.findIndex((x) => x.startsWith('Import'))).toBe(n.findIndex((x) => x.startsWith('Export')) + 1)
     expect(n.some((x) => x.startsWith('Share'))).toBe(false)
@@ -96,7 +96,7 @@ describe('object … menu key hints, Import and Copy', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     let menu = await openMenu(user)
     const n = within(menu).getAllByRole('menuitem').map((i) => i.textContent ?? '')
-    expect(n.indexOf('Copy')).toBe(n.indexOf('Text Stats') + 1)
+    expect(n.indexOf('Copy')).toBe(n.indexOf('Text stats') + 1)
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Copy' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy object reference' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('[[Notes]]'))

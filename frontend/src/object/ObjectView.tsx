@@ -151,20 +151,20 @@ export const FIND_IN_PAGE_MENU_ITEM = 'Find in page'
 
 /** M8 menu items and the focus-mode button. */
 export const OBJECT_M8_TEXT = {
-  versionHistory: 'Version History',
+  versionHistory: 'Version history',
   mergeObject: 'Merge into object',
   mergeTag: 'Merge into tag',
   present: 'Present',
   addToWhiteboard: 'Add to whiteboard',
-  enterFocusMode: 'Enter Focus Mode',
-  leaveFocusMode: 'Leave Focus Mode',
+  enterFocusMode: 'Enter focus mode',
+  leaveFocusMode: 'Leave focus mode',
 } as const
 
 /** M9 menu items. */
 export const OBJECT_M9_TEXT = {
   wideLayout: 'Wide layout',
   normalLayout: 'Normal layout',
-  textStats: 'Text Stats',
+  textStats: 'Text stats',
   export: 'Export',
   duplicate: 'Duplicate',
 } as const
@@ -1045,7 +1045,44 @@ export function ObjectView({
               {FIND_IN_PAGE_MENU_ITEM}
               <MenuKeys id="findInPage" />
             </DropdownMenuItem>
+            {canTemplate && type && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={propsReadOnly}>
+                  <Icon name="ph-file-dashed" size={14} />
+                  {USE_TEMPLATE_TEXT.menu}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="border-line bg-raised">
+                  <UseTemplateMenu
+                    type={type}
+                    editor={typeEditor}
+                    onApply={(id) => void applyTemplate(id)}
+                    onEdit={(p) => openTarget({ kind: 'object', path: p })}
+                    onCreated={(p) => openTarget({ kind: 'object', path: p })}
+                  />
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
             <PinMenuItems pin={{ kind: 'object', path, id: summary?.id }} shortcut={<MenuKeys id="toggleFavorite" />} />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={propsReadOnly || !summary || isTemplate}>
+                <Icon name="ph-swap" size={14} />
+                Change type
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="max-h-[360px] overflow-auto border-line bg-raised">
+                {otherTypes.map((t) => (
+                  <DropdownMenuItem key={t.id} onSelect={() => setChangeTo(t)}>
+                    <TypeChip type={t} size={18} />
+                    {t.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            {type && (
+              <DropdownMenuItem data-type-setting="" onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
+                <Icon name="ph-gear-six" size={14} />
+                Object type settings
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               disabled={!summary}
               onSelect={() => {
@@ -1129,43 +1166,12 @@ export function ObjectView({
               </>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger disabled={propsReadOnly || !summary || isTemplate}>
-                <Icon name="ph-swap" size={14} />
-                Change type
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="max-h-[360px] overflow-auto border-line bg-raised">
-                {otherTypes.map((t) => (
-                  <DropdownMenuItem key={t.id} onSelect={() => setChangeTo(t)}>
-                    <TypeChip type={t} size={18} />
-                    {t.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            {canTemplate && type && (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger disabled={propsReadOnly}>
-                  <Icon name="ph-file-dashed" size={14} />
-                  {USE_TEMPLATE_TEXT.menu}
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="border-line bg-raised">
-                  <UseTemplateMenu
-                    type={type}
-                    editor={typeEditor}
-                    onApply={(id) => void applyTemplate(id)}
-                    onEdit={(p) => openTarget({ kind: 'object', path: p })}
-                    onCreated={(p) => openTarget({ kind: 'object', path: p })}
-                  />
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            )}
             <DropdownMenuItem
               disabled={propsReadOnly || !summary || isTemplate}
               onSelect={() => setCollectionsOpen(true)}
             >
               <Icon name={COLLECTION_ICON} size={14} />
-              Edit Collections
+              Edit collections
             </DropdownMenuItem>
             {canDuplicate && (
               <DropdownMenuItem disabled={propsReadOnly} onSelect={() => void duplicate()}>
@@ -1180,12 +1186,6 @@ export function ObjectView({
               <Icon name="ph-git-merge" size={14} />
               {isTag ? OBJECT_M8_TEXT.mergeTag : OBJECT_M8_TEXT.mergeObject}
             </DropdownMenuItem>
-            {type && (
-              <DropdownMenuItem data-type-setting="" onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
-                <Icon name="ph-gear-six" size={14} />
-                Object Type Settings
-              </DropdownMenuItem>
-            )}
             <DropdownMenuSeparator />
             {canWide && (
               <DropdownMenuItem
@@ -1320,7 +1320,7 @@ export function ObjectView({
       {summary && (
         <Dialog open={collectionsOpen} onOpenChange={setCollectionsOpen}>
           <DialogContent className="w-auto border-line bg-raised p-0 text-fg sm:max-w-none">
-            <DialogTitle className="sr-only">Edit Collections</DialogTitle>
+            <DialogTitle className="sr-only">Edit collections</DialogTitle>
             <DialogDescription className="sr-only">Choose the collections this object belongs to.</DialogDescription>
             <CollectionPicker
               value={summary.collections ?? []}

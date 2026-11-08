@@ -1,6 +1,6 @@
 // Month: the strip Jan to Dec (the shown month highlighted; a click jumps to that month's first
 // day), then the month's daily notes as grid cards (M3's grid layout) in date order, loaded with one
-// `api.rows({paths})` call per range load, and a "+ New Object" row under them. No cell calendar.
+// `api.rows({paths})` call per range load, and a "+ New object" row under them. No cell calendar.
 // With no notes in the month the cards are replaced by "This month has no daily notes yet."
 // and the empty-state hint.
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -21,14 +21,14 @@ export const MONTH_TEXT = {
   empty: 'This month has no daily notes yet.',
   /** Shown under the month's empty line. */
   emptyHint: 'Create an object to see it here.',
-  /** Capitalised in the Month view ("New Object", not "New object"). */
-  newObject: 'New Object',
+  /** Sentence case like every other button (Gene, 2026-11-08). */
+  newObject: 'New object',
   /** Our string: the month strip's accessible name. */
   months: 'Months',
 }
 
 /**
- * The day "+ New Object" creates (or opens, when it exists) a daily note for: today when the shown
+ * The day "+ New object" creates (or opens, when it exists) a daily note for: today when the shown
  * month is this month, else the month's first day (our choice).
  */
 export function newObjectDay(monthFrom: Day, today: Day): Day {

@@ -79,10 +79,10 @@ describe('ObjectView M8', () => {
     const names = within(menu)
       .getAllByRole('menuitem')
       .map((i) => i.textContent)
-    for (const n of ['Version History', 'Merge into object', 'Present', 'Add to whiteboard']) expect(names.some((x) => x.startsWith(n))).toBe(true)
+    for (const n of ['Version history', 'Merge into object', 'Present', 'Add to whiteboard']) expect(names.some((x) => x.startsWith(n))).toBe(true)
     expect(names).not.toContain('Merge into tag')
 
-    await user.click(within(menu).getByRole('menuitem', { name: 'Version History' }))
+    await user.click(within(menu).getByRole('menuitem', { name: 'Version history' }))
     expect(useVersionHistory.getState().path).toBe('Pages/Notes.md')
     ;({ user, menu } = await openMenu())
     await user.click(within(menu).getByRole('menuitem', { name: 'Merge into object' }))
@@ -113,20 +113,20 @@ describe('ObjectView M8', () => {
     serve(detailFor('Pages/Notes.md', 'page', 'Notes'))
     render(<ObjectView path="Pages/Notes.md" mode="page" />)
     await screen.findByText('Hello.')
-    await user.click(screen.getByRole('button', { name: 'Enter Focus Mode' }))
+    await user.click(screen.getByRole('button', { name: 'Enter focus mode' }))
     expect(useFocusMode.getState().on).toBe(true)
-    const leave = await screen.findByRole('button', { name: 'Leave Focus Mode' })
+    const leave = await screen.findByRole('button', { name: 'Leave focus mode' })
     expect(leave.getAttribute('aria-pressed')).toBe('true')
     await user.click(leave)
     expect(useFocusMode.getState().on).toBe(false)
-    expect(await screen.findByRole('button', { name: 'Enter Focus Mode' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Enter focus mode' })).toBeTruthy()
   })
 
   test('test focus mode button is only on the page view', async () => {
     serve(detailFor('Pages/Notes.md', 'page', 'Notes'))
     render(<ObjectView path="Pages/Notes.md" mode="peek" />)
     await screen.findByText('Hello.')
-    expect(screen.queryByRole('button', { name: 'Enter Focus Mode' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Enter focus mode' })).toBeNull()
   })
 
   test('test task stats section mounts only for recurring task objects', async () => {

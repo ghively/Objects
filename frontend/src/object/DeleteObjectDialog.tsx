@@ -1,6 +1,6 @@
 /**
  * "Delete this object?": moves the object to the app's Trash (restorable for 30 days; not the
- * Windows Recycle Bin). The view that owns the object renders it, so the request carries the
+ * computer's own). Its button counts like every other delete button (`deleteObjectsLabel`). The view that owns the object renders it, so the request carries the
  * version the view last saved (`baseVersion`).
  *
  * `requestDelete(path)` (Ctrl+Backspace) asks the view showing `path` to open its dialog.
@@ -17,11 +17,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { deleteObjectsLabel } from '@/lib/deleteText'
 
 export const DELETE_OBJECT_TEXT = {
   title: 'Delete this object?',
-  description: 'Moves it to the Trash.',
-  action: 'Delete Object',
+  description: 'Moves it to the Trash, where it can be restored for 30 days.',
+  /** The `…` menu row; the dialog's button is `deleteObjectsLabel(1)`. */
+  action: 'Delete object',
 }
 
 interface DeleteRequestState {
@@ -86,7 +88,7 @@ export function DeleteObjectDialog({ open, onOpenChange, onConfirm }: DeleteObje
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <Button variant="destructive" disabled={busy} onClick={() => void confirm()}>
-            {DELETE_OBJECT_TEXT.action}
+            {deleteObjectsLabel(1)}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

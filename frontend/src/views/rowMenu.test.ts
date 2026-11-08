@@ -41,7 +41,7 @@ describe('commonRowMenu', () => {
       'Change type',
       'Copy object reference',
       'Duplicate',
-      'Delete Object',
+      'Delete object',
     ])
     expect(items.find((i) => i.key === 'delete')?.destructive).toBe(true)
     // "Change type" lists the other types.
@@ -60,7 +60,7 @@ describe('commonRowMenu', () => {
   test('test read-only rows offer no change type or delete', () => {
     const labels = commonRowMenu(mk({ readOnly: true }), ctx()).map((i) => i.label)
     expect(labels).not.toContain('Change type')
-    expect(labels).not.toContain('Delete Object')
+    expect(labels).not.toContain('Delete object')
   })
 
   test('test actions open, select, change type and delete through the context', () => {

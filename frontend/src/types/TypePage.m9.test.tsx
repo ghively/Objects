@@ -64,7 +64,7 @@ describe('TypePage row menu (Task 17)', () => {
       'Change type',
       'Copy object reference',
       'Duplicate',
-      'Delete Object',
+      'Delete object',
     ])
   })
 
@@ -72,10 +72,10 @@ describe('TypePage row menu (Task 17)', () => {
     const user = userEvent.setup()
     render(<TypePage type={BOOK} />)
     await user.pointer({ keys: '[MouseRight]', target: await rowEl('Beta') })
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete Object' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete object' }))
     const dialog = await screen.findByRole('alertdialog')
     expect(within(dialog).getByText('Delete this object?')).toBeInTheDocument()
-    await user.click(within(dialog).getByRole('button', { name: 'Delete Object' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete 1 object' }))
     await waitFor(() => expect(mocked.deleteObject).toHaveBeenCalledWith('Books/Beta.md', { baseVersion: 'v-Beta' }))
   })
 
@@ -92,12 +92,13 @@ describe('TypePage row menu (Task 17)', () => {
 })
 
 describe('TypePage Import CSV (Task 19)', () => {
-  test('test import csv sits after create collection in the more menu and opens the dialog', async () => {
+  test('test import csv sits after object type settings in the more menu and opens the dialog', async () => {
     const user = userEvent.setup()
     render(<TypePage type={BOOK} />)
     await user.click(await screen.findByRole('button', { name: 'More' }))
     const items = (await screen.findAllByRole('menuitem')).map((m) => m.textContent)
-    expect(items.indexOf('Import CSV')).toBe(items.indexOf('New Collection') + 1)
+    // The catalog's order: New collection, Pin to sidebar, Object type settings, Import.
+    expect(items).toEqual(['New collection', 'Pin to sidebar', 'Pin to...', 'Object type settings', 'Import CSV', 'Save as query', 'Delete object type'])
     await user.click(screen.getByRole('menuitem', { name: 'Import CSV' }))
     expect(await screen.findByText('Bulk import from CSV')).toBeInTheDocument()
   })

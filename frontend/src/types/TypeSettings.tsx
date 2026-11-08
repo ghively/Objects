@@ -107,7 +107,7 @@ export const TYPE_SETTINGS_TEXT = {
   // The saved-queries part is our string (see DeleteTypeDialog).
   deleteExplanation:
     'Moves the object type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
-  deleteAction: 'Delete Object Type',
+  deleteAction: 'Delete object type',
 }
 
 const FONTS: readonly { value: TypeFont; name: string }[] = [
@@ -122,7 +122,7 @@ export interface TypeSettingsProps {
   onOpenTemplate?(path: string): void
   /** The breadcrumb's type name: open the type's page. */
   onOpenType?(typeId: string): void
-  /** After "Delete Object Type" moved the type to the Trash. */
+  /** After "Delete object type" moved the type to the Trash. */
   onDeleted?(): void
 }
 

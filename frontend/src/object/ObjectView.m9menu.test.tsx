@@ -80,10 +80,10 @@ describe('ObjectView … menu (M9)', () => {
     const menu = await openMenu(user)
     const n = names(menu)
     const at = (s: string) => n.findIndex((x) => x === s || x.startsWith(s + 'Ctrl'))
-    expect(at('Text Stats')).toBe(at('Version History') + 1)
+    expect(at('Text stats')).toBe(at('Version history') + 1)
     expect(at('Export')).toBe(at('Present') + 1)
     // The sections: present, export … then version history, text stats (Gene, 2026-10-29).
-    expect(at('Export')).toBeLessThan(at('Version History'))
+    expect(at('Export')).toBeLessThan(at('Version history'))
     expect(at('Duplicate')).toBe(at('Merge into object') - 1)
   })
 
@@ -132,7 +132,7 @@ describe('ObjectView … menu (M9)', () => {
     const user = userEvent.setup()
     const menu = await openMenu(user)
     // Submenus are driven with plain clicks: jsdom has no layout, so a pointer move closes them.
-    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Text Stats' }))
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Text stats' }))
     const sub = await screen.findByTestId('text-stats-menu')
     expect(within(sub).getByText('Text stats')).toBeInTheDocument()
     const rows = [...sub.querySelectorAll<HTMLElement>('[data-stat]')]
