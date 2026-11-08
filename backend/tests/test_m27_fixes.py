@@ -378,6 +378,30 @@ def test_trash_batch_leaves_another_batchs_object_at_the_recorded_path(client, t
     assert [i["action"] for i in items_b if i["path"] == path_of["a"]] == ["created"]
 
 
+def test_trash_batch_trashes_its_object_a_rerun_only_updated(client, tmp_path):
+    """Review of audit 9: batch A created Pages/a.md, a re-run (batch B) only updated it, so B's
+    batch is in the provenance block; moving batch A to the Trash still trashes it."""
+    from test_m25_provenance import run as run_import
+
+    from objectapp.importers import batches
+
+    src = tmp_path / "S"
+    src.mkdir()
+    (src / "a.md").write_text("# a\n\ntext\n", encoding="utf-8")
+    root = client.space_root
+    first = run_import(client, src, kind="obsidian")["result"]
+    _d, items = batches.load_batch(root, first["batch"])
+    pa = next(i["path"] for i in items if i["action"] == "created")
+    (src / "a.md").write_text("# a\n\ntext changed\n", encoding="utf-8")
+    second = run_import(client, src, kind="obsidian")["result"]
+    _d, items_b = batches.load_batch(root, second["batch"])
+    assert [(i["path"], i["action"]) for i in items_b] == [(pa, "updated")]
+
+    out = client.post(f"/api/import/batches/{first['batch']}/trash").json()
+    assert out == {"trashed": 1, "alreadyTrashed": 0, "missing": 0, "notFound": []}, out
+    assert not (root / pa).exists()
+
+
 # -- 9. a re-run adds no duplicate originals, images or File objects ---------------------------------
 
 
