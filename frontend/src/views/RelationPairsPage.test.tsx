@@ -102,8 +102,19 @@ describe('RelationPairsPage', () => {
     expect(last).toBeNull()
   })
 
-  test('a basic type can not take the pairs', () => {
-    render(<Harness type={{ ...STORY, basic: true }} />)
+  test('decision AC-1: the basic Task type takes the pairs', async () => {
+    const TASK = { ...STORY, id: 'task', name: 'Task', basic: true }
+    mocked.createRelationPair.mockResolvedValueOnce({ type: { ...WITH_PAIRS, id: 'task', name: 'Task', basic: true }, firstId: 'd1', secondId: 'd2', created: true })
+    render(<Harness type={TASK} />)
+    expect(screen.queryByText('The properties of basic types are fixed.')).toBeNull()
+    expect((screen.getByRole('button', { name: 'Turn on sub-items' }) as HTMLButtonElement).disabled).toBe(false)
+    await userEvent.click(screen.getByRole('button', { name: 'Turn on dependencies' }))
+    expect(mocked.createRelationPair).toHaveBeenCalledWith('task', 'dependencies', 'r3')
+    await waitFor(() => expect(last?.viewDefinition.dependenciesConfig).toEqual({ blockedByPropertyId: 'blockedBy', blockingPropertyId: 'blocking' }))
+  })
+
+  test('a basic type other than Task can not take the pairs', () => {
+    render(<Harness type={{ ...STORY, name: 'Page', basic: true }} />)
     expect((screen.getByRole('button', { name: 'Turn on sub-items' }) as HTMLButtonElement).disabled).toBe(true)
     // The one sentence the backend and the Add property menu use for basic types.
     expect(screen.getByText('The properties of basic types are fixed.')).toBeTruthy()

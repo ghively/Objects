@@ -114,10 +114,10 @@ describe('Task list views (TaskSectionPanel)', () => {
     expect(offered).toBe(FULL_VIEW_LAYOUTS.length)
   })
 
-  test('test the Today list includes overdue and today, not done', async () => {
+  test('test the Today list includes overdue and today, done ones too (decision T1: the Calendar Day view\u2019s rule)', async () => {
     show('today')
     const view = await screen.findByTestId('data-view')
-    await waitFor(() => expect(titlesIn(view)).toEqual(['Overdue', 'Working']))
+    await waitFor(() => expect(titlesIn(view)).toEqual(['Overdue', 'Working', 'Finished']))
   })
 
   test('the Today list moves on at midnight', async () => {
@@ -125,8 +125,8 @@ describe('Task list views (TaskSectionPanel)', () => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] })
     vi.setSystemTime(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 30))
     show('today')
-    await waitFor(() => expect(titlesIn(screen.getByTestId('data-view'))).toEqual(['Overdue', 'Working']))
-    // Past midnight, tomorrow's Weekly is due today.
+    await waitFor(() => expect(titlesIn(screen.getByTestId('data-view'))).toEqual(['Overdue', 'Working', 'Finished']))
+    // Past midnight, tomorrow's Weekly is due today; yesterday's done Finished leaves the list.
     await act(async () => {
       vi.advanceTimersByTime(90_000)
     })

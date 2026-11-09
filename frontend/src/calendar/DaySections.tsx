@@ -2,7 +2,8 @@
 // Created and Updated (Updated is our addition), each a compact `DataView` with its own saved view
 // (`ui.calendar.daily.*View`); then (M8) Backlinks, Date references and Timeline, shown under
 // "All" only (the filter tabs gain none). Rows for every path of the range come from ONE `api.rows`
-// call per range load (`useCalendarRows`), never one call per section.
+// call per range load (`useCalendarRows`), never one call per section. The Tasks section is its own
+// component (`DayTasksSection`), which Tasks › Today shows for today (decision T1).
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { CalendarDay, CalendarRange, DateValue, Layout, Row, TypeDef, ViewState } from '@/api/types'
@@ -195,15 +196,24 @@ export interface CalendarRows {
   patchRow(path: string, row: Row): void
 }
 
-/** The rows of a calendar range: one `api.rows({paths})` call each time the range (re)loads. */
-export function useCalendarRows(data: CalendarRange | null): CalendarRows {
+/** The task paths of a range (Tasks › Today needs only the Tasks section's rows). */
+export function taskPaths(data: CalendarRange | null): string[] {
+  if (!data) return []
+  return [...new Set(Object.values(data.days).flatMap((cd) => cd.tasks.map((t) => t.path)))].sort()
+}
+
+/**
+ * The rows of a calendar range: one `api.rows({paths})` call each time the range (re)loads.
+ * `pathsOf` picks the paths (default: every path the range lists).
+ */
+export function useCalendarRows(data: CalendarRange | null, pathsOf: (data: CalendarRange | null) => string[] = rangePaths): CalendarRows {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const seq = useRef(0)
 
   useEffect(() => {
     if (!data) return
-    const paths = rangePaths(data)
+    const paths = pathsOf(data)
     const my = ++seq.current
     if (paths.length === 0) {
       setRows([])
@@ -220,7 +230,7 @@ export function useCalendarRows(data: CalendarRange | null): CalendarRows {
       .finally(() => {
         if (my === seq.current) setLoading(false)
       })
-  }, [data])
+  }, [data, pathsOf])
 
   const patchRow = useCallback((path: string, row: Row) => {
     setRows((cur) => cur.map((r) => (r.summary.path === path ? row : r)))
@@ -345,8 +355,6 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
   const types = useLinkIndex((s) => s.types)
   const typesById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])) as Record<string, TypeDef>, [types])
   const daily = useCalendarDaily()
-  const [toast, setToast] = useState<string | null>(null)
-  const [tasksView, setTasksView] = useSectionView(daily, 'tasksView', 'list')
   const [createdView, setCreatedView] = useSectionView(daily, 'createdView', 'wall')
   const [updatedView, setUpdatedView] = useSectionView(daily, 'updatedView', 'wall')
   const [datedView, setDatedView] = useSectionView(daily, 'datedView', 'list')
@@ -355,20 +363,7 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
     void ensureLinkIndex()
   }, [])
 
-  const badges = useMemo(() => taskBadges(calendarDay), [calendarDay])
-  const pipeline = useMemo(() => overduePipeline(badges), [badges])
-  const pick = useCallback(
-    (paths: Iterable<string>) => {
-      const out: Row[] = []
-      for (const p of new Set(paths)) {
-        const r = rows.byPath.get(p)
-        if (r) out.push(r)
-      }
-      return out
-    },
-    [rows.byPath],
-  )
-  const taskRows = useMemo(() => pick(badges.keys()), [pick, badges])
+  const pick = useCallback((paths: Iterable<string>) => pickRows(rows.byPath, paths), [rows.byPath])
   const datedRows = useMemo(() => pick((calendarDay?.dated ?? []).map((d) => d.path)), [pick, calendarDay])
   const createdRows = useMemo(() => pick(calendarDay?.created ?? []), [pick, calendarDay])
   const updatedRows = useMemo(() => pick(calendarDay?.updated ?? []), [pick, calendarDay])
@@ -383,70 +378,7 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
   const [closed, setClosed] = useState<Record<string, boolean>>({})
   const toggleClosed = (k: string) => setClosed((c) => ({ ...c, [k]: !c[k] }))
 
-  const onResult = useCallback(
-    (outcome: TaskOutcome) => {
-      if (outcome.row) rows.patchRow(outcome.row.summary.path, outcome.row)
-      setToast(completionToast(outcome))
-    },
-    [rows],
-  )
-  const rowExtras = useCallback(
-    (row: Row) => taskRowExtras(row, typesById[row.summary.type], { badges: badges.get(row.summary.path), onResult }),
-    [typesById, badges, onResult],
-  )
-
-  // Stats: each task path once; done from its entries.
-  const doneByPath = new Map<string, boolean>()
-  for (const t of calendarDay?.tasks ?? []) doneByPath.set(t.path, (doneByPath.get(t.path) ?? false) || t.done)
-  const doneCount = [...doneByPath.values()].filter(Boolean).length
-  const openCount = doneByPath.size - doneCount
-  const stats =
-    doneByPath.size === 0
-      ? null
-      : day === today
-        ? SECTIONS_TEXT.statsToday(openCount, doneCount)
-        : day < today
-          ? SECTIONS_TEXT.statsPast(doneCount)
-          : SECTIONS_TEXT.statsFuture(openCount)
-
-  const moveAll = async (to: Day) => {
-    setToast(null)
-    const movable = [...badges.entries()]
-      .filter(([p, kinds]) => !doneByPath.get(p) && (kinds.includes('date') || kinds.includes('overdue')))
-      .map(([p]) => rows.byPath.get(p))
-      .filter((r): r is Row => !!r)
-    let conflicts = 0
-    let failed: string | null = null
-    for (const r of movable) {
-      const current = r.values.date as DateValue | null | undefined
-      try {
-        await api.updateProperties(r.summary.path, { date: moveDate(current, to) }, r.version)
-      } catch (e) {
-        if (e instanceof ConflictError) conflicts += 1
-        else failed = e instanceof Error ? e.message : String(e)
-      }
-    }
-    if (conflicts) setToast(SECTIONS_TEXT.moveConflict(conflicts))
-    else if (failed) setToast(failed)
-    onChanged?.()
-  }
-
-  const createTask = async () => {
-    try {
-      await createAndOpen('task', { values: { date: { start: day, resolution: 'day' } } })
-      onChanged?.()
-    } catch (e) {
-      setToast(e instanceof Error ? e.message : String(e))
-    }
-  }
-
   const show = (f: DayFilter) => filter === 'all' || filter === f
-  const tasksEmpty = (
-    <div className="flex flex-col items-center gap-1 py-10 text-center">
-      <p className="text-[15px] font-medium text-fg">{day === today ? SECTIONS_TEXT.noTasksToday : SECTIONS_TEXT.noTasksOnDay}</p>
-      <p className="text-[14px] text-fg-muted">{SECTIONS_TEXT.emptyHint}</p>
-    </div>
-  )
   // The day's rows arrive with their previews in one `api.rows` call, so no section fetches any.
   const common = {
     types,
@@ -485,42 +417,7 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
           onToggleCollapsed={() => void saveCalendarDaily({ hideDailyNote: !daily.hideDailyNote })}
         />
       )}
-      {show('tasks') && (
-        <SectionShell label={SECTIONS_TEXT.tasks} testId="section-tasks" hideKey="hideTasks" collapsed={!!daily.hideTasks}>
-          {(heading) => (
-            <>
-              <DataView
-                {...common}
-                rows={taskRows}
-                scope={{ typeIds: ['task'] }}
-                state={tasksView}
-                onState={setTasksView}
-                pipeline={pipeline}
-                rowExtras={rowExtras}
-                emptyState={tasksEmpty}
-                heading={
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      {heading}
-                      {stats && (
-                        <span data-testid="task-stats" className="text-[14px] text-fg-muted">
-                          {stats}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                }
-                toolbarEnd={<TasksAddMenu onCreate={() => void createTask()} onMove={(to) => void moveAll(to)} />}
-              />
-              {toast && (
-                <p role="status" className="text-[13px] text-fg-muted">
-                  {toast}
-                </p>
-              )}
-            </>
-          )}
-        </SectionShell>
-      )}
+      {show('tasks') && <DayTasksSection day={day} today={today} calendarDay={calendarDay} rows={rows} onChanged={onChanged} />}
       {show('dated') && datedRows.length > 0 && (
         <SectionShell label={SECTIONS_TEXT.dated} testId="section-dated" hideKey="hideDated" collapsed={!!daily.hideDated}>
           {(heading) => <DataView {...common} rows={datedRows} state={datedView} onState={setDatedView} heading={heading} />}
@@ -596,6 +493,155 @@ export function DaySections({ day, today, calendarDay, rows, filter = 'all', onC
         </SectionShell>
       )}
     </div>
+  )
+}
+
+/** The rows of `paths` (each once, in order) that `byPath` holds. */
+function pickRows(byPath: Map<string, Row>, paths: Iterable<string>): Row[] {
+  const out: Row[] = []
+  for (const p of new Set(paths)) {
+    const r = byPath.get(p)
+    if (r) out.push(r)
+  }
+  return out
+}
+
+export interface DayTasksSectionProps {
+  day: Day
+  /** The viewer's local day. */
+  today: Day
+  calendarDay: CalendarDay | null
+  rows: CalendarRows
+  /** Tasks were created or moved here: the owner reloads. */
+  onChanged?(): void
+  /** The section's heading (default "Tasks"). */
+  label?: string
+}
+
+/**
+ * The Day view's Tasks section: the day's task entries (date, deadline, occurrence, and on today
+ * "Overdue ({n})" first), done ones kept, "N open, M done", and the `+` menu (Create task, Move all
+ * open tasks to). Decision T1: Tasks › Today shows this same section for today, so both list the
+ * same tasks; its saved view and collapsed state are the Calendar's (`ui.calendar.daily`).
+ */
+export function DayTasksSection({ day, today, calendarDay, rows, onChanged, label = SECTIONS_TEXT.tasks }: DayTasksSectionProps) {
+  const types = useLinkIndex((s) => s.types)
+  const typesById = useMemo(() => Object.fromEntries(types.map((t) => [t.id, t])) as Record<string, TypeDef>, [types])
+  const daily = useCalendarDaily()
+  const [toast, setToast] = useState<string | null>(null)
+  const [tasksView, setTasksView] = useSectionView(daily, 'tasksView', 'list')
+  const badges = useMemo(() => taskBadges(calendarDay), [calendarDay])
+  const pipeline = useMemo(() => overduePipeline(badges), [badges])
+  const taskRows = useMemo(() => pickRows(rows.byPath, badges.keys()), [rows.byPath, badges])
+
+  const onResult = useCallback(
+    (outcome: TaskOutcome) => {
+      if (outcome.row) rows.patchRow(outcome.row.summary.path, outcome.row)
+      setToast(completionToast(outcome))
+    },
+    [rows],
+  )
+  const rowExtras = useCallback(
+    (row: Row) => taskRowExtras(row, typesById[row.summary.type], { badges: badges.get(row.summary.path), onResult }),
+    [typesById, badges, onResult],
+  )
+
+  // Stats: each task path once; done from its entries.
+  const doneByPath = new Map<string, boolean>()
+  for (const t of calendarDay?.tasks ?? []) doneByPath.set(t.path, (doneByPath.get(t.path) ?? false) || t.done)
+  const doneCount = [...doneByPath.values()].filter(Boolean).length
+  const openCount = doneByPath.size - doneCount
+  const stats =
+    doneByPath.size === 0
+      ? null
+      : day === today
+        ? SECTIONS_TEXT.statsToday(openCount, doneCount)
+        : day < today
+          ? SECTIONS_TEXT.statsPast(doneCount)
+          : SECTIONS_TEXT.statsFuture(openCount)
+
+  const moveAll = async (to: Day) => {
+    setToast(null)
+    const movable = [...badges.entries()]
+      .filter(([p, kinds]) => !doneByPath.get(p) && (kinds.includes('date') || kinds.includes('overdue')))
+      .map(([p]) => rows.byPath.get(p))
+      .filter((r): r is Row => !!r)
+    let conflicts = 0
+    let failed: string | null = null
+    for (const r of movable) {
+      const current = r.values.date as DateValue | null | undefined
+      try {
+        await api.updateProperties(r.summary.path, { date: moveDate(current, to) }, r.version)
+      } catch (e) {
+        if (e instanceof ConflictError) conflicts += 1
+        else failed = e instanceof Error ? e.message : String(e)
+      }
+    }
+    if (conflicts) setToast(SECTIONS_TEXT.moveConflict(conflicts))
+    else if (failed) setToast(failed)
+    onChanged?.()
+  }
+
+  const createTask = async () => {
+    try {
+      await createAndOpen('task', { values: { date: { start: day, resolution: 'day' } } })
+      onChanged?.()
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const tasksEmpty = (
+    <div className="flex flex-col items-center gap-1 py-10 text-center">
+      <p className="text-[15px] font-medium text-fg">{day === today ? SECTIONS_TEXT.noTasksToday : SECTIONS_TEXT.noTasksOnDay}</p>
+      <p className="text-[14px] text-fg-muted">{SECTIONS_TEXT.emptyHint}</p>
+    </div>
+  )
+  const common = {
+    types,
+    layouts: SECTION_LAYOUTS,
+    compact: true,
+    toolbarCompact: true,
+    embedded: true,
+    patchRow: rows.patchRow,
+    loading: rows.loading,
+    previewsLoaded: true,
+  }
+  return (
+    <SectionShell label={label} testId="section-tasks" hideKey="hideTasks" collapsed={!!daily.hideTasks}>
+      {(heading) => (
+        <>
+          <DataView
+            {...common}
+            rows={taskRows}
+            scope={{ typeIds: ['task'] }}
+            state={tasksView}
+            onState={setTasksView}
+            pipeline={pipeline}
+            rowExtras={rowExtras}
+            emptyState={tasksEmpty}
+            heading={
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  {heading}
+                  {stats && (
+                    <span data-testid="task-stats" className="text-[14px] text-fg-muted">
+                      {stats}
+                    </span>
+                  )}
+                </div>
+              </div>
+            }
+            toolbarEnd={<TasksAddMenu onCreate={() => void createTask()} onMove={(to) => void moveAll(to)} />}
+          />
+          {toast && (
+            <p role="status" className="text-[13px] text-fg-muted">
+              {toast}
+            </p>
+          )}
+        </>
+      )}
+    </SectionShell>
   )
 }
 

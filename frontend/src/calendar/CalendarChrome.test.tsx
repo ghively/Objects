@@ -57,7 +57,7 @@ describe('CalendarChrome', () => {
     expect(buttons.map((b) => b.title)).toEqual([
       'Go to monthly view',
       'Go to weekly view',
-      'Show three days from today',
+      'Show the day before and after',
       'Go to daily view',
     ])
     expect(screen.getByRole('button', { name: 'Day' })).toHaveAttribute('aria-pressed', 'true')

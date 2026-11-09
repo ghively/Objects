@@ -407,7 +407,7 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def('goToToday', 'calendar', 'Jump to today', ['t'], 'calendar', false, false),
   def('setViewToMonth', 'calendar', 'Go to monthly view', ['m'], 'calendar', false, false),
   def('setViewToWeek', 'calendar', 'Go to weekly view', ['w'], 'calendar', false, false),
-  def('setViewToRolling', 'calendar', 'Show three days from today', ['r'], 'calendar', false, false),
+  def('setViewToRolling', 'calendar', 'Show the day before and after', ['r'], 'calendar', false, false),
   def('setViewToDay', 'calendar', 'Go to daily view', ['d'], 'calendar', false, false),
   def('goToPrevious', 'calendar', 'Back one day, week or month', ['ArrowLeft'], 'calendar', false, false),
   def('goToNext', 'calendar', 'Forward one day, week or month', ['ArrowRight'], 'calendar', false, false),

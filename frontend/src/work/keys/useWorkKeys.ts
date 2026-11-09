@@ -7,10 +7,12 @@ import { isEditableTarget } from '@/lib/shortcuts'
 import { entriesOf } from '@/nav/sidepanel'
 import { activeTab, usePeek, useTabs } from '@/nav/tabs'
 import { useSettingsModal } from '@/settings/useSettingsModal'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { clearWorkSearch, focusBrainDump, focusWorkSearch } from '../page/WorkPage'
 import { openItemPanel } from '../state/workActions'
 import { useWorkSelection } from '../state/useWorkSelection'
 import { useWorkUi } from '../state/useWorkUi'
+import { isTaskListView } from '../tasklists/registerView'
 import { workViews } from '../views/registry'
 import { G_SEQUENCE_MS } from './workShortcuts'
 
@@ -78,7 +80,11 @@ export function useWorkKeys(): void {
         gAt = null
         if (fresh && key.length === 1) {
           const calm = useWorkUi.getState().calm
-          const view = workViews().find((v) => v.key === key && (!calm || v.id === 'now'))
+          // Hide Task Management leaves the task lists out, so `g i` (Inbox) does nothing then.
+          const hideTasks = useSpaceInfo.getState().space?.hideTaskManagement ?? false
+          const view = workViews().find(
+            (v) => v.key === key && (!calm || v.id === 'now') && !(hideTasks && isTaskListView(v.id)),
+          )
           if (view) {
             e.preventDefault()
             useWorkUi.getState().setView(view.id)

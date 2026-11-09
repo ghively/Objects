@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { Row } from '@/api/types'
 import { FULL_VIEW_LAYOUTS } from '@/views/model'
-import { DEFAULT_TASK_SECTION, TASK_SECTIONS, TASK_SECTION_KEYS, sectionRows } from './taskSections'
+import { DEFAULT_TASK_SECTION, TASK_SECTIONS, TASK_SECTION_KEYS, sectionRows, todayOpenCount } from './taskSections'
 import { groupRows } from '@/views/group'
 import { useSettings } from '@/settings/useSettings'
 import { TASK_TYPE, taskRow } from './taskFixtures'
@@ -98,8 +98,23 @@ describe('taskSections', () => {
     expect(paths('status')).toHaveLength(ROWS.length)
   })
 
-  test('test today section includes overdue and today, not done', () => {
-    expect(paths('today')).toEqual(['Overdue', 'Today'])
+  test('T1: today follows the Calendar Day view: date covers today, deadline today, open overdue; done ones stay', () => {
+    const rows = [
+      ...ROWS,
+      taskRow('Tasks/DeadlineToday.md', { status: ['Not Started'], deadline: day('2026-10-26') }),
+      taskRow('Tasks/DoneDeadlineToday.md', { status: ['Done'], deadline: day('2026-10-26') }),
+      taskRow('Tasks/Range.md', { status: ['Next Up'], date: { start: '2026-10-25', end: '2026-10-27', resolution: 'day' } }),
+      // A timed range ending at 00:00 local leaves that day out (the Calendar's rule); done, so not overdue.
+      taskRow('Tasks/EndsAtMidnight.md', {
+        status: ['Done'],
+        date: { start: new Date(2026, 9, 25, 20, 0).toISOString(), end: new Date(2026, 9, 26, 0, 0).toISOString(), resolution: 'time' },
+      }),
+      taskRow('Tasks/TimedToday.md', { status: ['Not Started'], date: { start: new Date(2026, 9, 26, 15, 30).toISOString(), resolution: 'time' } }),
+    ]
+    const shown = sectionRows('today', rows, TASK_TYPE, NOW).map((r) => r.summary.path.slice(6, -3))
+    expect(shown).toEqual(['Overdue', 'Today', 'DoneToday', 'DeadlineToday', 'DoneDeadlineToday', 'Range', 'TimedToday'])
+    // The count badge is the list's open ones ("N open, M done").
+    expect(todayOpenCount(rows, TASK_TYPE, NOW)).toBe(5)
     expect(TASK_SECTIONS.today.preset(NOW).sorts).toEqual([{ propertyId: 'date', option: 'ascending' }])
   })
 

@@ -2,7 +2,8 @@
 // sub-items" and "Turn on dependencies" add (or reuse) the type's two-way relation pair through
 // `api.createRelationPair`, then store the pair's property keys in the view definition
 // (`subItemsConfig` / `dependenciesConfig`). "Turn off" clears only the view's key: the properties
-// stay, as ordinary relations with values in the files.
+// stay, as ordinary relations with values in the files. Basic types can't take the pairs, except
+// Task (decision AC-1).
 import { useState } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { DataViewDefinition, RelationPairKind, RelationPairResult, TypeDef, ViewState } from '@/api/types'
@@ -52,7 +53,9 @@ export function pairIsOn(type: TypeDef, def: DataViewDefinition, kind: RelationP
 export function RelationPairsPage({ type, state, onState }: RelationPairsPageProps) {
   const [busy, setBusy] = useState<RelationPairKind | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const blocked = type.basic ? RELATION_PAIRS_TEXT.basic : type.readOnlyReason ? RELATION_PAIRS_TEXT.readOnly : null
+  // Decision AC-1: of the basic types, Task takes sub-items and dependencies (the server allows it too).
+  const fixed = type.basic && type.name.toLowerCase() !== 'task'
+  const blocked = fixed ? RELATION_PAIRS_TEXT.basic : type.readOnlyReason ? RELATION_PAIRS_TEXT.readOnly : null
 
   const turnOn = async (kind: RelationPairKind) => {
     setBusy(kind)
