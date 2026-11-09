@@ -217,7 +217,9 @@ Each starter template pre-fills the new type's properties.
   large bold; the Description property as a paragraph under the title; a "Tags" row of colored tag chips with a
   small list icon; a divider; the body. A freshly created object (the New menu, a type's `+`, Ctrl+U and the
   other create buttons) opens with its title focused and selected, in the peek and on the full page, so typing
-  names it; "Add description" puts the caret in the description it reveals.
+  names it; "Add description" puts the caret in the description it reveals. Renaming an object (its title, a
+  table's title cell, a whiteboard's name) rewrites the links to it in other objects and then says so with a short
+  notice, "Updated links in 3 objects" ("1 object"); nothing is shown when no other object linked to it.
 - **Property value editors**:
   - Date: a chip; click opens a picker: an input with an info icon, presets (Yesterday, Today, Tomorrow, In 1
     week, In 2 weeks), month and year dropdowns, a month grid with the chosen day as a pill, toggles
