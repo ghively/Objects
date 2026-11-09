@@ -480,6 +480,16 @@ def replace_section(body: str, heading: str, text: str) -> str | None:
     return "".join(lines[:start]) + head + content + sep + "".join(tail)
 
 
+_LIST_ITEM_RE = re.compile(r"^[ \t]*(?:([-*+])|\d+([.)]))[ \t]")
+
+
+def _same_list(last: str, addition: str) -> bool:
+    """Whether `addition` starts with an item of the list that `last` (a section's last line)
+    ends: then it joins that list instead of starting a loose one after a blank line."""
+    a, b = _LIST_ITEM_RE.match(last), _LIST_ITEM_RE.match(addition)
+    return bool(a and b and a.groups() == b.groups())
+
+
 def append_to_section(body: str, heading: str | None, text: str) -> str | None:
     """`body` with `text` added at the end of the section (or of the body when `heading`
     is None), before the section's trailing blank lines."""
@@ -491,7 +501,7 @@ def append_to_section(body: str, heading: str | None, text: str) -> str | None:
             return addition
         if not body.endswith(("\n", "\r")):
             body += nl
-        if not body.endswith(nl + nl):
+        if not body.endswith(nl + nl) and not _same_list(lines[-1], addition):
             body += nl
         return body + addition
     span = _find(lines, heading)
@@ -504,7 +514,7 @@ def append_to_section(body: str, heading: str | None, text: str) -> str | None:
     before = lines[:insert]
     if before and not before[-1].endswith(("\n", "\r")):
         before[-1] += nl
-    needs_gap = insert > start + 1
+    needs_gap = insert > start + 1 and not _same_list(before[-1], addition)
     gap = nl if needs_gap else ""
     rest = lines[insert:]
     trailing = nl if rest and rest[0].strip() != "" else ""
