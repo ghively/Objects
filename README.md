@@ -135,7 +135,8 @@ Everything lives in a folder of `.md` files on your own disk. No account, no clo
 | **Whiteboards** | Objects, text blocks, frames and images on a canvas, joined by connectors, with pressure-sensitive pen ink |
 | **Automations** | Local rules triggered by creating an object, a property change, a schedule or a button |
 | **AI and agents** | A chat panel with a model picker, run through your own `claude` CLI; agents that are Claude Code project folders with memory, self-written skills, an MCP gateway, remote A2A agents, delegation and schedules. Nothing is written without your say |
-| **Work section** | Now, Flow, Projects map, queues, Stuck, Wins and Alerts views over Tasks and Projects; a brain-dump bar that saves Captures; a Work agent that files them |
+| **Tasks dashboard** | One page for every task and work item: it opens on Now, with Inbox, Today (the day's timeline over the same task list as the Calendar's day), your queues, the agent queue and Captures on one row, and the planning, list and review views (Flow, Projects map, Status, Deadline, Stuck, Wins, Alerts, Tickets…) folded under More views; a brain-dump bar that saves Captures; a Work agent that files them |
+| **Version control and backup** | Each space can be its own git repository: changes are committed after a quiet spell, **Space history** shows every commit with its diffs and restores the whole space (or one object) to any point as a new commit, and a remote (GitHub, GitLab, any https or ssh address, with your own git credentials) gets pushed now or automatically. Off until you turn it on; history is never rewritten |
 | **Import** | Notion, Obsidian and Anytype exports, Markdown folders and Files folders (Word, PDF, Excel, PowerPoint, HTML, images) into a new space, this space or a trial copy. Every imported object keeps a Source line; re-runs update instead of duplicating; a local sensitive-content scan runs first; an agent can propose a schema, which only you approve |
 | **Local API and MCP** | A token-protected API on `127.0.0.1` and an MCP server, so Claude Code or Claude Desktop can search, query, read and (with a read-write token) edit your notes |
 
@@ -153,7 +154,7 @@ uv run objectapp --space /path/to/space            # opens its own window
 uv run objectapp --space /path/to/space --browser  # or in your browser
 ```
 
-The server listens on `http://127.0.0.1:8790` only (`--port` changes the port). Point `--space` at an empty folder to start fresh, or at an existing folder of Markdown files. A space keeps its metadata in `.object/` and a rebuildable search cache in `.object-cache/`.
+The server listens on `http://127.0.0.1:8790` only (`--port` changes the port). Only the window Object opens can use it: each launch makes a random key, and the window opens at a one-time `/_open` link that hands the key over as a session cookie. With `--browser` the launcher prints that link (it works once, for 5 minutes; press Enter in the terminal for a new one); a bare `http://127.0.0.1:8790` tab shows "This page isn't connected to Object". Other programs use the token API under `/api/v1` (see MCP below), which keeps its own tokens. Point `--space` at an empty folder to start fresh, or at an existing folder of Markdown files. A space keeps its metadata in `.object/` and a rebuildable search cache in `.object-cache/`.
 
 AI features need the [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) CLI (`claude`) installed and signed in. Everything else works without it.
 
