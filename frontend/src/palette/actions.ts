@@ -9,6 +9,7 @@ export const ACTION_TEXT = {
   createNewEntity: (typeName: string) => `Create ${typeName}`,
   openCalendar: 'Open calendar',
   openToday: 'Open today',
+  openAllNotes: 'Open all notes',
   openGlobalGraph: 'Open global graph',
   openGraphView: 'Open graph view',
   toggleLeftSidebar: 'Toggle left sidebar',
@@ -26,6 +27,8 @@ export interface ActionContext {
   createObject(typeId: string): void
   openCalendar(): void
   openToday(): void
+  /** All notes: the sidebar doesn't list it (catalog §4), so the palette is its way in. */
+  openAllNotes?(): void
   openGlobalGraph(): void
   openGraphView(): void
   toggleSidebar(): void
@@ -65,6 +68,7 @@ export function buildActions(ctx: ActionContext): Action[] {
   }
   out.push({ id: 'openCalendar', label: ACTION_TEXT.openCalendar, icon: 'ph-calendar-blank', run: ctx.openCalendar })
   out.push({ id: 'openToday', label: ACTION_TEXT.openToday, icon: 'ph-calendar-check', run: ctx.openToday })
+  if (ctx.openAllNotes) out.push({ id: 'openAllNotes', label: ACTION_TEXT.openAllNotes, icon: 'ph-note', run: ctx.openAllNotes })
   if (ctx.openExtendedSearch) {
     out.push({ id: 'openEmptyLocalSpaceQuery', label: ACTION_TEXT.openEmptyLocalSpaceQuery, icon: 'ph-magnifying-glass', run: ctx.openExtendedSearch })
   }

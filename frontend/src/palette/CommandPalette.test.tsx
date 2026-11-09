@@ -530,6 +530,12 @@ describe('actions in the list', () => {
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'calendar' })
   })
 
+  test('"Open all notes" opens All notes, which the sidebar no longer lists (catalog §4)', async () => {
+    const { user } = setup()
+    await user.click(await findAction(user, 'all notes', 'openAllNotes'))
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'allNotes' })
+  })
+
   test('open graph view only offered with an object open', async () => {
     const { user, p } = setup()
     const input = await openSearch(user)
