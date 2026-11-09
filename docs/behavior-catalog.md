@@ -479,6 +479,14 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   Linux folder name) can't be fenced — no rule form Claude Code accepts matches it (three forms tried live on
   2.1.319, Linux). Rename such a folder if an agent should not read it with its file tools.
 
+- **Refused steps** (our wording): a tool step the run was not allowed to make reads "Not allowed to create 'X'
+  (this agent has the tool switched off)" (or "(the file is outside what this agent may read)", or the refusal's own
+  first line), never a past-tense "Created 'X' (failed)"; an ordinary tool error keeps the "(failed)" suffix.
+- **Add agent folder…** says what is wrong: "This folder isn't an Object agent." only when there is no readable
+  `agent.json`; a missing or malformed id says so and shows the id (an agent id is a 26-character ULID).
+- **Settings > Integrations > Secret variables**: **Delete** asks first, as a server's Delete does (**Confirm delete**
+  with "Agents that use this variable lose its value at once. This cannot be undone.").
+
 ## 10e. Agent and API guards (Object's own; decisions memo 2026-11-08)
 
 - **One turn per chat** (S8): a second message on a chat that is still answering (the same chat open in two tabs

@@ -19,6 +19,8 @@ export function SecretVariables() {
   const [vars, setVars] = useState<SecretVar[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [setting, setSetting] = useState<string | null>(null)
+  // Delete asks first, as a server's Delete does: the first click arms "Confirm delete".
+  const [confirming, setConfirming] = useState<string | null>(null)
 
   const load = useCallback(() => {
     api
@@ -39,6 +41,11 @@ export function SecretVariables() {
   }, [load])
 
   const remove = (name: string) => {
+    if (confirming !== name) {
+      setConfirming(name)
+      return
+    }
+    setConfirming(null)
     setError(null)
     api
       .deleteMcpSecret(name)
@@ -63,6 +70,7 @@ export function SecretVariables() {
                 </p>
                 {!v.settable && <p className="text-[12px] text-fg-muted">{T.fromEnvironment}</p>}
                 {v.usedBy.length > 0 && <p className="truncate text-[12px] text-fg-muted">{T.usedBy(v.usedBy)}</p>}
+                {confirming === v.name && <p className="text-[12px] text-fg-muted">{T.deleteVarHelp}</p>}
               </div>
               {v.settable && (
                 <Button
@@ -78,12 +86,13 @@ export function SecretVariables() {
               {v.settable && v.set && (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant={confirming === v.name ? 'destructive' : 'outline'}
                   size="sm"
-                  aria-label={`${T.deleteVar} ${v.name}`}
+                  aria-label={`${confirming === v.name ? T.confirmDelete : T.deleteVar} ${v.name}`}
                   onClick={() => remove(v.name)}
+                  onBlur={() => setConfirming((c) => (c === v.name ? null : c))}
                 >
-                  {T.deleteVar}
+                  {confirming === v.name ? T.confirmDelete : T.deleteVar}
                 </Button>
               )}
             </li>
