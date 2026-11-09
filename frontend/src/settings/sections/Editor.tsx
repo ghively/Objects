@@ -9,7 +9,8 @@ import type { DeviceSettings, OpenOnStartMode, SpaceEntry, Tri } from '@/api/typ
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ensureLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { referencesSettings } from '@/references/referencesUi'
+import { useSettings } from '@/settings/useSettings'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { LINK_VIEWS } from '@/types/CardViewSettings'
 import { OptionCards, SaveError, SecondaryButton, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
@@ -307,10 +308,9 @@ export function EditorSection() {
       .catch((e: unknown) => setError(errorText(e)))
   }
 
-  const sectionsDefault: DeviceSettings['backlinkSectionsDefault'] = {
-    ...settingsDefaults.backlinkSectionsDefault,
-    ...(settings.backlinkSectionsDefault as Partial<DeviceSettings['backlinkSectionsDefault']> | undefined),
-  }
+  // Read as the references section reads it: a "hidden" stored for Backlinks or Related Content
+  // (before Settings dropped that option for them) shows as Closed, and the next change writes it so.
+  const sectionsDefault: DeviceSettings['backlinkSectionsDefault'] = referencesSettings(settings).backlinkSectionsDefault
 
   const entry = root ? settings.openOnStart?.[root] : undefined
   const mode: OpenOnStartMode = entry?.mode ?? 'lastOpenedPage'

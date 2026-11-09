@@ -13,6 +13,7 @@ vi.mock('@/api/client', async (orig) => ({
 import { api, ConflictError } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek } from '@/nav/tabs'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { cardProperties } from './cards/cardConfig'
 import { DataView } from './DataView'
 import { emptyFilterGroup } from './model'
@@ -508,5 +509,34 @@ describe('useViewState', () => {
     const later = [{ propertyId: 'later', option: 'ascending' as const }]
     rerender({ initial: { ...base(), sorts: later } })
     expect(result.current[0].sorts).toEqual(later)
+  })
+})
+
+describe('DataView group labels', () => {
+  // The 2026-11-08 sweep: the "By Hour" label reads the Time format setting through the group
+  // context, so flipping the setting re-labels the groups without the rows changing.
+  test('a view grouped By Hour re-labels when the Time format setting changes', () => {
+    const DATED = typeDef({
+      id: 'dated',
+      name: 'Dated',
+      pluralName: 'Dated',
+      propertyDefinitions: [
+        propertyDef({ id: 'title', type: 'entity_title', name: 'Title' }),
+        propertyDef({ id: 'due', key: 'due', type: 'datetime', name: 'Due' }),
+      ],
+    })
+    const rows = [mk('Dated/A.md', {}, { due: { start: '2026-11-08T14:05:00.000Z', resolution: 'time' } }, 'dated')]
+    const state: ViewState = { ...base(), groupBy: { groups: [{ propertyId: 'due', option: 'hour' }] } }
+    try {
+      useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'UTC' } })
+      render(<DataView rows={rows} types={[DATED]} scope={{ typeIds: ['dated'] }} state={state} onState={() => {}} layouts={['list']} />)
+      expect(screen.getAllByTestId('group-header').map((h) => h.textContent)).toEqual(['Nov 8, 2026, 2 PM1'])
+      act(() => {
+        useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'UTC', twentyFourHourTime: true } })
+      })
+      expect(screen.getAllByTestId('group-header').map((h) => h.textContent)).toEqual(['Nov 8, 2026, 14:001'])
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 })

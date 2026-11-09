@@ -106,6 +106,11 @@ export interface ObjectViewProps {
   /** Called with each version this view adopts (load, saves, reloads). */
   onVersion?: (version: string) => void
   /**
+   * Called with the object's detail each time this view's copy changes (load, property writes,
+   * reloads), so an owner (the peek's daily-note header) reads nothing of its own.
+   */
+  onDetail?: (detail: ObjectDetail) => void
+  /**
    * Inline only: an element the owner provides for the object's `…` menu (the same menu as the
    * page's), drawn into it. The Calendar's Daily note header holds it beside Reviewed.
    */
@@ -271,6 +276,7 @@ export function ObjectView({
   autoFocus,
   initialText,
   onVersion,
+  onDetail,
   menuSlot,
   onDeleted,
   workHeader,
@@ -327,6 +333,11 @@ export function ObjectView({
   const versionRef = useRef('')
   const onVersionRef = useRef(onVersion)
   onVersionRef.current = onVersion
+  const onDetailRef = useRef(onDetail)
+  onDetailRef.current = onDetail
+  useEffect(() => {
+    if (detail && detail.summary.path === path) onDetailRef.current?.(detail)
+  }, [detail, path])
   const adoptVersion = useCallback((v: string) => {
     versionRef.current = v
     setVersion(v)
@@ -385,6 +396,16 @@ export function ObjectView({
         return
       }
       const mine = h?.getBody() ?? null
+      if (h && mine !== null && !h.isDirty() && theirs.body === h.savedBody()) {
+        // Only the frontmatter changed (a property write outside this view's own write path: the
+        // peek's Reviewed, another window): adopt the version and keep the editor's document
+        // (a reload would drop its selection, scroll and undo history for nothing).
+        setDetail(theirs)
+        adoptVersion(theirs.version)
+        void h.resume(theirs.version)
+        unblockRef.current()
+        return
+      }
       if (!h || mine === null || !h.isDirty()) {
         h?.reload(theirs.body, theirs.version)
         setDetail(theirs)

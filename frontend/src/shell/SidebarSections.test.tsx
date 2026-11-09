@@ -114,12 +114,12 @@ describe('SidebarSections', () => {
     expect(stored.pinned).toEqual([{ kind: 'collection', id: 'tooling' }])
   })
 
-  test('test Edit Section renames and Delete Section keeps the items pinned elsewhere', async () => {
+  test('test Edit section renames and Delete section keeps the items pinned elsewhere', async () => {
     const user = userEvent.setup()
     stored.pinned.push({ kind: 'query', id: 'open' })
     render(<Sidebar types={[SERVER]} />)
     fireEvent.contextMenu(await screen.findByRole('heading', { name: 'In Progress' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Edit Section' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit section' }))
     const input = await screen.findByRole('textbox', { name: 'Section Name' })
     await user.clear(input)
     await user.type(input, 'Doing')
@@ -127,7 +127,7 @@ describe('SidebarSections', () => {
     await waitFor(() => expect(stored.sections[0].name).toBe('Doing'))
 
     fireEvent.contextMenu(await screen.findByRole('heading', { name: 'Doing' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete Section' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete section' }))
     await waitFor(() => expect(stored.sections).toEqual([]))
     expect(stored.pinned).toContainEqual({ kind: 'query', id: 'open' })
     expect(await screen.findAllByText('Open servers')).toHaveLength(1)

@@ -148,6 +148,15 @@ export const REFERENCES_SETTINGS_DEFAULTS: ReferencesSettings = Object.freeze({
 }) as ReferencesSettings
 
 const SECTION_DEFAULTS: readonly SectionDefault[] = ['open', 'closed', 'hidden']
+/**
+ * Backlinks and Related Content are Open | Closed (the catalog; only Unlinked Mentions adds
+ * Hidden). A "hidden" stored for them before Settings dropped the option reads as Closed, so the
+ * section is shown and the Settings radio has a value.
+ */
+const OPEN_CLOSED: readonly SectionDefault[] = ['open', 'closed']
+function openOrClosed(v: unknown, fallback: SectionDefault): SectionDefault {
+  return v === 'hidden' ? 'closed' : oneOf(v, OPEN_CLOSED, fallback)
+}
 const CONTENT_VIEWS: readonly BacklinkContentView[] = ['inline', 'smallCard', 'wideCard', 'embed']
 const NESTED_VIEWS: readonly NestedBacklinkView[] = ['showBlockContainingBacklink', 'showFullPathAbove']
 
@@ -167,8 +176,8 @@ export function referencesSettings(settings: unknown): ReferencesSettings {
     : []
   return {
     backlinkSectionsDefault: {
-      backlinks: oneOf(sec.backlinks, SECTION_DEFAULTS, d.backlinkSectionsDefault.backlinks),
-      relatedContent: oneOf(sec.relatedContent, SECTION_DEFAULTS, d.backlinkSectionsDefault.relatedContent),
+      backlinks: openOrClosed(sec.backlinks, d.backlinkSectionsDefault.backlinks),
+      relatedContent: openOrClosed(sec.relatedContent, d.backlinkSectionsDefault.relatedContent),
       unlinkedMentions: oneOf(sec.unlinkedMentions, SECTION_DEFAULTS, d.backlinkSectionsDefault.unlinkedMentions),
     },
     backlinkContentView: oneOf(s.backlinkContentView, CONTENT_VIEWS, d.backlinkContentView),

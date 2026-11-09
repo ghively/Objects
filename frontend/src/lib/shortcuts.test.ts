@@ -287,6 +287,19 @@ describe('sweep 2026-11-08: catalogued keys', () => {
     expect(formatKeys('Mod-Shift-g', false)).toBe('Ctrl+Shift+G')
   })
 
+  test('Ctrl+Shift+E is "Open block styling" under Block editing, bound in the editor, apart from Export (Ctrl+E)', () => {
+    const d = byId().get('openBlockStyling')
+    expect(d).toBeTruthy()
+    expect(d?.category).toBe('block')
+    expect(d?.scope).toBe('editor')
+    expect(d?.name).toBe('Open block styling')
+    expect(d?.provisional).toBe(false)
+    expect(d?.bound).toBe(true)
+    expect(keysFor('openBlockStyling')).toEqual(['Mod-Shift-e'])
+    expect(keysFor('openExportMenu')).toEqual(['Mod-e'])
+    expect(formatKeys('Mod-Shift-e', false)).toBe('Ctrl+Shift+E')
+  })
+
   test('Ctrl+Shift+X is "Remove block styles" under Block editing, bound in the editor', () => {
     const d = byId().get('removeBlockStyles')
     expect(d).toBeTruthy()

@@ -137,6 +137,38 @@ describe('Paste as plain text (Ctrl+Shift+V)', () => {
     expect(serializeBody(editor)).toBe('PBold text\n\nitem\n')
   })
 
+  test('inside a code block the lines stay in the fence (the block is not split into paragraphs)', () => {
+    const editor = headless('```\nline\n```\n')
+    cursorAtEndOf(editor, 'line')
+    armPlainPaste()
+    paste(editor, { text: 'x\ny' })
+    expect(serializeBody(editor)).toBe('```\nlinex\ny\n```\n')
+    // The same in a raw block (its whole source is one text): the lines join it, in one block.
+    const raw = headless('<div>\nraw\n</div>\n')
+    cursorAtEndOf(raw, 'raw')
+    armPlainPaste()
+    paste(raw, { text: 'x\ny' })
+    expect(raw.state.doc.firstChild!.type.name).toBe('rawBlock')
+    expect(raw.state.doc.firstChild!.textContent).toBe('<div>\nraw\n</div>x\ny')
+    expect(serializeBody(raw)).toBe('<div>\nraw\n</div>x\ny\n')
+  })
+
+  test('inside a table cell the table is kept (the lines land in the cell)', () => {
+    const editor = headless('| A | B |\n| --- | --- |\n| c1 | c2 |\n')
+    cursorAtEndOf(editor, 'c1')
+    armPlainPaste()
+    paste(editor, { text: 'x\ny' })
+    expect(serializeBody(editor)).toBe('| A | B |\n| --- | --- |\n| c1x<br>y | c2 |\n')
+  })
+
+  test('a URL in the plain text stays text (no autolink)', () => {
+    const editor = headless('P\n')
+    cursorAtEndOf(editor, 'P')
+    armPlainPaste()
+    paste(editor, { text: 'see https://example.com/x now' })
+    expect(serializeBody(editor)).toBe('Psee https://example.com/x now\n')
+  })
+
   test('a plain Ctrl+V afterwards pastes normally again (the HTML is used)', () => {
     const editor = headless('P\n')
     cursorAtEndOf(editor, 'P')

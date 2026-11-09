@@ -107,13 +107,15 @@ describe('groupRows', () => {
     expect(labels(groups)).toEqual(['Earlier', 'Last week', 'Yesterday', 'Today', 'Tomorrow', 'Next week', 'Other'])
   })
 
-  test('By Hour labels follow the Time format setting', () => {
+  test('By Hour labels follow the Time format setting, read from the group context', () => {
     const rows = [R('a', { due: { start: '2026-11-08T14:05:00.000Z', resolution: 'time' } })]
     try {
       useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'UTC' } })
       expect(labels(groupRows(rows, by('due', 'hour'), undefined, ctx()).groups)).toEqual(['Nov 8, 2026, 2 PM'])
+      expect(labels(groupRows(rows, by('due', 'hour'), undefined, ctx({ twentyFourHourTime: true })).groups)).toEqual(['Nov 8, 2026, 14:00'])
+      // The pure function reads the context, not the store (the view puts the setting on the context).
       useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'UTC', twentyFourHourTime: true } })
-      expect(labels(groupRows(rows, by('due', 'hour'), undefined, ctx()).groups)).toEqual(['Nov 8, 2026, 14:00'])
+      expect(labels(groupRows(rows, by('due', 'hour'), undefined, ctx({ twentyFourHourTime: false })).groups)).toEqual(['Nov 8, 2026, 2 PM'])
     } finally {
       useSettings.setState({ settings: settingsDefaults })
     }

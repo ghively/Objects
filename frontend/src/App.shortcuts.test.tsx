@@ -105,6 +105,16 @@ describe('app shortcuts', () => {
     await waitFor(() => expect(usePeek.getState().path).toBe('task/Untitled.md'))
   })
 
+  test('a failed Ctrl+Shift+T create shows the error as a toast, as the New menu shows it', async () => {
+    await openObjectPage()
+    mocked.createObject.mockRejectedValueOnce(new Error('The space is read-only.'))
+    fireEvent.keyDown(document.body, { key: 'T', ctrlKey: true, shiftKey: true })
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', {}))
+    const toast = await screen.findByText('The space is read-only.')
+    expect(toast).toHaveAttribute('role', 'status')
+    expect(usePeek.getState().path).toBeNull()
+  })
+
   // The 2026-11-08 sweep: Ctrl+Alt+H is "Go to Calendar (press twice to jump to today)" (catalog, General).
   test('Ctrl+Alt+H opens the Calendar; pressed again while it is open, it jumps to today', async () => {
     await openObjectPage()
