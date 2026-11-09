@@ -19,9 +19,11 @@ automation whose actions remove the "Exclude from AI" tag or set or clear ``tags
 
 Routes (all JSON; ``read`` scope for the GETs and the import preview, ``read-write`` for the rest):
 
-- ``GET  /v1/types/{id}`` -> the TypeDef with ``revision`` (id or name)
+- ``GET  /v1/types`` -> ``{types}``, every TypeDef with ``revision`` and ``readOnlyReason`` (what the
+  window's ``GET /api/space`` lists); ``GET /v1/types/{id}`` -> one TypeDef (id or name)
 - ``GET  /v1/collections/{id}`` -> the collection with ``revision`` (id or name)
-- ``GET  /v1/queries/{id}`` -> the saved query with ``revision`` (id or name)
+- ``GET  /v1/queries`` -> ``{queries}``, every saved query with ``revision`` (the window's
+  ``GET /api/queries``); ``GET /v1/queries/{id}`` -> one saved query (id or name)
 - ``GET  /v1/whiteboard?path=`` -> ``{path, board, revision}``
 - ``GET  /v1/history?path=`` -> ``{versions}``; ``GET /v1/history/version?path=&id=`` -> a version
 - ``GET  /v1/references?path=`` -> ``{mentions}`` (unlinked mentions in visible objects)
@@ -429,6 +431,14 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
 
     # -- read --------------------------------------------------------------------------
 
+    @r.get("/v1/types")
+    @run
+    def type_definitions(request: Request):
+        # The list the window gets (`server.space_info`), so a script can keep a space's types
+        # without closing Object (2026-11-09).
+        auth(request)
+        return SafeJSONResponse(_jsonable({"types": [t.to_api(rev) for t, rev in space.types_with_revisions()]}))
+
     @r.get("/v1/types/{type_id}")
     @run
     def type_definition(type_id: str, request: Request):
@@ -461,6 +471,15 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
             if q.id == query_id or (q.name or "").casefold() == query_id.casefold():
                 return q
         return None
+
+    @r.get("/v1/queries")
+    @run
+    def saved_queries(request: Request):
+        auth(request)
+        status, body = app(request, "GET", "/api/queries")
+        if status >= 400:
+            return _failed(status, body)
+        return {"queries": body}
 
     @r.get("/v1/queries/{query_id}")
     @run

@@ -118,6 +118,8 @@ def test_v1_with_a_bearer_token_keeps_its_own_auth(keyed, space_dir: Path) -> No
     client, _key, _clock = keyed
     _record, secret = TokenStore(space_dir).create("agent", "read")
     assert client.get("/api/v1/schema", headers={"Authorization": f"Bearer {secret}"}).status_code == 200
+    # the definition routes too (a script keeps the space's types while Object is open)
+    assert client.get("/api/v1/types", headers={"Authorization": f"Bearer {secret}"}).status_code == 200
     assert client.get("/api/v1/schema", headers={"Authorization": "Bearer nope"}).status_code == 401
     # without any Authorization header it is an /api request like the others
     assert client.get("/api/v1/schema").json() == {"detail": "Only Object's own window can use this."}
