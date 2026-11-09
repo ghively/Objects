@@ -21,7 +21,7 @@ against a scratch server. **No box in Gene's `mN-acceptance.md` files was ticked
   36 `[ok]` RESULT: PASS; m22 44 ok PASS; m23 40 ok PASS; m24 72 ok PASS; m25 37 ok "All checks passed"; m26 13 ok
   PASS; m27 21 ok PASS. Zero `[FAIL]` lines.
 
-**Result:** 83 boxes: NOT-RUN 41, PASS 37, MANUAL 2, SUPERSEDED 1, DEFERRED-live-CLI 1, FAIL 1.
+**Result:** 83 boxes: PASS 44, NOT-RUN 31, PARTIAL 2, DEFERRED-live-CLI 2, MANUAL 2, SUPERSEDED 1, FAIL 1.
 
 Result key: PASS / FAIL / PARTIAL / SUPERSEDED (the box assumes the pre-redesign layout; the feature was checked at
 its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) / DEFERRED-live-CLI / NOT-RUN.
@@ -32,16 +32,16 @@ its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) 
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M21-1 | Researcher's agent page has a Schedules tab, last. It names the open space and says runs are saved as AI Chats. | NOT-RUN | (not reached) |
-| M21-2 | "New schedule": a name, a prompt, "Every day" at a time two minutes from now, and the default model. Within about a minute of that time an AI Chat ap… | NOT-RUN | (not reached) |
-| M21-3 | Researcher's Chats tab lists that chat with the "Scheduled" mark. Opening it shows the prompt and the reply. | NOT-RUN | (not reached) |
-| M21-4 | Settings > Automations lists the schedule as "Runs “Researcher” · Every day at …". Edit opens the schedule dialog, and Run log shows the run with a l… | NOT-RUN | (not reached) |
-| M21-5 | Asking Researcher in a chat to "schedule a weekly summary every Friday at 16:00" makes a schedule that shows in the tab. Asking it to delete it moves… | NOT-RUN | (not reached) |
-| M21-6 | After a schedule run, no "Learning…" line appears and no memory or skill change is logged from it. | NOT-RUN | (not reached) |
-| M21-7 | Close Object over a schedule's time and open it later: the "Missed automations" dialog offers the missed run. "Skip" runs nothing. | NOT-RUN | (not reached) |
-| M21-8 | Switch to another space: Researcher's schedules from the first space don't run there, and its Schedules tab shows only that space's schedules. | NOT-RUN | (not reached) |
-| M21-9 | Turning a schedule off stops it running. Turning "Activate notifications" off still saves the AI Chat but shows no notification. | NOT-RUN | (not reached) |
-| M21-10 | A skill that a schedule's prompt names stays active after "Tidy up now" or the curator's run. | NOT-RUN | (not reached) |
+| M21-1 | Researcher's agent page has a Schedules tab, last. It names the open space and says runs are saved as AI Chats. | **PASS** | Researcher (POST /api/agents) agent page tabs Profile\|Instructions\|Tools\|Memory\|Skills\|Learning\|Chats\|Schedules (last); Schedules: "Prompts this agent runs on a schedule in “sample”, while that space is open. Each run is saved as an AI Chat." |
+| M21-2 | "New schedule": a name, a prompt, "Every day" at a time two minutes from now, and the default model. Within about a minute of that time an AI Chat ap… | **PARTIAL** | (fake CLI) New schedule dialog: Name "Lane check", Prompt, Repeat Daily, Time 1:41 PM (2 min ahead), Default model -> at 13:41:04 "AI Chats/Lane check 2026-11-09.md" (agent: Researcher) with the prompt and the fake's reply. OS notification not observable here (m21_acceptance check 2: one notification titled "Weekly review"): MANUAL |
+| M21-3 | Researcher's Chats tab lists that chat with the "Scheduled" mark. Opening it shows the prompt and the reply. | **PASS** | Chats tab: "Lane check 2026-11-09 · Scheduled · sample · 2 messages"; opening it shows "Summarise the space in one line" and the reply |
+| M21-4 | Settings > Automations lists the schedule as "Runs “Researcher” · Every day at …". Edit opens the schedule dialog, and Run log shows the run with a l… | **PASS** | Settings > Automations: "Lane check · Runs “Researcher” · Every day at 1:41 PM · Ran 2 minutes ago"; menu Edit opens "Edit schedule"; Run log: "Done · Nov 9, 2026, 1:41 PM · On a schedule · Run an agent · [Lane check 2026-11-09] (button) · Saved the chat." |
+| M21-5 | Asking Researcher in a chat to "schedule a weekly summary every Friday at 16:00" makes a schedule that shows in the tab. Asking it to delete it moves… | **DEFERRED-live-CLI** | Natural-language "schedule a weekly summary every Friday at 16:00" needs a real model. The tool path passes with the fake (m21_acceptance check 4: schedule_manage create/list/update, delete -> Trash entry, another agent 404, create_automation refuses runAgent). Restore from Trash not driven here |
+| M21-6 | After a schedule run, no "Learning…" line appears and no memory or skill change is logged from it. | **PASS** | After the scheduled run the chat shows no "Learning…" line; m21_acceptance check 3: "no review ran after the schedule run: 0", a normal chat turn afterwards starts one |
+| M21-7 | Close Object over a schedule's time and open it later: the "Missed automations" dialog offers the missed run. "Skip" runs nothing. | **PASS** | Schedule "Missed check" daily at 13:46; server stopped 13:43:57-13:46:27 and restarted: dialog "Missed automations — These scheduled automations didn’t run while Object was closed. Run “Missed check” for the 1 missed times? Run all / Only the latest / Skip / Later"; Skip -> no new AI Chat, row "Skipped just now" |
+| M21-8 | Switch to another space: Researcher's schedules from the first space don't run there, and its Schedules tab shows only that space's schedules. | **PASS** | POST /spaces/switch to a second copy (sample2): Researcher Schedules tab "…in “sample2”… No schedules yet.", GET /automations empty, no AI Chats folder; m21_acceptance check 8: second space runs nothing |
+| M21-9 | Turning a schedule off stops it running. Turning "Activate notifications" off still saves the AI Chat but shows no notification. | **PARTIAL** | Edit schedule -> "Turned on" switch off -> Save: rule enabled false (GET /automations). Not running while off: m21_acceptance checks 5/7 (turned-off schedules owe nothing). Notification on/off: OS notification, MANUAL. Note: the Schedules row text shows no "Off" marker |
+| M21-10 | A skill that a schedule's prompt names stays active after "Tidy up now" or the curator's run. | **PASS** | Skills tab has "Tidy up now"; protection by prompt mention and by use: m21_acceptance check 5 (weekly-report and notes stay active after the curator pass 40 days on; unprotected old-notes archived) |
 | M21-11 | Unlinked mentions still show on the object page. | **PASS** | Unlinked mentions still show on the object page: Printer jams on line 3 Mentions tab lists the plain-text mention in "Shift notes" with Link (work space; M24-12) |
 
 ### M22 (`m22-acceptance.md`, 10 boxes)
