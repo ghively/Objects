@@ -96,12 +96,16 @@ describe('ReferencesSection (M8 settings)', () => {
     expect(screen.getByRole('tab', { name: /^All/ })).toHaveAttribute('aria-expanded', 'false')
   })
 
-  test('every section hidden leaves no references section', async () => {
+  // Settings offers Open | Closed for Backlinks and Related Content (Hidden only for Unlinked mentions,
+  // catalog section 1); a "hidden" stored for them before the 2026-11-08 sweep reads as Closed.
+  test('a stored Hidden for Backlinks and Related Content shows them closed; Unlinked mentions stay hidden', async () => {
     setSettings({ backlinkSectionsDefault: { backlinks: 'hidden', relatedContent: 'hidden', unlinkedMentions: 'hidden' } })
-    const { container } = render(<ReferencesSection path={SELF.path} summary={SELF} />)
-    await vi.waitFor(() => expect(mocked.references).toHaveBeenCalled())
-    await new Promise((r) => setTimeout(r, 0))
-    expect(container).toBeEmptyDOMElement()
+    await renderSection()
+    // Both read as Closed (so the section starts closed, as when every shown section is closed);
+    // Unlinked mentions keep Hidden: no tab.
+    expect(tabLabels()).toEqual(['All', 'Backlinks', 'Related Content'])
+    expect(screen.queryByRole('tabpanel')).toBeNull()
+    expect(screen.getByRole('tab', { name: /^All/ })).toHaveAttribute('aria-expanded', 'false')
   })
 
   test('test per object state wins over default', async () => {
