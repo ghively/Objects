@@ -279,6 +279,9 @@ Each starter template pre-fills the new type's properties.
   - Filter popover: "where" row builder with "Filter" and "Filter group" buttons. Sort popover: "+ Sort".
     Group by: a "Group by" button. Customize: "Card view" and "Calculations".
   - Tab strip: Overview | All | custom tabs (including Query-backed ones) | `+` to add a tab.
+- **Query builder search mode**: Auto | Title. Exact and Semantic are hidden until real full-text search exists
+  (Gene's decision Q-1: they matched exactly like Auto). A saved query that uses one still runs as Auto (the
+  server keeps accepting both) and shows Auto; the next edit of its search saves it as Auto.
   - Type page header: type icon + plural name; search icon; `...` (New collection, Pin to sidebar, Pin to…,
     Object type settings, Import CSV, Save as query, Delete object type; "New from template" is in the sidebar's
     type menu); a split "New" button.
