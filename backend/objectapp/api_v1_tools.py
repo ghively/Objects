@@ -40,7 +40,7 @@ Routes (all JSON; ``read`` scope for the GETs and the import preview, ``read-wri
   ``POST /v1/types/{id}/properties/{pid}/change-kind`` ``{toKind, revision}``;
   ``DELETE /v1/types/{id}?confirm=`` (428 ``{detail, affected, hiddenCount}`` without confirm)
 - ``POST /v1/collections`` ``{name, typeIds?}``; ``PUT /v1/collections/{id}`` ``{revision, collection}``;
-  ``DELETE /v1/collections/{id}?confirm=``
+  ``DELETE /v1/collections/{id}?confirm=`` (409 when any member is excluded from AI, decision S5)
 - ``POST /v1/queries`` ``{name, definition?}``; ``PUT /v1/queries/{id}`` ``{revision, query}``;
   ``DELETE /v1/queries/{id}``
 - ``POST /v1/whiteboards`` ``{title?}``; ``PUT /v1/whiteboard`` ``{path, revision, board}``
@@ -95,6 +95,7 @@ EXCLUSION_RULE = "An automation made by an agent can't remove “Exclude from AI
 AGENT_SCHEDULE_RULE = "Agent schedules are made with schedule_manage."  # our string (M21)
 OBJECT_CONFLICT = "The object changed since that version. Read it again and retry."
 DEFINITION_CONFLICT = "The definition changed since that revision. Read it again and retry."  # our string
+COLLECTION_HOLDS_EXCLUDED = "This collection holds pages excluded from AI; delete it in Object."  # decision S5
 MAX_BODY = 2_000_000
 MAX_PREVIEWS = 20
 """Preview ids whose mapping `start_import` may reuse (oldest dropped first)."""
@@ -963,18 +964,20 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         if found is None:
             return error(404, f'There is no collection "{collection_id}".')
         cid = found[0].id
-        members = collection_members(cid) if not confirm else []
+        members = collection_members(cid)
+        hidden_set = hidden_now()
+        shown = [m for m in members if m not in hidden_set]
+        if len(shown) < len(members):
+            # Decision S5: deleting it would trash or edit "Exclude from AI" pages; only the app may.
+            return error(409, COLLECTION_HOLDS_EXCLUDED)
         status, body = app(
             request, "DELETE", "/api/collections/{collection_id}",
             collection_id=cid, confirm=bool(confirm), clientId=origin(token),
         )
         if status == 428:
-            hidden_set = hidden_now()
-            shown = [m for m in members if m not in hidden_set]
-            hidden = len(members) - len(shown)
             data = dict(body) if isinstance(body, dict) else {}
             return error(428, data.get("detail") or "This change needs to be confirmed",
-                         affected=len(shown), hiddenCount=hidden)
+                         affected=len(shown), hiddenCount=0)
         if status < 400:
             guard.log(token, "delete-collection", cid, trashId=body.get("trashId"))
         return answer(status, body, "removedFrom", "deleted", "skipped")

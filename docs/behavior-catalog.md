@@ -344,12 +344,6 @@ Each starter template pre-fills the new type's properties.
   ("The run didn't finish within 30 minutes.", "The agent finished without marking the step done.", "Object closed
   during this run.") or asks Gene one question (a Question step is inserted before the step).
 
-## 10d. Agent and API guards (Object's own; decisions memo 2026-11-08)
-
-- **One turn per chat** (S8): a second message on a chat that is still answering (the same chat open in two tabs
-  or windows) gets one error, "This chat is still answering.", before anything is written, run or sent. Local
-  agents and remote (A2A) agents share the guard.
-
 ## 10c. Import and migration (M15 and M25-M27)
 
 The catalog has no import dialog (only the Import menu entries in sections 4 and 9), so everything here is Object's
@@ -396,6 +390,15 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **MCP**: `import_scan`, `import_proposal`, `import_report` (read) and `save_import_proposal`, `save_import_decisions`
   (write), the prompt `migrate_a_source` and the resource `object://skills/migrate-a-source` let an outside agent run the
   same workflow; `start_import` refuses a mapping that creates types outside an approved proposal (for the open space or a trial copy; a brand-new space is not checked).
+
+## 10d. Agent and API guards (Object's own; decisions memo 2026-11-08)
+
+- **One turn per chat** (S8): a second message on a chat that is still answering (the same chat open in two tabs
+  or windows) gets one error, "This chat is still answering.", before anything is written, run or sent. Local
+  agents and remote (A2A) agents share the guard.
+- **Deleting a collection over the API** (S5): `delete_collection` (MCP and `DELETE /api/v1/collections/{id}`) is
+  refused (409, "This collection holds pages excluded from AI; delete it in Object.") when any member is excluded
+  from AI, with or without confirm; nothing changes. Deleting it in Object is unchanged.
 
 ## 11. Unlinked mentions
 
