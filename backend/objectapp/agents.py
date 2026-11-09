@@ -159,10 +159,14 @@ class AgentRecord:
     in_state_dir: bool
     read_only_reason: str | None
     kind: Literal["local", "remote"] = "local"
+    warnings: list[str] = dataclasses.field(default_factory=list)
+    """What this agent's runs can't fence (`agentrun.fence_warnings`, decision A-2); empty for a
+    remote agent, whose runs have no local file tools."""
 
     def to_api(self, settings: dict[str, Any]) -> dict[str, Any]:
         """The API's ``Agent`` shape. A remote agent answers ``kind: "remote"``, its `RemoteInfo`
-        in ``remote`` (None for a local agent), no model, tool switches, learning or servers."""
+        in ``remote`` (None for a local agent), no model, tool switches, learning or servers.
+        ``warnings``: Object's-own-words lines the agent page shows under Folder."""
         d = self.data
         remote = self.kind == REMOTE_KIND
         info = _remote_info(self) if remote else None
@@ -204,6 +208,7 @@ class AgentRecord:
             "revision": self.revision,
             "mcpServers": servers,
             "remote": info,
+            "warnings": list(self.warnings),
         }
 
 
@@ -460,7 +465,7 @@ class AgentRegistry:
 
     def _record(self, agent_id: str, folder: Path, *, default: bool, kind: str = "local") -> AgentRecord:
         if kind == REMOTE_KIND and not default:
-            rec = dataclasses.replace(self._record(agent_id, folder, default=False), kind=REMOTE_KIND)
+            rec = dataclasses.replace(self._record(agent_id, folder, default=False), kind=REMOTE_KIND, warnings=[])
             if not rec.missing and rec.read_only_reason is None:
                 try:
                     RemoteAgentFile.model_validate(rec.data)
@@ -468,15 +473,17 @@ class AgentRegistry:
                     rec.read_only_reason = UNREADABLE
             return rec
         in_state = self._in_state_dir(folder)
+        warnings = self._fence_warnings(folder)
         if default and not (folder / ".object-agent" / "agent.json").is_file():
             return AgentRecord(
                 id=agent_id, folder=folder, data=_default_data(), revision=None, default=True,
-                exists=False, missing=False, in_state_dir=in_state, read_only_reason=None,
+                exists=False, missing=False, in_state_dir=in_state, read_only_reason=None, warnings=warnings,
             )
         if not folder.is_dir():
             return AgentRecord(
                 id=agent_id, folder=folder, data={"id": agent_id, "name": folder.name}, revision=None,
                 default=default, exists=True, missing=True, in_state_dir=in_state, read_only_reason=None,
+                warnings=warnings,
             )
         reason: str | None = None
         try:
@@ -490,8 +497,21 @@ class AgentRegistry:
                 reason = UNREADABLE
         return AgentRecord(
             id=agent_id, folder=folder, data=data, revision=revision, default=default,
-            exists=True, missing=False, in_state_dir=in_state, read_only_reason=reason,
+            exists=True, missing=False, in_state_dir=in_state, read_only_reason=reason, warnings=warnings,
         )
+
+    def _fence_warnings(self, own: Path) -> list[str]:
+        """What a run of the agent at `own` can't fence (`agentrun.fence_warnings`): the same
+        folders the run fences, as far as they are known outside a run (every registered space,
+        every other local agent's folder and the agent trash), each in its resolved form."""
+        from .agentrun import fence_warnings
+
+        try:
+            own_key = _key(_resolve(own))
+        except (OSError, ValueError):
+            own_key = _key(own)
+        others = [p for p in self.local_folders() if _key(p) != own_key]
+        return fence_warnings([*self._space_folders(), *others, self.trash_dir])
 
     def _default(self) -> AgentRecord:
         return self._record(DEFAULT_AGENT_ID, self._default_folder(), default=True)

@@ -11,15 +11,18 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { resetImportDialog, useImportDialog } from '@/import/useImportDialog'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { resetSettingsModal, useSettingsModal } from '@/settings/useSettingsModal'
 import { IMPORT_CONTENT_TEXT, ImportContentSection } from './ImportContent'
 
 const T = IMPORT_CONTENT_TEXT
+const mocked = vi.mocked(api)
 
 beforeEach(() => {
   vi.clearAllMocks()
   resetImportDialog()
   resetSettingsModal()
+  useSettings.setState({ settings: settingsDefaults, revision: 'r0', loaded: true })
 })
 
 describe('Import Content', () => {
@@ -81,5 +84,27 @@ describe('Import Content', () => {
     act(() => useSettingsModal.getState().open('importContent'))
     render(<ImportContentSection />)
     expect(await screen.findByText(T.historyEmpty)).toBeInTheDocument()
+  })
+
+  test('test OCR languages saves the ocrLanguages setting on blur and on Enter, empty for every language', async () => {
+    const user = userEvent.setup()
+    render(<ImportContentSection />)
+    const field = screen.getByRole('textbox', { name: 'OCR languages' })
+    expect(field).toHaveValue('')
+    expect(field).toHaveAttribute('placeholder', T.ocrLanguagesPlaceholder)
+    expect(screen.getByText(T.ocrLanguagesHelp)).toBeInTheDocument()
+    await user.type(field, ' eng+deu ')
+    expect(mocked.patchSettings).not.toHaveBeenCalled()
+    await user.tab()
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ ocrLanguages: 'eng+deu' }, expect.anything())
+    expect(useSettings.getState().settings.ocrLanguages).toBe('eng+deu')
+    // Enter saves too; the same value again saves nothing.
+    await user.click(field)
+    await user.keyboard('{Enter}')
+    expect(mocked.patchSettings).toHaveBeenCalledTimes(1)
+    await user.clear(field)
+    await user.keyboard('{Enter}')
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ ocrLanguages: '' }, expect.anything())
+    expect(mocked.patchSettings).toHaveBeenCalledTimes(2)
   })
 })

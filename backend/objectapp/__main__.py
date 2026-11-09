@@ -1,4 +1,4 @@
-"""Launcher: ``objectapp [--space PATH] [--port 8790] [--browser]``.
+"""Launcher: ``objectapp [--space PATH] [--port 8790] [--browser [--print-link]]``.
 
 Serves the API and the built front end on ``127.0.0.1`` only, then opens a
 native window (pywebview) or, with ``--browser``, the default web browser.
@@ -10,9 +10,11 @@ else the space opened last (the registry in the state dir) when it exists. A
 server on the new folder on the same port while the window stays open.
 
 Decision S6: the host makes one `uikey.LaunchKey` per launch (kept across space switches). The
-window opens at a one-time ``/_open`` link that trades its code for the key's cookie; with
-``--browser`` the link is also printed (for when no browser opens), and pressing Enter in the
-launcher's terminal prints and opens a new one (a browser that was closed lost its cookie).
+window opens at a one-time ``/_open`` link that trades its code for the key's cookie. With
+``--browser`` the browser gets the link alone: it is printed only when no browser could be opened
+or with ``--print-link``, since anything that can read the terminal (or a log of it) could use a
+printed link before the browser does. Pressing Enter in the launcher's terminal prints and opens
+a new one (a browser that was closed lost its cookie).
 """
 
 from __future__ import annotations
@@ -178,19 +180,24 @@ def _can_reopen() -> bool:
     return sys.stdin is not None and sys.stdin.isatty()
 
 
-def _open_in_browser(key: LaunchKey, url: str) -> None:
-    """Print and open a fresh one-time link (decision S6)."""
+def _open_in_browser(key: LaunchKey, url: str, print_link: bool = False) -> None:
+    """Open a fresh one-time link in the browser (decision S6). The link is printed only when no
+    browser could be opened, or with `print_link` (``--print-link``, and Enter in the terminal,
+    which asks for one): a printed link can be read by anything that sees the terminal."""
     link = key.open_url(url)
-    print(f"Object is running at {url} (opening it in your browser).", flush=True)
-    print(f"If no browser opened, open this link within 5 minutes (it works once): {link}", flush=True)
+    opened = webbrowser.open(link)
+    if print_link or not opened:
+        print(f"Object is running at {url}.", flush=True)
+        print(f"Open this link within 5 minutes (it works once): {link}", flush=True)
+    else:
+        print(f"Object is running at {url} (opened in your browser).", flush=True)
     if _can_reopen():
         print("Press Enter here for a new link.", flush=True)
-    webbrowser.open(link)
 
 
 def _reopen_on_enter(key: LaunchKey, url: str) -> None:
     for _line in sys.stdin:
-        _open_in_browser(key, url)
+        _open_in_browser(key, url, print_link=True)
 
 
 def _webview_start_options(platform: str) -> dict:
@@ -213,6 +220,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--space", type=Path, help="space folder to open")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--browser", action="store_true", help="open in the web browser")
+    parser.add_argument(
+        "--print-link", action="store_true",
+        help="with --browser, also print the one-time link (anyone reading the terminal could use it)",
+    )
     args = parser.parse_args(argv)
 
     space_root = startup_root(args.space)
@@ -236,7 +247,7 @@ def main(argv: list[str] | None = None) -> None:
 
     try:
         if args.browser:
-            _open_in_browser(host.ui_key, url)
+            _open_in_browser(host.ui_key, url, print_link=args.print_link)
             if _can_reopen():
                 threading.Thread(target=_reopen_on_enter, args=(host.ui_key, url), daemon=True).start()
             thread.join()

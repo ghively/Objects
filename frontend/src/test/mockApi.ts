@@ -365,6 +365,7 @@ export function agent(partial: Partial<Agent> & Pick<Agent, 'id'>): Agent {
     revision: 'r1',
     mcpServers: [],
     remote: null,
+    warnings: [],
     ...partial,
   }
 }

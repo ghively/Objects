@@ -23,7 +23,9 @@ agent's folder and the agent trash (``Read(...)`` covers Read, Glob and Grep; ``
 covers Edit, Write and NotebookEdit, as the CLI documents and the T1 spike checked), plus the
 agent's own protected files, the state dir's own files and Gene's Claude Code files. The rules
 go into the run's ``--settings`` file, so a folder's own settings can't lift them, and a path
-with commas or spaces needs no quoting.
+with commas or spaces needs no quoting. A folder whose name holds a backslash (legal on Linux)
+matches no rule form the CLI accepts, so it can't be fenced (decision A-2): `fence_warnings`
+names it, on the agent (the API's ``warnings``) and in the log when a run starts.
 
 (spike, adopted by Gene 2026-11-06) Every run's settings switch auto-memory off and name, in
 ``claudeMdExcludes``, the user ``CLAUDE.md`` and every ancestor folder's instruction files, since
@@ -39,6 +41,7 @@ No network client here: this module only builds a command and writes temp files.
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import shutil
@@ -59,7 +62,10 @@ from .tokens import TokenStore
 if TYPE_CHECKING:  # agents (T2) imports toolcatalog; this module only needs the type
     from .agents import AgentRecord
 
+log = logging.getLogger(__name__)
+
 __all__ = [
+    "BACKSLASH_MESSAGE",
     "CLI_FLAGS",
     "NESTED_AGENT",
     "NESTED_AGENTS_DIR",
@@ -81,6 +87,7 @@ __all__ = [
     "claude_md_excludes",
     "contributors",
     "fence_folders",
+    "fence_warnings",
     "fence_rules",
     "fill_refs",
     "nesting_problem",
@@ -166,6 +173,11 @@ NESTED_MESSAGE = "An agent folder can't be inside a space folder or hold one."
 NESTED_AGENT = "An agent folder can't be inside another agent's folder or hold one."  # our string
 NESTED_TRASH = "An agent folder can't be inside the agent trash."  # our string
 NESTED_AGENTS_DIR = "An agent folder can't be the folder that holds Object's agents."  # our string
+# Decision A-2: a fenced folder no rule can name. Our string.
+BACKSLASH_MESSAGE = (
+    'The folder "{path}" can\'t be fenced from this agent\'s file tools because its name contains a '
+    "backslash. Rename it if the agent shouldn't read it."
+)
 
 OBJECT_GUIDANCE = (
     "You are {agent}, an agent inside Object, the user's local Markdown notes app. "
@@ -311,6 +323,23 @@ def fence_folders(scope: RunScope, spaces: list[Path], agents: list[Path]) -> li
             found += _both_forms(Path(p))
     found += _both_forms(Path(scope.state) / AGENTS_DIR / TRASH_DIR)
     return _dedupe(found)
+
+
+def fence_warnings(folders: Iterable[Path | str], sep: str = os.sep) -> list[str]:
+    """One `BACKSLASH_MESSAGE` per fenced folder whose path holds a backslash, in order, each path
+    once. `rule_path` turns ``\\`` into ``/`` (the CLI's rule form), so such a folder, legal on Linux
+    and macOS, matches no rule and stays open to the run's file tools (decision A-2). On Windows
+    (`sep` is ``\\``) the backslash separates path components and no name can hold one: nothing."""
+    if sep == "\\":
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for f in folders:
+        text = str(f)
+        if "\\" in text and text not in seen:
+            seen.add(text)
+            out.append(BACKSLASH_MESSAGE.format(path=text))
+    return out
 
 
 def _both_forms(p: Path) -> list[Path]:
@@ -529,6 +558,8 @@ def _fence(scope: RunScope, parts: RunParts) -> None:
     cache = os.environ.get("OBJECT_CACHE_DIR")
     if cache:  # spaces' search index and frontmatter cache live here, outside the space folders
         folders = _dedupe([*folders, *_both_forms(Path(cache))])
+    for warning in fence_warnings(folders):  # once per run, in the app log (decision A-2)
+        log.warning(warning)
     rules = fence_rules(folders, own, scope.state, Path.home())
     config = _claude_config_dir()
     if config is not None:  # as ~/.claude's: the login and the user's Claude Code files

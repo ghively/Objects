@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 
@@ -82,6 +83,34 @@ def test_list_never_writes(tmp_path: Path) -> None:
     assert api["name"] == "Assistant" and api["icon"] == "ph-sparkle" and api["model"] == "sonnet"
     assert api["exists"] is False and api["default"] is True and api["kind"] == "local"
     assert not state.exists() or not any(state.rglob("*"))
+
+
+def test_agent_api_has_no_warnings_for_a_normal_agent(reg: AgentRegistry) -> None:
+    rec = reg.ensure_default()
+    assert rec.warnings == [] and rec.to_api({})["warnings"] == []
+    assert all(r.to_api({})["warnings"] == [] for r in reg.list())
+
+
+@pytest.mark.skipif(os.name == "nt", reason="a folder name can't hold a backslash on Windows")
+def test_agent_api_warns_about_a_backslash_folder_the_fence_cant_name(reg: AgentRegistry, state: Path, tmp_path: Path) -> None:
+    """Decision A-2 (the backslash fence is no longer silent): a registered space or another
+    agent's folder whose name holds a backslash is named on the agent, in Object's words."""
+    from objectapp.agentrun import BACKSLASH_MESSAGE
+
+    space = tmp_path / "Notes\\Old"
+    space.mkdir()
+    Registry(state).register(space, touch=False)
+    rec = reg.ensure_default()
+    assert rec.to_api({})["warnings"] == [BACKSLASH_MESSAGE.format(path=str(space.resolve()))]
+    assert "can't be fenced from this agent's file tools because its name contains a backslash" in rec.warnings[0]
+    # Another agent's folder with a backslash is named on this agent, not on itself.
+    where = tmp_path / "Agents\\Two"
+    where.mkdir()
+    two = reg.create(AgentInput(name="Two"), "Soul", location=where)
+    other = BACKSLASH_MESSAGE.format(path=str(two.folder))
+    assert reg.get(rec.id).warnings == [BACKSLASH_MESSAGE.format(path=str(space.resolve())), other]
+    assert reg.get(two.id).warnings == [BACKSLASH_MESSAGE.format(path=str(space.resolve()))]
+    assert reg.get(two.id).to_api({})["warnings"] == reg.get(two.id).warnings
 
 
 def test_ensure_default_makes_the_skeleton(reg: AgentRegistry, state: Path) -> None:

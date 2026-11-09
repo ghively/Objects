@@ -479,6 +479,10 @@ export interface DeviceSettings {
   workAutoRun: boolean
   /** MCP tools (`mcp__<server>__<tool>`) a read-only run may use (at most 500). */
   workReadTools: string[]
+  // ---- Import (2026-11-09) ----
+  /** The languages the import's OCR reads: Tesseract codes joined with `+` (`eng+deu`); `''` = every
+   *  installed language. */
+  ocrLanguages: string
 }
 
 /** M8 `DeviceSettings.language`. */
@@ -2045,6 +2049,9 @@ export interface Agent {
   mcpServers: { name: string; missingVars: string[]; usable: boolean }[]
   /** M20: a remote agent's card and connection; null for a local agent. */
   remote: RemoteInfo | null
+  /** What this agent's runs can't fence (a folder whose name holds a backslash), in Object's words;
+   *  shown under Folder. Empty for most agents and for every remote agent. */
+  warnings: string[]
 }
 
 // ---- M20: remote agents (A2A) ----

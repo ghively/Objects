@@ -185,6 +185,76 @@ def test_the_launcher_opens_each_window_at_its_own_one_time_link(tmp_path: Path,
     assert all(c and c.startswith(f"object-ui-{port}=") and "HttpOnly" in c for _code, c in answers)
 
 
+def test_browser_launch_prints_the_link_only_when_no_browser_opened(monkeypatch, capsys) -> None:
+    """Known limit (S6): with ``--browser`` the one-time link was printed before the browser got
+    it, so anything reading the terminal or its log could use it first. Now a browser that opened
+    gets the link alone; the link is printed when none could be opened or with ``--print-link``."""
+    key = LaunchKey(PORT)
+    url = f"http://127.0.0.1:{PORT}/"
+    opened: list[str] = []
+    monkeypatch.setattr(launcher, "_can_reopen", lambda: True)
+
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda link: opened.append(link) or True)
+    launcher._open_in_browser(key, url)
+    out = capsys.readouterr().out
+    assert len(opened) == 1 and opened[0].startswith(url + "_open?code=")
+    assert "_open?code=" not in out
+    assert out.splitlines() == [
+        f"Object is running at {url} (opened in your browser).",
+        "Press Enter here for a new link.",
+    ]
+
+    # No browser could be opened: the link is the only way in, so it is printed.
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda link: opened.append(link) or False)
+    launcher._open_in_browser(key, url)
+    out = capsys.readouterr().out
+    assert len(opened) == 2 and opened[1] != opened[0]
+    assert f"Object is running at {url}." in out
+    assert f"Open this link within 5 minutes (it works once): {opened[1]}" in out
+    assert "Press Enter here for a new link." in out
+
+    # ``--print-link`` (and Enter in the terminal, which asks for a link): printed even when a
+    # browser opened.
+    monkeypatch.setattr(launcher.webbrowser, "open", lambda link: opened.append(link) or True)
+    launcher._open_in_browser(key, url, print_link=True)
+    out = capsys.readouterr().out
+    assert len(opened) == 3 and opened[2] in out and "(opened in your browser)" not in out
+
+    # Not a terminal: no Enter line.
+    monkeypatch.setattr(launcher, "_can_reopen", lambda: False)
+    launcher._open_in_browser(key, url)
+    assert capsys.readouterr().out.splitlines() == [f"Object is running at {url} (opened in your browser)."]
+
+
+def test_enter_in_the_terminal_prints_a_new_link(monkeypatch) -> None:
+    calls: list[tuple] = []
+    monkeypatch.setattr(launcher, "_open_in_browser", lambda key, url, print_link=False: calls.append((url, print_link)))
+    monkeypatch.setattr(launcher.sys, "stdin", iter(["\n", "\n"]))
+    launcher._reopen_on_enter(LaunchKey(PORT), "http://127.0.0.1:8812/")
+    assert calls == [("http://127.0.0.1:8812/", True)] * 2
+
+
+def test_the_launcher_passes_print_link_to_the_browser_opener(tmp_path: Path, monkeypatch) -> None:
+    """``--browser --print-link`` reaches `_open_in_browser`; plain ``--browser`` does not print."""
+    monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path / "state"))
+    root = tmp_path / "space"
+    root.mkdir()
+    (root / "Note.md").write_text("Body\n", encoding="utf-8")
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    calls: list[tuple] = []
+
+    def open_in_browser(key, url, print_link=False):
+        calls.append((url, print_link))
+        raise KeyboardInterrupt  # as Ctrl-C in the terminal: the launcher stops its server
+
+    monkeypatch.setattr(launcher, "_open_in_browser", open_in_browser)
+    launcher.main(["--space", str(root), "--port", str(port), "--browser", "--print-link"])
+    launcher.main(["--space", str(root), "--port", str(port), "--browser"])
+    assert calls == [(f"http://127.0.0.1:{port}/", True), (f"http://127.0.0.1:{port}/", False)]
+
+
 def test_linux_window_keeps_web_storage_in_the_state_dir(tmp_path: Path, monkeypatch) -> None:
     """pywebview's GTK backend turns localStorage off in private mode, which left the UI's
     persisted stores without storage (main pane: "e.persist.getOptions" is undefined); Linux
