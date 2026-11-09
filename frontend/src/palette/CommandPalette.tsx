@@ -130,6 +130,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
         cal.today()
         onOpenTarget({ kind: 'calendar' })
       },
+      openAllNotes: () => onOpenTarget({ kind: 'allNotes' }),
       openGlobalGraph: () => onOpenTarget({ kind: 'graph' }),
       openGraphView: onShowRightPanel,
       toggleSidebar: onToggleSidebar,
