@@ -626,3 +626,18 @@ def test_14_day_rule_moves_items_out(space: Space, svc: WorkService):
     space.clock = lambda: datetime(2026, 11, 14, 10, 0, tzinfo=UTC)
     assert "Last week fix" not in _by_title(svc.items())
     assert "Last week fix" in _by_title(svc.items("all"))
+
+
+def test_withdraw_logs_withdrew(space: Space, svc: WorkService):
+    """Fix pass H: Withdraw (reopen of an approved Approve step) logs a withdrawal, not a reopen."""
+    s2 = _step(svc.item(PRINTER), 2)
+    svc.step(PRINTER, s2["id"], s2["rev"], "approve", GENE)
+    s2 = _step(svc.item(PRINTER), 2)
+    res = svc.step(PRINTER, s2["id"], s2["rev"], "reopen", GENE)
+    assert "Gene withdrew the approval of step 2" in res["activity"]
+    assert "reopened" not in res["activity"]
+    s2 = _step(res["item"], 2)
+    res = svc.step(PRINTER, s2["id"], s2["rev"], "decline", GENE, text="no")
+    s2 = _step(res["item"], 2)
+    res = svc.step(PRINTER, s2["id"], s2["rev"], "reopen", GENE)
+    assert "Gene reopened step 2" in res["activity"]

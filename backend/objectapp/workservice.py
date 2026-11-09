@@ -36,6 +36,7 @@ from .workbody import (
     floor_label,
     one_line,
     stamp_local,
+    withdraw_text,
     work_note_text,
 )
 from .workfields import FIELD_KEYS, is_work_type
@@ -408,7 +409,9 @@ class WorkService:
                 not_before_local=stamp_local(nb, self.space.tz) if nb is not None else None,
                 date=self._day(now),
             )
-            return self._append(text_, lines, event, now)
+            # Fix pass H: reopening an approved step is the Withdraw button: log it as such.
+            withdrew = action == "reopen" and seen.get("before") == "approved"
+            return self._append(text_, lines, event, now, activity=withdraw_text(event) if withdrew else None)
 
         try:
             outcome = self._write(rel, None, lines, raw=raw, body=body)

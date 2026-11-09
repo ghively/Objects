@@ -382,6 +382,8 @@ Each starter template pre-fills the new type's properties.
   row since Gene last acted on it (decision S3): the 4th Agent step stays Open and is listed in Stuck under
   **Waiting for Run now** ("The agent ran 3 steps of this item in a row by itself. Press Run now to let it go on.");
   any action of Gene's on the item (Run now included) starts the count again. The count survives a restart.
+- **Withdraw** (an approved Approve step's button, a `reopen`) logs "Gene withdrew the approval of step n …" in
+  Activity; reopening a done or declined step still logs "reopened".
 - **A step list that can't be read** (a hand-edited entry with an unknown kind or state): the readable steps show,
   but no step offers an action (`stepsUnreadable`, every step's `actions` empty), and the work header lists the
   problems ("Step 3 has an unknown kind "maybe".") until the file is fixed — the server refuses every step write.
