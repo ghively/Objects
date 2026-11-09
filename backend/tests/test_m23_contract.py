@@ -183,10 +183,13 @@ def test_settings_keys(state: Path) -> None:
         with pytest.raises(settings.SettingsProblem) as exc:
             settings.patch({"workAlertIntervals": bad}, None)
         assert exc.value.message == "Intervals are whole minutes from 1 to 10080.", bad
-    # Other keys keep the built message.
+    # Other keys keep the built messages: an unknown key, and a bad value.
     with pytest.raises(settings.SettingsProblem) as exc:
         settings.patch({"nope": 1}, None)
-    assert exc.value.message == "The setting \"nope\" can't be saved."
+    assert exc.value.message == 'There is no setting named "nope".'
+    with pytest.raises(settings.SettingsProblem) as exc:
+        settings.patch({"monochromeTags": "true"}, None)
+    assert exc.value.message == "The setting \"monochromeTags\" can't be saved."
     assert not state.exists()  # nothing was written
 
     folder = str(state.parent / "monitoring")

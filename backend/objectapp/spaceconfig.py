@@ -46,12 +46,17 @@ _lock = threading.RLock()
 
 
 class SpaceConfigProblem(ValueError):
-    """A ``PUT /api/space`` patch has an unknown key or a value of the wrong shape (422)."""
+    """A ``PUT /api/space`` patch has an unknown key or a value of the wrong shape (422).
+
+    The default text is the bad-value sentence; `_checked` passes the unknown-key one for a
+    key that is not a setting at all (review 2026-11-08, NIT 7).
+    """
 
     def __init__(self, key: str, message: str | None = None) -> None:
-        super().__init__(message or f"The setting \"{key}\" can't be saved.")
+        text = message or f"The setting \"{key}\" can't be saved."
+        super().__init__(text)
         self.key = key
-        self.message = message or f"The setting \"{key}\" can't be saved."
+        self.message = text
 
 
 def _path(root: Path) -> Path:
@@ -109,7 +114,7 @@ def _checked(patch_: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for key, value in patch_.items():
         if key not in PATCH_KEYS:
-            raise SpaceConfigProblem(key)
+            raise SpaceConfigProblem(key, f'There is no setting named "{key}".')
         if key == "name":
             if not isinstance(value, str) or not value.strip():
                 raise SpaceConfigProblem(key, "A space needs a name.")
