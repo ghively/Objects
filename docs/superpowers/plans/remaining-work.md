@@ -71,6 +71,14 @@ The history below is in the order it was written: the per-milestone sections new
   (Gene's setting: off). Also added "Show the sidebar when Object opens" (Appearance > Layout, `4482c11`); that was
   a misreading of Gene's ask (he meant the notes' properties panel), so his value is back on; the switch stays.
 
+- **Readiness gate before daily use (2026-11-09, Linux, `82359e2`):** back end 3388 passed, 19 skipped (one
+  wall-clock budget test, `test_task_stats_fast.py`, failed only while the front-end suite and build ran beside it
+  and passed alone); front end 4083 passed, 1 skipped; `tsc`, lint and build clean. A headless launch on a copy of
+  `space-sample` through the `/_open` link: bare `/api` answers 401, the shell, today's note (Ctrl+Shift+D),
+  editing a page (only that file changed), search, Tasks, Calendar, Graph, Assistant and Trash all open with no
+  console, page or HTTP errors. Opening the space changed no `.md` file (only M1's first-open type files, since the
+  fixture has no `.object/types/`).
+
 ### Needs Gene
 
 1. **Hand-checks:** the list in `auto-acceptance-2026-11-08.md`, "What needs Gene by hand" (Windows and pywebview,
