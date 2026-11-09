@@ -286,7 +286,7 @@ from .watcher import LINKED_KINDS, ChangeEvent, SpaceWatcher
 from .whiteboardapi import whiteboard_router
 from .whiteboardfile import sidecar_owner
 from .whiteboardstore import whiteboard_ui_problem
-from .workloop import WorkLoop
+from .workloop import WorkLoop, on_change_event
 from .workseams import build_seams
 from .workservice import WorkService
 from .workview import api_extra as query_api_extra
@@ -1261,6 +1261,9 @@ def create_app(
         """
         if event.kind in LINKED_KINDS and event.linked is None:
             event = replace(event, linked=space.links.take_linked())
+        # Decision S3 (fix pass 2026-11-09): Gene's own edit of a work item, told apart by the
+        # event's origin (his window's client id), starts its auto-run count again.
+        on_change_event(space, event)
         loop = hub.loop
         if loop is not None and loop.is_running() and not hub.closed:
             loop.call_soon_threadsafe(hub.publish, event)
