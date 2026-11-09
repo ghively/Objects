@@ -371,6 +371,11 @@ export interface SpaceInfo {
   revision?: string
   /** M22: the Jira site the browse links use (`https://…`), or null. Optional, as M7's keys are. */
   jiraSite?: string | null
+  /**
+   * Fix pass H2: a new or empty folder that was never asked "Pick a starting point" (no `setup`
+   * in `space.json`, no basic types, no files). Optional, as M7's keys are.
+   */
+  needsSetup?: boolean
 }
 
 /** M7 `PUT /api/space` patch: only these keys are written to `space.json`. */

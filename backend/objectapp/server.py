@@ -267,7 +267,7 @@ from .space import (
     RestoreConflict,
     Space,
 )
-from .spaceconfig import SpaceConfigProblem, space_fields
+from .spaceconfig import SpaceConfigProblem, needs_setup, space_fields
 from .spaceconfig import patch as patch_space_config
 from .spaces import Registry, SpaceNameProblem, create_space, is_full_path, normalize
 from .typedefs import has_undecodable
@@ -564,6 +564,10 @@ _TASK_SECTION_KEYS = frozenset(
         "all",
     }
 )
+
+
+class SpaceSetupRequest(BaseModel):
+    setup: str
 
 
 class PatchSpaceRequest(BaseModel):
@@ -1064,10 +1068,24 @@ def create_app(
             "hideTaskManagement": fields["hideTaskManagement"],
             "jiraSite": fields["jiraSite"],
             "revision": fields["revision"],
+            "needsSetup": needs_setup(space.root),
         }
 
     @api.get("/space")
     def get_space():
+        return space_info()
+
+    @api.post("/space/setup")
+    def post_space_setup(req: SpaceSetupRequest):
+        # Fix pass H2: "Pick a starting point" for a space opened as a new or empty folder.
+        if req.setup not in ("basic", "blank"):
+            return _error(422, "Pick \"basic\" or \"blank\" as the starting point.")
+        if not needs_setup(space.root):
+            return _error(409, "This space already has a starting point.")
+        try:
+            space.apply_setup(req.setup)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         return space_info()
 
     @api.put("/space")

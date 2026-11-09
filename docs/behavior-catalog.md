@@ -173,6 +173,10 @@ Each starter template pre-fills the new type's properties.
 
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
+- A space opened as a new or empty folder (`objectapp --space <folder>`: no `setup` in `space.json`, no basic
+  types, no files) asks "Pick a starting point" once — the same "Start with basic setup" / "Empty space" choices
+  as "Create new space" (`POST /api/space/setup`). Nothing is written before a pick; closing asks again next
+  time. The pick is recorded as `space.json` `setup` (Create space records it too).
 - Main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant (Gene's 2026-11-08 redesign;
   Calendar is the space's opening view). The Assistant is the built-in, always-on helper — a program
   feature, not an "agent" — shown with its own icon; a click opens its chat. Like an agent row it carries a

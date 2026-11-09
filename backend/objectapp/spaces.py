@@ -288,7 +288,8 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     target = parent / safe_filename(name)
     target.mkdir()  # FileExistsError when anything is already there
     (target / ".object").mkdir()
-    atomic_write(target / ".object" / "space.json", dump_json({"name": name}))
+    # `setup` records the pick, so the space never asks again on open (spaceconfig.needs_setup).
+    atomic_write(target / ".object" / "space.json", dump_json({"name": name, "setup": setup}))
     if setup == "basic":
         from .basicsetup import write_basic_types
 
