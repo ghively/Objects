@@ -65,6 +65,11 @@ The history below is in the order it was written: the per-milestone sections new
   newest first); pin it from its `…` menu ("Pin to Sidebar"). Creating it needed today's daily note
   (`DailyNotes/2026-11-09.md`), because a query can only name a type the space has, and DailyNote exists once the
   first daily note does.
+- **Today's note pop-out** (`4482c11`): the top bar's "Today's note", the palette's "Pop out today's daily note" and
+  Ctrl+Shift+D open today's daily note in the peek (created when missing), like an object clicked on the timeline.
+- **"Show properties by default"** (Settings > Editor, `adf830a`): off opens notes with the properties panel hidden
+  (Gene's setting: off). Also added "Show the sidebar when Object opens" (Appearance > Layout, `4482c11`); that was
+  a misreading of Gene's ask (he meant the notes' properties panel), so his value is back on; the switch stays.
 
 ### Needs Gene
 
