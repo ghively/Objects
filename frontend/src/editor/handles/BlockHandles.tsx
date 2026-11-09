@@ -8,7 +8,10 @@
  * menu in it. Clicking the drag handle selects the block and opens the block
  * menu; dragging it moves the block (ProseMirror's drag of a node selection).
  * The block count of a selection is the block-selection bar's
- * (`selectionBar/BlockSelectionBar.tsx`).
+ * (`selectionBar/BlockSelectionBar.tsx`). "Open block styling" (Ctrl+Shift+E,
+ * `extensions/openBlockStyling.ts`) asks for the same menu with an event on the
+ * editor's element: the overlay selects the block (a block selection is kept)
+ * and anchors the menu where its handle sits.
  */
 import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
@@ -16,7 +19,8 @@ import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import { createPortal } from 'react-dom'
 import { Icon } from '@/components/Icon'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { insertBlock, selectBlocks } from '../extensions/blockSelection'
+import { blockSelectionRange, insertBlock, selectBlocks } from '../extensions/blockSelection'
+import { OPEN_BLOCK_MENU_EVENT, type OpenBlockMenuDetail } from '../extensions/openBlockStyling'
 import { openSlashMenu } from '../extensions/slashMenu'
 import { BLOCK_PARENTS, leafBlockAt } from '../nodes/blockOptions'
 import { BlockMenu } from './BlockMenu'
@@ -122,6 +126,23 @@ export function BlockHandles({ editor }: { editor: Editor }) {
     },
     [editor, hover],
   )
+
+  // Ctrl+Shift+E: open the block menu for the target block, as the drag handle's click does.
+  useEffect(() => {
+    const dom = editor.view.dom
+    const onOpen = (e: Event) => {
+      const pos = (e as CustomEvent<OpenBlockMenuDetail>).detail?.pos
+      if (typeof pos !== 'number') return
+      if (!blockSelectionRange(editor.state) && !selectBlocks(editor, pos)) return
+      const rect = rectOf(editor, pos)
+      if (!rect) return
+      setHover({ pos, rect })
+      const left = Math.max(0, rect.left - HANDLE_WIDTH - 4)
+      setMenu({ left, top: rect.top, width: HANDLE_WIDTH, height: Math.min(rect.height, 24) })
+    }
+    dom.addEventListener(OPEN_BLOCK_MENU_EVENT, onOpen)
+    return () => dom.removeEventListener(OPEN_BLOCK_MENU_EVENT, onOpen)
+  }, [editor])
 
   const onDragHandleClick = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
