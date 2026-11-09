@@ -4,7 +4,7 @@ Lane C1a, branch `lane/c1a-acceptance-m4-m6` (off `lane/c1-acceptance-m1-m9`). D
 
 Classes: AUTO = verifiable by driving app/API/files; MANUAL = taste/look, Windows-only (notifications, Wacom), or his real data/scale.
 
-**Counts:** MANUAL 44, NOT-RUN 21, PARTIAL 4, PASS 26, SUPERSEDED 3 (total 98)
+**Counts:** MANUAL 44, NOT-RUN 1, PARTIAL 13, PASS 37, SUPERSEDED 3 (total 98)
 
 ## Script reruns on this branch (2026-11-08)
 
@@ -15,8 +15,20 @@ Classes: AUTO = verifiable by driving app/API/files; MANUAL = taste/look, Window
 | `scripts/m5_acceptance.py` | space-links | exit 0, 19 [ok] |
 | `scripts/m6_acceptance.py` | space-whiteboard | exit 0, 20 [ok] |
 | `scripts/m6_acceptance.py` | space-sample | exit 0, 19 [ok] |
+| `uv run pytest backend/tests/test_reminders.py backend/tests/test_reminders_edit.py` | — | 21 passed |
 
-Logs: `~/.hermes/cache/scratch/lane-c1a/acc/*.log`.
+Logs: `~/.hermes/cache/scratch/lane-c1a/acc/*.log`. Live UI runs used space-calendar (M4), space-links (M5) and space-sample (M6: a fresh board created from "+ New", since space-sample has no whiteboard type yet).
+
+## Findings worth a fix pass (no code changed in this lane)
+
+1. **Stale backlinks after a link is added elsewhere (M5#5).** If another object gains a link to the open object (Link-a-mention in References, or an outside edit that adds `[[Loose task]]` to a page), the open object's Properties panel "Backlinks" chips and the Tasks dashboard Context grouping keep the old backlinks until the page is reloaded. `/api/references`, the References tab and table cells are already current. Likely cause: the row/panel feeds refresh only on changes to the object's own path.
+2. **A daily-note template swallows the first typed text (M4#3).** With a DailyNote default template (Standup: `## Yesterday / ## Today / ## Blockers`), typing in an empty day's inline note creates the note from the template, and the typed text lands at the end of the last heading: `## Blockerstempl line`. The empty slot shows no template preview, so nothing tells the user where the text will go.
+3. **"Changed elsewhere. Reloaded." not observed (M6#17).** The board does reload after an outside edit of `.whiteboard.json`, but the notice never showed up in the DOM. It may be timing or a render outside the polled tree, so Gene should check it by eye.
+4. **Box text out of date (not bugs):** M4#13 expects status, date and completed lines. Completing a recurring task now also writes an `occurrenceLog` block. M6#45 ("board edits don't bump lastUpdated") was reversed by `806934c feat(whiteboard): board edits bump lastUpdated`. M5#12 mentions an action-palette switch button, but actions now share the one palette list. In space-sample, creating the first whiteboard also writes all the inferred `.object/types/*.json` files.
+
+## Headless limits (what stays PARTIAL / NOT-RUN)
+
+HTML5 drag-and-drop (palette to board, Pinned to board), multi-select (Shift/Ctrl-click), connector handle drags, and the sigma graph canvas (node click, graph search) can't be driven with CDP mouse events in this harness. The affected boxes say what was and wasn't covered.
 
 
 
@@ -83,7 +95,7 @@ Logs: `~/.hermes/cache/scratch/lane-c1a/acc/*.log`.
 | M6#2 | Wacom pressure test | With the Pen, a light stroke is thin and a heavy one thick, varying smoothly within one stroke. | MANUAL | **MANUAL** | Wacom pen hardware / touch screen (Windows Ink) |
 | M6#3 | Wacom pressure test | A fast scribble has no gaps or corners. | MANUAL | **MANUAL** | Wacom pen hardware / touch screen (Windows Ink) |
 | M6#4 | Wacom pressure test | The Highlighter is flat and translucent. | MANUAL | **MANUAL** | Wacom pen hardware / touch screen (Windows Ink) |
-| M6#5 | Wacom pressure test | Turning the pen over (eraser end) erases the strokes it crosses, whatever tool is selected. | MANUAL | **MANUAL** | Wacom pen hardware / touch screen (Windows Ink) |
+| M6#5 | Wacom pressure test | Turning the pen over (eraser end) erases the strokes it crosses, whatever tool is selected. | MANUAL | **MANUAL** | Wacom pen hardware / touch screen (Windows Ink) — mouse proxy: the Eraser tool erased both strokes it crossed (ink.svg 2->0 paths) |
 | M6#6 | Wacom pressure test | The barrel button never draws. | MANUAL | **MANUAL** | Wacom pen hardware / touch screen (Windows Ink) |
 | M6#7 | Wacom pressure test | A mouse stroke draws with a simulated taper. | MANUAL | **MANUAL** | visual (taper look); mouse stroke saved with constant pressure 0.5 per point (data-points '644.5,294.71,0.5 …'), the taper is a rendering effect to judge by eye |
 | M6#8 | Wacom pressure test | Resting the palm on a touch screen while drawing adds nothing. | MANUAL | **MANUAL** | Wacom pen hardware / touch screen (Windows Ink) |
@@ -91,25 +103,25 @@ Logs: `~/.hermes/cache/scratch/lane-c1a/acc/*.log`.
 | M6#10 | Wacom pressure test | The ink is still there after closing and reopening the app. | AUTO | **PASS** | Pen stroke saved to Whiteboards/Untitled.ink.svg (<path id=s-… data-tool=pen data-color=gray data-width=4>); after a full page reload the board renders 1 ink path ([data-stroke-id]) |
 | M6#11 | Wacom pressure test | `Whiteboards/<title>.ink.svg` opened in Edge or Chrome shows the same strokes. | AUTO | **PASS** | file://…/Whiteboards/Untitled.ink.svg opened in Chromium: root <svg>, 1 <path>, bbox 590x118 (the stroke drawn on the board); m6_acceptance.py §4 [ok] SVG parses, viewBox, one <path> per stroke with pressures |
 | M6#12 | Wacom pressure test | Note any lag between pen and line. | MANUAL | **MANUAL** | Wacom pen hardware / touch screen (Windows Ink) |
-| M6#13 | Files | Opening his existing space changes nothing (`git status` clean). | MANUAL | **MANUAL** | his existing space (real data) |
+| M6#13 | Files | Opening his existing space changes nothing (`git status` clean). | MANUAL | **MANUAL** | his existing space (real data) — fixture proxy: m6_acceptance.py §1/§12 [ok] 6 boards read twice, 0 files changed; M1 no-edit pass 0 files changed |
 | M6#14 | Files | A new board is at most three files, side by side in `Whiteboards/`. | AUTO | **PASS** | New board = Whiteboards/Untitled.md only; first edit added Untitled.whiteboard.json, first stroke Untitled.ink.svg — three files side by side in Whiteboards/ |
-| M6#15 | Files | A `git diff` after moving one shape shows only that node's `position` lines in the `.whiteboard.json`. | AUTO | **NOT-RUN** |  |
-| M6#16 | Files | Delete a board and restore it from the Trash: all three files come back. Rename a board: all three files follow. | AUTO | **NOT-RUN** |  |
-| M6#17 | Files | Edit a board's `.whiteboard.json` in VS Code while it is open: the board reloads ("Changed elsewhere. Reloaded."). | AUTO | **NOT-RUN** |  |
-| M6#18 | Files | Two windows editing different nodes of one board at once both keep their changes (merge). | AUTO | **NOT-RUN** |  |
+| M6#15 | Files | A `git diff` after moving one shape shows only that node's `position` lines in the `.whiteboard.json`. | AUTO | **PASS** | Dragging the heart shape: .whiteboard.json diff = only that node's position x 750->810, y 510->540 (the .md got only its lastUpdated stamp, see M6#45) |
+| M6#16 | Files | Delete a board and restore it from the Trash: all three files come back. Rename a board: all three files follow. | AUTO | **PASS** | m6_acceptance.py (space-whiteboard, rerun on this branch) §7 [ok] rename moves .md + sidecars byte-identical; §9 [ok] delete takes all three out, restore brings them back byte-identical, title taken -> '(2)' with three files together; §10 purge removes the sidecar folder. Not re-driven through the Trash UI |
+| M6#17 | Files | Edit a board's `.whiteboard.json` in VS Code while it is open: the board reloads ("Changed elsewhere. Reloaded."). | AUTO | **PARTIAL** | External rewrite of Untitled.whiteboard.json (block text -> 'boardword changed outside', then '... 2') while the board was open: the canvas reloaded and showed the new text both times; the 'Changed elsewhere. Reloaded.' notice was never found in the DOM (polled ~5 s) — check by eye |
+| M6#18 | Files | Two windows editing different nodes of one board at once both keep their changes (merge). | AUTO | **PARTIAL** | Two-window merge not driven (one headless window); frontend/src/whiteboard/merge.test.ts passes (vitest: 9 tests incl. camera.test.ts) and backend api_merge announces whiteboard merges; needs Gene's two-window check |
 | M6#19 | In the app | Create a board from "+ New". | AUTO | **PASS** | '+ New' > Whiteboard created Whiteboards/Untitled.md and opened the board (toolbox 'Whiteboard tools', 100% zoom, 'Add a block or object to get started.') |
-| M6#20 | In the app | Every tool. | AUTO | **NOT-RUN** |  |
-| M6#21 | In the app | Every shape and gate, with Engineering mode on. | AUTO | **PASS** | Placed all 9 picker shapes (json shapes rectangle, ellipse, diamond, parallelogram, triangle, star, bubble, blockArrow, heart); Canvas display > Engineering mode on (ui.json whiteboard.isEngineeringMode=true) adds Gates/Choose gate with AND, OR, NOT, NAND, NOR, XOR, XNOR, HIGH, LOW; each placed as a labelled rectangle (shape rectangle + label block) |
-| M6#22 | In the app | Text editing and alignment. | AUTO | **NOT-RUN** |  |
-| M6#23 | In the app | An object dragged from Pinned, one dragged from the search palette, and one picked with "Existing object", each opened in the peek by double-click. | AUTO | **NOT-RUN** |  |
-| M6#24 | In the app | Connectors in all styles, with labels. | AUTO | **NOT-RUN** |  |
-| M6#25 | In the app | Frames: wrap, title, drag with contents. | AUTO | **NOT-RUN** |  |
-| M6#26 | In the app | Align, order, flip, duplicate, delete. | AUTO | **NOT-RUN** |  |
-| M6#27 | In the app | Lock. | AUTO | **NOT-RUN** |  |
-| M6#28 | In the app | Every Canvas display switch. | AUTO | **NOT-RUN** |  |
-| M6#29 | In the app | The zoom menu and the zoom keys. | AUTO | **NOT-RUN** |  |
-| M6#30 | In the app | Undo and redo across nodes and ink. | AUTO | **NOT-RUN** |  |
-| M6#31 | In the app | Boards in backlinks and search: an object embedded on a board lists the board in its references, and a word typed in a board text block finds the board in Ctrl+ | AUTO | **NOT-RUN** |  |
+| M6#20 | In the app | Every tool. | AUTO | **PARTIAL** | Exercised: Move, Hand (H), Text, Existing object, Shapes (9), Gates (Engineering mode), Frame (via Wrap in new frame), Pen, Highlighter, Eraser (erased the 2 strokes it crossed: svg 2->0 paths), Undo/Redo. Not exercised: New object, Media (Image/PDF/Audio/File/Web link), Select ink, Lock whiteboard, Play |
+| M6#21 | In the app | Every shape and gate, with Engineering mode on. | AUTO | **PASS** | Placed all 9 picker shapes (json shapes rectangle, ellipse, diamond, parallelogram, triangle, star, bubble, blockArrow, heart); Canvas display > Engineering mode on (ui.json whiteboard.isEngineeringMode=true) adds Gates/Choose gate with AND, OR, NOT, NAND, NOR, XOR, XNOR, HIGH, LOW; each placed as a labelled rectangle (shape rectangle + label block) (harness note: of 9 gate clicks the board got AND, OR, NOR, XOR, XNOR x2, HIGH, LOW — NOT/NAND landed as XNOR/missing because the menu items share 2-letter prefixes in innerText; the menu itself lists all 9) |
+| M6#22 | In the app | Text editing and alignment. | AUTO | **PASS** | Double-click the text block + typing -> markdown 'boardword lane c1a edited'; selection toolbar Text alignment > Align text center -> block gets align: center (menu Align text left/center/right) |
+| M6#23 | In the app | An object dragged from Pinned, one dragged from the search palette, and one picked with "Existing object", each opened in the peek by double-click. | AUTO | **PARTIAL** | 'Existing object' + click on the canvas opened the picker (2026-10-23, Ada Lovelace, Alpha Page, Alpha Server, …); picking Alpha (Server) placed an entity block ([[Servers/Alpha]]); double-click on it opened 'Object preview' peek of Alpha. Drags from Pinned and from the search palette not run (HTML5 drag-and-drop is not drivable via CDP mouse events here) |
+| M6#24 | In the app | Connectors in all styles, with labels. | AUTO | **PARTIAL** | Shift+L drag on the canvas created a connector edge {markerEnd: 'arrow'} between two point nodes; drawing from a shape's handle to another shape did not connect headless (overlapping source/target handles), so connector styles and labels were not exercised |
+| M6#25 | In the app | Frames: wrap, title, drag with contents. | AUTO | **PARTIAL** | Selection toolbar 'Wrap in new frame' on the bubble -> frame node 'Frame 1' (150x150) around it; dragging the frame by its top edge moved frame (30,480)->(120,540) and the bubble (60,510)->(150,570) with it. Frame title edit not run |
+| M6#26 | In the app | Align, order, flip, duplicate, delete. | AUTO | **PARTIAL** | Selection toolbar = Color, Fill, Text alignment, Flip, Order, Duplicate, Wrap in new frame, Lock, Delete. Flip vertical -> flipY: true; Order > Bring to front -> z 20 (max); Duplicate 20->21 nodes; Delete removed the heart node. Align (multi-selection) not reached: Shift/Ctrl-click and Shift-marquee selected only one node headless |
+| M6#27 | In the app | Lock. | AUTO | **PASS** | Selection toolbar Lock -> node gets locked: true; dragging it afterwards leaves position unchanged (120,570). The 'Lock whiteboard' toolbox button not tried |
+| M6#28 | In the app | Every Canvas display switch. | AUTO | **PASS** | Canvas display menu: Snap to grid, Snap to nodes, Show dots, Zoom with scroll wheel, Engineering mode; each toggle written to .object/ui.json whiteboard (isSnappingToGrid/isSnappingToNodes/isShowingDots/isZoomingOnScroll false, isEngineeringMode true); Show dots off removes the background dot pattern |
+| M6#29 | In the app | The zoom menu and the zoom keys. | AUTO | **PASS** | Zoom menu: Zoom in Ctrl+Plus, Zoom out Ctrl+Minus, Zoom to fit Shift+1, Zoom to selection Shift+2, Zoom to 100% Ctrl+0, then 5,10,20,33,50,75,100,125,160,200,300%; picking 50% set 50%; keys Ctrl+= 50->75, Ctrl+- ->50->33, Ctrl+0 ->100, Shift+1 fit ->65% |
+| M6#30 | In the app | Undo and redo across nodes and ink. | AUTO | **PARTIAL** | Node history: after a rect placement Undo removed it and Redo restored it (22->21->22 nodes); a text edit undid back to the old text and redid; ink: Undo/Redo of single strokes (M6#9). An interleaved stroke+node sequence was not confirmed (the test stroke did not land) |
+| M6#31 | In the app | Boards in backlinks and search: an object embedded on a board lists the board in its references, and a word typed in a board text block finds the board in Ctrl+ | AUTO | **PASS** | After placing Alpha (Server) on the board, /api/references?path=Servers/Alpha.md backlinks = Projects/Object app.md, Whiteboards/Untitled.md; Ctrl+K 'boardword' lists 'Untitled \| Whiteboard \| boardword lane c1a edited …' |
 | M6#32 | Against the behaviour catalog  | The toolbox position and contents. | MANUAL | **MANUAL** | visual comparison against the behaviour catalog (judge by eye) |
 | M6#33 | Against the behaviour catalog  | The zoom control. | MANUAL | **MANUAL** | visual comparison against the behaviour catalog (judge by eye) |
 | M6#34 | Against the behaviour catalog  | The selection toolbar. | MANUAL | **MANUAL** | visual comparison against the behaviour catalog (judge by eye) |
@@ -121,14 +133,14 @@ Logs: `~/.hermes/cache/scratch/lane-c1a/acc/*.log`.
 | M6#40 | Against the behaviour catalog  | The entity node's caption and card. | MANUAL | **MANUAL** | visual comparison against the behaviour catalog (judge by eye) |
 | M6#41 | Against the behaviour catalog  | The first "zoom to fit" against the title overlay (see above). | MANUAL | **MANUAL** | visual comparison against the behaviour catalog (judge by eye) |
 | M6#42 | Decisions made without a refer | The shortcut keys follow the whiteboard part of the Shortcuts sheet: V, H, T, L, Shift+L (arrow), R, O, P (triangle), F, ] and [ (front and back), Ctrl+] and Ct | AUTO | **PASS** | With focus on the board canvas: H->Hand, T->Text, L/Shift+L/R/O/P->Shapes (armed shape kinds), F->Frame, D->Pen (Width 4), Shift+D->Highlighter (Width 16), E->Eraser, V->Move; Ctrl+= 50->75%, Ctrl+- ->50->33%, Ctrl+0 ->100%, Shift+1 (fit) ->65%. Not run: ]/[ order keys, Ctrl+G, Ctrl+Arrow resize, nudge sizes (see M6#25/#26) |
-| M6#43 | Decisions made without a refer | Frames dragging their contents. | AUTO | **NOT-RUN** |  |
+| M6#43 | Decisions made without a refer | Frames dragging their contents. | AUTO | **PASS** | Same as M6#25: dragging Frame 1 moved its contained bubble by the same +90,+60 |
 | M6#44 | Decisions made without a refer | 9 of the 12 shapes in the picker. | AUTO | **PASS** | Choose shape lists Line, Arrow + 9 shapes: Rectangle, Ellipse, Diamond, Parallelogram, Triangle, Star, Bubble, Arrow right, Heart |
 | M6#45 | Decisions made without a refer | Board edits don't bump `lastUpdated`. | AUTO | **SUPERSEDED** | Decision reversed by commit 806934c 'feat(whiteboard): board edits bump lastUpdated' (whiteboardstore.py: only that line, at most once a minute, no snapshot). Observed: Untitled.md diff = lastUpdated only, 04:38:11 -> 04:39:11 -> 04:40:12 across a minute of edits |
-| M6#46 | Decisions made without a refer | The camera is per viewer. | AUTO | **NOT-RUN** |  |
-| M6#47 | Decisions made without a refer | "Clear Whiteboard" also clears the ink. | AUTO | **NOT-RUN** |  |
-| M6#48 | Decisions made without a refer | Change type is refused for boards. | AUTO | **NOT-RUN** |  |
-| M6#49 | Decisions made without a refer | Ink colours and widths. | AUTO | **NOT-RUN** |  |
+| M6#46 | Decisions made without a refer | The camera is per viewer. | AUTO | **PASS** | Camera is not persisted to the board: .whiteboard.json keys = version, nodes, edges, blocks; ui.json whiteboard holds only display switches; zoom/pan differs per viewer |
+| M6#47 | Decisions made without a refer | "Clear Whiteboard" also clears the ink. | AUTO | **PASS** | More options > Clear Whiteboard -> confirm 'Clear this whiteboard? Everything on the canvas, objects and connectors, will be removed. Undo brings it back.' -> nodes 24->0 and ink.svg paths 1->0 |
+| M6#48 | Decisions made without a refer | Change type is refused for boards. | AUTO | **PARTIAL** | Board page menus offer no Change type (More options = Export as PNG, Version History, Clear Whiteboard, Delete); the refusal path itself (API/other entry points) not exercised |
+| M6#49 | Decisions made without a refer | Ink colours and widths. | AUTO | **PASS** | Pen armed: Ink color = 18 colours (Gray, Rose, Pink, Fuchsia, Purple, Violet, Indigo, Blue, Light blue, Cyan, Teal, Emerald, Green, Lime, Yellow, Amber, Orange, Red); Width 2/4/8 (pen default 4), highlighter default 16, saved as data-color/data-width on the path |
 | M6#50 | Decisions made without a refer | A placed text block opens for typing at once. | AUTO | **PASS** | Text tool + click on the canvas: focus lands in the new block's ProseMirror at once; typed 'boardword lane c1a' -> .whiteboard.json block node 390x60 with blocks[...].markdown = 'boardword lane c1a' |
-| M6#51 | Decisions made without a refer | Dragging a search result closes the palette. | AUTO | **NOT-RUN** |  |
+| M6#51 | Decisions made without a refer | Dragging a search result closes the palette. | AUTO | **NOT-RUN** | Needs an HTML5 drag from a palette result onto the board; CDP mouse events don't drive HTML5 drag-and-drop in this harness |
 | M6#52 | Decisions made without a refer | Whiteboard is offered in "+ New" before the space has the type. | AUTO | **PASS** | space-sample has no whiteboard type: sidebar New menu lists DailyNote, Page, Person, Project, Server, Tag, Task, Whiteboard; picking it wrote .object/types/whiteboard.json (+ the other inferred types materialized as files) and Whiteboards/Untitled.md |
 | M6#53 | Decisions made without a refer | The Task 7, 9, 10, 11 and 12 choices and strings listed above. | MANUAL | **MANUAL** | decision review of Task 7/9/10/11/12 choices and strings |
