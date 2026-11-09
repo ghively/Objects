@@ -35,7 +35,7 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 ## 1. Settings
 
 A two-pane modal: left nav with a "Search settings" field, right pane for the chosen page. Groups:
-Account, General, Space, Integrations. Footer of the nav: version, Diagnostics, Reload.
+Account, General, Space, Integrations. Footer of the nav: version, Reload (Object has no Diagnostics row).
 
 **Account** **(out of scope)**: account, password and authentication, active sessions, subscription and billing.
 Object has no accounts.
@@ -254,6 +254,10 @@ Each starter template pre-fills the new type's properties.
 - **Slash menu**, **@ picker**, **markdown shortcuts**: see audit items 41-43 and section 2.
 - **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).
 - **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves.
+- **Edited lines are written in the editor's standard Markdown form**: the line of a block you edit is rewritten
+  that way (`_b_` becomes `*b*`, `[X]` becomes `[x]`, a setext heading becomes ATX `#`, a bare URL becomes
+  `[url](url)`, `\#` escapes appear); it renders the same, and only that line changes in the file — every untouched
+  line keeps its bytes (Gene's decision D5).
 
 ## 7. Graph, Trash, Explore, Help
 
