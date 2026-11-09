@@ -136,7 +136,7 @@ Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down
 page up/down.
 
 **Navigation**: Navigate back Ctrl+Left or Ctrl+[ | Navigate forward Ctrl+Right or Ctrl+] | Open in new tab Ctrl+Click | Open in
-side panel (Shift+Click) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y (not in Object).
+side panel (Shift+Click; inline `[[links]]` too) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y (not in Object).
 
 **Calendar**: Go to monthly view M | Go to weekly view W | Show the day before and after R (decision C9) | Go to daily view D | Jump to today T | Back / forward one day, week or month
 Left/Right | Toggle calendar sidebar Ctrl+Alt+S.
