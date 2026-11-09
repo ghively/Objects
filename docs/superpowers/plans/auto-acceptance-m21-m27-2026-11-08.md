@@ -21,7 +21,7 @@ against a scratch server. **No box in Gene's `mN-acceptance.md` files was ticked
   36 `[ok]` RESULT: PASS; m22 44 ok PASS; m23 40 ok PASS; m24 72 ok PASS; m25 37 ok "All checks passed"; m26 13 ok
   PASS; m27 21 ok PASS. Zero `[FAIL]` lines.
 
-**Result:** 83 boxes: PASS 56, NOT-RUN 15, PARTIAL 5, MANUAL 3, DEFERRED-live-CLI 2, SUPERSEDED 1, FAIL 1.
+**Result:** 83 boxes: PASS 63, NOT-RUN 7, PARTIAL 6, MANUAL 3, DEFERRED-live-CLI 2, SUPERSEDED 1, FAIL 1.
 
 Result key: PASS / FAIL / PARTIAL / SUPERSEDED (the box assumes the pre-redesign layout; the feature was checked at
 its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) / DEFERRED-live-CLI / NOT-RUN.
@@ -131,10 +131,10 @@ its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
 | M27-1 | Run the acceptance script, then a real trial on a copy of a work export: mark the trial in the wizard, see the accuracy in the report. | NOT-RUN | (not reached) |
-| M27-2 | Apply a proposal in the wizard: the types and properties look right; a group under 10 documents is not made. | NOT-RUN | (not reached) |
-| M27-3 | A flagged file is imported excluded from AI and is not in the trial. | NOT-RUN | (not reached) |
-| M27-4 | Low-confidence pages land in the Import inbox collection. | NOT-RUN | (not reached) |
-| M27-5 | An outside agent (Claude Desktop) reads the `migrate_a_source` prompt and calls `import_scan`, `save_import_proposal`. | NOT-RUN | (not reached) |
+| M27-2 | Apply a proposal in the wizard: the types and properties look right; a group under 10 documents is not made. | **PASS** | Wizard Apply on the MCP-saved proposal (batch 01M6ZBFV…): review g1 edited (Playbook->Runbook, drop owner), g2 Memo accepted, g3 extend turned down, g4 use accepted -> "1 type created, 0 types extended."; GET /api/space: new type runbook "Runbook/Runbooks" with only environment label (options Prod, Dev; Rare <30% dropped); Memo (3 documents) not made: applied.skipped "A new type needs at least 10 documents (3 here)…" |
+| M27-3 | A flagged file is imported excluded from AI and is not in the trial. | **PASS** | Secrets.md (scan-flagged, left on "Import, excluded from AI") written with excludeFromAI: true; trial list 50 rows (Notes, Runbook 00-48) without Secrets; fake claude log has no "Object: …Secrets" line; file untouched by filing (type Page, no values) |
+| M27-4 | Low-confidence pages land in the Import inbox collection. | **PASS** | Trial decisions with confidence low (Runbook 01, 07, Notes) -> front matter collections: [Import inbox], type left Page; high ones moved to Runbooks/ with environment: Prod (scripted half: m27_acceptance.py "low confidence goes to the Import inbox" [ok]) |
+| M27-5 | An outside agent (Claude Desktop) reads the `migrate_a_source` prompt and calls `import_scan`, `save_import_proposal`. | **PARTIAL** | No Claude Desktop here; scripted MCP stdio client (objectapp-mcp, read-write token) on :8809: list_prompts -> ["migrate_a_source"] (5801-char skill text, stages and gates), import_scan -> draft batch + findings by kind/line (no values), save_import_proposal -> revision + checks (Rare dropped <30%, Memo 3 docs problem); a bad kind is refused 422. Real Desktop run stays MANUAL |
 | M27-6 | Normalise merges "Prod / prod / Production" tags. | NOT-RUN | (not reached) |
 
 ### M27UI (`m27-ui-acceptance.md`, 9 boxes)
@@ -142,11 +142,11 @@ its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
 | M27UI-1 | Preview a source: the scan step comes before the mapping step; Back returns to the source. | NOT-RUN | (not reached) |
-| M27UI-2 | A flagged file set to "Leave out" is not imported; one left as "Import, excluded from AI" is written with `excludeFromAI`. | NOT-RUN | (not reached) |
-| M27UI-3 | Finish an import into this space: "Review proposed schema" shows each group as use / extend / create with counts, examples, fill rates, options and m… | NOT-RUN | (not reached) |
+| M27UI-2 | A flagged file set to "Leave out" is not imported; one left as "Import, excluded from AI" is written with `excludeFromAI`. | **PASS** | Wizard scan step (63 scanned, 2 flagged): "Runbooks/Deploy keys.md" set to Leave out -> not in Pages/, report "left out, not read or imported", 0 sk_live hits; "Runbooks/Secrets.md" left on "Import, excluded from AI" -> Pages/Secrets.md front matter excludeFromAI: true (counts 64 source: 62 imported, 2 left out) |
+| M27UI-3 | Finish an import into this space: "Review proposed schema" shows each group as use / extend / create with counts, examples, fill rates, options and m… | **PASS** | Re-seen on a real wizard import (60 runbooks, MCP-saved proposal): CREATE TYPE Playbook 60 documents / CREATE TYPE Memo 3 / EXTEND EXISTING TYPE Page 12 / USE EXISTING TYPE Page 1, each with Examples, "Environment label · 100% have a value", "Options: Prod, Dev", "Prod, prod, Production merged into Prod". Note: problems (Memo <10 docs) and dropped properties (Rare) are not shown in the step |
 | M27UI-4 | Apply stays disabled until every item is accepted, edited or turned down; reloading the dialog restores the decisions. | NOT-RUN | (not reached) |
-| M27UI-5 | Edit renames a type and drops a property; Apply creates only what was accepted. | NOT-RUN | (not reached) |
-| M27UI-6 | Trial shows 50 objects with each value and its quote; Right/Wrong marks stick and the accuracy line updates. | NOT-RUN | (not reached) |
+| M27UI-5 | Edit renames a type and drops a property; Apply creates only what was accepted. | **PASS** | Edit on Playbook: Name Runbook, Plural Runbooks, untick "Keep Owner" -> status Edited, review saved {name:Runbook, plural:Runbooks, dropProperties:[owner]}; Apply -> type runbook "Runbook" with environment only; turned-down extend and <10-doc Memo not made (applied.created ["runbook"], skipped g2, g3) |
+| M27UI-6 | Trial shows 50 objects with each value and its quote; Right/Wrong marks stick and the accuracy line updates. | **PASS** | Start trial -> "Trial on the first 50 objects": 50 rows (Right:/Wrong: buttons), each with type, confidence and "environment: Prod / Quote: Environment: Production"; refused value shown "environment: Dev(Did not pass the check)"; Right x3 + Wrong x1 -> "3 of 4 marked right (75%)", aria-pressed true on the marked buttons, GET filing verdicts right/right/right/wrong, rightShare 0.75 |
 | M27UI-7 | "Continue with the rest" starts the bulk pass only then. | NOT-RUN | (not reached) |
 | M27UI-8 | Normalise lists near-duplicate tags and options; merging changes them everywhere. | NOT-RUN | (not reached) |
 | M27UI-9 | The last step shows the Import inbox count and "Open Import inbox" opens that collection. | NOT-RUN | (not reached) |
