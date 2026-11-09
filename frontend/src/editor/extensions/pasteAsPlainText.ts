@@ -29,14 +29,14 @@ export function pastePlainText(view: EditorView, text: string): boolean {
   if (selection.$from.parent.type.spec.code) {
     const code = text.replace(/\r\n?/g, '\n')
     if (!code) return false
-    view.dispatch(view.state.tr.insertText(code).scrollIntoView().setMeta('paste', true).setMeta('uiEvent', 'paste'))
+    view.dispatch(view.state.tr.insertText(code).scrollIntoView().setMeta('paste', true))
     return true
   }
   const lines = text.split(/(?:\r\n?|\n)+/).filter((line) => line.length > 0)
   if (lines.length === 0) return false
   const paragraphs = lines.map((line) => schema.nodes.paragraph.create(null, schema.text(line)))
   const slice = new Slice(Fragment.from(paragraphs), 1, 1)
-  view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView().setMeta('paste', true).setMeta('uiEvent', 'paste'))
+  view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView().setMeta('paste', true))
   return true
 }
 

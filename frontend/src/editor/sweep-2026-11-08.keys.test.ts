@@ -161,6 +161,14 @@ describe('Paste as plain text (Ctrl+Shift+V)', () => {
     expect(serializeBody(editor)).toBe('| A | B |\n| --- | --- |\n| c1x<br>y | c2 |\n')
   })
 
+  test('a URL in the plain text stays text (no autolink)', () => {
+    const editor = headless('P\n')
+    cursorAtEndOf(editor, 'P')
+    armPlainPaste()
+    paste(editor, { text: 'see https://example.com/x now' })
+    expect(serializeBody(editor)).toBe('Psee https://example.com/x now\n')
+  })
+
   test('a plain Ctrl+V afterwards pastes normally again (the HTML is used)', () => {
     const editor = headless('P\n')
     cursorAtEndOf(editor, 'P')
