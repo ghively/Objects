@@ -33,7 +33,7 @@ The boxes in those files are **not** ticked; this report is the evidence.
 
 ## Counts
 
-67 boxes: MANUAL 1, NOT-RUN 35, PARTIAL 2, PASS 28, SUPERSEDED 1
+67 boxes: DEFERRED-live-CLI 1, MANUAL 1, NOT-RUN 21, PARTIAL 3, PASS 40, SUPERSEDED 1
 
 
 ## M15 (m15-acceptance.md)
@@ -84,20 +84,20 @@ The boxes in those files are **not** ticked; this report is the evidence.
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M18.1 | Tell Assistant something about yourself and ask it to remember it. The step "Saved a memory about you" shows; the Memory tab's "About you… | **NOT-RUN** | not reached |
-| M18.2 | Start a new chat: it knows the fact. In the old chat it says it was saved for next time. | **NOT-RUN** | not reached |
-| M18.3 | After about ten messages a small "Learning…" line shows under a reply, then a summary like "Saved 1 memory, updated 1 skill". You can typ… | **NOT-RUN** | not reached |
-| M18.4 | Your chat goes on normally after a review: the next reply follows on from your last message and shows nothing of the review. | **NOT-RUN** | not reached |
-| M18.5 | "Learn from this chat" in the chat's `…` menu runs a review on demand. | **NOT-RUN** | not reached |
-| M18.6 | Ask the agent to make a skill for a task you repeat. The Skills tab lists it as Active, made by Agent, with its use count and last use. O… | **NOT-RUN** | not reached |
-| M18.7 | Undo a change in a skill's History: the skill goes back. Undo the undo: it comes back. | **NOT-RUN** | not reached |
-| M18.8 | Archive a skill, turn on "Show archived", Restore it. Pin a skill. | **NOT-RUN** | not reached |
-| M18.9 | "Tidy up now" merges two overlapping skills you made the agent write, archives the absorbed one ("Absorbed into …") and shows a short rep… | **NOT-RUN** | not reached |
-| M18.10 | The Learning tab's numbers save; setting "Review memory every" to 0 stops memory reviews. | **NOT-RUN** | not reached |
-| M18.11 | The Chats tab's search finds a chat by a word from its middle, with the word in bold in a snippet. | **NOT-RUN** | not reached |
-| M18.12 | Ask the agent what it remembers about an earlier chat: it uses "Searched past chats". | **NOT-RUN** | not reached |
-| M18.13 | Ask the agent to read an "Exclude from AI" page and to remember what it says: it can't read it, so nothing about it is saved. | **NOT-RUN** | not reached |
-| M18.14 | "Memory & skills" in an agent's `…` menu opens its Memory tab. | **NOT-RUN** | not reached |
+| M18.1 | Tell Assistant something about yourself and ask it to remember it. The step "Saved a memory about you" shows; the Memory tab's "About you… | **PASS** | Assistant chat turn calling memory add(user) -> step 'Saved a memory about you' (result chars 21, cap 1375); Assistant's Memory tab 'About you: Prefers short answers — 21 / 1,375 characters' with History 'Saved a memory about you … by the agent / Undo'. Live: lane A check 5. Note: after the redesign the Assistant's own agent page (Memory/Skills/Learning tabs) has no sidebar entry — it was reached only by clicking a Learning summary line. |
+| M18.2 | Start a new chat: it knows the fact. In the old chat it says it was saved for next time. | **PARTIAL** | A new chat's run carries the snapshot (--append-system-prompt has <user-profile>…Prefers short answers</user-profile> and <memory>Rack A is in room 2</memory>); the old chat's next turn does not (frozen snapshot). 'It says it was saved for next time' is the live model's wording = DEFERRED-live-CLI. |
+| M18.3 | After about ten messages a small "Learning…" line shows under a reply, then a summary like "Saved 1 memory, updated 1 skill". You can typ… | **PASS** | New chat, 10 fake turns: 'Learning…' line appeared after message 10; composer stayed enabled and a message typed while the review ran got its reply; then 'Saved 1 memory' (review sleep 5 s via the fake). Clicking a summary opens the change (memory -> Memory tab; memory+skill -> Skills tab). |
+| M18.4 | Your chat goes on normally after a review: the next reply follows on from your last message and shows nothing of the review. | **PASS** | Review run used --resume <chat session> --fork-session --no-session-persistence; the next turn resumed the chat's own session id (3fd5eb6a…, fork false) and the panel showed only the user's turns and replies plus the one-line summary. |
+| M18.5 | "Learn from this chat" in the chat's `…` menu runs a review on demand. | **PASS** | Chat '…' menu has 'Learn from this chat'; it ran a review on demand -> 'Saved 1 memory, updated 1 skill' (memory 'Rack A is in room 2' + patch of rack-labels). |
+| M18.6 | Ask the agent to make a skill for a task you repeat. The Skills tab lists it as Active, made by Agent, with its use count and last use. O… | **PASS** | Chat turn skill_manage create -> step "Created the skill 'rack-labels'"; Skills tab row 'rack-labels · How to label racks · Active · uses 1 · 11/8/2026 10:34 PM · Agent'. BUG FOUND+FIXED (fix(accept-m18.6)): editing SKILL.md in the skill page rewrote its frontmatter as '---\n## name: rack-labels description: … created\_by: agent' (skill lost name/description). After the fix the frontmatter shows above the editor and is saved unchanged; edit appended 'Use the label maker.'; ledger/History gained "Rewrote 'rack-labels' … by you" (the History list only shows it after reopening, not live). |
+| M18.7 | Undo a change in a skill's History: the skill goes back. Undo the undo: it comes back. | **PASS** | Edited rack-labels ('Check twice.'): History showed "Rewrote … by you" at once (after fix 908c9d0 — before it, the list kept old rows and Undo answered 'This changed again since. Undo the later change first.'); Undo -> file lost the line, row "Undid: Rewrote 'rack-labels' … by Undo"; Undo of that -> file byte-identical to the edited version, row "Undid: Undid: …". |
+| M18.8 | Archive a skill, turn on "Show archived", Restore it. Pin a skill. | **PASS** | Archive -> detail shows Restore, skill leaves the list; 'Show archived' switch -> row 'rack-labels … Archived'; Restore -> Active again; Pin -> button flips to Unpin and the Pinned column marks it. BUG FOUND+FIXED 6b4d08b: with Show archived on every active skill was listed twice (the archived=true route answer includes active skills). |
+| M18.9 | "Tidy up now" merges two overlapping skills you made the agent write, archives the absorbed one ("Absorbed into …") and shows a short rep… | **PASS** | Agent made broad-skill + narrow-skill (chat skill_manage create); 'Tidy up now' with the fake curator archiving narrow-skill into broad-skill -> list drops narrow-skill, 'Last tidy-up, 11/8/2026 10:41:52 PM' + the run's report text (fake: 'Hello from the fake claude.'); archived narrow-skill shows 'Absorbed into broad-skill' and History "Archived 'narrow-skill' into 'broad-skill'". Merge quality with a real model = live CLI (not run). |
+| M18.10 | The Learning tab's numbers save; setting "Review memory every" to 0 stops memory reviews. | **PASS** | Learning tab: set 'Review memory every' 0 and 'Review skills every' 15 -> agent learning saved {memoryReviewEvery: 0, skillReviewEvery: 15} and shown after reload; then 11 turns in a new chat ran 0 review runs (no --fork-session run) and no Learning line. |
+| M18.11 | The Chats tab's search finds a chat by a word from its middle, with the word in bold in a snippet. | **PASS** | Assistant Chats tab 'Search chats' = 'about' finds 'Quiet turn 1' by its 12th message ('What did we say about racks before?') and the 'Message 1 about racks' chat, snippets with <strong>about</strong>. |
+| M18.12 | Ask the agent what it remembers about an earlier chat: it uses "Searched past chats". | **PASS** | Fake turn calling session_search -> step "Searched past chats for 'racks'". Whether a live model chooses the tool when asked = live CLI (lane A did not cover). |
+| M18.13 | Ask the agent to read an "Exclude from AI" page and to remember what it says: it can't read it, so nothing about it is saved. | **DEFERRED-live-CLI** | The refusal half is shown (M17.7: Read/Grep/Glob on the excluded page fail, marker absent; m18 script check 11 / fence tests). 'So nothing about it is saved' depends on what a live model does next; not run (no real CLI spend). |
+| M18.14 | "Memory & skills" in an agent's `…` menu opens its Memory tab. | **PASS** | Researcher row '…' menu > 'Memory & skills' opened the agent page on the Memory tab (tabs: Researcher\|Profile\|…\|Memory*\|…). |
 | M18.15 | Unlinked mentions still show on the object page. | **PASS** | Page 'Mention probe' with plain text 'Yesterday Ada Lovelace reviewed the plan.' -> Ada Lovelace page tab 'Mentions 1' lists it with a 'Link' button (checked once on this build, after M17-M20 are all in). |
 
 ## M19 (m19-acceptance.md)
