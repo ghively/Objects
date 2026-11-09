@@ -99,14 +99,18 @@ The history below is in the order it was written: the per-milestone sections new
    Wacom, look and themes, real data and scale, live model wording, the file manager, decisions). Re-read the "Box
    texts that are out of date" table there before ticking. Boxes stay unticked in `mN-acceptance.md` until he does.
 2. **Your extra custom object types:** the list of types beyond the starter types now in `main` (see "Done on
-   2026-11-09") that your spaces should start with, so they can be added through the app's own code.
+   2026-11-09") that your spaces should start with, so they can be added through the app's own code. Gene,
+   2026-11-09: not a list yet. The current types "seem a little wonky"; first a deeper discussion of how objects are
+   created and which types exist.
 3. **An Anytype export** (a few objects, Markdown with files), to confirm and fix the reader's gaps (below).
 4. **A git remote address**, when you want backup off this machine (Settings > Space > Version control > Remote;
-   any https or ssh remote; the system's git credentials are used).
+   any https or ssh remote; the system's git credentials are used). Gene, 2026-11-09: later; version control stays
+   local for now.
 5. **Windows checks:** the S6 launch key in a real pywebview window (the window and the keep-on-top window open at
    `/_open`, every request carries the cookie, a `curl` without it gets 401), the run fence, reminder toasts, Wacom,
    microphone and clipboard prompts. Nothing has been gated on Windows since 2026-11-06.
-6. **Fix pass H, "For Gene"** (`lane-h2-for-gene-2026-11-08.md`); recommendation for each: keep.
+6. **Fix pass H, "For Gene"** (`lane-h2-for-gene-2026-11-08.md`): **decided 2026-11-09, Gene kept all four as
+   recommended** (closed; M9#14 still to be re-run on a type page's query tab during the hand-checks).
    - Item 5: "Pages/Alpha" from the search box makes `Pages/Pages.md` (the title is kept; the file name rule matches
      the export). Keep.
    - Item 6: Wide layout looks unchanged with the properties panel open at 1440 px (the column never reaches the
@@ -114,7 +118,8 @@ The history below is in the order it was written: the per-milestone sections new
    - Item 7: block colour from the selection bar works (a harness issue; now pinned by a test). Nothing to do.
    - Item 8: "Release type constraint" lives on a type page's query tab. Keep; re-run M9#14 there.
 7. **Credentials in the Work and Personal source spaces:** scrub them with the approved procedure (memo D2) before
-   any import, and review the 10 "possible secrets" wiki pages (`ai-pass/review.md`).
+   any import, and review the 10 "possible secrets" wiki pages (`ai-pass/review.md`). Gene, 2026-11-09: later, but
+   before any real import; no real import runs until it is done.
 
 ### Known limits
 
