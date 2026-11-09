@@ -55,6 +55,8 @@ export type Target =
   | { kind: 'agent'; id: string; tab?: string }
   /** M23: the Work section's page, on one of its views (the remembered view when absent). */
   | { kind: 'work'; view?: WorkViewId }
+  /** 2026-11-08: the space's git history (version control). */
+  | { kind: 'spaceHistory' }
 
 /**
  * What a side-panel entry shows (Task 15): a page target, M5's local graph of the tab's object,
@@ -229,6 +231,7 @@ export function sameTarget(a: SidepanelTarget | null | undefined, b: SidepanelTa
     case 'calendar':
     case 'tasks':
     case 'graph':
+    case 'spaceHistory':
       return true
   }
 }

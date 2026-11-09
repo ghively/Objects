@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useTabs } from '@/nav/tabs'
 import { useSettingsModal } from '@/settings/useSettingsModal'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { useCreateSpaceDialog } from './CreateSpaceDialog'
@@ -45,6 +46,7 @@ export const SPACES_MENU_TEXT = {
   removeConfirm: 'Object forgets this space. Its folder and files stay where they are.', // our string
   cancel: 'Cancel',
   spaceSettings: 'Space settings',
+  spaceHistory: 'Space history', // our string (2026-11-08, version control)
   addSpace: 'Create space',
   openFolder: 'Open folder…', // our string
   folderPath: 'Folder path', // our string
@@ -329,6 +331,14 @@ export function SpacesMenu({ children }: SpacesMenuProps) {
             onClick={() => {
               setOpen(false)
               useSettingsModal.getState().open('space')
+            }}
+          />
+          <FooterButton
+            icon="ph-clock-counter-clockwise"
+            label={T.spaceHistory}
+            onClick={() => {
+              setOpen(false)
+              useTabs.getState().open({ kind: 'spaceHistory' })
             }}
           />
           <FooterButton

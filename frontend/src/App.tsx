@@ -68,6 +68,7 @@ const LocalGraphPanel = lazyWithReload(() => loadLocalGraphPanel().then((m) => (
 // Warm those chunks once the shell is idle, so their first open costs no download.
 const PREFETCH = [loadGraphPage, loadLocalGraphPanel, loadCalendarPage]
 const TypeSettings = lazyWithReload(() => import('@/types/TypeSettings').then((m) => ({ default: m.TypeSettings })))
+const SpaceHistoryPage = lazyWithReload(() => import('@/vcs/SpaceHistoryPage').then((m) => ({ default: m.SpaceHistoryPage })))
 
 const REFRESH_DELAY_MS = 150
 /** Events after which the whole object list and the types are fetched again (a `changed` refreshes one summary). */
@@ -167,6 +168,13 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
     case 'work':
       // M23's Work page, now the Tasks dashboard (Gene's redesign), on its view.
       return <WorkPage view={target.view} />
+    case 'spaceHistory':
+      // 2026-11-08: the space's git history and "Restore space to this point".
+      return (
+        <Suspense fallback={null}>
+          <SpaceHistoryPage />
+        </Suspense>
+      )
   }
 }
 

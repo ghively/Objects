@@ -136,6 +136,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
       toggleRightPanel: onToggleRightPanel,
       openExtendedSearch: () => openExtendedSearch(),
       openSettings: () => useSettingsModal.getState().open(),
+      openSpaceHistory: () => onOpenTarget({ kind: 'spaceHistory' }),
       toggleFocusMode: focusModeToggle(),
       spaces,
       openSpace: (path) => {
