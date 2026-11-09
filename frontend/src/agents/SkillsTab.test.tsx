@@ -106,6 +106,21 @@ describe('SkillsTab', () => {
     await waitFor(() => expect(mocked.agentSkill).toHaveBeenLastCalledWith(RESEARCHER, 'narrow-skill', false))
   })
 
+  test('test Show archived lists each skill once', async () => {
+    // accept-m18.8: the route's archived=true answer holds the active skills too, as the server does.
+    mocked.agentSkills.mockImplementation(async (_id, archived) =>
+      archived
+        ? [skillSummary({ name: 'broad-skill' }), skillSummary({ name: 'narrow-skill', state: 'archived' })]
+        : [skillSummary({ name: 'broad-skill' })],
+    )
+    const user = userEvent.setup()
+    render(<SkillsTab agent={agent({ id: RESEARCHER })} />)
+    const table = await screen.findByRole('table', { name: T.skillsTab })
+    await user.click(screen.getByRole('switch', { name: T.showArchived }))
+    await within(table).findByText('narrow-skill')
+    expect(within(table).getAllByText('broad-skill')).toHaveLength(1)
+  })
+
   test('test Tidy up now shows Tidying up and then the report', async () => {
     const user = userEvent.setup()
     render(<SkillsTab agent={agent({ id: RESEARCHER })} />)
