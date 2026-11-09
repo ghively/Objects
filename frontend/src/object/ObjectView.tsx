@@ -82,6 +82,7 @@ import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 import { isWorkType } from '@/types/WorkFieldsSection'
 import { ResolutionNoteSection } from '@/work/ResolutionNote'
 import { WorkHeader } from '@/work/panel/WorkHeader'
+import { useSettings } from '@/settings/useSettings'
 
 // Raw mode (CodeMirror) loads when first switched to, not with the shell (audit 2026-11-01 F1).
 const RawMode = lazyWithReload(() => import('@/editor/RawMode').then((m) => ({ default: m.RawMode })))
@@ -320,6 +321,7 @@ export function ObjectView({
   const [raw, setRaw] = useState(false)
   /** The pane toggled in this view; until then the object's own `hideProperties` decides. */
   const [paneToggled, setPaneToggled] = useState<boolean | null>(null)
+  const propertiesByDefault = useSettings((s) => s.settings.showPropertiesByDefault !== false)
   const [deleted, setDeleted] = useState(false)
   /** The Trash entry of this window's own delete ("Undo Delete"). */
   const [trashId, setTrashId] = useState<string | null>(null)
@@ -945,13 +947,18 @@ export function ObjectView({
     }
     void writes.updateProperties(updates)
   }
-  // Polish item 17: the pane toggle is per object:
-  // hiding saves `hideProperties: true`, showing removes the key. Read-only: this view only.
-  const panelOpen = paneToggled ?? detail?.frontmatter.hideProperties !== true
+  // Polish item 17: the pane toggle is per object. With "Show properties by default" on (the
+  // default), hiding saves `hideProperties: true` and showing removes the key; off (2026-11-09),
+  // the pane starts hidden, showing saves `hideProperties: false` and hiding removes the key.
+  // Read-only: this view only.
+  const hideProperties = detail?.frontmatter.hideProperties
+  const panelOpen = paneToggled ?? (propertiesByDefault ? hideProperties !== true : hideProperties === false)
   const togglePanel = () => {
     const next = !panelOpen
     setPaneToggled(next)
-    if (!propsReadOnly && detail) writeProperties({ hideProperties: next ? null : true })
+    if (!propsReadOnly && detail) {
+      writeProperties({ hideProperties: propertiesByDefault ? (next ? null : true) : next ? false : null })
+    }
   }
   const onTypeChange = (next: TypeDef) => typeEditor.save(next)
   const onOpenTag = (name: string) => void openTag(name).catch(() => undefined)

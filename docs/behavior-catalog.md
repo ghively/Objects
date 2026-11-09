@@ -52,7 +52,9 @@ Object has no accounts.
   the left sidebar collapsed, "Toggle sidebar" or Ctrl+Shift+Left shows it; device setting `showSidebarOnStart`).
 - AI Assistant: "Hide AI features" switch.
 - Editor: Disable spellcheck; Spellcheck language (Experimental); Open objects as a full page (Alt+Shift click
-  opens the preview instead); Insert links inline by default; Type icons on inline links;
+  opens the preview instead); Show properties by default (ours, 2026-11-09; on by default; off: objects open with
+  the properties panel hidden, and the properties button shows it for that object by saving `hideProperties:
+  false`, hiding again removes the key); Insert links inline by default; Type icons on inline links;
   Turn off automatic numbered lists (so `1. ` at block start converts by default); How nested backlinks
   show at first (Just the linking block | Full path above); Keep type settings inside Settings only;
   Hide outliner lines; Toggle style (Toggle | Bullet); Hide App Menu; When Object

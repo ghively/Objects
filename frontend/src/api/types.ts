@@ -422,6 +422,9 @@ export interface DeviceSettings {
   hideOutlinerLines: boolean
   /** Whether the left sidebar is shown when Object opens (2026-11-09). */
   showSidebarOnStart: boolean
+  /** Whether an object opens with its properties panel shown; off: only objects saved with
+   *  `hideProperties: false` show it (2026-11-09). */
+  showPropertiesByDefault: boolean
   twentyFourHourTime: boolean
   dateFormatting: 'localized' | 'DMY' | 'MDY' | 'YMD'
   /** Keyed by space root; a missing entry means `lastOpenedPage`. */

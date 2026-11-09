@@ -33,6 +33,9 @@ export const EDITOR_TEXT = {
   fullPage: 'Open objects as a full page',
   fullPageDescription:
     'Clicking an object opens it as a full page. Images and PDFs keep opening in the preview, and you can still preview anything else by clicking with Option-Shift (Mac) or Alt-Shift (Windows) held down.',
+  propertiesByDefault: 'Show properties by default', // our string
+  propertiesByDefaultDescription:
+    'Open objects with their properties panel showing. Off: the panel starts hidden; the properties button shows it for that object.', // our string
   inlineIcons: 'Type icons on inline links',
   inlineIconsDescription: 'Put a small colored type icon before each inline link to an object.',
   outliner: 'Hide outliner lines',
@@ -112,6 +115,7 @@ export const EDITOR_SEARCH: string[] = [
   T.disableSpellcheck,
   T.spellCheckLang,
   T.fullPage,
+  T.propertiesByDefault,
   T.inlineLinks,
   T.hideType,
   T.highlightStyle,
@@ -357,6 +361,12 @@ export function EditorSection() {
         <SpellCheckLangInput value={settings.spellCheckLang ?? null} onSave={(spellCheckLang) => set({ spellCheckLang })} />
       </SettingGroup>
       <SwitchRow title={T.fullPage} help={T.fullPageDescription} checked={settings.alwaysOpenAsFullPage} onChange={(v) => set({ alwaysOpenAsFullPage: v })} />
+      <SwitchRow
+        title={T.propertiesByDefault}
+        help={T.propertiesByDefaultDescription}
+        checked={settings.showPropertiesByDefault !== false}
+        onChange={(v) => set({ showPropertiesByDefault: v })}
+      />
       <SwitchRow
         title={T.inlineLinks}
         help={T.inlineLinksDescription}

@@ -30,6 +30,7 @@ CONTRACT_DEFAULTS = {
     "hideEntityIconsOnInlineLinks": False,
     "hideOutlinerLines": False,
     "showSidebarOnStart": True,
+    "showPropertiesByDefault": True,
     "twentyFourHourTime": False,
     "dateFormatting": "localized",
     "openOnStart": {},

@@ -54,6 +54,8 @@ DEFAULTS: dict[str, Any] = {
     "hideOutlinerLines": False,
     # 2026-11-09 (Gene): whether the left sidebar is shown when Object opens.
     "showSidebarOnStart": True,
+    # 2026-11-09 (Gene): whether an object opens with its properties panel shown.
+    "showPropertiesByDefault": True,
     "twentyFourHourTime": False,
     "dateFormatting": "localized",
     "openOnStart": {},

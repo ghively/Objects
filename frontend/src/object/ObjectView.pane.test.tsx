@@ -17,6 +17,8 @@ vi.mock('@/references/ReferencesSection', () => ({ ReferencesSection: () => null
 import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
+import { settingsDefaults } from '@/settings/defaults'
+import { useSettings } from '@/settings/useSettings'
 import { ObjectView } from './ObjectView'
 
 const mocked = vi.mocked(api)
@@ -42,6 +44,7 @@ function load(frontmatter: Record<string, unknown>) {
 
 beforeEach(() => {
   localStorage.clear()
+  useSettings.setState({ settings: { ...settingsDefaults }, loaded: true })
   useTabs.getState().reset()
   usePeek.getState().close()
   resetLinkIndex()
@@ -76,6 +79,41 @@ describe('property-pane toggle (polish item 17)', () => {
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith(PATH, { hideProperties: true }, 'v1', undefined))
     await user.click(screen.getByRole('button', { name: 'Show properties' }))
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenLastCalledWith(PATH, { hideProperties: null }, expect.anything(), undefined))
+    expect(screen.getByText('Status')).toBeInTheDocument()
+  })
+})
+
+// 2026-11-09 (Gene): "Show properties by default" off opens notes with the panel hidden.
+describe('Show properties by default: off', () => {
+  beforeEach(() => {
+    useSettings.setState({ settings: { ...settingsDefaults, showPropertiesByDefault: false }, loaded: true })
+  })
+
+  test('an object opens with the pane hidden', async () => {
+    load({})
+    render(<ObjectView path={PATH} mode="peek" />)
+    await screen.findByText('Hello.')
+    expect(screen.getByRole('button', { name: 'Show properties' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByText('Status')).toBeNull()
+  })
+
+  test('showing saves hideProperties: false on that object; hiding again removes it', async () => {
+    const user = userEvent.setup()
+    load({})
+    render(<ObjectView path={PATH} mode="peek" />)
+    await screen.findByText('Hello.')
+    await user.click(screen.getByRole('button', { name: 'Show properties' }))
+    expect(screen.getByText('Status')).toBeInTheDocument()
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith(PATH, { hideProperties: false }, 'v1', undefined))
+    await user.click(screen.getByRole('button', { name: 'Hide properties' }))
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenLastCalledWith(PATH, { hideProperties: null }, expect.anything(), undefined))
+    expect(screen.queryByText('Status')).toBeNull()
+  })
+
+  test('an object saved with hideProperties: false still opens with the pane shown', async () => {
+    load({ hideProperties: false })
+    render(<ObjectView path={PATH} mode="peek" />)
+    await screen.findByText('Hello.')
     expect(screen.getByText('Status')).toBeInTheDocument()
   })
 })
