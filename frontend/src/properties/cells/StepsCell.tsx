@@ -12,6 +12,23 @@ import { StepList, type StepActionExtra } from '@/work/StepList'
 import type { CellExtras } from '../cellFor'
 import type { CellProps } from './types'
 
+const STATES = new Set(['open', 'approved', 'done', 'declined'])
+
+/**
+ * The steps as the list can show them. Until the decoded steps arrive the panel gets the raw front
+ * matter, where a step typed into the file by hand may have no `state` or `id`; read them the way
+ * the server does (open, `@n` by position) so the list renders instead of throwing.
+ */
+function asShown(value: StepValue[] | null | undefined): StepValue[] {
+  if (!Array.isArray(value)) return []
+  return value.map((s, i) => {
+    if (!s || typeof s !== 'object') return s
+    const state = STATES.has(s.state) ? s.state : 'open'
+    const id = typeof s.id === 'string' && s.id ? s.id : `@${i + 1}`
+    return state === s.state && id === s.id ? s : { ...s, state, id }
+  })
+}
+
 /** The table form of a step list ('' when it has none). */
 export function stepsSummary(steps: readonly StepValue[]): string {
   if (steps.length === 0) return ''
@@ -28,8 +45,8 @@ export function stepsFromResult(res: WorkWriteResult, key: string): StepValue[] 
 }
 
 export function StepsCell({ def, value, readOnly, density, inTable, path, onWorkWrite }: CellProps<StepValue[] | null> & CellExtras) {
-  const [shown, setShown] = useState<StepValue[]>(() => (Array.isArray(value) ? value : []))
-  useEffect(() => setShown(Array.isArray(value) ? value : []), [value])
+  const [shown, setShown] = useState<StepValue[]>(() => asShown(value))
+  useEffect(() => setShown(asShown(value)), [value])
 
   if (density === 'table' || inTable) {
     const text = stepsSummary(shown)

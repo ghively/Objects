@@ -4,17 +4,20 @@
 // views here too (`work/tasklists/registerView.ts`); Today is the day timeline with today's tasks.
 // The Task rows load once for the page (`useTaskRowsFeed`). Every
 // dashboard view is computed from `useWorkData`; the page's own state (energy, Just one thing,
-// view, the focus line) is `useWorkUi`, browser storage only.
+// view, the focus line) is `useWorkUi`, browser storage only. While the space hides task management
+// (`space.json` `hideTaskManagement`) the task lists are left out and the dashboard stays (M23's Work).
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import type { WorkBoard, WorkBoardItem, WorkViewId } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { createAndOpen } from '@/create/createAndOpen'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { zonedParts } from '@/lib/zonedTime'
 import { TASKS_TEXT } from '@/tasks/TasksPage'
 import { useTaskRows, useTaskRowsFeed } from '@/tasks/useTaskRows'
 import { useWorkKeys } from '../keys/useWorkKeys'
 import { DEFAULT_PARTS, useWorkData, useWorkEvents, type WorkDataState, type WorkPart } from '../state/useWorkData'
 import { useWorkUi } from '../state/useWorkUi'
+import { isTaskListView } from '../tasklists/registerView'
 import { workViews } from '../views/registry'
 import { BrainDumpBar, focusBrainDumpField } from './BrainDumpBar'
 import { FocusRail } from './FocusRail'
@@ -110,7 +113,9 @@ export function WorkPage({ view }: { view?: WorkViewId }): JSX.Element {
   // A new visit starts with no search.
   useEffect(() => () => clearWorkSearch(), [])
 
-  const all = workViews()
+  // Hide Task Management hides the task lists (the old Tasks page), not the work dashboard.
+  const hideTasks = useSpaceInfo((s) => s.space?.hideTaskManagement ?? false)
+  const all = hideTasks ? workViews().filter((v) => !isTaskListView(v.id)) : workViews()
   const shown = calm ? all.filter((v) => v.id === 'now') : all
   const current = shown.find((v) => v.id === (calm ? 'now' : uiView)) ?? shown[0]
   const currentId: WorkViewId = current?.id ?? 'now'

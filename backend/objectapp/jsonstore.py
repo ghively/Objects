@@ -85,8 +85,11 @@ class JsonStore:
         own_writes: dict[str, str],
         trash_ids: Callable[[], set[str]] = lambda: set(),
         lock: threading.RLock | None = None,
+        before_write: Callable[[str, bytes], None] | None = None,
     ) -> None:
         self.root = Path(root)
+        self.before_write = before_write
+        """The space's version-history hook: given a definition's bytes before each save."""
         self.folder = folder
         self.own_writes = own_writes
         self.trash_ids = trash_ids
@@ -182,6 +185,11 @@ class JsonStore:
                 raise RevisionConflict(current)
             payload = dump_json(data)
             revision = hashlib.sha256(payload).hexdigest()
+            if current and self.before_write is not None:
+                try:
+                    self.before_write(rel, path.read_bytes())
+                except OSError:
+                    pass
             path.parent.mkdir(parents=True, exist_ok=True)
             previous = self.own_writes.get(rel)
             self.own_writes[rel] = revision

@@ -537,6 +537,7 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'work', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'workQueue', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'mcpServers', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'settings', path: RESYNC_PATH, version: null, origin: null },
 ]
 
 /**
@@ -1274,7 +1275,7 @@ export const api = {
 
   /** Patch device settings. Rejects with `ConflictError` (409) on a stale `baseRevision`. */
   patchSettings(patch: Partial<DeviceSettings>, opts: { baseRevision: string }): Promise<SettingsResponse> {
-    return request<SettingsResponse>('/settings', json('PUT', { patch, baseRevision: opts.baseRevision }))
+    return request<SettingsResponse>('/settings', json('PUT', { patch, baseRevision: opts.baseRevision, clientId: CLIENT_ID }))
   },
 
   /** The spaces registry (unwrapped from `{spaces}`), in registry order. */
@@ -1291,6 +1292,14 @@ export const api = {
     const body: Record<string, unknown> = { name, location }
     if (setup !== undefined) body.setup = setup
     return request<{ path: string }>('/spaces', json('POST', body), spaceConflict)
+  },
+
+  /**
+   * Fix pass H2: apply "Pick a starting point" to the open (new or empty) space; returns the fresh
+   * space info. 409 when the space already has one.
+   */
+  spaceSetup(setup: SpaceSetup): Promise<SpaceInfo> {
+    return request<SpaceInfo>('/space/setup', json('POST', { setup }))
   },
 
   /** Register an existing folder as a space. 404 when it is not a folder. */
@@ -1478,8 +1487,10 @@ export const api = {
   },
 
   /** "Apply": creates and extends the accepted types. App only, never an MCP tool. */
-  async applyProposal(batchId: string): Promise<{ created: string[]; extended: string[] }> {
-    const res = await request<{ created: string[]; extended: string[] }>(
+  async applyProposal(
+    batchId: string,
+  ): Promise<{ created: string[]; extended: string[]; skipped?: { id: string; reason: string }[] }> {
+    const res = await request<{ created: string[]; extended: string[]; skipped?: { id: string; reason: string }[] }>(
       `/import/batches/${seg(batchId)}/proposal/apply`,
       json('POST', {}),
     )
@@ -1579,6 +1590,15 @@ export const api = {
    */
   runAutomation(id: string, path: string): Promise<AutomationRun> {
     return request<AutomationRun>(`/automations/${seg(id)}/run`, json('POST', { path, clientId: CLIENT_ID }))
+  },
+
+  /**
+   * "Run now" for a schedule rule: one run outside its schedule. A plain rule's run comes back;
+   * an agent schedule's is handed to the agent jobs (`{queued: true}`). 404, 422 (not a schedule,
+   * turned off), 423.
+   */
+  runScheduleNow(id: string): Promise<AutomationRun | { queued: true }> {
+    return request<AutomationRun | { queued: true }>(`/automations/${seg(id)}/run-now`, json('POST', {}))
   },
 
   /** A rule's run log, newest first (at most 200). 404. */

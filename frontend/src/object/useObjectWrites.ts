@@ -26,6 +26,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, type MutableRefObject 
 import { api, ConflictError, StepChangedError } from '@/api/client'
 import type { RenameResult, UpdateResult, WorkWriteResult } from '@/api/types'
 import { taskClient } from '@/tasks/taskContract'
+import { announceRelinked } from './relinkNotice'
 
 export interface BodyControl {
   /** Save pending body edits and wait for every save in flight; `ok: false` after a conflict. */
@@ -203,6 +204,7 @@ export function useObjectWrites(opts: ObjectWritesOptions): ObjectWrites {
         o.adoptVersion(res.version)
         void o.bodyControl.resume(res.version)
         o.onRenamed?.(res, path, title)
+        announceRelinked(res)
         return res
       }),
     [enqueue],

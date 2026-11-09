@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useUiStore } from './usePinned'
+import { VcsStatusIndicator } from '@/vcs/VcsStatusIndicator'
 import {
   orderTypeEntries,
   saveTypeOrder,
@@ -233,8 +234,7 @@ export function Sidebar({
   workActive,
   activeCollectionId,
 }: SidebarProps) {
-  // "Tasks" is hidden while the space hides task management (`space.json` `hideTaskManagement`).
-  const hideTasks = useSpaceInfo((s) => s.space?.hideTaskManagement ?? false)
+  // `useSpaceInfo` also tells the Tasks dashboard whether the space hides task management.
   useEffect(() => {
     void useSpaceInfo.getState().ensure()
   }, [])
@@ -444,14 +444,14 @@ export function Sidebar({
           active={calendarActive}
           onClick={(e) => onOpenTarget?.({ kind: 'calendar' }, { newTab: e.ctrlKey || e.metaKey })}
         />
-        {!hideTasks && (
-          <MainNavButton
-            icon="ph-check-circle"
-            label="Tasks"
-            active={tasksActive || workActive}
-            onClick={(e) => onOpenTarget?.({ kind: 'work' }, { newTab: e.ctrlKey || e.metaKey })}
-          />
-        )}
+        {/* Always shown: it is the work dashboard too. While the space hides task management
+            (`space.json` `hideTaskManagement`) the dashboard leaves out the task lists instead. */}
+        <MainNavButton
+          icon="ph-check-circle"
+          label="Tasks"
+          active={tasksActive || workActive}
+          onClick={(e) => onOpenTarget?.({ kind: 'work' }, { newTab: e.ctrlKey || e.metaKey })}
+        />
         <MainNavButton
           icon="ph-graph"
           label="Graph"
@@ -459,7 +459,7 @@ export function Sidebar({
           onClick={(e) => onOpenTarget?.({ kind: 'graph' }, { newTab: e.ctrlKey || e.metaKey })}
         />
         {/* The built-in Assistant, not an agent: directly under Graph. */}
-        <AssistantNavButton />
+        <AssistantNavButton onOpenTarget={onOpenTarget} />
       </nav>
 
       {/* M17: the agents, a section of their own, below the main navigation. */}
@@ -507,6 +507,8 @@ export function Sidebar({
         >
           <Icon name="ph-keyboard" size={17} />
         </button>
+        {/* 2026-11-08: the backup line, shown only while version control is on. */}
+        <VcsStatusIndicator />
       </footer>
     </aside>
   )

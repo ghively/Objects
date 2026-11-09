@@ -76,6 +76,22 @@ describe('AgentsSection', () => {
     expect(openInSidepanel).toHaveBeenCalledWith({ kind: 'aiChat', agentId: 'assistant' })
   })
 
+  test('test the Assistant row menu opens its own page without making it an agent row', async () => {
+    const onOpenTarget = vi.fn()
+    const user = userEvent.setup()
+    render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
+    const nav = screen.getByRole('navigation', { name: 'Main' })
+    await user.click(await within(nav).findByRole('button', { name: AGENT_TEXT.rowMenu('Assistant') }))
+    const menu = await screen.findByRole('menu')
+    // No Duplicate / Delete: the Assistant is built in.
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Open chat', 'Settings', 'Memory & skills'])
+    await user.click(within(menu).getByRole('menuitem', { name: 'Settings' }))
+    expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'agent', id: 'assistant' }, {})
+    await user.click(within(nav).getByRole('button', { name: AGENT_TEXT.rowMenu('Assistant') }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Memory & skills' }))
+    expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'agent', id: 'assistant', tab: 'memory' }, {})
+  })
+
   test('test the row menu items', async () => {
     const onOpenTarget = vi.fn()
     const user = userEvent.setup()

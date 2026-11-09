@@ -1,5 +1,5 @@
 // M21: the agent page's Schedules tab (spec section 9): the open space's schedules of this agent,
-// each with its switch, name, trigger summary and last run, and a menu with "Edit", "Run log" and
+// each with its switch, name, trigger summary and last run, and a menu with "Run now" (turned-on schedules), "Edit", "Run log" and
 // "Delete" (to the trash, no confirm, as M14 does). "New schedule" and "Edit" open the schedule
 // dialog; "Run log" shows M14's run log inside the tab. A schedule that can't be read shows why and
 // no switch. A read-only or missing agent disables "New schedule" and the switches. The list
@@ -35,6 +35,7 @@ export function SchedulesTab({ agent }: { agent: Agent }) {
   const [editing, setEditing] = useState<AutomationRule | 'new' | null>(null)
   const [logFor, setLogFor] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const locked = !!agent.readOnlyReason || agent.missing
 
   useEffect(() => {
@@ -74,6 +75,11 @@ export function SchedulesTab({ agent }: { agent: Agent }) {
           {error}
         </p>
       )}
+      {notice && !error && (
+        <p role="status" className="text-[13px] text-fg-muted">
+          {notice}
+        </p>
+      )}
       {loaded && schedules.length === 0 && <p className="text-[14px] text-fg-muted italic">{T.empty}</p>}
       {schedules.length > 0 && (
         <ul aria-label={T.list} className="flex flex-col divide-y divide-line rounded-lg border border-line">
@@ -85,6 +91,10 @@ export function SchedulesTab({ agent }: { agent: Agent }) {
               onToggle={(on) => run(setRuleEnabled(r, on))}
               onEdit={() => setEditing(r)}
               onLog={() => setLogFor(r.id)}
+              onRunNow={() => {
+                setNotice(null)
+                run(api.runScheduleNow(r.id).then(() => setNotice(T.running(r.name))))
+              }}
               onDelete={() => run(api.deleteAutomation(r.id))}
             />
           ))}
@@ -101,6 +111,7 @@ function ScheduleRow({
   onToggle,
   onEdit,
   onLog,
+  onRunNow,
   onDelete,
 }: {
   rule: AutomationRule
@@ -108,14 +119,17 @@ function ScheduleRow({
   onToggle(on: boolean): void
   onEdit(): void
   onLog(): void
+  onRunNow(): void
   onDelete(): void
 }) {
   const twentyFourHour = useSettings((s) => s.settings.twentyFourHourTime)
   const now = useNow()
   const [menuOpen, setMenuOpen] = useState(false)
   const readOnly = !!rule.readOnlyReason
-  const summary = readOnly ? rule.readOnlyReason : triggerSummary(rule.trigger, { types: [], collections: [], twentyFourHour })
+  const when = triggerSummary(rule.trigger, { types: [], collections: [], twentyFourHour })
+  const summary = readOnly ? rule.readOnlyReason : rule.enabled ? when : `${T.off} · ${when}`
   const items = [
+    ...(readOnly || locked || !rule.enabled ? [] : [{ label: T.runNow, run: onRunNow }]),
     ...(readOnly ? [] : [{ label: T.edit, run: onEdit }]),
     { label: T.log, run: onLog },
     ...(readOnly ? [] : [{ label: T.remove, run: onDelete }]),

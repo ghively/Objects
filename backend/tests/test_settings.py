@@ -226,3 +226,22 @@ def test_get_space_and_settings_write_nothing(state: Path, blocks_space_dir: Pat
 def test_m10_ai_settings_validate(state: Path, key: str, good, bad):
     assert settings._valid(key, good)
     assert not settings._valid(key, bad)
+
+
+def test_settings_patch_route_announces_a_settings_event(state: Path, blocks_space_dir: Path):
+    """Fix pass H: other windows (and the Work page's Alerts) learn of a settings change."""
+    import time
+
+    from objectapp.watcher import ChangeEvent
+
+    app = create_app(Space(blocks_space_dir), None, watch=False)
+    published: list[ChangeEvent] = []
+    app.state.hub.publish = published.append
+    with TestClient(app) as c:
+        c.get("/api/settings")
+        r = c.put("/api/settings", json={"patch": {"darkTheme": "darkDimmed"}, "baseRevision": "", "clientId": "w1"})
+        assert r.status_code == 200, r.text
+        deadline = time.monotonic() + 5
+        while not published and time.monotonic() < deadline:
+            time.sleep(0.02)
+    assert published == [ChangeEvent("settings", "settings.json", r.json()["revision"], origin="w1")]

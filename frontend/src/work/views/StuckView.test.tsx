@@ -83,6 +83,22 @@ describe('StuckView', () => {
     expect(within(failed).getByText('The run stopped')).toBeInTheDocument()
   })
 
+  test('test an agent step held by the auto-run cap waits for run now with its reason', () => {
+    const reason = 'The agent ran 3 steps of this item in a row by itself. Press Run now to let it go on.'
+    const r = show(undefined, agentStatus({ available: true, note: null, rows: [] }))
+    expect(screen.queryByRole('region', { name: 'Waiting for Run now' })).toBeNull()
+    r.unmount()
+    const held = { path: 'Tasks/Badge reader audit.md', title: 'Badge reader audit', stepId: 's4', n: 4,
+      stepText: 'Look again', heldAt: '2026-11-05T09:00:00.000Z', reason }
+    useWorkData.setState({ board: workBoard([]), agent: agentStatus({ available: true, note: null, held: [held] }) })
+    render(<StuckView data={useWorkData.getState()} now={NOW} />)
+    const region = section('Waiting for Run now')
+    expect(within(region).getByText('Badge reader audit')).toBeInTheDocument()
+    expect(within(region).getByText('Look again')).toBeInTheDocument()
+    expect(within(region).getByText(reason)).toBeInTheDocument()
+    expect(screen.queryByText('Nothing is stuck')).toBeNull()
+  })
+
   test('test nothing is stuck', () => {
     useWorkData.setState({ board: workBoard([]), agent: agentStatus() })
     render(<StuckView data={useWorkData.getState()} now={NOW} />)

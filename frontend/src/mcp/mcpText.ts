@@ -68,6 +68,7 @@ export const MCP_TEXT = {
   setVar: 'Set…',
   replaceVar: 'Replace…',
   deleteVar: 'Delete',
+  deleteVarHelp: 'Agents that use this variable lose its value at once. This cannot be undone.',
   fromEnvironment: "Comes from this computer's environment",
 
   // The Set dialog

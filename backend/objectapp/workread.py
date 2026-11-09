@@ -99,6 +99,9 @@ class WorkItemData(ResolutionData):
     project_path: str | None = None
     last_touched: str = ""
     problems: list[str] = field(default_factory=list)
+    steps_unreadable: bool = False
+    """Fix pass H: the step list has an entry that can't be read, so every step write is refused
+    (`STEPS_UNREADABLE`) until the file is fixed: the UI offers no step actions."""
 
 
 # -- small helpers --------------------------------------------------------------------------------
@@ -154,9 +157,12 @@ def _raw(space: Space, rel: str):
     return raw
 
 
-def work_steps(steps: Sequence[Step], positions: Sequence[int] | None = None) -> list[dict]:
+def work_steps(
+    steps: Sequence[Step], positions: Sequence[int] | None = None, unreadable: bool = False
+) -> list[dict]:
     """``WorkStep``s of a step list: the ``StepValue`` (id/rev from the step's position in the
-    file) plus ``n`` (1-based), ``current`` and the user's ``actions``."""
+    file) plus ``n`` (1-based), ``current`` and the user's ``actions`` (none while the list has an
+    entry that can't be read: every step write is refused then; fix pass H)."""
     cur = current_index(steps)
     out: list[dict] = []
     for i, step in enumerate(steps):
@@ -165,7 +171,7 @@ def work_steps(steps: Sequence[Step], positions: Sequence[int] | None = None) ->
             **step_api(step, pos),
             "n": i + 1,
             "current": i == cur,
-            "actions": allowed_actions(steps, i, "user"),
+            "actions": [] if unreadable else allowed_actions(steps, i, "user"),
         })
     return out
 
@@ -330,13 +336,14 @@ def item_data(space: Space, rel: str, *, now: datetime, jira_site: str | None) -
         project_path=project_path,
         last_touched=iso_instant(touched) if touched is not None else "",
         problems=problems,
+        steps_unreadable=bool(step_problems),
     )
 
 
 def summary(data: WorkItemData) -> dict:
     """The item's ``WorkItemSummary``."""
     steps = list(data.steps)
-    wsteps = work_steps(steps, [n for n, _s in data.steps_at])
+    wsteps = work_steps(steps, [n for n, _s in data.steps_at], data.steps_unreadable)
     cur = next((s for s in wsteps if s["current"]), None)
     last: ActivityLine | None = data.activity[-1] if data.activity else None
     return {
@@ -367,6 +374,7 @@ def summary(data: WorkItemData) -> dict:
         "lastActivity": dict(last) if last is not None else None,
         "lastTouched": data.last_touched,
         "problems": list(data.problems),
+        "stepsUnreadable": data.steps_unreadable,
     }
 
 
@@ -376,7 +384,7 @@ def full(data: WorkItemData, body: str) -> dict:
     notes: list[WorkNoteLine] = list(data.work_notes)
     out.update({
         "fields": dict(data.fields),
-        "steps": work_steps(list(data.steps), [n for n, _s in data.steps_at]),
+        "steps": work_steps(list(data.steps), [n for n, _s in data.steps_at], data.steps_unreadable),
         "verified": list(data.verified),
         "assumed": list(data.assumed),
         "toRaiseConfidence": list(data.to_raise),

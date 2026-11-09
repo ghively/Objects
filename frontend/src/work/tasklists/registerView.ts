@@ -11,6 +11,12 @@ import { registerWorkView } from '../views/registry'
 /** The dashboard view id of a task section. */
 export const listViewId = (key: TaskSectionKey): string => `list-${key}`
 
+/** Whether a dashboard view is one of the task lists (left out while the space hides task management). */
+export const isTaskListView = (id: string): boolean => id.startsWith('list-')
+
+/** The key after `g` (decision D3: only Inbox, of the Drive row, has one). */
+const KEYS: Partial<Record<TaskSectionKey, string>> = { inbox: 'i' }
+
 /** Sections whose button shows a count (the Drive lists; the others stay quiet). */
 const COUNTED: readonly TaskSectionKey[] = ['inbox']
 
@@ -22,7 +28,7 @@ for (const key of TASK_SECTION_KEYS) {
     id: listViewId(key),
     label: section.title,
     icon: section.icon,
-    key: null,
+    key: KEYS[key] ?? null,
     count: (_d, now) => (COUNTED.includes(key) ? sectionCount(key, now) : 0),
     Component: () => createElement(TaskSectionPanel, { sectionKey: key }),
   })

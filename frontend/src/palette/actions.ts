@@ -9,12 +9,14 @@ export const ACTION_TEXT = {
   createNewEntity: (typeName: string) => `Create ${typeName}`,
   openCalendar: 'Open calendar',
   openToday: 'Open today',
+  openAllNotes: 'Open all notes',
   openGlobalGraph: 'Open global graph',
   openGraphView: 'Open graph view',
   toggleLeftSidebar: 'Toggle left sidebar',
   toggleSidepanel: 'Toggle right side panel',
   openEmptyLocalSpaceQuery: 'Open extended search',
   openSettings: 'Open settings',
+  openSpaceHistory: 'Open space history',
   openSpace: (spaceName: string) => `Open space "${spaceName}"`,
   toggleFocusMode: 'Toggle focus mode',
 } as const
@@ -26,6 +28,8 @@ export interface ActionContext {
   createObject(typeId: string): void
   openCalendar(): void
   openToday(): void
+  /** All notes: the sidebar doesn't list it (catalog §4), so the palette is its way in. */
+  openAllNotes?(): void
   openGlobalGraph(): void
   openGraphView(): void
   toggleSidebar(): void
@@ -34,6 +38,8 @@ export interface ActionContext {
   openExtendedSearch?(): void
   /** M8: "Open settings". */
   openSettings?(): void
+  /** 2026-11-08: the space's git history (version control). */
+  openSpaceHistory?(): void
   /** M8: "Toggle focus mode"; absent while focus mode isn't available. */
   toggleFocusMode?: (() => void) | null
   /** M8: the registered spaces; "Open space …" is offered for each other, present one. */
@@ -65,6 +71,7 @@ export function buildActions(ctx: ActionContext): Action[] {
   }
   out.push({ id: 'openCalendar', label: ACTION_TEXT.openCalendar, icon: 'ph-calendar-blank', run: ctx.openCalendar })
   out.push({ id: 'openToday', label: ACTION_TEXT.openToday, icon: 'ph-calendar-check', run: ctx.openToday })
+  if (ctx.openAllNotes) out.push({ id: 'openAllNotes', label: ACTION_TEXT.openAllNotes, icon: 'ph-note', run: ctx.openAllNotes })
   if (ctx.openExtendedSearch) {
     out.push({ id: 'openEmptyLocalSpaceQuery', label: ACTION_TEXT.openEmptyLocalSpaceQuery, icon: 'ph-magnifying-glass', run: ctx.openExtendedSearch })
   }
@@ -73,6 +80,8 @@ export function buildActions(ctx: ActionContext): Action[] {
     out.push({ id: 'openGraphView', label: ACTION_TEXT.openGraphView, icon: 'ph-graph', run: ctx.openGraphView })
   }
   if (ctx.openSettings) out.push({ id: 'openSettings', label: ACTION_TEXT.openSettings, icon: 'ph-gear', run: ctx.openSettings })
+  if (ctx.openSpaceHistory)
+    out.push({ id: 'openSpaceHistory', label: ACTION_TEXT.openSpaceHistory, icon: 'ph-clock-counter-clockwise', run: ctx.openSpaceHistory })
   if (ctx.toggleFocusMode) {
     out.push({ id: 'toggleFocusMode', label: ACTION_TEXT.toggleFocusMode, icon: 'ph-arrows-in', run: ctx.toggleFocusMode })
   }

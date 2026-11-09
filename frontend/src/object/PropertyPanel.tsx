@@ -41,6 +41,9 @@ const CORE_KEYS = new Set([
   'lastUpdated',
   'coverImage',
   'color',
+  // M25's system block (where an imported object came from): shown as the Source line, never as an
+  // External property (fix pass H).
+  'importSource',
   ...LAYOUT_KEYS,
 ])
 

@@ -12,6 +12,7 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, useTabs } from '@/nav/tabs'
+import { markFresh, resetFresh } from '@/create/freshObjects'
 import { ObjectHeader } from './ObjectHeader'
 
 const mocked = vi.mocked(api)
@@ -27,6 +28,7 @@ beforeEach(() => {
   localStorage.clear()
   useTabs.getState().reset()
   resetLinkIndex()
+  resetFresh()
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
   mocked.ensureTag.mockImplementation(async (name: string) => ({ path: `Tags/${name}.md`, created: false }))
   mocked.images.mockResolvedValue([])
@@ -138,6 +140,49 @@ describe('ObjectHeader', () => {
     // Both actions are offered only while the field is empty.
     expect(screen.getByRole('button', { name: 'Add cover image' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add aliases' })).toBeInTheDocument()
+  })
+
+  test('a freshly created object opens with its title focused and selected (M2#3)', async () => {
+    markFresh('Pages/Notes.md')
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={vi.fn()} onPropertiesChange={vi.fn()} />)
+    const title = screen.getByRole('textbox', { name: 'Title' }) as HTMLInputElement
+    await waitFor(() => expect(title).toHaveFocus())
+    expect([title.selectionStart, title.selectionEnd]).toEqual([0, 'Notes'.length])
+  })
+
+  test('an object that was not just created does not take the focus; the mark is used once', async () => {
+    const { unmount } = render(<ObjectHeader summary={page()} type={PAGE} onRename={vi.fn()} onPropertiesChange={vi.fn()} />)
+    await new Promise((r) => requestAnimationFrame(r))
+    expect(screen.getByRole('textbox', { name: 'Title' })).not.toHaveFocus()
+    unmount()
+    markFresh('Pages/Notes.md')
+    const first = render(<ObjectHeader summary={page()} type={PAGE} onRename={vi.fn()} onPropertiesChange={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveFocus())
+    first.unmount()
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={vi.fn()} onPropertiesChange={vi.fn()} />)
+    await new Promise((r) => requestAnimationFrame(r))
+    expect(screen.getByRole('textbox', { name: 'Title' })).not.toHaveFocus()
+  })
+
+  test('Add description puts the caret in the field it reveals', async () => {
+    const user = userEvent.setup()
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={vi.fn()} onPropertiesChange={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: 'Add description' }))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Description' })).toHaveFocus())
+  })
+
+  test('the Add icon and Add cover image triggers reach their button, so the popover can anchor to it', async () => {
+    // Acceptance M2 #7: the popover's trigger passes its ref and props through `asChild`; a trigger that drops
+    // them leaves the popover unpositioned (off screen at translate(0, -200%)) in a real browser.
+    const user = userEvent.setup()
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={vi.fn()} onPropertiesChange={vi.fn()} />)
+    for (const name of ['Add icon', 'Add cover image']) {
+      const button = screen.getByRole('button', { name })
+      expect(button).toHaveAttribute('aria-haspopup', 'dialog')
+      await user.click(button)
+      expect(button).toHaveAttribute('aria-expanded', 'true')
+      await user.keyboard('{Escape}')
+    }
   })
 
   test('an existing icon opens the picker, and "Remove" clears it', async () => {

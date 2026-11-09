@@ -371,6 +371,11 @@ export interface SpaceInfo {
   revision?: string
   /** M22: the Jira site the browse links use (`https://…`), or null. Optional, as M7's keys are. */
   jiraSite?: string | null
+  /**
+   * Fix pass H2: a new or empty folder that was never asked "Pick a starting point" (no `setup`
+   * in `space.json`, no basic types, no files). Optional, as M7's keys are.
+   */
+  needsSetup?: boolean
 }
 
 /** M7 `PUT /api/space` patch: only these keys are written to `space.json`. */
@@ -651,6 +656,8 @@ export type ChangeKind =
   | 'work'
   /** M23 (announced by M24): the work agent's queue changed. */
   | 'workQueue'
+  /** Fix pass H: the device settings changed (`path` `settings.json`, `version` their revision). */
+  | 'settings'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -1568,6 +1575,8 @@ export interface ImportResult {
   removed?: number
   leftOut?: number
   failed?: number
+  /** Of `failed`, the objects not written because the import stopped. */
+  notWritten?: number
   originals?: number
   sourceItems?: number
 }
@@ -2600,6 +2609,8 @@ export interface WorkItemSummary {
   lastTouched: string
   /** Unreadable steps, duplicate ids, a field of the wrong kind… */
   problems: string[]
+  /** Fix pass H: a step entry can't be read, so the server refuses every step write until the file is fixed. */
+  stepsUnreadable?: boolean
 }
 
 export interface WorkItem extends WorkItemSummary {
@@ -2753,12 +2764,24 @@ export interface AgentQueueRow {
   result: string | null
   error: string | null
 }
+/** Decision S3: an Agent step the auto-run cap held back (3 in a row); it waits for Run now. */
+export interface AgentHeldRow {
+  path: string
+  title: string
+  stepId: string | null
+  n: number | null
+  stepText: string | null
+  heldAt: string | null
+  reason: string
+}
 export interface AgentStatus {
   available: boolean
   agentName: string | null
   actsOnApprovals: boolean
   carrying: number
   rows: AgentQueueRow[]
+  /** Decision S3; absent while the agent loop is unavailable. */
+  held?: AgentHeldRow[]
   note: string | null
 }
 export type CaptureFrom = WorkViewId | 'focusSession' | 'keepOnTop' | 'panel'
@@ -2819,6 +2842,10 @@ export interface ProposalGroup {
   documentCount: number
   examples: string[]
   properties: ProposalProperty[]
+  /** Why Apply will skip this item (the app's rules, e.g. too few documents); empty when it can be applied. */
+  problems?: string[]
+  /** Properties the app's rules left out of the item, each with the reason. */
+  dropped?: { key: string; name: string; reason: string }[]
 }
 
 export interface SchemaProposal {
@@ -2860,12 +2887,21 @@ export interface FilingValue {
   ok: boolean
 }
 
+/** A tag or collection a filing result adds, with the words it was read from. */
+export interface FilingLabel {
+  value: string
+  quote: string
+  ok: boolean
+}
+
 export interface FilingTrialItem {
   path: string
   title: string
   type: string
   confidence: FilingConfidence
   values: FilingValue[]
+  tags?: FilingLabel[]
+  collections?: FilingLabel[]
   verdict: FilingVerdict | null
 }
 

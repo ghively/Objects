@@ -177,6 +177,15 @@ describe('<BlockSelectionBar>', () => {
     expect(serializeBody(editor)).toBe(BODY)
   })
 
+  test('the color dropdown sets a text colour on the file (acceptance M7#5)', async () => {
+    const editor = mounted(BODY)
+    render(<BlockSelectionBar editor={editor} />)
+    select(editor, 1)
+    const menu = await openMenu('Color')
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Red text$/ }))
+    expect(serializeBody(editor)).toBe('One two\n\n<!-- block: color=text-red -->\nThree\n\nFour five six\n')
+  })
+
   test('the icon dropdown sets the block icon', async () => {
     const editor = mounted(BODY)
     render(<BlockSelectionBar editor={editor} />)

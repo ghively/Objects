@@ -21,6 +21,11 @@ export const TOOL_STEP_TEXT = {
   running: 'Running…',
   failed: ' (failed)',
   stopped: ' (stopped)',
+  // A refused call says so and why (fix pass H), instead of a past-tense line with "(failed)".
+  refused: (action: string, reason: string) => `Not allowed to ${action} (${reason})`,
+  refusedLine: (line: string, reason: string) => `${line} (refused: ${reason})`,
+  toolOff: 'this agent has the tool switched off',
+  pathDenied: 'the file is outside what this agent may read',
   noResult: 'No result',
 } as const
 
@@ -215,9 +220,36 @@ function baseLine(step: ToolStepState): string {
   return `Used ${step.name}`
 }
 
-/** The step's one line (the table in the M16 plan): failed and stopped steps get a suffix. */
+// The leading past-tense verbs of the lines, as the action a refusal names ("Created 'X'" -> "create 'X'").
+const INFINITIVE: Record<string, string> = {
+  Created: 'create', Edited: 'edit', Moved: 'move', Renamed: 'rename', Deleted: 'delete', Added: 'add', Updated: 'update',
+  Handed: 'hand', Used: 'use', Read: 'read', Searched: 'search', Looked: 'look', Ran: 'run', Queried: 'query', Found: 'find',
+  Wrote: 'write', Saved: 'save', Changed: 'change', Marked: 'mark', Completed: 'complete', Scheduled: 'schedule',
+  Called: 'call', Listed: 'list', Opened: 'open', Restored: 'restore', Removed: 'remove', Appended: 'append',
+  Replaced: 'replace', Set: 'set', Made: 'make', Sent: 'send', Asked: 'ask', Turned: 'turn', Linked: 'link', Filed: 'file',
+}
+
+/** Why a failed call was refused (the CLI's permission answers), or null when it is an ordinary error. */
+export function refusalReason(result: string | null): string | null {
+  if (!result) return null
+  if (/permission to use .+ (?:has been )?denied|haven't granted/i.test(result)) return TOOL_STEP_TEXT.toolOff
+  if (/denied by your permission settings|directory that is denied/i.test(result)) return TOOL_STEP_TEXT.pathDenied
+  if (/\b(?:refused|not allowed|blocked)\b/i.test(result)) {
+    const first = result.trim().split('\n')[0].replace(/\.$/, '')
+    return first.length > VALUE_CAP ? first.slice(0, VALUE_CAP - 1) + ELLIPSIS : first
+  }
+  return null
+}
+
+/** The step's one line (the table in the M16 plan): failed and stopped steps get a suffix; a refused one says why. */
 export function toolStepLine(step: ToolStepState): string {
   const line = baseLine(step)
+  const reason = step.done && step.isError ? refusalReason(step.result) : null
+  if (reason) {
+    const [verb, ...rest] = line.split(' ')
+    const inf = INFINITIVE[verb]
+    return inf ? TOOL_STEP_TEXT.refused([inf, ...rest].join(' '), reason) : TOOL_STEP_TEXT.refusedLine(line, reason)
+  }
   if (step.done && step.isError) return line + TOOL_STEP_TEXT.failed
   if (!step.done && step.stopped) return line + TOOL_STEP_TEXT.stopped
   return line

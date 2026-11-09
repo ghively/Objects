@@ -268,6 +268,13 @@ def test_add_folder(reg: AgentRegistry, tmp_path: Path) -> None:
     with pytest.raises(AgentInvalid) as e:
         reg.add_folder(plain)
     assert e.value.message == "This folder isn't an Object agent."
+    # fix pass H: an agent folder whose id is malformed says what's wrong, not "isn't an Object agent"
+    for bad, says in (("01JC7ZK3T9Q4M2X8B5N6R1V0WO", '"01JC7ZK3T9Q4M2X8B5N6R1V0WO" isn\'t valid'), ("", "has no id")):
+        data["id"] = bad
+        (copy / ".object-agent" / "agent.json").write_bytes(dump_json(data))
+        with pytest.raises(AgentInvalid) as e:
+            reg.add_folder(copy)  # refused before the listed check
+        assert says in e.value.message, e.value.message
     with pytest.raises(AgentNotFound):
         reg.add_folder(tmp_path / "nope")
     # a copy of the default agent's folder: its id is always listed

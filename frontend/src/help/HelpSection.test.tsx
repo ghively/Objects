@@ -12,8 +12,8 @@ import { Sidebar } from '@/shell/Sidebar'
 import { ShortcutsSheet } from '@/settings/ShortcutsSheet'
 import { resetSettingsModal, useSettingsModal } from '@/settings/useSettingsModal'
 import { typeDef } from '@/test/mockApi'
-import { HELP_COLLAPSED_KEY, HELP_TEXT } from './helpText'
-import { HELP_DOCS } from './HelpDialog'
+import { GUIDES, HELP_COLLAPSED_KEY, HELP_TEXT } from './helpText'
+import { GUIDE_DOCS, HELP_DOCS } from './HelpDialog'
 
 const TYPES = [typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true })]
 
@@ -57,14 +57,14 @@ describe('Help & Resources (sidebar)', () => {
     fetchSpy.mockRestore()
   })
 
-  it('renders the section below the object types with its three entries', () => {
+  it('renders the section below the object types with its four entries', () => {
     render(<Sidebar types={TYPES} />)
     const section = helpSection()
     // Below the object types, at the end of the sidebar's scrolling content.
     const types = screen.getByRole('heading', { name: 'Object Types' })
     expect(types.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     const entries = within(section).getAllByRole('listitem').map((li) => li.textContent)
-    expect(entries).toEqual([HELP_TEXT.shortcuts, HELP_TEXT.gettingStarted, HELP_TEXT.markdownReference])
+    expect(entries).toEqual([HELP_TEXT.shortcuts, HELP_TEXT.gettingStarted, HELP_TEXT.markdownReference, HELP_TEXT.guides])
     // Local only: no link of any kind.
     expect(section.querySelectorAll('a')).toHaveLength(0)
   })
@@ -113,6 +113,40 @@ describe('Help & Resources (sidebar)', () => {
     expect(words).toBeLessThanOrEqual(500)
     const ref = HELP_DOCS.markdownReference
     for (const topic of ['Headings', 'Lists', 'To-dos', 'Quotes', 'Toggles', 'Links', 'front matter']) expect(ref).toContain(topic)
+  })
+
+  it('How-to guides lists the guides and opens each read-only, with no request off this machine and no write (D1)', async () => {
+    const user = userEvent.setup()
+    render(<Sidebar types={TYPES} />)
+    await user.click(within(helpSection()).getByRole('button', { name: HELP_TEXT.guides }))
+    const dialog = await screen.findByRole('dialog', { name: HELP_TEXT.guides })
+    expect(dialog).toHaveAttribute('data-help-doc', 'guides')
+    const titles = GUIDES.map((g) => g.title)
+    expect(titles).toEqual(['People', 'Meetings', 'Projects', 'Books', 'The Tasks dashboard'])
+    for (const g of GUIDES) {
+      await user.click(within(dialog).getByRole('button', { name: g.title }))
+      expect(dialog.querySelector(`[data-guide="${g.id}"]`)).not.toBeNull()
+      await waitFor(() => expect(within(dialog).getByRole('heading', { level: 1 })).toHaveTextContent(g.title))
+      expect(dialog.querySelector('.ProseMirror')).toHaveAttribute('contenteditable', 'false')
+      await user.click(within(dialog).getByRole('button', { name: HELP_TEXT.allGuides }))
+    }
+    expect(fetchedUrls(fetchSpy).filter((u) => !isLocal(u))).toEqual([])
+    expect(spaceWrites()).toEqual([])
+  })
+
+  it('the guides name no remote address, stay short and cover their type', () => {
+    for (const text of Object.values(GUIDE_DOCS)) {
+      expect(text).not.toMatch(/[a-z]+:\/\/|www\./i)
+      expect(text.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(420)
+    }
+    for (const [id, props] of [
+      ['people', ['Picture', 'Category', 'Organizations', 'Projects', 'Meetings']],
+      ['meetings', ['Date', 'Type', 'Attendees', 'Project', 'Reviewed']],
+      ['projects', ['Status', 'Timeframe', 'Collaborators', 'Steps', 'Projects map']],
+      ['books', ['Authors', 'Genre', 'Rating', 'Reading timeline']],
+      ['tasksDashboard', ['Now', 'Inbox', 'Today', 'More views', 'Plan', 'Manage', 'Review', 'Create task', 'brain-dump']],
+    ] as const)
+      for (const p of props) expect(GUIDE_DOCS[id]).toContain(p)
   })
 
   it('folds like the other sections, and the fold persists', async () => {

@@ -29,6 +29,8 @@ import { SKILL_SAVE_MS, SkillDetail } from './SkillDetail'
 const mocked = vi.mocked(api)
 const RESEARCHER = '01JC7ZK3T9Q4M2X8B5N6R1V0WE'
 const SKILL_MD = '---\nname: rack-labels\ndescription: How to label server racks\ncreated_by: agent\n---\nUse the row letter.'
+/** What the editor shows: SKILL.md without its frontmatter. */
+const BODY = 'Use the row letter.'
 
 function detail(partial: Partial<SkillDetailData> = {}): SkillDetailData {
   return {
@@ -65,10 +67,10 @@ describe('SkillDetail', () => {
       await settle()
       expect(mocked.agentSkill).toHaveBeenCalledWith(RESEARCHER, 'rack-labels', false)
       const editor = screen.getByRole('textbox', { name: 'SKILL.md' })
-      expect(editor).toHaveValue(SKILL_MD)
+      expect(editor).toHaveValue(BODY)
 
       mocked.saveAgentSkillFile.mockResolvedValueOnce({ revision: 'r2' })
-      fireEvent.change(editor, { target: { value: `${SKILL_MD} Then the slot.` } })
+      fireEvent.change(editor, { target: { value: `${BODY} Then the slot.` } })
       await act(async () => {
         vi.advanceTimersByTime(SKILL_SAVE_MS - 1)
       })
@@ -81,7 +83,7 @@ describe('SkillDetail', () => {
 
       // On blur at once, with the new revision; a 409 keeps the text and offers a reload.
       mocked.saveAgentSkillFile.mockRejectedValueOnce(new ConflictError('r9'))
-      fireEvent.change(editor, { target: { value: `${SKILL_MD} Twice.` } })
+      fireEvent.change(editor, { target: { value: `${BODY} Twice.` } })
       fireEvent.blur(editor)
       await settle()
       expect(mocked.saveAgentSkillFile).toHaveBeenLastCalledWith(RESEARCHER, 'rack-labels', 'SKILL.md', `${SKILL_MD} Twice.`, 'r2')
@@ -92,6 +94,29 @@ describe('SkillDetail', () => {
       await settle()
       expect(screen.queryByText(T.conflict)).toBeNull()
       expect(screen.getByRole('textbox', { name: 'SKILL.md' })).toHaveValue('Changed elsewhere.')
+    })
+
+    test('test the frontmatter stays out of the editor and is saved byte for byte', async () => {
+      // accept-m18.6: the Markdown editor read `---` frontmatter as text and saved it back as a heading.
+      const head = '---\r\nname: rack-labels\r\ndescription: How to label server racks\r\ncreated_by: agent\r\n---\r\n'
+      mocked.agentSkill.mockResolvedValue(detail({ text: `${head}# Rack labels\r\n\r\nUse the row letter.` }))
+      render(<SkillDetail agentId={RESEARCHER} name="rack-labels" archived={false} onClose={() => undefined} />)
+      await settle()
+      const editor = screen.getByRole('textbox', { name: 'SKILL.md' })
+      // (a textarea reports CRLF as LF; the editor gets the body without the frontmatter)
+      expect(editor).toHaveValue('# Rack labels\n\nUse the row letter.')
+      expect(screen.getByText(/description: How to label server racks/)).toBeInTheDocument()
+      mocked.saveAgentSkillFile.mockResolvedValueOnce({ revision: 'r2' })
+      fireEvent.change(editor, { target: { value: '# Rack labels\n\nUse the row letter. Then the slot.' } })
+      fireEvent.blur(editor)
+      await settle()
+      expect(mocked.saveAgentSkillFile).toHaveBeenCalledWith(
+        RESEARCHER,
+        'rack-labels',
+        'SKILL.md',
+        `${head}# Rack labels\n\nUse the row letter. Then the slot.`,
+        'r1',
+      )
     })
   })
 
@@ -149,5 +174,19 @@ describe('SkillDetail', () => {
     for (const r of rows) expect(within(r).getByRole('button', { name: /Undo/ })).toBeEnabled()
     await user.click(within(rows[0]).getByRole('button', { name: `${T.undo}: Patched 'rack-labels'` }))
     expect(mocked.undoLedgerEntry).toHaveBeenCalledWith(RESEARCHER, '01JLEDGER00000000000000002')
+  })
+
+  test('test your own save shows in the History at once', async () => {
+    // accept-m18.7: this window's own agentLearning event is not delivered back to it, so the list kept
+    // the old rows and Undo on them answered "changed again since".
+    mocked.agentLedger.mockResolvedValue({ entries: [], more: false })
+    mocked.saveAgentSkillFile.mockResolvedValueOnce({ revision: 'r2' })
+    render(<SkillDetail agentId={RESEARCHER} name="rack-labels" archived={false} onClose={() => undefined} />)
+    const editor = await screen.findByRole('textbox', { name: 'SKILL.md' })
+    await waitFor(() => expect(mocked.agentLedger).toHaveBeenCalledTimes(1))
+    fireEvent.change(editor, { target: { value: `${BODY} Edited.` } })
+    fireEvent.blur(editor)
+    await waitFor(() => expect(mocked.saveAgentSkillFile).toHaveBeenCalled())
+    await waitFor(() => expect(mocked.agentLedger).toHaveBeenCalledTimes(2))
   })
 })

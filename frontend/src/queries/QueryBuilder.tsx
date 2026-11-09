@@ -38,7 +38,6 @@ export const BUILDER_TEXT = {
   termCount: 'Type 2 or more characters',
   addTerm: 'With more than one term, a result needs to match only one.',
   mode: 'Mode',
-  modeNote: 'Works like Auto until full-text search arrives.',
   limit: 'Limit',
   noLimit: 'No limit',
   paused: PAUSED_HINT,
@@ -65,10 +64,13 @@ export interface QueryConstraint {
 
 type SearchMode = NonNullable<QueryDefinition['search']>['searchMode']
 
-export const SEARCH_MODES: { key: SearchMode; label: string; tooltip: string; note?: boolean }[] = [
-  { key: 'auto', label: 'Auto', tooltip: 'Mixes the other modes for the best results.' },
-  { key: 'fullText', label: 'Exact', tooltip: 'Looks for the exact words anywhere in the object.', note: true },
-  { key: 'semantic', label: 'Semantic', tooltip: 'Finds objects about the same idea, even in other words.', note: true },
+/**
+ * The modes offered. Exact (`fullText`) and Semantic (`semantic`) are hidden until real full-text
+ * search exists (decision Q-1): they matched exactly like Auto. A saved query that has one still
+ * runs as Auto (the server accepts both) and shows Auto here.
+ */
+export const SEARCH_MODES: { key: SearchMode; label: string; tooltip: string }[] = [
+  { key: 'auto', label: 'Auto', tooltip: 'Looks for the words in titles, aliases, descriptions and text.' },
   { key: 'title', label: 'Title', tooltip: 'Looks for the exact words in titles only.' },
 ]
 
@@ -419,7 +421,8 @@ function TagsSection({ def, onChange }: { def: QueryDefinition; onChange(e: Edit
 
 function SearchSection({ def, onChange }: { def: QueryDefinition; onChange(e: Edit): void }) {
   const terms = def.search?.searchTerms ?? []
-  const mode = def.search?.searchMode ?? 'auto'
+  // Exact and Semantic are hidden (Q-1) and match like Auto: show them as Auto.
+  const mode: SearchMode = def.search?.searchMode === 'title' ? 'title' : 'auto'
   const [draft, setDraft] = useState('')
   const short = draft.trim().length > 0 && draft.trim().length < MIN_TERM
   const setSearch = (searchTerms: { text: string }[], searchMode: SearchMode = mode) =>
@@ -475,7 +478,6 @@ function SearchSection({ def, onChange }: { def: QueryDefinition; onChange(e: Ed
             ))}
           </div>
           <p className="text-[12px] text-fg-muted">{SEARCH_MODES.find((m) => m.key === mode)?.tooltip}</p>
-          {SEARCH_MODES.find((m) => m.key === mode)?.note && <p className="text-[12px] text-fg-muted">{BUILDER_TEXT.modeNote}</p>}
           <p className="text-[12px] text-fg-muted">{BUILDER_TEXT.paused}</p>
         </>
       )}

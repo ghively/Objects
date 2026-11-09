@@ -80,6 +80,18 @@ describe('StepsCell', () => {
     expect(onWorkWrite).toHaveBeenCalledTimes(1)
   })
 
+  test('steps typed into the file by hand (no id, no state) render as open steps', () => {
+    // Before the decoded steps arrive the panel gets the raw front matter; a hand-typed step has
+    // no `state` and no `id` (the server reads them as open and `@n`).
+    const raw = [{ kind: 'do', text: 'Sweep the floor' }, { kind: 'question', text: 'Who reloads the labels?' }]
+    const onWorkWrite = vi.fn()
+    render(
+      <StepsCell def={stepsDef} value={raw as unknown as StepValue[]} path="Tasks/A.md" onWorkWrite={onWorkWrite} onChange={vi.fn()} />,
+    )
+    expect(screen.getByText('Sweep the floor')).toBeInTheDocument()
+    expect(screen.getByText('Who reloads the labels?')).toBeInTheDocument()
+  })
+
   test('without onWorkWrite the panel is read-only', () => {
     render(<StepsCell def={stepsDef} value={STEPS} onChange={vi.fn()} />)
     expect(screen.queryByRole('button', { name: '+ Add step' })).not.toBeInTheDocument()

@@ -56,9 +56,10 @@ describe('BrainDumpBar', () => {
     const user = userEvent.setup()
     render(<BrainDumpBar view="now" />)
     await user.type(box(), 'Tray 2 squeaks{Enter}')
-    await act(async () => {})
+    // Wait for the refusal rather than one microtask flush: under full-suite load the
+    // rejected capture can settle a few ticks later (flaked once on 2026-11-08).
+    expect(await screen.findByText('Saving a brain dump comes with M24.')).toBeInTheDocument()
     expect(box()).toHaveValue('Tray 2 squeaks')
-    expect(screen.getByText('Saving a brain dump comes with M24.')).toBeInTheDocument()
     expect(useWorkToasts.getState().toasts).toEqual([])
   })
 

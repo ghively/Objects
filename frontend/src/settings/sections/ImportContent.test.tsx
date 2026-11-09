@@ -9,6 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
+import { api } from '@/api/client'
 import { resetImportDialog, useImportDialog } from '@/import/useImportDialog'
 import { resetSettingsModal, useSettingsModal } from '@/settings/useSettingsModal'
 import { IMPORT_CONTENT_TEXT, ImportContentSection } from './ImportContent'
@@ -51,5 +52,34 @@ describe('Import Content', () => {
     expect(screen.getByRole('button', { name: 'Import from Obsidian' })).toHaveAccessibleDescription(T.obsidianHelp)
     expect(screen.getByRole('button', { name: 'Import from Anytype' })).toHaveAccessibleDescription(T.anytypeHelp)
     expect(screen.getByText(T.startImportingDescription)).toBeInTheDocument()
+  })
+
+  test('test import history reopens the review of an earlier batch (fix pass H)', async () => {
+    vi.mocked(api.importBatches).mockResolvedValueOnce([
+      {
+        id: 'b2',
+        startedAt: '2026-11-08T10:00:00',
+        finishedAt: '2026-11-08T10:01:00',
+        source: { path: '/home/gene/Vault', kind: 'obsidian', system: 'obsidian' },
+        counts: { imported: 12 },
+      },
+      { id: 'b1', startedAt: '2026-11-07T09:00:00', source: { path: '/x/old.zip', kind: 'notion', system: 'notion' }, counts: {}, trashedAt: 'x' },
+    ])
+    const user = userEvent.setup()
+    act(() => useSettingsModal.getState().open('importContent'))
+    render(<ImportContentSection />)
+    const button = await screen.findByRole('button', { name: T.reviewLabel('Vault') })
+    expect(screen.getByText('2026-11-08 10:01 · 12 objects')).toBeInTheDocument()
+    // A batch moved to the Trash has nothing left to review.
+    expect(screen.queryByRole('button', { name: T.reviewLabel('old.zip') })).toBeNull()
+    await user.click(button)
+    expect(useImportDialog.getState()).toMatchObject({ isOpen: true, preset: { reviewBatch: 'b2' } })
+    expect(useSettingsModal.getState().isOpen).toBe(false)
+  })
+
+  test('test import history says when nothing was imported', async () => {
+    act(() => useSettingsModal.getState().open('importContent'))
+    render(<ImportContentSection />)
+    expect(await screen.findByText(T.historyEmpty)).toBeInTheDocument()
   })
 })

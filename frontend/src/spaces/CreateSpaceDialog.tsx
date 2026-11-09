@@ -43,7 +43,8 @@ export const CREATE_SPACE_TEXT = {
 
 const T = CREATE_SPACE_TEXT
 
-const SETUPS: { value: SpaceSetup; icon: string; label: string; description: string }[] = [
+/** M8's two starting points; also offered when a new or empty folder is opened (`StartingPointDialog`). */
+export const SETUPS: { value: SpaceSetup; icon: string; label: string; description: string }[] = [
   { value: 'basic', icon: 'ph-shapes', label: T.basicLabel, description: T.basicDescription },
   { value: 'blank', icon: 'ph-file-dashed', label: T.blankLabel, description: T.blankDescription },
 ]

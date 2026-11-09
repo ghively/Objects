@@ -1,6 +1,10 @@
 # Object: remaining work
 
-Status as of 2026-11-07: **M1-M27 are all built, reviewed, fixed and gated, and all are on `master`** (the default branch; there is no `main`). The feature branches `feat/m10` to `feat/m15`, `feat/m16-m24`, `feat/m22-m23` and `fix/deleted-type-queries`, and the old `ccr-*` branches, are merged or obsolete. M16-M24 were merged and gated on 2026-11-06 (`78c5785` M16-M21, `a11a5f4` M22-M23, M24 built on `ccr-381ccf85-cjstne`); M25 (provenance and re-runs), M26 (readers and the scan) and M27 (the agent workflow) were built 2026-11-06/07 and gated. M23, M24 and M25-M27 each had one review and one fix pass; M19-M22 were reviewed on their build tracks.
+Status as of 2026-11-08 (evening): **M1-M27 are built and on `master`; everything built on 2026-11-08 is on `integrate/2026-11-08`** (all lanes merged there, not yet on `master`). That day: the sidebar redesign, the Tasks dashboard, git-backed spaces, the decisions memo (`decisions-memo-2026-11-08.md`, approved by Gene) built, live checks of the real CLI, OCR and MCP, and an automated run of all 435 acceptance boxes (`auto-acceptance-2026-11-08.md`). The current list is "What remains" below; the history follows it.
+
+**Gate on `integrate/2026-11-08` (Linux, 2026-11-09, after lanes A-F, G1-G5, H1-H3 and the acceptance fixes; vitest and pytest run one after the other):** back end 3391 passed, 16 skipped, 3 xpassed, 0 failed; front end 4074 passed, 1 skipped (537 files); lint 0 errors; `npm run build` clean. One frontend timing flake under load (`BrainDumpBar` "M23 seam") was fixed by waiting for the refusal text instead of one flush.
+
+Earlier status (2026-11-07): M1-M27 were all built, reviewed, fixed and gated, and all on `master` (the default branch; there is no `main`). The feature branches `feat/m10` to `feat/m15`, `feat/m16-m24`, `feat/m22-m23` and `fix/deleted-type-queries`, and the old `ccr-*` branches, are merged or obsolete. M16-M24 were merged and gated on 2026-11-06 (`78c5785` M16-M21, `a11a5f4` M22-M23, M24 built on `ccr-381ccf85-cjstne`); M25 (provenance and re-runs), M26 (readers and the scan) and M27 (the agent workflow) were built 2026-11-06/07 and gated. M23, M24 and M25-M27 each had one review and one fix pass; M19-M22 were reviewed on their build tracks.
 
 **2026-11-09: sweep round 3** (`bug-audit-2026-11-08.md`, "Round 3"): one review of the whole branch (no HIGH; all findings fixed), the remaining catalogued editor keys bound, and four older review items closed on Gene's decisions (Retry re-approves a failed Approve step; agent runs can't use the app's own `/api` routes, `runfence.py` with `psutil`; a moved import source is matched; a moved remote agent address waits for confirmation). **Gate (Linux):** back end 3287 passed, 0 failed; front end 3984 passed; `tsc`, lint (0 errors), build clean; acceptance 52/52 PASS. Still open: auto-run depth cap; learning and A2A routes rely on CLI tool lists; the live-CLI checks (fence glob characters, `--resume`); a Windows hand-check of the run fence.
 
@@ -12,14 +16,89 @@ Status as of 2026-11-07: **M1-M27 are all built, reviewed, fixed and gated, and 
 
 The history below is in the order it was written: the per-milestone sections newest first, then the table of everything built, then older verification tables.
 
-**What remains, in one list:**
-1. **Gene's hands-on checks, M1-M27** (all unticked: 255 boxes in `m1-acceptance.md` to `m9-acceptance.md`, 37 in `m10` to `m15`, 134 in `m16` to `m27`, and 9 in `m27-ui-acceptance.md`), and the fixes they produce, one finding per commit with a regression test. Run them on a copy of a work export kept outside the repo (`git init` there; `npm run build` in `frontend/`, then `uv run objectapp --space <copy>`). `hands-on-checklist.md` merges the M1-M9 ones. Only his Windows machine can check: the pywebview window, Windows toast reminders, Wacom pressure and tilt, microphone and clipboard permissions, a type page with 1,000+ real objects, and the look against the behaviour catalog in Light, Light Dimmed, Dark and Dark Dimmed.
-2. **Never exercised, only tested against fakes:** the real `claude` CLI (the AI panel, agents, the Work agent, the import filing pass), the Atlassian/Jira MCP behind Desk sync, an MCP server under a live Claude Code or Claude Desktop session, OCR (needs `tesseract` installed; untested), SharePoint fetching (M27 ships the skill text and M25's manifest only, no fetch code), the Anytype reader (unverified until a real export is checked), and the M15 import dialog on Windows.
-3. **Open review items for Gene's call** (not changed): the M24 list (Retry re-runs a timed-out Approve step with full tools and no new approval; learning and A2A routes rely on the CLI tool lists only; a full-tool work run can reach local app routes; `file_capture` is not atomic; no auto-run depth cap); the M25-M27 list in `m27-acceptance.md` under "Open review items" (agents with a shell can reach the import routes, so 'an agent cannot approve its own schema' rests on the missing MCP tool; MCP `start_import` into a new space skips the proposal check; moving a source folder makes the next run create new objects; a flagged file cannot be imported without protection); M20 review item 5 (Refresh sends the stored token to the card's host even when the card moved its endpoint to another host; the plan contradicts itself); whether any CLI built-in outside the Tools tab should be denied by default, and whether an agent may change an excluded member's collections through `delete_collection` (both from M17).
-4. **The bug-audit decisions** (`bug-audit-2026-11-07.md`, "Fix status", items 1-10; the branch is merged, PR #12) and **the sweep's decisions** (`bug-audit-2026-11-08.md`, "Decisions for Gene" and "Choices made in the fixes"). **Other decisions for Gene:** whether the how-to guides ship as built-in seeds; scrub the plaintext credentials found in his Work and Personal source spaces before any import; the guessed values (item 2 of "What is left" below). Settled already: all features unlocked, nothing gated (2026-11-02); AI is in, through the Claude Code CLI; the Standard design shows properties in the side column and inline below 768 px (2026-10-28); deleting a type trashes its saved queries and restore brings them back (2026-11-05).
-5. **Not yet catalogued** (needs a scratch view or approval; see `polish-audit-2026-11-02.md`, "Not yet poked"): filter, sort and group editors, Customize card view, Tasks page, Queries, Weblink and PDF viewers, image and file objects, Two Columns/Code/Math/Toggle/Group/Horizontal line blocks, Word and Latex export, Three days view in the other spaces, drag and drop, markdown list shortcuts with real key events.
-6. **Wiki import follow-ups** (outside the repo, in Gene's `ObjectSpaces` folder): review the 10 "possible secrets" pages listed in `ai-pass/review.md`; the wiki copy is a snapshot (refresh = recopy and AI-reread only new or changed pages).
-7. **Later:** an installer; migrating `C:\Git\wiki` into Object's format (a separate project; M25-M27 are the tooling for it); the network integrations (calendar feeds, Readwise, Kindle, Telegram, WhatsApp, email, Raycast); Object Team (parked, see below).
+## What remains (after 2026-11-08)
+
+### Done on 2026-11-08
+
+- **Sidebar redesign:** Calendar, Tasks, Graph and Assistant on top; Agents as its own section with a header `+`;
+  Trash at the bottom; All notes off the sidebar (palette "Open all notes"). Catalog §4.
+- **Tasks dashboard:** the Work page and the task lists merged into one page (Drive row, More views: Plan, Manage,
+  Review); the old Tasks page retired; Tasks › Today uses the Calendar Day view's task list (T1). Catalog §4.
+- **Git-backed spaces** (`specs/2026-11-08-git-backed-spaces-design.md`, catalog §12): version control per space, off
+  until turned on; debounced commits; a remote with push and update; **Space history** with Restore; git versions in
+  an object's Version History; backup of agents and settings.
+- **Safety (decisions memo §1):** S1 an explicit `--tools` list; S2 every run's token carries the agent tools it may
+  call; S3 at most 3 auto-runs in a row per item; S4 fence paths escape `[ ]` (live-checked); S5 `delete_collection`
+  refuses a collection with excluded members; S6 a per-launch key for `/api`; S7 `--resume` live PASS; S8 one turn
+  per chat for remote agents too. Catalog §10d, §10e.
+- **Other decisions:** D1 how-to guides as read-only Help pages; D3 `g i` / `g c` and unbound keys marked; D5;
+  Q-1 (query modes Auto and Title only); C9; AC-1 (sub-items on the basic Task type); AC-2 (imported images are Image
+  objects); OCR of mixed PDFs, once per page; A-2 documented. A-1 (grey Glob and Grep with the shell on) was not
+  built: with an explicit `--tools` list the CLI offers them beside the shell (catalog §10d).
+- **Empty spaces:** a new or empty folder asks "Pick a starting point" once (basic setup: Person, Meeting, Project,
+  Book; or empty). Catalog §4.
+- **Live checks:** the real `claude` CLI 2.1.319 (`live-cli-check-2026-11-08.md`); OCR, MCP under a real
+  `claude -p`, Anytype and SharePoint (`ocr-mcp-check-2026-11-08.md`).
+- **Acceptance:** all 435 boxes run by agents; 4 FAILs, all fixed; fix passes G and H closed the findings
+  (`auto-acceptance-2026-11-08.md`). The catalog gained the approved C1-C11 write-ups.
+
+### Needs Gene
+
+1. **Hand-checks:** the list in `auto-acceptance-2026-11-08.md`, "What needs Gene by hand" (Windows and pywebview,
+   Wacom, look and themes, real data and scale, live model wording, the file manager, decisions). Re-read the "Box
+   texts that are out of date" table there before ticking. Boxes stay unticked in `mN-acceptance.md` until he does.
+2. **Your extra custom object types:** the list of types beyond the basic setup's four that your spaces should
+   start with, so they can be added through the app's own API.
+3. **An Anytype export** (a few objects, Markdown with files), to confirm and fix the reader's gaps (below).
+4. **A git remote address**, when you want backup off this machine (Settings > Space > Version control > Remote;
+   any https or ssh remote; the system's git credentials are used).
+5. **Windows checks:** the S6 launch key in a real pywebview window (the window and the keep-on-top window open at
+   `/_open`, every request carries the cookie, a `curl` without it gets 401), the run fence, reminder toasts, Wacom,
+   microphone and clipboard prompts. Nothing has been gated on Windows since 2026-11-06.
+6. **Fix pass H, "For Gene"** (`lane-h2-for-gene-2026-11-08.md`); recommendation for each: keep.
+   - Item 5: "Pages/Alpha" from the search box makes `Pages/Pages.md` (the title is kept; the file name rule matches
+     the export). Keep.
+   - Item 6: Wide layout looks unchanged with the properties panel open at 1440 px (the column never reaches the
+     Normal max width). Keep.
+   - Item 7: block colour from the selection bar works (a harness issue; now pinned by a test). Nothing to do.
+   - Item 8: "Release type constraint" lives on a type page's query tab. Keep; re-run M9#14 there.
+7. **Credentials in the Work and Personal source spaces:** scrub them with the approved procedure (memo D2) before
+   any import, and review the 10 "possible secrets" wiki pages (`ai-pass/review.md`).
+
+### Known limits
+
+- **Launch key (S6)** (`backend/objectapp/uikey.py:23-30`): a local process running as Gene can still read the
+  browser's memory or, with `--browser`, a session cookie that session restore wrote to disk; and it can read the
+  printed `/_open` link before the browser uses it. `/api/v1` with a token is open by design. The run fence behind it
+  (`runfence.py:22-37`) misses processes that detach from the run's tree and is off where `psutil` can't see
+  connection owners (macOS without root).
+- **Backslash fence (A-2):** a folder whose name contains `\` can't be fenced from an agent's file tools; rename it
+  (catalog §10d).
+- **Chart "Export SVG"** (`views/layouts/chart/exportChart.ts:1-4`): `html-to-image` wraps the chart's HTML in an SVG
+  `<foreignObject>`, so the file is not vector shapes; browsers show it, vector editors may not. Options: keep it;
+  serialise the chart's own `<svg>` (the layouts already draw SVG, `chart/BarChart.tsx:71`) with its styles inlined;
+  or offer PNG only.
+- **Import preview counts:** the preview lists images under the Page row; the import makes them Image objects
+  (`importers/planner.py:109-119`, AC-2).
+- **Tasks dashboard reloads its rows** whenever any object outside the task rows changes, to keep the Context
+  grouping's backlinks live (`views/useRows.ts:91-94`, `tasks/useTaskRows.ts:37-38`); a cost on big spaces.
+- **S3 count reset:** only Gene's work actions on an item (step actions, Run now; `workloop.py:307-311`) start its
+  auto-run count again; editing one of its properties does not.
+- **Anytype reader** (`ocr-mcp-check-2026-11-08.md`, "Anytype reader"): against the exporter's source, the type
+  sits under `Object type`, titles come out as slugs, `Creation date` is not `createdAt`, the `id` is an ordinary
+  property, relations come out as file-name labels, and the `schemas/*.schema.json` formats are ignored. Medium risk;
+  waiting on a real export.
+- **OCR is English only:** `tesseract` runs without `-l` (`readers/pdf.py:4`).
+- **SharePoint:** no fetch code (by design); a Microsoft 365 MCP server would download into a Files folder first.
+- Closed on the same day, listed so nobody reopens them: the `settings` event is in `RESYNC_EVENTS`
+  (`api/client.ts:540`, `d79f60f`), so a reconnect reloads device settings.
+
+### Parked
+
+- An installer (spec §6).
+- Migrating `C:\Git\wiki` into Object's format (a separate project; M25-M27 are its tooling).
+- The network integrations: calendar feeds, Readwise, Kindle, Telegram, WhatsApp, email, Raycast.
+- Object Team (`specs/2026-10-28-object-team-design.md`), parked until Gene expands to the team.
 
 Done and closed (details in the sections below): the polish backlog (2026-11-03/04), both audits (2026-10-28 and 2026-11-01, merged: PR #4 `84f3c16`), the Windows-only gzip and M15 test failures, M10-M15 (PRs #5-#11), the agents milestones M16-M21 (design `specs/2026-11-05-agents-design.md`), the work dashboard M22-M24 (design `specs/2026-11-05-work-dashboard-design.md`) and import and migration M25-M27 (design `specs/2026-11-06-import-migration-design.md`).
 

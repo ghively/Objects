@@ -500,10 +500,13 @@ def _hidden_cases() -> dict[str, Callable[[Env], list[Any]]]:
         return [out]
 
     def delete_collection_lists(env: Env) -> list[Any]:
+        # Decision S5: a collection holding an excluded page is refused over the API (409).
+        secret = env.bytes_of(SECRET)
         ask = attempt(env, "delete_collection", collection_id=env.collection)
-        assert _extra(ask) == {"affected": 1, "hiddenCount": 1}
-        done = env.call("delete_collection", collection_id=env.collection, confirm=True)
-        assert SECRET not in done["removedFrom"] + done["deleted"] and done["hiddenCount"] == 1
+        done = attempt(env, "delete_collection", collection_id=env.collection, confirm=True)
+        for out in (ask, done):
+            assert out == "Conflict: This collection holds pages excluded from AI; delete it in Object.", out
+        assert env.bytes_of(SECRET) == secret
         return [ask, done]
 
     def merge_either_side(env: Env) -> list[Any]:
@@ -600,7 +603,6 @@ def test_no_tool_reveals_an_excluded_page(env: Env, case: str) -> None:
     assert "Secret project" not in text
     if case == "trash":
         return  # Secret is in the trash (moved by the app's window, not a tool)
-    if case != "delete_collection":  # the confirmed delete takes Secret out of the collection
-        assert env.bytes_of(SECRET) == secret_before
+    assert env.bytes_of(SECRET) == secret_before  # S5: delete_collection refuses, so Secret is untouched
     assert env.bytes_of(env.hidden_board) == board_before
     assert env.bytes_of(TEMPLATE) == template_before

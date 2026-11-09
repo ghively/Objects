@@ -15,6 +15,7 @@
  *
  * M14: mounts the automations' "Missed automations" catch-up dialog.
  * M15: mounts the import dialog (loaded when first opened, as the Settings modal).
+ * Fix pass H2: mounts "Pick a starting point" for a space opened as a new or empty folder.
  */
 import { Suspense, useEffect, useState } from 'react'
 import { lazyWithReload } from '@/lib/lazyReload'
@@ -26,6 +27,7 @@ import { useGlobalShortcut } from '@/lib/shortcuts'
 import { useSettingsModal } from '@/settings/useSettingsModal'
 import { useImportDialog } from '@/import/useImportDialog'
 import { CreateSpaceDialog } from '@/spaces/CreateSpaceDialog'
+import { StartingPointDialog } from '@/spaces/StartingPointDialog'
 import { SpaceSwitchOverlay } from '@/spaces/SpacesMenu'
 import { VersionHistoryDialog } from '@/history/VersionHistoryDialog'
 import { MergeDialog } from '@/merge/MergeDialog'
@@ -95,6 +97,7 @@ export function GlobalOverlays() {
       <DeviceSettingsFollower />
       <SettingsOverlays />
       <CreateSpaceDialog />
+      <StartingPointDialog />
       <ImportOverlay />
       <SpaceSwitchOverlay />
       <VersionHistoryDialog />

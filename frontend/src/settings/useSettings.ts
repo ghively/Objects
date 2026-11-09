@@ -2,7 +2,7 @@
 // patches before it with the latest revision; on a 409 it reloads and re-applies the same
 // patch once (M3's `useViewState` rule: never a blind overwrite).
 import { create } from 'zustand'
-import { api, ConflictError } from '@/api/client'
+import { api, CLIENT_ID, ConflictError } from '@/api/client'
 import type { DeviceSettings } from '@/api/types'
 import { settingsDefaults } from './defaults'
 
@@ -23,6 +23,22 @@ function merged(s: Partial<DeviceSettings> | null | undefined): DeviceSettings {
 
 let queue: Promise<void> = Promise.resolve()
 let loading: Promise<void> | null = null
+/** Fix pass H (M16.8): the first load starts following `settings` events from other windows. */
+let watching = false
+
+function watch(): void {
+  if (watching) return
+  watching = true
+  api.onChange((e) => {
+    if (e.kind !== 'settings' || e.origin === CLIENT_ID) return
+    void useSettings.getState().load().catch(() => undefined)
+  })
+}
+
+/** Tests: follow the events again on the next load (after the api mock changed). */
+export function resetSettingsWatch(): void {
+  watching = false
+}
 /** Patches made while a load is in flight: its answer predates them, so they go back on top. */
 let patchedDuringLoad: Partial<DeviceSettings> | null = null
 
@@ -35,6 +51,7 @@ export const useSettings = create<SettingsState>((set, get) => ({
     // One request shared by everyone asking while it is in flight (App's start-up and the first
     // settings reader mount in the same tick).
     if (loading) return loading
+    watch()
     const mine: Partial<DeviceSettings> = (patchedDuringLoad ??= {})
     loading = api
       .settings()

@@ -166,9 +166,12 @@ def _extra_sections(extra: dict, obj: Callable[[str], str]) -> list[str]:
                  "source ids, so none was made twice."), ""]
     kept = extra.get("originals", 0)
     large = extra.get("originalsLarge") or []
-    if kept or large:
+    images = extra.get("images", 0)
+    if kept or large or images:
         how = "File objects" if extra.get("keep") == "fileObjects" else "attachments"
-        lines = [f"- Kept {_count(kept, 'original')} in Attachments/Originals ({how})."]
+        lines = [f"- Kept {_count(kept, 'original')} in Attachments/Originals ({how})."] if kept or large else []
+        if images:  # AC-2: an image is an Image object whose source is its original
+            lines.append("- 1 image became an Image object." if images == 1 else f"- {images:,} images became Image objects.")
         lines += [f"- {obj(p)}: over 100 MB, the original was not copied" for p in large]
         out += _section("Originals", lines)
     losses = extra.get("losses") or []

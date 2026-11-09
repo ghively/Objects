@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 from fake_claude import install
 from fastapi.testclient import TestClient
-from m14support import Clock, m14_space
+from m14support import NEW_TAG, Clock, m14_space
 
 from objectapp import agentrun, aichat, schedulerun, transcripts
 from objectapp import settings as device_settings
@@ -601,3 +601,33 @@ def test_contributor_installed() -> None:
     schedulerun.install()
     names = [name for _o, name, _fn in agentrun.contributors()]
     assert names.count("schedule-guidance") == 1
+
+
+# -- Run now (fix pass H: M24-11) ---------------------------------------------------------------
+
+
+def test_run_now_queues_an_agent_schedule(env) -> None:
+    with opened(env) as client:
+        rule = create(client, schedule(env["researcher"].id))
+        res = client.post(f"/api/automations/{rule['id']}/run-now", json={})
+        assert res.status_code == 202, res.text
+        assert res.json() == {"queued": True}
+        idle(client)
+        runs = runs_of(client, rule["id"])
+    assert len(fake_runs(env["log"])) == 1
+    assert len(runs) == 1 and runs[0]["status"] == "ok"
+    assert runs[0]["trigger"]["kind"] == "schedule" and runs[0]["trigger"]["catchUp"] is False
+
+
+def test_run_now_refusals(env) -> None:
+    with opened(env) as client:
+        off = create(client, schedule(env["researcher"].id, enabled=False))
+        res = client.post(f"/api/automations/{off['id']}/run-now", json={})
+        assert res.status_code == 422 and res.json()["detail"] == TURNED_OFF
+        button = create(client, {"name": "Press", "trigger": {"kind": "button", "scope": None},
+                                 "actions": [{"kind": "addTag", "tagId": NEW_TAG}]})
+        res = client.post(f"/api/automations/{button['id']}/run-now", json={})
+        assert res.status_code == 422 and "schedule" in res.json()["detail"]
+        assert client.post("/api/automations/nope/run-now", json={}).status_code == 404
+        idle(client)
+    assert fake_runs(env["log"]) == []

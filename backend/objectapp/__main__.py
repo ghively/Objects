@@ -8,11 +8,17 @@ specific start-up space (``startupSpace: 'specific'``) when that folder exists;
 else the space opened last (the registry in the state dir) when it exists. A
 `SpaceHost` serves it and, when the app asks to switch spaces, restarts the
 server on the new folder on the same port while the window stays open.
+
+Decision S6: the host makes one `uikey.LaunchKey` per launch (kept across space switches). The
+window opens at a one-time ``/_open`` link that trades its code for the key's cookie; with
+``--browser`` the link is also printed (for when no browser opens), and pressing Enter in the
+launcher's terminal prints and opens a new one (a browser that was closed lost its cookie).
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
 import threading
 import time
 import urllib.request
@@ -27,6 +33,7 @@ from .appstate import state_dir
 from .server import create_app
 from .space import ReadOnly, Space
 from .spaces import Registry
+from .uikey import HEADER, LaunchKey
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8790
@@ -38,10 +45,11 @@ def build_server_config(
     port: int = DEFAULT_PORT,
     static_dir: Path | None = DEFAULT_STATIC_DIR,
     on_switch: Callable[[Path], None] | None = None,
+    ui_key: LaunchKey | None = None,
 ) -> uvicorn.Config:
-    """The uvicorn config for `space`. Always bound to localhost."""
+    """The uvicorn config for `space`. Always bound to localhost. `ui_key`: decision S6."""
     # M21: the app's own loopback URL, for the agent schedule runs it starts.
-    app = create_app(space, static_dir, on_switch=on_switch, base_url=f"http://{HOST}:{port}")
+    app = create_app(space, static_dir, on_switch=on_switch, base_url=f"http://{HOST}:{port}", ui_key=ui_key)
     # uvicorn runs off the main thread here, so it installs no signal handlers;
     # a short graceful timeout keeps a lingering connection from stalling exit.
     return uvicorn.Config(
@@ -66,7 +74,8 @@ class SpaceHost:
 
     `run` blocks: it serves `first_root` until the server exits; if
     `request_switch` was called meanwhile it serves that folder next (same port),
-    otherwise it returns. `stop` ends it.
+    otherwise it returns. `stop` ends it. `ui_key` is the launch's key (decision S6), the same
+    for every space it serves.
     """
 
     def __init__(self, port: int = DEFAULT_PORT, static_dir: Path | None = DEFAULT_STATIC_DIR):
@@ -77,6 +86,7 @@ class SpaceHost:
         self._next: Path | None = None
         self._stopping = False
         self.root: Path | None = None
+        self.ui_key = LaunchKey(port)
 
     def run(self, first_root: Path) -> None:
         root: Path | None = Path(first_root)
@@ -85,7 +95,7 @@ class SpaceHost:
             Registry(state_dir()).register(space.root)
             server = uvicorn.Server(
                 build_server_config(
-                    space, self.port, self.static_dir, on_switch=self.request_switch
+                    space, self.port, self.static_dir, on_switch=self.request_switch, ui_key=self.ui_key
                 )
             )
             with self._lock:
@@ -136,8 +146,10 @@ def startup_root(space_arg: Path | None) -> Path | None:
     return None
 
 
-def _wait_until_up(url: str, timeout: float = 10.0, thread: threading.Thread | None = None) -> bool:
+def _wait_until_up(url: str, timeout: float = 10.0, thread: threading.Thread | None = None,
+                   key: str | None = None) -> bool:
     """True once the server answers; False when it hasn't by `timeout` or `thread` ended first.
+    `key`: the launch key, sent as the ``X-Object-Key`` header (decision S6).
 
     uvicorn ends its thread when it can't bind the port (another Object is running
     there), so waiting on is pointless: the launcher must not open a window on it.
@@ -145,7 +157,8 @@ def _wait_until_up(url: str, timeout: float = 10.0, thread: threading.Thread | N
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(url + "api/space", timeout=1):
+            probe = urllib.request.Request(url + "api/space", headers={HEADER: key} if key else {})
+            with urllib.request.urlopen(probe, timeout=1):
                 return True
         except OSError:
             if thread is not None and not thread.is_alive():
@@ -159,6 +172,25 @@ def _port_taken_message(port: int) -> str:
         f"Object could not start: port {port} is already in use. "
         "Is Object already running? Close it, or pass --port to use another port."
     )
+
+
+def _can_reopen() -> bool:
+    return sys.stdin is not None and sys.stdin.isatty()
+
+
+def _open_in_browser(key: LaunchKey, url: str) -> None:
+    """Print and open a fresh one-time link (decision S6)."""
+    link = key.open_url(url)
+    print(f"Object is running at {url} (opening it in your browser).", flush=True)
+    print(f"If no browser opened, open this link within 5 minutes (it works once): {link}", flush=True)
+    if _can_reopen():
+        print("Press Enter here for a new link.", flush=True)
+    webbrowser.open(link)
+
+
+def _reopen_on_enter(key: LaunchKey, url: str) -> None:
+    for _line in sys.stdin:
+        _open_in_browser(key, url)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -180,7 +212,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     thread.start()
     url = f"http://{HOST}:{args.port}/"
-    if not _wait_until_up(url, thread=thread) and not thread.is_alive():
+    if not _wait_until_up(url, thread=thread, key=host.ui_key.secret) and not thread.is_alive():
         # The server thread died before answering: the port is taken (uvicorn logged
         # "address already in use"). A window on that URL would show another
         # program, or nothing.
@@ -189,16 +221,19 @@ def main(argv: list[str] | None = None) -> None:
 
     try:
         if args.browser:
-            webbrowser.open(url)
+            _open_in_browser(host.ui_key, url)
+            if _can_reopen():
+                threading.Thread(target=_reopen_on_enter, args=(host.ui_key, url), daemon=True).start()
             thread.join()
         else:
             import webview
 
-            webview.create_window("Object", url, width=1440, height=900)
-            # M23: Keep on top opens a small always-on-top window at /?mini=work.
+            webview.create_window("Object", host.ui_key.open_url(url), width=1440, height=900)
+            # M23: Keep on top opens a small always-on-top window at /?mini=work. pywebview's
+            # private mode gives each window its own cookies, so it gets its own code (S6).
             windowhost.set_opener(
                 lambda u: webview.create_window(
-                    "Object focus", u, width=360, height=470, on_top=True
+                    "Object focus", host.ui_key.open_url(u), width=360, height=470, on_top=True
                 )
             )
             webview.start()

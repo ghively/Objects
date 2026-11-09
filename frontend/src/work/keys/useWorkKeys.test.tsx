@@ -21,8 +21,14 @@ import { clearWorkSearch, focusBrainDump, focusWorkSearch } from '../page/WorkPa
 import { openItemPanel } from '../state/workActions'
 import { useWorkSelection } from '../state/useWorkSelection'
 import { loadWorkUi, useWorkUi } from '../state/useWorkUi'
-import { resetWorkViews } from '../views/registry'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
+import { registerWorkView, resetWorkViews, workViews } from '../views/registry'
+import '../captures/registerView'
+import '../tasklists/registerView'
 import { useWorkKeys } from './useWorkKeys'
+
+/** The glob-registered views `g i` and `g c` open, kept before `resetWorkViews` drops them. */
+const DRIVE_GLOB_VIEWS = workViews().filter((v) => v.id === 'captures' || v.id === 'list-inbox')
 
 const A = 'Tasks/Printer jams on line 3.md'
 const B = 'Tasks/Waiting on Pat.md'
@@ -156,6 +162,27 @@ describe('useWorkKeys', () => {
     vi.setSystemTime(new Date(Date.now() + 1500))
     press('n')
     expect(useWorkUi.getState().view).toBe('now')
+  })
+
+  test('D3: g then i opens Inbox and g then c opens Captures; g i does nothing while task lists are hidden', () => {
+    expect(DRIVE_GLOB_VIEWS.map((v) => v.id).sort()).toEqual(['captures', 'list-inbox'])
+    for (const v of DRIVE_GLOB_VIEWS) registerWorkView(v)
+    render(<Harness />)
+    press('g')
+    press('i')
+    expect(useWorkUi.getState().view).toBe('list-inbox')
+    press('g')
+    press('c')
+    expect(useWorkUi.getState().view).toBe('captures')
+    const space = useSpaceInfo.getState().space
+    useSpaceInfo.setState({ space: { ...(space ?? {}), hideTaskManagement: true } as never })
+    try {
+      press('g')
+      press('i')
+      expect(useWorkUi.getState().view).toBe('captures')
+    } finally {
+      useSpaceInfo.setState({ space })
+    }
   })
 
   test('test j k Enter Space', () => {

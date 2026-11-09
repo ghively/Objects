@@ -24,17 +24,24 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 | Calendar Month and Week views, backlinks, Export dialog | specified (section 10) |
 | Unlinked mentions | specified (section 11) |
 | Brain dump, Work agent | specified (section 10b) |
+| Agents: run tools and the fence | specified in part (section 10d) |
 | Import: Source line, Files source, scan, proposal, trial, normalise, Import inbox | specified (section 10c); the exact strings live in the code |
 | Tab and sidebar context menus, Overview tab, collection page, outline | specified (section 9) |
-| Views: layouts, toolbar, Overview | specified (sections 8, 9); the inner screens of the filter, sort and group editors and Customize are not specified yet |
+| Drag and drop | specified (section 9b) |
+| Views: layouts, toolbar, filter, sort and group editors, Customize view, Queries page, Overview | specified (sections 8, 9) |
 | Object page: header, properties, side panel | specified (section 5); outline and stats in section 9; backlinks in section 10; unlinked mentions in section 11 |
-| Editor: block menu, selection toolbar, slash, @ | specified (section 6); the default table in section 10; the look of Two Columns, Code, Math, Toggle, Group and Horizontal line blocks is not specified yet |
-| Graph, Trash, Explore panel, shortcuts | specified (section 7); export dialog in section 10 (PDF, Markdown; Word and LaTeX options not specified yet); the import dialog is described in section 10c |
+| Editor: block menu, selection toolbar, slash, @, markdown list shortcuts | specified (section 6); the default table, Two Columns, Code, Math, Toggle, Group and Horizontal line blocks, and media blocks in section 10 |
+| PDF, Weblink, image and file objects | specified (section 10) |
+| Version control and backup (git) | specified (section 12) |
+| Graph, Trash, Explore panel, shortcuts | specified (section 7); export dialog (PDF, Markdown, Word, LaTeX) in section 10; the import dialog is described in section 10c |
 
 ## 1. Settings
 
 A two-pane modal: left nav with a "Search settings" field, right pane for the chosen page. Groups:
-Account, General, Space, Integrations. Footer of the nav: version, Diagnostics, Reload.
+Account, General, Space, Integrations. Footer of the nav: version, Reload (Object has no Diagnostics row).
+Device settings changed elsewhere (another window, the API) load into an open window without a reload (a
+`settings` change event), and an open agent's Tools tab reads its groups again when an outside server is turned
+on or off or a secret is set.
 
 **Account** **(out of scope)**: account, password and authentication, active sessions, subscription and billing.
 Object has no accounts.
@@ -69,9 +76,15 @@ Object has no accounts.
 - Space Settings: Icon, Name, Description, Delete space.
 - Object Types: "Custom object types" and "Basic object types" tile grids plus Create; per type: Icon, Name,
   Plural, Color, Description, Properties (Add Property), Templates (New Template), Configuration (see the
-  audit doc item 27), Delete object type. Basic types' properties cannot be edited. Field lists per built-in
+  audit doc item 27), Delete object type. Basic types' properties cannot be edited, except that the basic Task type
+  takes the sub-items and dependencies pairs (Parent item / Sub-items, Blocked by / Blocking; a table or
+  timeline view's Customize › Sub-items and dependencies; decision AC-1). Field lists per built-in
   type are in audit item 28.
 - Task management: "Hide Task Management" per space.
+- Automations (M14): in the rule editor, "Set a property" on a date needs a date or "Now" ticked; with neither it
+  shows "Pick a date or tick Now." under the value and Save refuses with the same message (it would write the
+  date empty, `completed: null`). A rule saved like that before keeps running unchanged; opening it shows the
+  message.
 
 **Integrations** **(later)**
 - Calendar Integrations; Task actions.
@@ -88,19 +101,20 @@ Object has no accounts.
 
 Opened from the arrow icon next to the theme toggle; a scrolling list grouped General, Text editing,
 Markdown, Block editing, Page, Navigation, Calendar, AI Assistant, Table, Date picker, PDF viewer, Weblink.
-Ctrl means Cmd on Mac. "Shift" is written as Shift here.
+Ctrl means Cmd on Mac. "Shift" is written as Shift here. "(not in Object)" marks a catalogued key that Object leaves
+unbound on purpose; "(not bound)" one whose key is taken by another action (decision D3).
 
 **General**: Open settings Ctrl+, | Create new task Ctrl+Shift+T | Add new content Ctrl+U | Search
-this space Ctrl+P or Ctrl+K | Open extended search Ctrl+Shift+P | Toggle dark mode Ctrl+Shift+L |
+this space Ctrl+P or Ctrl+K | Open extended search Ctrl+Shift+P (not in Object) | Toggle dark mode Ctrl+Shift+L |
 Toggle focus mode Ctrl+Shift+M | Toggle left sidebar Ctrl+Shift+Left | Toggle right side panel
-Ctrl+Shift+Right | Toggle side panel entry list Ctrl+Shift+Down | Toggle media sidebar Ctrl+Alt+Right | Close
+Ctrl+Shift+Right | Toggle side panel entry list Ctrl+Shift+Down (not in Object) | Toggle media sidebar Ctrl+Alt+Right (not in Object) | Close
 current tab Ctrl+W | Show or hide the list of open tabs Ctrl+Shift+Up | Undo Ctrl+Z | Redo Ctrl+Shift+Z
-or Ctrl+Y | Go to Calendar Ctrl+Alt+H (press twice to jump to today) | Open Explore Ctrl+J | Open Explore in the
-side panel Ctrl+Shift+J | Multi-select blocks and objects Ctrl+Shift+Click | Show or hide the shortcuts list Ctrl+Shift+B |
-Show/hide the getting-started checklist Ctrl+Shift+A.
+or Ctrl+Y | Go to Calendar Ctrl+Alt+H (press twice to jump to today) | Open Explore Ctrl+J (not in Object) | Open Explore in the
+side panel Ctrl+Shift+J (not in Object) | Multi-select blocks and objects Ctrl+Shift+Click | Show or hide the shortcuts list Ctrl+Shift+B |
+Show/hide the getting-started checklist Ctrl+Shift+A (not in Object).
 
 **Text editing**: Cut, copy, paste Ctrl+X/C/V | Paste as plain text Ctrl+Shift+V | Make this block a task
-Ctrl+Shift+T | Format as code Ctrl+E | Format as TeX formula Ctrl+M | Insert/format as link Ctrl+K | Format bold Ctrl+B |
+Ctrl+Shift+T | Format as code Ctrl+E | Format as TeX formula Ctrl+M | Insert/format as link Ctrl+K (not bound: Ctrl+K is Search this space, taken first; decision D3) | Format bold Ctrl+B |
 Italicize Ctrl+I | Strikethrough Ctrl+Shift+S | Underline (unbound) | Highlight the selected text Ctrl+Shift+H | Move active block up or
 down Alt+Up/Down | Move this block up or down among its siblings Alt+Shift+Up/Down | Tick or untick the to-do in this block Ctrl+Enter | Expand or collapse the toggle in this block
 Ctrl+Up/Down (inserts and focuses a child block if none) | Select this block as a whole Esc or Ctrl+A |
@@ -121,15 +135,15 @@ Tick or untick the to-do in this block Ctrl+Enter | Open or close all toggles on
 Code block: leave downwards or upwards (Ctrl+Shift+Down/Up) | Math block likewise | Merge text blocks
 Ctrl+Shift+G.
 
-**Page**: Favorite or unfavorite this page Ctrl+Shift+* | Import, Export this page (Ctrl+E), Share menu Ctrl+S |
+**Page**: Favorite or unfavorite this page Ctrl+Shift+* | Import, Export this page (Ctrl+E), Share menu Ctrl+S (not in Object) |
 Start presentation mode Ctrl+Alt+P; back one slide / next presentation slide; exit presentation mode Esc | Find in page Ctrl+F | Select all top-level blocks |
 Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down) | Scroll to top Home, bottom End,
 page up/down.
 
 **Navigation**: Navigate back Ctrl+Left or Ctrl+[ | Navigate forward Ctrl+Right or Ctrl+] | Open in new tab Ctrl+Click | Open in
-side panel (Shift+Click) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y.
+side panel (Shift+Click; inline `[[links]]` too) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y (not in Object).
 
-**Calendar**: Go to monthly view M | Go to weekly view W | Show three days from today R | Go to daily view D | Jump to today T | Back / forward one day, week or month
+**Calendar**: Go to monthly view M | Go to weekly view W | Show the day before and after R (decision C9) | Go to daily view D | Jump to today T | Back / forward one day, week or month
 Left/Right | Toggle calendar sidebar Ctrl+Alt+S.
 
 **AI Assistant**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; send a message to the daily
@@ -137,17 +151,18 @@ note; retry Ctrl+Alt+R; close chat Ctrl+Alt+X; rephrase Ctrl+Alt+U.
 
 **Work** (M23; on the Work page only, never while typing in a field or editor): Search work / |
 Brain dump B | Go to Now, Flow, Projects map, Today, On the floor, Your queues, Agent queue, Stuck, Wins,
-Alerts, Everything: G then N, W, P, T, O, Q, H, S, Y, L, E (within 1.5 s; in Just one thing only G then N) |
+Alerts, Everything, Inbox, Captures: G then N, W, P, T, O, Q, H, S, Y, L, E, I, C (I and C: decision D3; the other task
+lists and Tickets have no key; G then I does nothing while task management is hidden; within 1.5 s; in Just one thing only G then N) |
 Next row J | Previous row K | Open Enter | Peek Space | Previous item [ | Next item ] | Close Esc (the work item
 panel first, else the focus line and the search) | Shortcuts ?.
 
-**Table**: expand selection in four directions (Shift+arrows) | fill selected cells Ctrl+resize | insert
+**Table** (not in Object; decision D3: these groups stay unbound): expand selection in four directions (Shift+arrows) | fill selected cells Ctrl+resize | insert
 rows below / columns after | delete rows/columns Ctrl+Shift+Backspace-style | move row/column Alt+arrows |
 select all cells | enter cell editing | clear cells | toggle identifier reference mode F4.
 
-**Date picker**: toggle include time | toggle end date Ctrl+R | arrow keys move by day, week, month (Alt+Shift
-for the end date), year | **PDF viewer**: search, capture snapshot Ctrl+Shift+D, zoom Ctrl+0, set/next/previous
-page | **Weblink**: search.
+**Date picker** (not in Object; the date picker binds only Enter): toggle include time | toggle end date Ctrl+R | arrow keys move by day, week, month (Alt+Shift
+for the end date), year | **PDF viewer** (not in Object: no PDF viewer): search, capture snapshot Ctrl+Shift+D, zoom Ctrl+0, set/next/previous
+page | **Weblink** (not in Object: no Weblink viewer): search.
 
 ## 3. "Add new object type" gallery (the `+` next to "Object Types")
 
@@ -163,9 +178,15 @@ Each starter template pre-fills the new type's properties.
 
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
+- A space opened as a new or empty folder (`objectapp --space <folder>`: no `setup` in `space.json`, no basic
+  types, no files) asks "Pick a starting point" once — the same "Start with basic setup" / "Empty space" choices
+  as "Create new space" (`POST /api/space/setup`). Nothing is written before a pick; closing asks again next
+  time. The pick is recorded as `space.json` `setup` (Create space records it too).
 - Main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant (Gene's 2026-11-08 redesign;
   Calendar is the space's opening view). The Assistant is the built-in, always-on helper — a program
-  feature, not an "agent" — shown with its own icon; a click opens its chat. "All notes" is gone from the
+  feature, not an "agent" — shown with its own icon; a click opens its chat. Like an agent row it carries a
+  hover `…` menu (Open chat, Settings, Memory & skills — no Duplicate/Delete: it is built in), the way into
+  its own page (Profile, Instructions, Memory, Skills, Learning, Chats…). "All notes" is gone from the
   sidebar — with many note types it was a dumping ground; the view stays reachable through queries and the
   palette.
 - Agents (M17), a section of its own with the standard section header, directly below the main navigation;
@@ -181,12 +202,21 @@ Each starter template pre-fills the new type's properties.
   Today, Your queues, Agent queue, Captures), and **More views** folds **Plan** (Scheduled, Flow, Projects
   map, On the floor), **Manage** (Status, Open, Deadline, Recurring, Reminders, Context, Tags, All) and
   **Review** (Stuck, Wins, Alerts, Tickets, Everything, Completed); a folded view that is open stays on the
-  row. The task sections are list views of the dashboard, each with the quick add on top (a new task gets
+  row. Wins (and its count) follows every object change once loaded, and Alerts follows a settings change (the
+  monitoring folder), so neither needs a reload. The task sections are list views of the dashboard, each with the quick add on top (a new task gets
   the values the section's filter implies). **Today** is one view: the day timeline (meetings, focus lines,
-  the now-line, deadline countdowns) with **Today's tasks** (overdue and due today, not done) under it; its
-  badge counts today's tasks, Inbox's counts the inbox. The Task rows load once for the page. The old Tasks
-  page (header and section tabs) is retired. Controls use the app's pill style (14px, `bg-hover-2` when
-  on).
+  the now-line, deadline countdowns; it spans 07:00-17:30 at least and widens to the whole hour of any earlier or
+  later meeting, so evening meetings are on it) with **Today's tasks** under it — the Calendar Day view's Tasks section for
+  today (decision T1, one list in both places): tasks whose date covers today, whose deadline is today, and the
+  open overdue ones under "Overdue (n)"; done ones stay, struck; "N open, M done" and the `+` menu (Create task,
+  Move all open tasks to); "Open in Calendar" under it opens the Calendar's Day view on today. Today's badge
+  counts that list's open tasks, Inbox's counts the inbox. While the space hides task management ("Hide Task
+  Management"), the Tasks entry stays — the dashboard is the work dashboard too — and the dashboard leaves
+  out the task lists (the list views and Today's tasks) instead; the work views and the timeline stay. On
+  Today's timeline a block too short for its label and time (the 24-minute Morning brief) shows the two on
+  one line under the track (the next row down when two would meet; the tooltip stays). The Task rows load
+  once for the page. The old Tasks page (header and section tabs) is retired. Controls use the app's pill style
+  (14px, `bg-hover-2` when on).
 - Object Types header: fold chevron, count, a `...` menu (Sort manually with a check, Sort alphabetically) and
   a `+` (the gallery above) on hover.
 - "Add section" opens a small form (a one-line explanation that a section is a named heading for pages
@@ -210,7 +240,14 @@ Each starter template pre-fills the new type's properties.
 - **Header**, top to bottom: type pill (icon + name; click to change type), a relation button, then any
   property surfaced in the header (a Status chip such as "In Progress"), a "Collections" chip; the title in
   large bold; the Description property as a paragraph under the title; a "Tags" row of colored tag chips with a
-  small list icon; a divider; the body.
+  small list icon; a divider; the body. A freshly created object (the New menu, a type's `+`, Ctrl+U and the
+  other create buttons) opens with its title focused and selected, in the peek and on the full page, so typing
+  names it; "Add description" puts the caret in the description it reveals. Renaming an object (its title, a
+  table's title cell, a whiteboard's name) rewrites the links to it in other objects and then says so with a short
+  notice, "Updated links in 3 objects" ("1 object"); nothing is shown when no other object linked to it.
+- **Whiteboard changed outside** (its `.whiteboard.json` edited in another program while the board is open): the
+  board reloads and says "Changed elsewhere. Reloaded."; another view of the same board in this window (a page
+  and a peek) follows silently.
 - **Property value editors**:
   - Date: a chip; click opens a picker: an input with an info icon, presets (Yesterday, Today, Tomorrow, In 1
     week, In 2 weeks), month and year dropdowns, a month grid with the chosen day as a pill, toggles
@@ -220,13 +257,18 @@ Each starter template pre-fills the new type's properties.
     colored chips each with a checkbox (multi-select). Two tag objects with the same title are different
     objects with their own colors.
   - Text, number, checkbox, label: not specified yet.
+- **Property name** (a property label's menu, and "Name" in Property settings): Enter or leaving the field commits
+  the new name; Escape goes back only to the last committed name, so Enter then Escape keeps the new one (Escape
+  in Property settings closes the dialog).
 - **Tags** are objects of the Tag type with a color; the chip uses that color.
 
 ## 6. Editor chrome and menus
 
 - **Selection toolbar** (appears above selected text): Bold, Italic, Strikethrough, Underline, bulleted list,
   numbered/to-do list, Link, Code, TeX formula, color/highlight, `+`, `@` mention, AI sparkle.
-- **Block handle**: hovering a block shows `+` (insert below) and a six-dot grip at its left. Clicking the grip
+- **Block handle**: hovering a block shows `+` (insert below; it opens the slash menu in the new block, and
+  Escape with nothing typed closes it leaving the block empty — no stray `/`; a `/` typed by hand stays) and a
+  six-dot grip at its left. Clicking the grip
   selects the block and opens a menu: Hierarchy (current level, submenu), List >, To-do, Quote, Toggle, Group
   (Ctrl+G), AI assistant..., Turn into..., Copy >, Duplicate (Ctrl+D), Remove (Backspace).
 - **Block selection bar** (bottom of the page while blocks are selected): left "N block(s) . M words" with a
@@ -235,9 +277,23 @@ Each starter template pre-fills the new type's properties.
   dropdown, delete (red), AI, close.
 - **Inline code** renders as a purple monospace token with a tinted background; **tables** are bordered with a
   header row; the empty body's placeholder reads "Start writing, or type / for blocks..."; the title placeholder "Untitled".
-- **Slash menu**, **@ picker**, **markdown shortcuts**: see audit items 41-43 and section 2.
+- **Slash menu**, **@ picker**: see audit items 41-43 and section 2.
+- **Markdown list shortcuts** (decision C11; `editor/extensions/markdownShortcuts.ts`, `editor/document.ts`):
+  - At a block's start, typed marks followed by Space convert: `|` quote, `>` toggle, `*` or `-` bullet, `1.`
+    numbered, `a)` alphabetical, `i)` roman, `[]` to-do, `()` icon, `#`-`####` heading. `---` makes a horizontal
+    line.
+  - Marks combine, with Space only after the last (`>#` + Space = heading 1 in a toggle). They apply inside out:
+    heading, icon, quote, list, toggle. Two marks of one kind (two lists, two headings) stay text.
+  - A single bullet, number or heading mark is StarterKit's own rule. `> ` makes a toggle, not a quote; `[] ` makes
+    a to-do list like the menus.
+  - `()` always gives the same icon (Object keeps no last-used icon).
+  - "Turn off automatic numbered lists" removes `1.` as a mark, alone and combined.
 - **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).
 - **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves.
+- **Edited lines are written in the editor's standard Markdown form**: the line of a block you edit is rewritten
+  that way (`_b_` becomes `*b*`, `[X]` becomes `[x]`, a setext heading becomes ATX `#`, a bare URL becomes
+  `[url](url)`, `\#` escapes appear); it renders the same, and only that line changes in the file — every untouched
+  line keeps its bytes (Gene's decision D5).
 
 ## 7. Graph, Trash, Explore, Help
 
@@ -251,7 +307,11 @@ Each starter template pre-fills the new type's properties.
 - **Explore** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
   (objects related to the page you are on) with "Find More". Toggled with Ctrl+Shift+Right; the tooltip reads
   "Hide sidepanel".
-- **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback.
+- **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback. Object's own
+  section is local only: Keyboard shortcuts, Getting started, Markdown reference and **How-to guides** (Gene's
+  decision D1). How-to guides opens a read-only list (People, Meetings, Projects, Books — one per basic-setup type —
+  and The Tasks dashboard); a guide shows read-only with "All guides" to go back. The guides ship with the app and
+  are never seeded into a space as objects (they would land in All notes and the counts).
 - **Theme toggle** in the sidebar footer switches dark and light immediately (it persists).
 
 ## 8. Search, New menu, view toolbar
@@ -259,13 +319,82 @@ Each starter template pre-fills the new type's properties.
 - **Search palette**: see audit backlog item 2 (placeholder text, Today/Earlier groups, type at the right).
 - **New menu**: popover with Search; types in recent-use order; footer hints.
 - **View toolbar** (type pages, `All` tab): count pill, Filter, Sort, Group by, a layout dropdown, Customize.
-  - Layouts: List, Wall (cards), Kanban, Gallery, Table, Embed.
-  - Filter popover: "where" row builder with "Filter" and "Filter group" buttons. Sort popover: "+ Sort".
-    Group by: a "Group by" button. Customize: "Card view" and "Calculations".
+  - Layouts (`views/model.ts`): List, Wall, Kanban, Gallery, Table, Embed, Calendar, Timeline, Chart, Gallery strip.
+  - Filter popover: "where" row builder with "+ Filter" and "+ Filter group" buttons (below). Sort popover: "Add
+    sort". Group by: a "Group by" button. Customize: "Customize view" (below).
   - Tab strip: Overview | All | custom tabs (including Query-backed ones) | `+` to add a tab.
   - Type page header: type icon + plural name; search icon; `...` (New collection, Pin to sidebar, Pin to…,
     Object type settings, Import CSV, Save as query, Delete object type; "New from template" is in the sidebar's
     type menu); a split "New" button.
+- **Filter editor** (decision C1; `views/FilterEditor.tsx`, `views/filter.ts`):
+  - Popover body: rows that start "where", then the group operator (a menu "and | or" on the second row, plain
+    text on the rest), Property, Operator, value editor and a `…` menu (Turn into group, Remove; Remove only, one
+    level down).
+  - "+ Filter" and "+ Filter group"; a new group takes the opposite operator and two filters. A nested group is
+    boxed and titled "Filter group", with `…` Ungroup and Remove and its own "+ Filter". Removing a group's last
+    filter removes the group. Nesting goes two levels deep.
+  - No filterable property: "No properties can be filtered here". A broken filter shows "Invalid — Will be ignored".
+  - Operators by kind:
+    - Text, URL, email, phone, ID: is empty, is not empty, includes, does not include, is, is not, starts with,
+      ends with.
+    - Number: = ≠ ≥ > ≤ <.
+    - Checkbox: is selected, is not selected.
+    - Label, relation, tags: is empty, is not empty, includes, does not include.
+    - Object type: is, is not. Collections and backlinks: includes.
+    - Date: is empty, is not empty, is, is before, is after, is on or before, is on or after. A date with an end
+      adds the "start …" and "end …" forms. The Task date adds is recurring, is not recurring, has reminder, has no
+      reminder.
+    - Files, steps, floor items, blocks: is empty, is not empty.
+  - Date values (`views/dates.ts`): overdue, today, yesterday, tomorrow, this week, this month, this year, one week
+    ago, in one week, one month ago, in one month, Specific date. "This week" follows "Start of the week".
+- **Sort editor** (decision C2; `views/SortEditor.tsx`, `views/sort.ts`): rows of Property and Order, a "Move to
+  top" arrow on every row but the first, and an × to remove. "Add sort" adds the next unused property; with no
+  sorts it reads "No sort". Dates: Oldest first, Newest first, is empty first, is empty last. Everything else:
+  ascending, descending. Object type, steps and floor items can't be sorted.
+- **Group editor** (decision C3; `views/GroupEditor.tsx`, `views/group.ts`):
+  - "Group by": a property menu starting with "None", then "Group option" and "Sort groups by"; one level of
+    grouping.
+  - Options: status label default | By category; long text By Text | By Linked Objects; number By Exact Value |
+    By Range (Min, Max, Group every); date By Hour | By Day | By Week | By Month | By Year | Relative | Scheduled.
+  - Group order: label Order | Order inverse, others default; then ascending, descending, (relations: Created
+    oldest first, Created newest first), smallest first, largest first, Manual.
+  - Long text with paragraphs, files, steps, text lists and floor items can't be grouped.
+- **Customize view** (decision C4; `views/CustomizeMenu.tsx`, `views/cards/CardCustomize.tsx`), a 16rem menu:
+  - "Layout" (only when the toolbar is under 480 px).
+  - The layout's own page: Table (one type only), Card view (Wall, Gallery, Gallery strip, Kanban), Calendar,
+    Timeline, Chart.
+  - "Sub-items and dependencies".
+  - "Groups", "Calculations", and "Show details" / "Hide details".
+  - "Groups": "Visible groups" and "Hidden groups" with an eye per row; "Show all groups", "Hide all groups";
+    switches "Hide new groups" and "Hide empty groups". Ungrouped: "Group the view by a property first."
+  - "Calculations": one row per calculation ("<Property>: <kind>", ×), and an add row with Property and
+    Calculation. Kinds (`views/calc.ts`): Count all, Count values, Count unique values, Count empty, Count not
+    empty, Percent empty, Percent not empty, Checked, Unchecked, Percent checked, Percent unchecked, Earliest
+    date, Latest date, Date range, Sum, Average, Median, Min, Max, Range.
+  - "Card view", per type: the type name with a gear (opens Object type settings) and a "Use default" switch.
+    "Selected Properties" can be dragged to reorder and removed with ×; "Add Properties" lists the rest, or "All
+    properties are already added". With "Use default" on, the list is read-only.
+- **Queries page and a query** (decision C5; `queries/QueriesPage.tsx`, `QueryPage.tsx`, `QueryBuilder.tsx`,
+  `runQuery.ts`):
+  - Sidebar "Queries" (in the Object Types block) opens a list headed "Queries" with "New". Each row has Open, Pin
+    to Sidebar, Delete. Empty: "No queries" / "Queries you save show up here."
+  - "New" creates a draft and opens it. A query page has an icon, an editable name (Enter commits, Escape
+    reverts) and `…`: Pin to Sidebar, Pin to object type / Unpin, Pin to dashboard / Unpin, Delete. "Edit query"
+    / "Close editor" toggles the builder. Results are a data view.
+  - A draft with no search term, tag or type: "Query isn’t ready" / "The draft is kept, but it lists nothing
+    until it has a search term, a tag or an object type." No results: "No content found".
+  - Builder: Types: All, or picked types (four shown), plus "Exclude object types" (excluding needs a search term
+    or a tag first, and is ignored while particular types are picked). Collection: All | In any collection | In no
+    collection. "Tags or backlinks": Any of | All of, plus "Leave out tags or backlinks". Search: up to five terms
+    of two or more characters; Enter adds a term, and a result needs to match one. Mode: Auto | Title (below).
+    Limit: 1, 3, 5, 10, 25, 50, No limit.
+  - During a search, sorting and property filters are off: "Sorting and property filters are off during a search."
+  - A query's automatic title: "Tasks, Pages tagged work …", or "All notes" with no types (`queries/autoTitle.ts`).
+- **Query builder search mode**: Auto | Title. Auto looks for the words in titles, aliases, descriptions and text (a
+  case-folded substring); Title looks in titles only. Exact and Semantic are hidden until real full-text search exists
+  (Gene's decision Q-1: they matched exactly like Auto). A saved query that uses one still runs as Auto (the
+  server keeps accepting both) and shows Auto; the next edit of its search saves it as Auto. The Search page's **Save as
+  Query** saves Auto too, with or without **Text matches only** (that toggle filters the Search page only).
 - **Wall cards** show: the type label, the icon and title, the description, then one row per card-view property
   with its icon and value or "Empty" (Collaborators, Time frame, Status on Projects).
 
@@ -290,6 +419,31 @@ Each starter template pre-fills the new type's properties.
   of a paragraph, made with `()` Space), tables with a header row, tags row with colored chips, inline code.
 - **Note**: opening an object and selecting text must not change its "Last Updated"; only a real edit does.
 
+## 9b. Drag and drop (decision C10)
+
+Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
+
+- **Editor**: a block moves by its handle with its bytes intact (`editor/handles/dragMove.ts`). Columns dividers and
+  media sizes drag and write on release. Files dropped in upload (section 10, media objects).
+- **Sidebar**: sections reorder by drag (`shell/SidebarSections.tsx`). Pinned and custom-section items reorder; an
+  object pin dragged onto a whiteboard adds it there (`shell/PinnedSection.tsx`). Types drag in manual sort.
+- **Side panel**: an entry's title dragged onto the main view swaps them (`shell/SidePanelArea.tsx`). The divider
+  drags between 10 % and 90 %; a double click resets it to 45 % (`nav/sidepanel.ts`).
+- **Search palette**: a result row dragged onto a whiteboard adds that object; the palette closes as the drag starts
+  (`palette/SearchView.tsx`).
+- **Views**:
+  - Kanban cards drag between columns and write the group value. A card that can't move gets "This card can't be
+    moved here." and no drag starts.
+  - Calendar-layout chips move by whole days and write one property; a range moves whole
+    (`views/layouts/CalendarLayout.tsx`).
+  - Timeline: the bar body moves both dates, an edge moves one, written on drop; "No date" tray items drag onto the
+    axis (`views/layouts/TimelineLayout.tsx`).
+  - Table columns resize, clamped live (`views/table/TableLayout.tsx`).
+- **Lists that reorder by drag**: label options (on Task status, dragging to another section changes its category,
+  `properties/LabelMenu.tsx`), text-list items, templates, Overview sections, card properties, automation actions
+  (`automations/RuleEditor.tsx`) and Work steps (`work/StepList.tsx`).
+- **Cover image**: "Drag to move the image" while repositioning (`object/CoverImage.tsx`).
+
 ## 10. Calendar views, backlinks, export, blocks
 
 - **Month view**: header "Nov 2026" at the left, the view switcher (Month, Week, Three days, Day) centered,
@@ -301,22 +455,92 @@ Each starter template pre-fills the new type's properties.
 - **Week view**: a single column of days. Each day: the weekday name colored by weekday (Sunday red, Monday amber
   with a red "Today" pill, Tuesday pink, Wednesday green, Thursday orange, Friday blue), the date as a large
   title, "Week 45", then the note or a "+ Daily Note" button. No month sidebar.
+- **Three days view** (decision C9; `calendar/ThreeDaysView.tsx`, `calendar/dates.ts`, `calendar/useCalendar.ts`):
+  three equal columns, the anchor day with the day before and after (yesterday, today, tomorrow when anchored on
+  today). Each is the small day header over the daily-note slot, and nothing else (Tasks, Created and Backlinks are
+  Day-view sections). The pill (Reviewed, "Open as Page", `…`) shows on an existing note; a missing note shows "+
+  Daily Note". Previous and next move one day; Up and Down move one week. The switcher tooltip and the R shortcut
+  read "Show the day before and after".
+- **Daily note from a template**: clicking or typing in an empty day's inline note creates the note (from the
+  DailyNote default template, if any) and the typing goes into its own paragraph after the template content (or
+  into the template's first empty paragraph) — never onto the end of the template's last heading.
+- **Day view** on today: the header's right side has a "Tasks dashboard" link to Tasks › Today, which lists the
+  same tasks as the Day view's Tasks section (decision T1); other days have no link.
 - **Backlinks** (bottom of an object, a "Backlinks" pill with a count and a collapse toggle): each backlink is an
   embedded reference, not a link list. A task shows as a task row (circle checkbox, title, status chip with a
   dropdown, date icon, priority pill) plus the line that links here ("Parent project: <object chip>"); other
   objects show the linking block with its parent context. A leading radio-dot marks each reference; hovering shows
   small action icons (expand, `...`, and three more at the right). Unlinked Mentions is a separate section
   (section 11).
+- **Backlinks stay live**: when another object gains or loses a link to the open one (Link on a mention, an
+  outside edit adding `[[X]]`), the Properties panel's Backlinks chips and the Tasks dashboard's Context grouping
+  update without a reload (a change to any other object re-reads them).
 - **Inline tag**: a `#tag` typed in a paragraph renders as a colored chip in the text.
 - **Export dialog** (object `...` > Export, Ctrl+E): a modal with format tiles PDF, Markdown, Microsoft Word,
-  Latex. PDF: Style cards (Notes: matches the page's styling; Essay and Academic, both Experimental),
-  Options (Include embeds; Include outline; Hide empty properties, on by default; Show type labels),
-  Format (A4 | Letter), Properties (All properties, with a per-property list), and an Export button.
-  Markdown: "Include subpages (as a folder)" (zip), Include media, Add the title as a top heading, Links as
-  wikilinks. The Word and Latex options are not specified yet.
+  Latex; Markdown is selected on open. PDF: Style cards (Notes: matches the page's styling; Essay; Academic — all
+  three available, none marked Experimental), Options (Include embeds; Include outline; Hide empty properties, on by
+  default; Show type labels), Format (A4 | Letter), Properties (All properties, with a per-property list), and an
+  Export button. Markdown: "Include subpages (as a folder)" (zip), Include media, Add the title as a top heading,
+  Links as wikilinks.
+- **Word and Latex export** (decision C8; `object/ExportDialog.tsx`, `backend/objectapp/exportdoc.py`):
+  - Options: "Hide empty properties", "Show type labels" and the Properties list ("All properties" plus one per
+    property). No Style or paper choice.
+  - Both come from one reading of the body (headings, paragraphs, lists and to-dos, quotes, code, math, tables,
+    horizontal lines, images, object embeds; block annotations dropped).
+  - Word: paper is A4 with 2 cm margins; the title uses the Title style, the type the Subtitle style. To-dos show as
+    ☐/☑. Code and math are Consolas "Code" paragraphs (math as its TeX source). Tables have a bold first row. Images
+    keep only their alt text, in italics. Embeds show a bold blue title, then the embedded blocks. Web and mail links
+    become real hyperlinks; wikilinks are blue text.
+  - Latex: an `article` with `amssymb`, `ulem` and `hyperref`; unnumbered headings (`\section*` …). Lists map to
+    `itemize` / `enumerate`; to-dos to `[$\square$]` / `[$\boxtimes$]`. Code in `verbatim`, math in `\[ … \]`,
+    tables in a ruled `tabular` with a bold first row. Images become a `% image: <src>` comment plus their alt text.
 - **Table block** (slash > Table): a 2 column by 3 row empty table with a rounded border, header row styling,
-  and cells that edit in place. The look of Two Columns, Code, Math, Toggle, Group and Horizontal line blocks is
-  not specified beyond section 6 (code and math) and the shortcut sheet in section 2 (keyboard behavior).
+  and cells that edit in place.
+- **Blocks** (decision C7):
+  - **Two Columns** (`editor/nodes/columns.ts`, `editor/layout/ColumnsView.tsx`, `editor/layout/Divider.tsx`): slash
+    "Two Columns" inserts 2 even columns (`<!-- columns widths=… -->`). Dividers drag in whole percent, each column at
+    least 10, and write `widths` on release. Hover shows "Column layout" (Columns | Grid: Grid wraps responsively,
+    without dividers), "Add column" and "Remove column", for 1 to 6 columns; widths are spread evenly again.
+  - **Code** (`editor/nodes/codeBlock.ts`, `editor/code/CodeBlockView.tsx`): the bar shows on hover or focus: "Select
+    language", "Wrap lines", "Lock editing" (text read-only until unlocked; moving or deleting the block still
+    works), "Copy to clipboard", "Download as file". Markdown and Mermaid blocks add Edit | Edit & Display | Display
+    (default Display). Highlighting is a decoration only; the bytes never change. Slash "Mermaid Diagram" shows only
+    while searching.
+  - **Math** (`editor/nodes/mathBlock.ts`, `editor/math/MathBlockView.tsx`): `$$…$$` rendered with KaTeX, one row per
+    blank-line-separated part. A click opens the TeX source with a live preview and "Close". Enter inserts a
+    paragraph (above at the very start, else below); Shift+Enter is a line break; Escape closes and selects the block.
+  - **Toggle** (`editor/nodes/toggle.ts`): `<!-- toggle open -->…<!-- /toggle -->`; the first child is the toggle's
+    line. A caret rotates when open and dims with no children; an outliner line runs along the children unless "Hide
+    outliner lines" is on. With Toggle style Bullet, the caret shows as a bullet until hovered. A click writes `open`
+    to the file.
+  - **Group** (`editor/nodes/group.ts`, `editor/layout/GroupView.tsx`): `<!-- group color=… -->`; a rounded box,
+    neutral fill by default, with `color` and `align`. Placeholder "Box heading..." on an empty first line. Hover
+    shows "Ungroup". Ctrl+G groups or ungroups the selected blocks.
+  - **Horizontal line** (`editor/slash/slashItems.ts`): slash "Horizontal line" inserts it below the block (in place
+    of an empty block); `---` at a block start does the same.
+- **PDF, Weblink, image and file objects** (decision C6; `backend/objectapp/typemodel.py`,
+  `editor/media/MediaView.tsx`):
+  - There is no separate PDF or Weblink viewer: an object of a media type is a page whose body holds the media
+    block.
+  - The media types (Weblink, File, Image, PDF, Audio, Video, Tweet) are basic types with fixed, read-only system
+    fields: Weblink: URL, domain, iframe URL, preview image. Tweet: URL, source. File, PDF, Audio: MIME type, file
+    size, source. Image and Video add width and height.
+  - Editable extras with built-in option sets: PDF: Number of Pages, Table of Contents, Document type, Topic. Image:
+    Category, Colors. Weblink: Category, Topic. Audio: Duration, Origin, Category.
+  - A Weblink's preview image is the card image when it is a space file (`views/cards/SmallCard.tsx`).
+  - Import makes every image a Page row would take an Image object (section 10c). With "Keep originals as File
+    objects" picked, each other original becomes a File, PDF, Audio or Video object of the basic media type (made when
+    the space has none); otherwise originals go to `Attachments/Originals/` (`importers/writer.py`).
+  - Media blocks: Image: resizable, alignable, caption. PDF: an iframe, 600 px tall by default, with a bottom drag
+    handle. Audio: controls and caption. Video: resizable, alignable, caption. File: a card with icon, name, size,
+    "Open … on system" and "Download …". Missing file: "File not found." Every media block's `…` menu has "Remove
+    Block".
+  - Web link block: a card with title, domain and URL that opens in the system browser. Nothing is fetched
+    (`editor/nodes/bookmark.ts`).
+  - Resizing writes once, on release. Align left, center or right; "Add caption" / "Remove caption", placeholder
+    "Caption..." (`editor/media/ResizableEmbed.tsx`).
+  - Files dropped or pasted into the editor upload to `Attachments/` (never overwriting, 100 MiB limit checked first)
+    and insert a media block at the drop point (`editor/extensions/fileDrop.ts`, `editor/media/upload.ts`).
 - **Delete** of a page from the list or the peek `...` menu uses the same confirmation as before and the object
   goes to Trash.
 
@@ -328,13 +552,26 @@ Each starter template pre-fills the new type's properties.
   queue a question or a break-down; anything else is filed as typed. The capture is never deleted by filing.
 - **Captures** view (Work switcher, icon lightbulb, no key; count = New + Needs you): filters All, New, Needs you,
   Filed; a row shows Captured, From, Filed to, Linked item and, for Needs you, the question with **Reply to the
-  agent** + **Send**; **Mark filed**; empty text "Nothing waiting to be filed.".
+  agent** + **Send**; **Mark filed**; empty text "Nothing waiting to be filed.". A parked dump picked in Now's
+  "Parked dumps need you" opens Captures on Needs you with that dump's reply box focused (the capture's own page
+  has no reply box).
 - **Agent acts on my approvals** (switch; Agent queue and Settings > Work): off = approvals, answers, notes and
   requests only wait in the Agent queue; on = Object runs due entries one at a time. **Agent runs by itself**
-  (Settings > Work): an Agent step that becomes current runs once, read-only.
+  (Settings > Work): an Agent step that becomes current runs once, read-only. At most 3 auto-runs of one item in a
+  row since Gene last acted on it (decision S3): the 4th Agent step stays Open and is listed in Stuck under
+  **Waiting for Run now** ("The agent ran 3 steps of this item in a row by itself. Press Run now to let it go on.");
+  any action of Gene's on the item (Run now included) starts the count again. The count survives a restart.
+- **Withdraw** (an approved Approve step's button, a `reopen`) logs "Gene withdrew the approval of step n …" in
+  Activity; reopening a done or declined step still logs "reopened".
+- **A step list that can't be read** (a hand-edited entry with an unknown kind or state): the readable steps show,
+  but no step offers an action (`stepsUnreadable`, every step's `actions` empty), and the work header lists the
+  problems ("Step 3 has an unknown kind "maybe".") until the file is fixed — the server refuses every step write.
 - **Settings > Work**: **Create the Work agent** (shell warning; offers to copy your `change-reviewer`),
   **Read tools** (mark a server's read-only tools; no more than 500), **Set up Desk sync** (an off schedule at
   07:00 every weekday that updates ticket fields only; never writes to Jira or ServiceNow).
+- **Agent page > Schedules**: each row's menu offers **Run now** (turned-on schedules only; one run outside the
+  schedule, same guards as a due occurrence, through `POST /automations/{id}/run-now`), **Edit**, **Run log** and
+  **Delete**. A turned-off schedule's summary reads "Off · Every weekday at 7:00 AM".
 - **Queue entry states**: pending, running, done, failed (reason + **Retry**), withdrawn. A failed run says why
   ("The run didn't finish within 30 minutes.", "The agent finished without marking the step done.", "Object closed
   during this run.") or asks Gene one question (a Question step is inserted before the step).
@@ -347,44 +584,124 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **Import dialog** ("Import from another app"): **Zip file or folder** path; **Exported from** Detect automatically
   | Notion | Obsidian | Anytype | Files (a folder, with an optional `_manifest.jsonl`); **Preview** writes nothing.
   Steps in order: source, **Check for sensitive content** (scan), **Review mappings** (types, properties, options),
-  progress with **Stop import**, finish. **Import into**: A new space | This space; the review step also offers
+  progress with **Stop import**, finish. A folder's type name is its singular (Books -> Book, Stories -> Story,
+  People -> Person, Children -> Child); into this space a folder joins an existing type with that name, or one whose
+  plural is the folder's name (so a "People" folder joins Person instead of making "People (2)").
+  **Import into**: A new space | This space; the review step also offers
   **Keep originals as** Attachments (default) | File objects, and **Try on a copy of this space** (imports into a copy
-  named "<space> (trial)" next to the open space; on by default for a first run into this space).
+  named "<space> (trial)" next to the open space; on by default for a first run into this space). A finished import into
+  the copy offers **Switch and review proposed schema** (the batch lives in the copy): it switches to the copy and opens
+  that batch's Proposed schema there.
 - **Source line** (object page, under the properties; hidden when the object was not imported): **Source**
   "Imported from <system> (author, modified <date>, version <v>)", **Open original** (the web url, else the kept
   file) and **Show file** (shows the kept original in the file manager). Every imported object carries the system
   frontmatter block `importSource` (system, url, id, version, author, created, modified, original, contentHash, batch,
-  importedAt).
+  importedAt); it is a system field, so the property panel never lists it under External properties.
+- **Links between imported pages**: a source link names a page by path or by name; when several pages share the name
+  (Books/Dune and Movies/Dune) the one nearest the linking page wins (its own folder, then the deepest shared folder,
+  then the shortest path), and the written link is the title only when the space resolves it to that object, else its
+  path.
 - **Queryable import fields**: filters, sorts and columns offer **Imported from**, **Import batch** and **Source modified**
   (the last is a text filter on the ISO date).
 - **Files source**: every non-Markdown file is one page (text and images where they appeared) with the untouched
   original kept in `Attachments/Originals/` (over 100 MB: not copied, listed in the report). A file that cannot be
   read becomes an "Original only" page. Sheets over 200 rows or 20 columns are not shown ("see the original").
+  An image (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`) is an **Image object** in the Image type's folder
+  (`Images/`; the basic media type Image, made when the space has none): MIME type, file size, width, height and
+  source (the kept original) as its read-only system fields, the image
+  in its body (the design's call, approved by Gene as AC-2 on 2026-11-08; not a Page holding the image). Only images
+  the Page row would take: a mapping that puts them in a folder or key type, or the Page row into another type, wins.
+  The report's Originals section says "1 image became an Image object."; File objects mode makes no second object for
+  an image; the File, PDF, Audio and Video objects it makes belong to the basic media types (made when the space has
+  none, like Image), so their MIME type, file size and source are read-only system fields, not External properties. An image an earlier import made into a Page stays that Page on a re-run (matched by source id, updated in
+  place, never duplicated or migrated) and the report notes "Kept as a Page: an earlier import made it before images
+  became Image objects".
+- **Scanned PDF pages (OCR)**: a page with no text layer (or one under 32 characters) that holds an image is read with
+  a local `tesseract`, English only, and its text merged in page order, so a PDF mixing text and scanned pages keeps
+  every page's text (Gene's call, 2026-11-08). The report names the pages: "Needs OCR: page 2 read with the local OCR
+  engine", or "Needs OCR: page 2 has no text layer" without `tesseract`; a PDF with no text layer at all still says
+  "Needs OCR: read with the local OCR engine" (or "Needs OCR"). Each scanned page is OCR'd once: **Check for
+  sensitive content**, the import's own scan and the import reuse the text, cached in memory by the image's content
+  hash (never written to the space or the state folder; a restart of the app reads it again).
 - **Check for sensitive content** (local, nothing sent anywhere; findings never show the matched text): **Leave out**
   (one folder or pattern per line; left-out files are never read), then **Flagged files** with a kind (Private key, API
   key or token, Password assignment, Connection string, Card number) and line; each defaults to **Import, excluded from AI**
   and can be switched to **Leave out**.
 - **Re-runs**: the same source updates its objects in place (the old text goes to version history), reuses identical
   attachments and never overwrites Gene's edits. Finish step and Import report: counts that add up (source items =
-  imported + updated + unchanged + changed in both + left out + failed), **Changed in both** (**Take source** /
+  imported + updated + unchanged + changed in both + left out + failed; after **Stop import** both say how many of the
+  failed were "not written because the import stopped"), **Changed in both** (**Take source** /
   **Keep mine**, and **Take source for all** / **Keep mine for all**), **Removed at source** (listed, never trashed).
   **Move batch to Trash** moves the objects the batch created (not the ones it only updated) to the Trash.
-- **Proposed schema** (finish step offers **Review proposed schema**): each group is **Use existing type**, **Extend
+- **Proposed schema** (finish step offers **Review proposed schema**; so does each row of **Settings > Import Content >
+  Import history**, the open space's import batches newest first (source, date, objects; trashed batches left out), which
+  reopens the same Proposed schema, Trial, Normalise and Import inbox steps after the dialog was closed or the app
+  reloaded): each group is **Use existing type**, **Extend
   existing type** or **Create type**, with document counts, examples, "N% have a value" fill rates, options and merges;
   **Accept**, **Edit** (Name, Plural name, Keep <property>) or **Turn down**; **Apply** stays disabled until every
   item is decided and creates only what was accepted. A new type needs 10 documents; a property needs 30% of its
-  group. Only the app applies a proposal; no MCP tool can.
+  group. An item the rules will skip says so before Apply ("Apply will skip this: <reason>"), properties the rules left
+  out are listed under **Left out** with their reason, and the Apply summary names each skipped item and why
+  ("Skipped: Memo (…)"; items the user turned down are not repeated). Only the app applies a proposal; no MCP tool can.
 - **Trial on the first 50 objects**: **Start trial**; each result shows a confidence (High, Medium, Low), the value
-  and its **Quote**, and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
+  and its **Quote**, the **Tags** and **Collections** it adds (each with its quote), and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
   failed the app's check says **Did not pass the check**. **Continue with the rest** starts the bulk pass (40 objects
   per agent turn). Flagged files are not in the trial.
 - **Normalise tags and options**: near-duplicate tags and option values (for example Prod / prod / Production) with
   **Merge into** and **Merge N groups**; "Nothing looks like a duplicate." when there are none.
 - **Import inbox**: low-confidence pages land in a collection named "Import inbox"; the last step says
-  "N objects in the Import inbox for you to look at." with **Open Import inbox**.
+  "N objects in the Import inbox for you to look at." with **Open Import inbox**. The open window learns of the collection
+  the pass made: an import's resync reloads the collections, and a collection page opened on an id the window
+  doesn't know yet fetches the collections once more before it says "Unknown collection".
 - **MCP**: `import_scan`, `import_proposal`, `import_report` (read) and `save_import_proposal`, `save_import_decisions`
   (write), the prompt `migrate_a_source` and the resource `object://skills/migrate-a-source` let an outside agent run the
   same workflow; `start_import` refuses a mapping that creates types outside an approved proposal (for the open space or a trial copy; a brand-new space is not checked).
+
+## 10d. Agents: tools and the fence (M17-M18)
+
+- **Built-in tools** (decisions memo S1): a run is offered only the Claude Code built-ins whose Tools-tab row is on,
+  plus the skill tool and `ToolSearch` (which Object's MCP tools load behind); the run passes them as an explicit
+  `--tools` list, never `--tools default`. A built-in the CLI adds later (on 2.1.319: CronCreate, RemoteTrigger,
+  SendMessage, ScheduleWakeup, Workflow, Monitor...) stays off until it gets a Tools-tab row. Read-only work runs
+  get only Web fetch and the skill tool; an import filing run gets none.
+- **What a run's token may call** (decisions memo S2): every run (chats, Work, filing, schedules, delegation,
+  reviews) carries, on its token, the Object agent tools its tool lists allow, so Object itself refuses the
+  others with "This run can't use {tool}." even if the CLI let a call through; an agent's Tools-tab switch-off of
+  Memory, Change skills, Delegate or Call a remote agent is enforced by Object, not only by Claude Code. Read-only
+  runs (Work read, filing a brain dump, Desk sync, import filing) can never write the agent's memory or skills.
+- **Shell and search**: with the shell on, Find files (Glob) and Search in files (Grep) stay ordinary switches. The
+  run names them in its `--tools` list, and Claude Code (checked on 2.1.319) then offers them beside the shell;
+  only the old `--tools default` dropped them for shell-on runs, which is why greying them out (approved as A-1)
+  was not built.
+- **The fence**: a run's file tools are denied every space folder (notes are reached only through Object's tools),
+  the other agents' folders, the agent trash and Object's own state files, through path rules in the run's
+  settings. Known limit, accepted (decisions memo A-2): a folder whose name contains a backslash (`\`, legal in a
+  Linux folder name) can't be fenced — no rule form Claude Code accepts matches it (three forms tried live on
+  2.1.319, Linux). Rename such a folder if an agent should not read it with its file tools.
+
+- **Refused steps** (our wording): a tool step the run was not allowed to make reads "Not allowed to create 'X'
+  (this agent has the tool switched off)" (or "(the file is outside what this agent may read)", or the refusal's own
+  first line), never a past-tense "Created 'X' (failed)"; an ordinary tool error keeps the "(failed)" suffix.
+- **Add agent folder…** says what is wrong: "This folder isn't an Object agent." only when there is no readable
+  `agent.json`; a missing or malformed id says so and shows the id (an agent id is a 26-character ULID).
+- **Settings > Integrations > Secret variables**: **Delete** asks first, as a server's Delete does (**Confirm delete**
+  with "Agents that use this variable lose its value at once. This cannot be undone.").
+
+## 10e. Agent and API guards (Object's own; decisions memo 2026-11-08)
+
+- **One turn per chat** (S8): a second message on a chat that is still answering (the same chat open in two tabs
+  or windows) gets one error, "This chat is still answering.", before anything is written, run or sent. Local
+  agents and remote (A2A) agents share the guard.
+- **Deleting a collection over the API** (S5): `delete_collection` (MCP and `DELETE /api/v1/collections/{id}`) is
+  refused (409, "This collection holds pages excluded from AI; delete it in Object.") when any member is excluded
+  from AI, with or without confirm; nothing changes. Deleting it in Object is unchanged.
+- **Only Object's own window uses `/api`** (S6): each launch makes a random key; the window (and the keep-on-top
+  window) opens at a one-time `/_open` link that hands it over as a session cookie, so every request the UI makes
+  carries it. Without it `/api` answers 401 "Only Object's own window can use this." and the page shows "This page
+  isn't connected to Object" ("Only the window Object opened can use this space. Open Object again from its
+  launcher."). With `--browser` the launcher also prints the link (it works once, for 5 minutes) and Enter in its
+  terminal prints and opens a new one. `/api/v1` with a token keeps its own auth; the run fence stays as a second
+  layer.
 
 ## 11. Unlinked mentions
 
@@ -397,3 +714,53 @@ Object builds it in full (M5): `backend/objectapp/references.py` (matching on Un
 boundaries, titles and aliases of at least a minimum length, longest name first, linking a mention from the
 list), `frontend/src/references/` and the Editor settings. **Gene wants this kept**; it is a ground rule in
 `CLAUDE.md`.
+
+## 12. Version control and backup
+
+Gene, 2026-11-08: "I want the entire object workspace gitbacked for backup to github or lab and version control
+and rollbacks." Object's own feature (no counterpart in the reference app); design note
+`docs/superpowers/specs/2026-11-08-git-backed-spaces-design.md`. Remote-agnostic: any git remote address (https or
+ssh: GitHub, GitLab, a self-hosted server).
+
+- **Off until turned on.** Opening a space never starts it and never writes a file. **Settings > Space > Version
+  control** (after Space Settings): "Turn on version control" puts the space folder in its own git repository
+  (`git init`, or a folder that already is a repository is adopted with its history and branch), keeps a managed
+  block in `.gitignore` (`.object-cache/`, the app's `.*.tmp` temp files, `.DS_Store`, `Thumbs.db`; `.object/` is
+  content and never ignored) and makes the first commit ("Object: start version control"). A folder tracked by a
+  repository in a parent folder is refused. Without git installed the section says "Git is not installed" and it
+  stays off. Turning it off stops the commits; the repository and its history stay.
+- **Commits** happen after a quiet spell ("Commit after", default 2 minutes, from 30 seconds to 30 minutes) with
+  no app write and no change seen on disk, and when the app stops (switching or closing the space, quitting).
+  Other programs' edits are committed too. Messages summarise: "Object: edit 3 objects (Printer jams, Rack, Tape)",
+  "Object: add 1 object (…)", "Object: update 2 files (…)", the paths in the body. The author is the user's git
+  identity, else "Object <object@localhost>". Object stages only the paths it found changed, never commits a change
+  another program staged (it stays staged and the section says so), waits for `.git/index.lock` (never deletes
+  it), and does not commit during a merge, rebase or on a detached HEAD. "Commit now" commits at once.
+- **Remote**: a "Remote" address and an optional "Branch" (default: the current branch), "Save remote", and when
+  set "Push now", "Update from remote" and "Push automatically" (on: push 10 minutes after the first unpushed
+  commit, "Push after" 5 / 10 / 30 / 60 minutes). Unset by default; then the status just says "No remote set".
+  Object uses the system's git credentials (credential helper, SSH agent) and never stores a token or password; git
+  never waits on a prompt. On start a space with a remote is fetched and fast-forwarded only when the folder has no
+  uncommitted changes and the remote is simply ahead; a remote that has diverged shows "Remote has diverged: N
+  commits there and M here. Object never overwrites either side; merge them with git." Nothing is ever force-pushed.
+- **Space history** (a page; from the spaces menu under "Space settings", the palette's "Open space history", the
+  section's button and the sidebar's backup line): the commits newest first (message, time, "N files changed"); a
+  picked commit shows its changes as text diffs per file; **Restore space to this point** asks "Restore the whole
+  space?" and makes every file what it was at that commit as a new commit ("Object: restore to <short> (<date>)"),
+  committing pending changes first; the space's index reloads. History is never rewritten.
+- **Version History dialog** (an object's `…` menu): under the saved versions, "In version control" lists the
+  object's commits (following renames) as "Commit <short>"; one previews and restores like a saved version, as a new
+  commit ("Object: restore "<title>" to <short> (<date>)").
+- **Saved versions** (M8) stay the fine-grained layer. Their folder in the state dir is keyed by the space's stable
+  id (`spaceId` in `.object/space.json`, written when version control is turned on or on the next app save in a
+  space that has a `space.json`), so moving or renaming the folder keeps them; older path-keyed history is moved over.
+  Type, collection, query and view definitions keep a saved version before each app save too.
+- **Settings > Offline & Sync > Backup**: "Back up all spaces" (version control on for every space on this device,
+  with a line per space that couldn't) and the "Back up agents and settings" switch: the per-user state folder
+  (agents, automations, device settings, the spaces list) in its own repository, with a remote field and "Push now".
+  Secrets and token files, caches, saved-version snapshots, logs and run ledgers are never committed, even when the
+  `.gitignore` block is edited away.
+- **Sidebar footer**: while version control is on, a quiet line at the right: "Saved 5 min ago", "Backed up 2 min
+  ago" after a push, "Changes waiting", or "Backup problem" in the danger colour; its tooltip has the detail, a
+  click opens Space history. Nothing shows while it is off.
+- Agent runs can't reach any of this (the run fence covers `/api/vcs`); it is not an MCP tool.

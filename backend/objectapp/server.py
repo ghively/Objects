@@ -199,6 +199,7 @@ from . import (
     api_tasks,
     api_v1,
     api_v1_tools,
+    api_vcs,
     delegation,
     api_v1_captures,
     api_v1_desksync,
@@ -252,6 +253,8 @@ from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
 from .reviews import ReviewRunner
 from .runfence import RunFenceMiddleware
+from .uikey import LaunchKey, UiKeyMiddleware
+from .vcsservice import VcsService
 from .searchindex import SearchIndex
 from .settings import SettingsProblem, time_zone
 from .settings import patch as patch_settings
@@ -264,7 +267,7 @@ from .space import (
     RestoreConflict,
     Space,
 )
-from .spaceconfig import SpaceConfigProblem, space_fields
+from .spaceconfig import SpaceConfigProblem, needs_setup, space_fields
 from .spaceconfig import patch as patch_space_config
 from .spaces import Registry, SpaceNameProblem, create_space, is_full_path, normalize
 from .typedefs import has_undecodable
@@ -563,6 +566,10 @@ _TASK_SECTION_KEYS = frozenset(
 )
 
 
+class SpaceSetupRequest(BaseModel):
+    setup: str
+
+
 class PatchSpaceRequest(BaseModel):
     patch: dict[str, Any]
     baseRevision: str = ""
@@ -572,6 +579,7 @@ class PatchSpaceRequest(BaseModel):
 class PatchSettingsRequest(BaseModel):
     patch: dict[str, Any]
     baseRevision: str = ""
+    clientId: str | None = None
 
 
 class CreateSpaceRequest(BaseModel):
@@ -889,8 +897,14 @@ def create_app(
     watch: bool = True,
     on_switch: Callable[[Path], None] | None = None,
     base_url: str | None = None,
+    ui_key: LaunchKey | None = None,
 ) -> FastAPI:
     """The app for `space`. With `watch`, a `SpaceWatcher` runs for the app's lifespan.
+
+    Decision S6: `ui_key` is the launcher's per-launch key (`uikey.LaunchKey`); with it every
+    ``/api`` request (bar ``/api/v1`` with a bearer token) and the page itself need the key
+    (`UiKeyMiddleware`), and ``/_open`` hands it to the window. Without it (tests, acceptance
+    scripts) there is no key check; the run fence applies either way.
 
     M21: `base_url` is the app's own loopback URL (``__main__.build_server_config`` passes it);
     agent schedule runs give it to the agent as ``OBJECT_API_URL``. Without it (tests) they use
@@ -951,6 +965,7 @@ def create_app(
     async def lifespan(_app: FastAPI):
         hub.loop = asyncio.get_running_loop()
         hub.closed = False
+        vcs_service.start()
         scheduler.start()
         search.start()
         automations.start()
@@ -965,6 +980,7 @@ def create_app(
                 await asyncio.to_thread(work_loop.stop)
                 await asyncio.to_thread(automations.stop)
                 await asyncio.to_thread(alert_watch.stop)
+                await asyncio.to_thread(vcs_service.stop)  # the closing commit
                 hub.close()
                 await asyncio.to_thread(search.stop)
                 await asyncio.to_thread(scheduler.stop)
@@ -984,6 +1000,7 @@ def create_app(
             await asyncio.to_thread(work_loop.stop)
             await asyncio.to_thread(automations.stop)
             await asyncio.to_thread(alert_watch.stop)
+            await asyncio.to_thread(vcs_service.stop)  # the closing commit
             hub.close()
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -991,6 +1008,17 @@ def create_app(
             await asyncio.to_thread(watcher.stop)
             await asyncio.to_thread(search.stop)
             await asyncio.to_thread(scheduler.stop)
+
+    # 2026-11-08: version control. Off until the user turns it on for a space; the worker commits
+    # after a quiet spell (app writes reset the wait through the space listener).
+    def registered_spaces() -> list[Path]:
+        try:
+            return [Path(e.path) for e in Registry(state_dir()).list(current=space.root) if not e.missing]
+        except (OSError, ValueError):
+            return []
+
+    vcs_service = VcsService(space, registered_spaces=registered_spaces)
+    space.add_listener(lambda _change: vcs_service.touch())
 
     app = FastAPI(
         title="Object", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
@@ -1006,8 +1034,12 @@ def create_app(
     # 2026-11-08: an agent run (the CLI's process tree) can't use the app's own /api routes;
     # /api/v1 with a bearer token (the MCP servers' path) and the static files stay as they are.
     app.add_middleware(RunFenceMiddleware, run_pids=running_run_pids)
+    if ui_key is not None:
+        # Decision S6: the launch key, checked before the run fence (its second layer).
+        app.add_middleware(UiKeyMiddleware, key=ui_key)
     app.add_middleware(LocalOnlyMiddleware)  # added last: the outermost, so it checks first
     app.state.space = space
+    app.state.vcs = vcs_service
     app.state.hub = hub
     app.state.reminders = scheduler
     app.state.search = search
@@ -1037,10 +1069,24 @@ def create_app(
             "hideTaskManagement": fields["hideTaskManagement"],
             "jiraSite": fields["jiraSite"],
             "revision": fields["revision"],
+            "needsSetup": needs_setup(space.root),
         }
 
     @api.get("/space")
     def get_space():
+        return space_info()
+
+    @api.post("/space/setup")
+    def post_space_setup(req: SpaceSetupRequest):
+        # Fix pass H2: "Pick a starting point" for a space opened as a new or empty folder.
+        if req.setup not in ("basic", "blank"):
+            return _error(422, "Pick \"basic\" or \"blank\" as the starting point.")
+        if not needs_setup(space.root):
+            return _error(409, "This space already has a starting point.")
+        try:
+            space.apply_setup(req.setup)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         return space_info()
 
     @api.put("/space")
@@ -1074,6 +1120,8 @@ def create_app(
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         settings_changed(data)
+        # Fix pass H: other windows reload their settings (and the Work page its Alerts).
+        announce(ChangeEvent("settings", "settings.json", revision, origin=req.clientId))
         return {"settings": data, "revision": revision}
 
     # -- spaces (M7): the registry in the state dir; folders are never deleted --
@@ -2298,6 +2346,10 @@ def create_app(
     api.include_router(api_agents.router(ctx))
     # M10: the AI assistant (status, a chat turn over SSE, saved AI chats).
     api.include_router(api_ai.router(ctx, reviews=reviews, curator=curator))
+    # 2026-11-08: version control and backup (`vcsservice`); fenced from agent runs like every
+    # /api route, and not an MCP tool.
+    vcs_service.on_restored = lambda target, changed: api_vcs.reload_after_restore(ctx, target, changed)
+    api.include_router(api_vcs.router(ctx, vcs_service))
     app.include_router(api)
     # M6: the whiteboard routes carry their own /api prefix.
     app.include_router(whiteboard_router(space, announce_whiteboard))

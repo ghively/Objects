@@ -156,8 +156,9 @@ describe('QueryPage', () => {
     await user.clear(screen.getByRole('textbox', { name: 'Search' }))
     await user.type(screen.getByRole('textbox', { name: 'Search' }), 'plan{Enter}')
     expect(await screen.findByText('With more than one term, a result needs to match only one.')).toBeInTheDocument()
-    await user.click(screen.getByRole('radio', { name: 'Exact' }))
-    expect(screen.getByText('Works like Auto until full-text search arrives.')).toBeInTheDocument()
+    // Exact and Semantic are hidden until full-text search exists (Q-1).
+    expect(screen.getAllByRole('radio').map((r) => r.textContent)).toEqual(['Auto', 'Title'])
+    await user.click(screen.getByRole('radio', { name: 'Title' }))
 
     await user.click(screen.getByRole('button', { name: 'Limit' }))
     const items = (await screen.findAllByRole('menuitemcheckbox')).map((i) => i.textContent)
@@ -171,10 +172,24 @@ describe('QueryPage', () => {
       () => {
         const d = lastSaved()![0].definition
         expect(d.limit).toEqual({ size: 5, random: true })
-        expect(d.search).toEqual({ searchTerms: [{ text: 'plan' }], searchMode: 'fullText' })
+        expect(d.search).toEqual({ searchTerms: [{ text: 'plan' }], searchMode: 'title' })
       },
       { timeout: 2000 },
     )
+  })
+
+  test('a saved query in a hidden mode (Exact, Semantic) shows Auto; editing it writes Auto (Q-1)', async () => {
+    const user = userEvent.setup()
+    setup(Q({ definition: emptyDef({ search: { searchTerms: [{ text: 'alp' }], searchMode: 'semantic' } }) }))
+    render(<QueryPage id="q1" />)
+    await user.click(await screen.findByRole('button', { name: 'Edit query' }))
+    expect(screen.queryByRole('radio', { name: 'Semantic' })).toBeNull()
+    expect(screen.queryByRole('radio', { name: 'Exact' })).toBeNull()
+    expect(screen.getByRole('radio', { name: 'Auto' })).toHaveAttribute('aria-checked', 'true')
+    expect(mocked.saveQuery).not.toHaveBeenCalled()
+    await user.type(screen.getByRole('textbox', { name: 'Search' }), 'beta{Enter}')
+    await waitFor(() => expect(mocked.saveQuery).toHaveBeenCalled(), { timeout: 2000 })
+    expect(lastSaved()![0].definition.search).toEqual({ searchTerms: [{ text: 'alp' }, { text: 'beta' }], searchMode: 'auto' })
   })
 
   test('test Pin to object type adds query section to type views', async () => {

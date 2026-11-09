@@ -2,6 +2,8 @@
 // (`bound: false`): `useWorkKeys` handles them while the Work page is mounted. The keys are the
 // spec's (section 5, keyboard); the ids and names are ours. `g n` is a two-key sequence.
 import { registerShortcuts, type ShortcutDef } from '@/lib/shortcuts'
+import { TASK_SECTIONS } from '@/tasks/taskSections'
+import { CAPTURE_TEXT } from '../captures/captureText'
 import { WORK_TEXT } from '../workText'
 
 /** How long `g` waits for the view key (ours). */
@@ -17,7 +19,10 @@ const def = (id: string, name: string, keys: string[]): ShortcutDef => ({
   bound: false,
 })
 
-/** `g` then this key opens the view (the Work views table; Tickets has no key). */
+/**
+ * `g` then this key opens the view (the Work views table; Tickets and the other task lists have no
+ * key). Inbox and Captures, of the Drive row, got `g i` and `g c` later (decision D3).
+ */
 const GO: [string, string, string][] = [
   ['workGoNow', WORK_TEXT.viewNow, 'n'],
   ['workGoFlow', WORK_TEXT.viewFlow, 'w'],
@@ -30,6 +35,8 @@ const GO: [string, string, string][] = [
   ['workGoWins', WORK_TEXT.viewWins, 'y'],
   ['workGoAlerts', WORK_TEXT.viewAlerts, 'l'],
   ['workGoEverything', WORK_TEXT.viewEverything, 'e'],
+  ['workGoInbox', TASK_SECTIONS.inbox.title, 'i'],
+  ['workGoCaptures', CAPTURE_TEXT.label, 'c'],
 ]
 
 export const WORK_SHORTCUTS: ShortcutDef[] = [

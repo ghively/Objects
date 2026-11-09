@@ -108,6 +108,43 @@ describe('<BlockHandles>', () => {
     expect(other.state.doc.child(1).textContent).toBe('Hello')
   })
 
+  test('Escape after the plus handle takes its `/` away, leaving the new empty block (M7#20)', async () => {
+    const editor = mounted('Hello\n\nWorld\n')
+    render(
+      <>
+        <BlockHandles editor={editor} />
+        <SlashMenu editor={editor} />
+      </>,
+    )
+    hoverBlock(editor, 0)
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: '+' }))
+    })
+    await screen.findByRole('listbox', { name: '/' })
+    const esc = (target: TiptapEditor) => {
+      const event = new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'keyCode', { value: 27 })
+      act(() => {
+        target.view.dom.dispatchEvent(event)
+      })
+    }
+    esc(editor)
+    await waitFor(() => expect(screen.queryByRole('listbox', { name: '/' })).toBeNull())
+    expect(editor.state.doc.childCount).toBe(3)
+    expect(editor.state.doc.child(1).textContent).toBe('')
+    expect(serializeBody(editor)).not.toContain('/')
+
+    // A `/` typed by hand stays when Escape closes its menu.
+    const typed = mounted('Hello\n')
+    render(<SlashMenu editor={typed} />)
+    act(() => {
+      typed.commands.setTextSelection(typed.state.doc.content.size - 1)
+      typed.view.dispatch(typed.state.tr.insertText(' /'))
+    })
+    esc(typed)
+    expect(typed.state.doc.textContent).toBe('Hello /')
+  })
+
   test('drag handle selects the block and opens the block menu with shortcut hints', async () => {
     const editor = mounted('Hello\n\nWorld\n')
     render(<BlockHandles editor={editor} />)

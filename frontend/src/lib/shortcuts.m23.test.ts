@@ -34,9 +34,12 @@ describe('M23 shortcuts', () => {
       expect(d.bound).toBe(false)
     }
     const keys = WORK_SHORTCUTS.map((d) => d.keys[0])
-    expect(keys).toEqual(['/', 'b', 'g n', 'g w', 'g p', 'g t', 'g o', 'g q', 'g h', 'g s', 'g y', 'g l', 'g e', 'j', 'k', 'Enter', 'Space', '[', ']', 'Escape', '?'])
+    expect(keys).toEqual(['/', 'b', 'g n', 'g w', 'g p', 'g t', 'g o', 'g q', 'g h', 'g s', 'g y', 'g l', 'g e', 'g i', 'g c', 'j', 'k', 'Enter', 'Space', '[', ']', 'Escape', '?'])
     expect(WORK_SHORTCUTS.find((d) => d.keys[0] === 'g n')?.name).toBe('Go to Now')
     expect(WORK_SHORTCUTS.find((d) => d.keys[0] === 'g e')?.name).toBe('Go to Everything')
+    // Decision D3: the Drive row's Inbox and Captures get `g i` and `g c`.
+    expect(WORK_SHORTCUTS.find((d) => d.keys[0] === 'g i')?.name).toBe('Go to Inbox')
+    expect(WORK_SHORTCUTS.find((d) => d.keys[0] === 'g c')?.name).toBe('Go to Captures')
   })
 
   test('the Shortcuts sheet lists the Work group', () => {
@@ -46,6 +49,8 @@ describe('M23 shortcuts', () => {
     expect(within(section).getByText('Go to Now')).toBeInTheDocument()
     expect(section.querySelector('[data-keys="g n"]')?.textContent).toBe('G then N')
     expect(within(section).getByText('Search work')).toBeInTheDocument()
+    expect(section.querySelector('[data-keys="g i"]')?.textContent).toBe('G then I')
+    expect(section.querySelector('[data-keys="g c"]')?.textContent).toBe('G then C')
   })
 
   test('no collision in scope work', () => {

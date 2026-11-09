@@ -110,7 +110,7 @@ describe('test client calls every M7 route with the contract shapes', () => {
     const [url, init] = callOf(fetchMock, 1)
     expect(url).toBe('/api/settings')
     expect(init?.method).toBe('PUT')
-    expect(bodyOf(init)).toEqual({ patch: { themeMode: 'light' }, baseRevision: '' })
+    expect(bodyOf(init)).toEqual({ patch: { themeMode: 'light' }, baseRevision: '', clientId: CLIENT_ID })
   })
 
   test('patchSettings 409 throws ConflictError', async () => {

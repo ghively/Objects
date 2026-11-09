@@ -58,6 +58,7 @@ export const RULE_TEXT = {
   needTime: 'Enter a time.',
   needStart: 'Choose a start date.',
   needActionField: (n: number) => `Action ${n} isn't finished.`,
+  needDate: 'Pick a date or tick Now.',
   repeatsTemplate: (name: string) => `Repeats template “${name}”`,
   repeatName: (name: string) => `Repeat “${name}”`,
   // M21 (our strings)
@@ -140,6 +141,16 @@ export function writableDefs(scopeTypeList: readonly TypeDef[]): PropertyDef[] {
 
 /** Date kinds, which offer "Now". */
 export const isDateKind = (kind: PropertyType | undefined): boolean => kind === 'datetime' || kind === 'datetimeSimple'
+
+/**
+ * A "Set a property" on a date with "Now" unticked and no date: it would write the date empty
+ * (`completed: null`), so the editor refuses to save it. A saved rule like this keeps running as it is.
+ */
+export function missingDate(action: AutomationAction, defs: readonly PropertyDef[]): boolean {
+  if (action.kind !== 'setProperty' || action.now) return false
+  if (action.value !== null && action.value !== undefined && action.value !== '') return false
+  return isDateKind(defs.find((d) => d.key === action.key)?.type)
+}
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`

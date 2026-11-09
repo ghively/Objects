@@ -35,6 +35,7 @@ __all__ = [
     "stamp_local",
     "work_note_lines",
     "work_note_text",
+    "withdraw_text",
 ]
 
 ACTIVITY = "Activity"
@@ -132,6 +133,11 @@ _FLOOR_VERBS = {
     "uncollect": "un-ticked",
     "remove": "removed a floor item:",
 }
+
+
+def withdraw_text(event: WorkEvent) -> str:
+    """The Activity text of a Withdraw (a reopen of an approved step; fix pass H)."""
+    return f"{event.who} withdrew the approval of {_step(event)}"
 
 
 def activity_text(event: WorkEvent) -> str:

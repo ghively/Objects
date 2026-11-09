@@ -9,7 +9,7 @@ registerWorkView({
   id: 'captures',
   label: CAPTURE_TEXT.label,
   icon: WORK_ICONS.capture,
-  key: null,
+  key: 'c', // decision D3
   count: () => openCaptureCount(),
   Component: CapturesView,
 })

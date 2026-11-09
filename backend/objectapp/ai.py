@@ -74,6 +74,13 @@ __all__ = [
 
 MODES = ("chat", "askBlock", "tagBlock", "tagObject", "autofill", "rephrase")
 TURN_TIMEOUT = 300.0
+CHAT_BUSY = "This chat is still answering."  # our string
+RUNNING_CHATS: set[tuple[str, str]] = set()
+"""The ``(agent id, chat id)`` of every chat turn this process is running, local (`api_ai`) and
+remote (`remotechat`, decision S8). A second turn on a running chat (the same chat open in two
+tabs or windows) would append its user line and its answer between the first's, and resume the
+same CLI session (or A2A context) twice; it gets one ``error`` frame (`CHAT_BUSY`) before anything
+is written, started or sent."""
 """Seconds a turn may run before the CLI is stopped."""
 STATUS_TIMEOUT = 10.0
 MAX_CONTEXT_CHARS = 60_000
@@ -151,9 +158,10 @@ def status(setting: str | None) -> dict[str, Any]:
         detail = (out.stderr or out.stdout or "").strip()[-500:]
         return {"available": False, "reason": "error", "claudePath": claude, "version": None,
                 "message": f"`claude --version` failed (exit {out.returncode}): {detail}".strip()}
-    version = (out.stdout or "").strip().splitlines()
-    return {"available": True, "reason": "ok", "claudePath": claude,
-            "version": version[0].strip() if version else None, "message": None}
+    # The CLI's own line: a version-manager wrapper (mise) can print a line of its own first.
+    lines = [ln.strip() for ln in (out.stdout or "").splitlines() if ln.strip()]
+    version = next((ln for ln in lines if "Claude Code" in ln), lines[-1] if lines else None)
+    return {"available": True, "reason": "ok", "claudePath": claude, "version": version, "message": None}
 
 
 # -- context and prompt ---------------------------------------------------------------

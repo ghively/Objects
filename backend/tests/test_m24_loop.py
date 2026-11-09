@@ -408,6 +408,23 @@ def test_agent_status_for_m23(env: Env) -> None:
     assert withdrawn and withdrawn[0]["error"] == REAPPROVE
 
 
+def test_step_entries_carry_the_item_title(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Found on the live-CLI run (lane A): an entry queued by a step action or a note had no title,
+    so its Agent queue row showed no item name and its headless chat was titled "Brain dump · run"."""
+    actions(monkeypatch, {"approve": [step_call("complete", "Done.")]})
+    title = env.service.item(P)["title"]
+    env.step(P, STEP, "approve")
+    env.service.note(P, "request", "hi", GENE)
+    status = AgentSeam().status(env.service.space, [])
+    assert [r["title"] for r in status["rows"]] == [title, title]
+    env.acts()
+    env.idle()
+    [e] = [x for x in env.entries() if x["kind"] == "approve"]
+    chats = (Path(env.agent.folder) / ".object-agent" / "sessions").glob("*.jsonl")
+    heads = [json.loads(p.read_text(encoding="utf-8").splitlines()[0]) for p in chats]
+    assert any(h.get("id") == e["chatId"] and h.get("title", "").startswith(title) for h in heads), heads
+
+
 def test_auto_run(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
     actions(monkeypatch, {"run": [step_call("fail", "Can't read the log", ask="Which reader?")]})
     env.acts()
@@ -752,3 +769,43 @@ def test_an_approved_step_is_queued_again_when_its_item_is_reopened_by_status(
     space.update_properties(P, {"priority": ["Low"]}, space.read(P)[2])
     env.idle()
     assert len([x for x in env.entries() if x["kind"] == "approve"]) == 2
+
+
+def test_auto_runs_stop_after_three_in_a_row(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Decision S3 (2026-11-08): an agent that keeps adding "next" Agent steps gets at most three
+    auto-runs of one item since Gene last acted on it; the fourth Agent step stays Open, is shown
+    in Stuck with a reason, and waits for Run now. The count is kept in the queue file (a restart
+    doesn't reset it); any action of Gene's on the item does."""
+    steps = env.service.item(B)["steps"]
+    env.service.edit_steps(B, [{"op": "remove", "stepId": s["id"], "stepRev": s["rev"]} for s in steps]
+                           + [{"op": "add", "kind": "do", "text": "Gene checks"}], GENE)
+    do_id = env.service.item(B)["steps"][0]["id"]
+    actions(monkeypatch, {"run": [
+        {"server": "object", "tool": "edit_steps",
+         "args": {"path": "{path}", "ops": [{"op": "add", "kind": "agent", "text": "Look again", "before": do_id}]}},
+        step_call("complete", "Looked"),
+    ]})
+    env.acts()
+    env.service.edit_steps(B, [{"op": "add", "kind": "agent", "text": "Look first", "before": do_id}], GENE)
+    env.idle()
+
+    def runs() -> list[dict]:
+        return [e for e in env.entries() if e["kind"] == "run"]
+
+    assert [(e["auto"], e["state"]) for e in runs()] == [(True, "done")] * 3
+    assert len(env.runs()) == 3
+    current = next(s for s in env.service.item(B)["steps"] if s["current"])
+    assert current["kind"] == "agent" and current["state"] == "open" and current["text"] == "Look again"
+    [held] = env.loop.agent_status()["held"]
+    assert held["path"] == B and held["stepId"] == current["id"] and held["stepText"] == "Look again"
+    assert held["reason"] == "The agent ran 3 steps of this item in a row by itself. Press Run now to let it go on."
+    # kept across a restart: a fresh store reads the count, and a scan doesn't run the step
+    assert workloop.QueueStore(env.root).auto_streak(B) == 3
+    assert env.loop.scan_auto_runs() == 0 and len(runs()) == 3
+
+    # Run now is Gene's action: the count starts again, so three more auto-runs follow it
+    env.step(B, current["id"], "run")
+    assert env.loop.agent_status()["held"] == []
+    env.idle()
+    assert [e["auto"] for e in runs()] == [True] * 3 + [False] + [True] * 3
+    assert [h["path"] for h in env.loop.agent_status()["held"]] == [B]

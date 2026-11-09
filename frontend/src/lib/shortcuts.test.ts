@@ -129,6 +129,10 @@ describe('shortcuts', () => {
     expect(name('openImportMenu')).toBe('Import')
   })
 
+  test('C9: Three days is "Show the day before and after", the same words as its tooltip', () => {
+    expect(allShortcuts().find((d) => d.id === 'setViewToRolling')?.name).toBe('Show the day before and after')
+  })
+
   test('isEditableTarget follows App.tsx rule', () => {
     const div = document.createElement('div')
     div.innerHTML = '<div contenteditable="true"><p id="p">x</p></div><div contenteditable="false"><span id="s">y</span></div><textarea id="t"></textarea>'

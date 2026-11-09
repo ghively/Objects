@@ -32,7 +32,8 @@ import { TASK_TYPE } from '@/tasks/taskFixtures'
 import boardJson from '../__fixtures__/board.json'
 import { resetWorkData } from '../state/useWorkData'
 import { loadWorkUi, useWorkUi } from '../state/useWorkUi'
-import { resetWorkViews, workViews } from '../views/registry'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
+import { registerWorkView, resetWorkViews, workViews } from '../views/registry'
 import { WorkPage } from './WorkPage'
 import { clearWorkSearch } from './WorkTopBar'
 
@@ -133,9 +134,44 @@ describe('WorkPage', () => {
     await show('today')
     const body = document.querySelector('[data-work-view-body="today"]') as HTMLElement
     expect(body.querySelector('[data-work-view="today"]')).not.toBeNull() // the timeline
+    // Decision T1: the Calendar Day view's Tasks section for today, with its + menu, not the old list.
     const tasks = within(body).getByRole('region', { name: 'Today\u2019s tasks' })
-    expect(tasks.querySelector('[data-task-section="today"]')).not.toBeNull()
-    expect(within(tasks).getByRole('textbox', { name: 'Task title' })).toBeInTheDocument()
+    expect(tasks.getAttribute('data-testid')).toBe('section-tasks')
+    expect(within(tasks).queryByRole('textbox', { name: 'Task title' })).toBeNull()
+    expect(within(body).getByRole('button', { name: 'Open in Calendar' })).toBeInTheDocument()
+  })
+
+  // The space's Hide Task Management hides the task lists (the old Tasks page), not the dashboard:
+  // it is M23's Work page too, so it stays reachable with the work views and the timeline-only Today.
+  test('test hide task management leaves out the task lists and keeps the work dashboard', async () => {
+    const user = userEvent.setup()
+    registerWorkView({ id: 'list-inbox', label: 'Inbox', icon: 'ph-tray', key: null, count: () => 0, Component: () => null })
+    registerWorkView({ id: 'list-all', label: 'All', icon: 'ph-list', key: null, count: () => 0, Component: () => null })
+    useSpaceInfo.setState({
+      space: { name: 's', root: '/s', types: [], icon: null, description: null, hideTaskManagement: true, revision: 'r' },
+      loaded: true,
+    })
+    try {
+      const r = await show('today')
+      const ids = () => [...switcher().querySelectorAll('[data-work-view]')].map((b) => b.getAttribute('data-work-view'))
+      await user.click(within(switcher()).getByRole('button', { name: 'More views' }))
+      expect(ids()).not.toContain('list-inbox')
+      expect(ids()).not.toContain('list-all')
+      expect(ids()).toEqual(expect.arrayContaining(['now', 'today', 'queues', 'agent', 'flow', 'stuck', 'everything']))
+      // Today is the day timeline alone.
+      const body = document.querySelector('[data-work-view-body="today"]') as HTMLElement
+      expect(body.querySelector('[data-work-view="today"]')).not.toBeNull()
+      expect(within(body).queryByRole('region', { name: 'Today\u2019s tasks' })).toBeNull()
+      // A task list left open falls back to the dashboard's first view.
+      r.unmount()
+      await show('list-inbox')
+      expect(selectedView()).toBe('now')
+      // Showing task management again brings the lists back.
+      act(() => useSpaceInfo.setState((st) => ({ space: st.space && { ...st.space, hideTaskManagement: false } })))
+      expect(switcher().querySelector('[data-work-view="list-inbox"]')).not.toBeNull()
+    } finally {
+      resetSpaceInfo()
+    }
   })
 
   test('test Create task creates a task and opens it in the peek', async () => {
@@ -262,6 +298,6 @@ describe('WorkPage', () => {
   })
 
   test('test WorkPage lists Captures (M24 registers it through the glob)', () => {
-    expect(registeredAtImport).toContainEqual({ id: 'captures', label: 'Captures', key: null })
+    expect(registeredAtImport).toContainEqual({ id: 'captures', label: 'Captures', key: 'c' }) // decision D3: g then c
   })
 })

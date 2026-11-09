@@ -294,6 +294,35 @@ def test_delete_collection_requires_confirm_428(space_dir: Path):
     assert published == []
 
 
+def test_v1_delete_collection_refuses_excluded_members_409(space_dir: Path):
+    """Decision S5 (2026-11-08): the v1 API (and so the MCP tool) refuses to delete a collection
+    holding any "Exclude from AI" member, with or without confirm, and changes no file; with only
+    visible members it still answers 428, then deletes on confirm. The app's own route is unchanged."""
+    from objectapp.tokens import TokenStore
+
+    _delete_setup(space_dir)
+    _member(space_dir, SERVER, "excludeFromAI: true")
+    _record, secret = TokenStore(space_dir).create("agent", "read-write")
+    auth = {"Authorization": f"Bearer {secret}"}
+    space, c, published = _client(space_dir)
+    before = {p: (space_dir / p).read_bytes() for p in _files(space_dir)}
+    with c:
+        asked = c.delete("/api/v1/collections/tooling", headers=auth)
+        forced = c.delete("/api/v1/collections/tooling?confirm=true", headers=auth)
+        after = {p: (space_dir / p).read_bytes() for p in _files(space_dir)}
+        other = c.delete("/api/v1/collections/other", headers=auth)
+        other_ok = c.delete("/api/v1/collections/other?confirm=true", headers=auth)
+        app_route = c.delete("/api/collections/tooling")
+    message = "This collection holds pages excluded from AI; delete it in Object."
+    assert asked.status_code == 409 and asked.json()["detail"] == message
+    assert forced.status_code == 409 and forced.json()["detail"] == message
+    assert SERVER not in asked.text and SERVER not in forced.text
+    assert after == before
+    assert other.status_code == 428 and other.json()["hiddenCount"] == 0
+    assert other_ok.status_code == 200, other_ok.text
+    assert app_route.status_code == 428 and app_route.json()["affected"] == 2
+
+
 def test_delete_collection_trashes_sole_members_only(space_dir: Path):
     _delete_setup(space_dir)
     space, c, published = _client(space_dir)

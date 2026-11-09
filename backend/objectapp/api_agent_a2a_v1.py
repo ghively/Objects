@@ -100,9 +100,13 @@ def router(ctx: ApiContext) -> APIRouter:
     guard = V1Guard(ctx, TokenStore(ctx.space.root))
     r = APIRouter()
 
-    def auth(request: Request, tool: str) -> tuple[TokenRecord, AgentRecord, AgentRegistry]:
+    def auth(request: Request, tool: str, hands_on: bool = False) -> tuple[TokenRecord, AgentRecord, AgentRegistry]:
+        """`hands_on` (remote-call, delegate): `flat`'s refusals come before the token's tool list
+        (decisions memo S2 gives every run one), so a delegated run still hears why."""
         registry = AgentRegistry()
         token, agent = agent_auth(guard, registry, request)
+        if hands_on:
+            flat(token, request)
         agent_tool_allowed(token, tool)
         return token, agent, registry
 
@@ -154,8 +158,7 @@ def router(ctx: ApiContext) -> APIRouter:
     @r.post("/v1/agent/remote-call")
     @_aguarded
     async def remote_call(req: RemoteCallRequest, request: Request):
-        token, caller, registry = await asyncio.to_thread(auth, request, "remote_agent_call")
-        flat(token, request)
+        token, caller, registry = await asyncio.to_thread(auth, request, "remote_agent_call", True)
         _length(req.message, "message", 1, MESSAGE_MAX)
         target = await asyncio.to_thread(find, registry, req.agent)
         if target.kind != REMOTE_KIND:
@@ -199,8 +202,7 @@ def router(ctx: ApiContext) -> APIRouter:
     @r.post("/v1/agent/delegate")
     @_aguarded
     async def delegate(req: DelegateRequest, request: Request):
-        token, caller, registry = await asyncio.to_thread(auth, request, "delegate")
-        flat(token, request)
+        token, caller, registry = await asyncio.to_thread(auth, request, "delegate", True)
         _length(req.goal, "goal", 1, GOAL_MAX)
         context = req.context or ""
         _length(context, "context", 0, CONTEXT_MAX)

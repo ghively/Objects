@@ -135,6 +135,7 @@ from .typemodel import (
     TypeReadOnly,
     UnreadableType,
     load_types,
+    is_task_type,
     system_property_defs,
     topup_task_type,
     type_revision,
@@ -1138,6 +1139,7 @@ class Space:
             self.own_writes,
             trash_ids=lambda: self.trash.definition_ids(folder),
             lock=self._lock,
+            before_write=self._call_before_write,
         )
 
     # -- collections ---------------------------------------------------------
@@ -1400,6 +1402,10 @@ class Space:
             except PermissionError as exc:
                 return Skip(rel, f"The file could not be written: {exc.strerror or exc}")
         raise AssertionError("unreachable")
+
+    def _write_type_json(self, t: TypeDefinition, base_revision: str) -> str:
+        """`write_type_json` with the version-history hook (the type file's bytes before the save)."""
+        return write_type_json(self.root, t, base_revision, before_write=self._call_before_write)
 
     def _call_before_write(self, rel: str, data: bytes, object_id: str | None = None) -> None:
         """Run the `before_write` hook (M8 history) for ``rel``'s current bytes; never raises.
@@ -3513,7 +3519,7 @@ class Space:
             return False
         try:
             self._check_type_free(t.id)
-            write_type_json(self.root, t, "")
+            self._write_type_json(t, "")
         except (RevisionConflict, TypeReadOnly):
             return False
         self._types_changed(t.id)
@@ -4119,7 +4125,7 @@ class Space:
         new.templates = templates
         try:
             self._check_type_free(t.id)
-            write_type_json(self.root, new, type_revision(self.root, t.id))
+            self._write_type_json(new, type_revision(self.root, t.id))
         except (RevisionConflict, TypeReadOnly):
             return False
         self.types = [new if x.id == t.id else x for x in self.types]
@@ -4308,7 +4314,7 @@ class Space:
     def _save_type(self, t: TypeDefinition) -> bool:
         try:
             self._check_type_free(t.id)
-            write_type_json(self.root, t, type_revision(self.root, t.id))
+            self._write_type_json(t, type_revision(self.root, t.id))
         except (RevisionConflict, TypeReadOnly):
             return False
         self._types_changed(t.id)
@@ -4741,6 +4747,30 @@ class Space:
             return None
         return TypeDefinition.from_json(data, fallback_id=type_id) if isinstance(data, dict) else None
 
+    def apply_setup(self, setup: str) -> None:
+        """Fix pass H2: apply M8's "Pick a starting point" to this (new or empty) space.
+
+        ``basic`` writes the Person, Meeting, Project and Book types (`basicsetup`) and loads
+        them; ``blank`` writes nothing else. Either way ``space.json`` records the pick
+        (``setup``), so the space is asked once. Raises `ValueError` for another value.
+        """
+        from . import spaceconfig
+        from .basicsetup import basic_types
+
+        if setup not in ("basic", "blank"):
+            raise ValueError(f"Unknown space setup: {setup!r}")
+        with self._lock:
+            if setup == "basic":
+                taken = {t.id for t in self.types}
+                for t in basic_types():
+                    if t.id in taken:
+                        continue
+                    self._write_type_json(t, "")
+                    self.types.append(t)
+                    self._types_changed(t.id)
+                self._sort_types()
+            spaceconfig.set_internal(self.root, "setup", setup)
+
     def create_type(
         self,
         name: str,
@@ -4824,7 +4854,7 @@ class Space:
                 # Built and checked before the type is written, so a query that can't be
                 # made never leaves a half-created type: the type is made without it.
                 query = self._template_query(tpl.key, t)
-            write_type_json(self.root, t, "")
+            self._write_type_json(t, "")
             self.types.append(t)
             self._sort_types()
             self._types_changed(t.id)
@@ -4834,6 +4864,34 @@ class Space:
                     self.create_query(*query)
                 except Exception:  # the type exists now: never fail its creation
                     _log.warning("Could not save the query %r of type %s", query[0], t.id, exc_info=True)
+            return t
+
+    def create_media_type(self, name: str) -> TypeDefinition:
+        """Create and save the basic media type ``name`` (Image, PDF, File, ...): its media fields
+        (``mimeType``, ``fileSize``, ``width``, ``height``, ``source`` ...) are read-only system
+        definitions, as for a migrated v1 media type. Used by the importer (AC-2: imported images
+        are Image objects). Raises `InvalidValue` for a name in use or that is no media type."""
+        from .typemodel import basic_media_type
+
+        with self._lock:
+            if self._name_taken(name):
+                raise InvalidValue(f'An object type named "{name}" already exists.')
+            types_dir = self.root / ".object" / "types"
+            taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
+            if types_dir.is_dir():
+                taken |= {f.stem for f in types_dir.glob("*.json")}
+            base = slug(name)
+            type_id, n = base, 2
+            while type_id in taken:
+                type_id, n = f"{base}-{n}", n + 1
+            try:
+                t = basic_media_type(name, type_id)
+            except KeyError:
+                raise InvalidValue(f'"{name}" is not a media type.') from None
+            self._write_type_json(t, "")
+            self.types.append(t)
+            self._sort_types()
+            self._types_changed(t.id)
             return t
 
     def _template_query(
@@ -4880,16 +4938,18 @@ class Space:
         one counterpart is a list that syncs back to it.
         """
         lookup = types if types is not None else {x.id: x for x in self.types}
-        if t.basic:
+        allowed = p.options.get("allowedTypes") or []
+        # Decision AC-1: the basic Task type syncs with itself (its sub-items and dependencies pairs).
+        task_self = is_task_type(t) and allowed == [t.id]
+        if t.basic and not task_self:
             return SYNC_NOT_ALLOWED
         ids = _sync_ids(p)
         if p.type != "entity" or p.options.get("hasFixedSet"):
             return SYNC_MULTI_ONLY
         if not _is_multi(p) and len(ids) != 1:
             return SYNC_MULTI_ONLY
-        allowed = p.options.get("allowedTypes") or []
         target = lookup.get(allowed[0]) if len(allowed) == 1 else None
-        if target is None or target.basic:
+        if target is None or (target.basic and not task_self):
             return SYNC_NOT_ALLOWED
         for pid in ids:
             q = next((x for x in target.propertyDefinitions if x.id == pid), None)
@@ -4985,7 +5045,7 @@ class Space:
         try:
             rewritten, skipped = self._apply_type_ops(to_write, run)
             with self._lock:
-                revision = write_type_json(self.root, new, current)
+                revision = self._write_type_json(new, current)
                 self._loaded_revisions[new.id] = revision  # else the next refresh reloads it
                 self._sort_types()
         except BaseException:
@@ -5359,8 +5419,11 @@ class Space:
     def _commit_type(self, t: TypeDefinition, base_revision: str) -> str:
         """Write a type's JSON and put it in memory; return the new revision."""
         self._check_type_free(t.id, base_revision)
-        revision = write_type_json(self.root, t, base_revision)
+        revision = self._write_type_json(t, base_revision)
         self._loaded_revisions[t.id] = revision
+        # In memory the type keeps the fields a load tops up (the Task and work fields), as
+        # `refresh_type` does; the file keeps only what it stored.
+        topup_work_fields(topup_task_type(t), self.types)
         if any(x.id == t.id for x in self.types):
             self.types = [t if x.id == t.id else x for x in self.types]
         else:
@@ -5586,7 +5649,7 @@ class Space:
         backfilled), and nothing at all when the pair is already there.
 
         Raises `KeyError`, `TypeReadOnly`, `RevisionConflict` and `InvalidValue`
-        (unknown kind, basic type, or a same-named property that doesn't match).
+        (unknown kind, a basic type other than Task, or a same-named property that doesn't match).
         """
         spec = RELATION_PAIRS.get(kind)
         if spec is None:
@@ -5595,7 +5658,8 @@ class Space:
             t, current = self._editable_type(type_id)
             if current != (base_revision or ""):
                 raise RevisionConflict(current)
-            if t.basic:
+            # Decision AC-1: of the basic types, only Task may take sub-items and dependencies.
+            if t.basic and not is_task_type(t):
                 raise InvalidValue(SYNC_NOT_ALLOWED)
 
             def named(name: str) -> PropertyDefinition | None:

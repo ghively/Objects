@@ -7,6 +7,9 @@ export const AGENT_TEXT = {
   continueIntro:
     'An agent can propose types and properties for what was imported. You review the proposal, try it on 50 objects, and nothing is applied without your say.',
   continueButton: 'Review proposed schema',
+  // A trial copy: the batch lives in the copy, so the review opens there after the switch.
+  continueCopyIntro: 'The proposal belongs to the copy. Switch to it to review the proposed schema, try it on 50 objects and see the Import inbox.',
+  continueCopyButton: 'Switch and review proposed schema',
   skip: 'Skip',
 
   // Proposed schema.
@@ -35,6 +38,11 @@ export const AGENT_TEXT = {
   applying: 'Applying…',
   applied: (created: number, extended: number) => `${pl(created, 'type', 'types')} created, ${pl(extended, 'type', 'types')} extended.`,
   itemLabel: (name: string) => `Proposal item ${name}`,
+  willSkip: (reason: string) => `Apply will skip this: ${reason}`,
+  droppedHeading: 'Left out',
+  droppedLine: (name: string, reason: string) => `${name}: ${reason}`,
+  skippedSummary: (items: { name: string; reason: string }[]) =>
+    `Skipped: ${items.map((i) => `${i.name} (${i.reason.replace(/\.$/, '')})`).join('; ')}.`,
 
   // Trial.
   trialHeading: 'Trial on the first 50 objects',
@@ -45,6 +53,8 @@ export const AGENT_TEXT = {
   failed: 'The agent run failed. Nothing more was applied.',
   confidence: { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' },
   quote: 'Quote',
+  tagsLabel: 'Tags',
+  collectionsLabel: 'Collections',
   valueRejected: 'Did not pass the check',
   right: 'Right',
   wrong: 'Wrong',

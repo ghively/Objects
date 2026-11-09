@@ -8,6 +8,8 @@ import { useTabs } from '@/nav/tabs'
 import { focusDay } from '@/test/mockApi'
 import boardJson from '../__fixtures__/board.json'
 import { resetWorkData, useWorkData } from '../state/useWorkData'
+import type { DayBlock } from '../logic/daySlots'
+import { blockCaptions } from '../logic/timelineCaptions'
 import { TodayView } from './TodayView'
 
 const BOARD = boardJson as unknown as WorkBoard
@@ -84,6 +86,18 @@ describe('TodayView', () => {
     expect(line.style.left).toBe(`${(180 / 630) * 100}%`)
   })
 
+  // Fix pass H: tonight's meetings are on the timeline, with the now-line.
+  test('test an evening meeting widens the timeline to it', () => {
+    const late = { path: 'Meetings/Late call.md', title: 'Late call', start: '2026-11-05T22:40:00.000Z', end: '2026-11-05T23:20:00.000Z', startLocal: '22:40', endLocal: '23:20' }
+    useWorkData.setState({ board: BOARD, today: { day: '2026-11-05', now: '', nowLocal: '22:13', meetings: [late] } })
+    render(<TodayView data={useWorkData.getState()} now={new Date('2026-11-05T22:13:00.000Z')} />)
+    expect(screen.getAllByText('Late call').length).toBeGreaterThan(0)
+    const marks = [...document.querySelectorAll('[data-hour-mark]')].map((m) => m.getAttribute('data-hour-mark'))
+    expect(marks[0]).toBe('7')
+    expect(marks.at(-1)).toBe('23')
+    expect(document.querySelector('[data-work-now-line]')).toHaveAttribute('data-time', '22:13')
+  })
+
   test('test no now-line outside the day', () => {
     useWorkData.setState({ board: BOARD, today: { day: '2026-11-05', now: '', nowLocal: '18:00', meetings: [] } })
     render(<TodayView data={useWorkData.getState()} now={new Date('2026-11-05T18:00:00.000Z')} />)
@@ -116,6 +130,60 @@ describe('TodayView', () => {
   test('test the day name shows', () => {
     show()
     expect(screen.getByText('Thursday, November 5')).toBeInTheDocument()
+  })
+})
+
+// A block too short for its label and time (the 24-minute Morning brief is ~35px wide at 1440px and
+// read "M…") hangs both, on one line, under the track; long blocks keep them inside.
+describe('TodayView short blocks', () => {
+  beforeEach(() => resetWorkData())
+
+  test('test the Morning brief shows its label and time in a caption under the track', () => {
+    show()
+    const [brief] = block('brief')
+    expect(brief).toHaveAttribute('data-short')
+    expect(brief).toHaveAttribute('title', 'Morning brief 07:00-07:24')
+    expect(brief).toHaveAttribute('data-start', '07:00')
+    const caption = brief.querySelector('[data-block-caption]') as HTMLElement
+    expect(caption).toHaveAttribute('data-block-caption', 'start')
+    expect(caption).toHaveAttribute('data-lane', '0')
+    expect(caption.className).toContain('whitespace-nowrap')
+    expect(within(caption).getByText('Morning brief')).not.toHaveClass('truncate')
+    expect(within(caption).getByText('07:00-07:24')).toBeInTheDocument()
+    // The track's box makes room for the caption row.
+    const box = brief.closest('[data-work-timeline]') as HTMLElement
+    expect(box.style.paddingBottom).not.toBe('')
+  })
+
+  test('test long blocks keep their label and time inside, the wrap-up hangs from its end', () => {
+    show()
+    for (const f of block('focus')) {
+      expect(f).not.toHaveAttribute('data-short')
+      expect(f.querySelector('[data-block-caption]')).toBeNull()
+    }
+    // Wrap-up (16:30-17:12) would run past 17:30 from its start, so it ends at its block's end.
+    const [wrap] = block('wrapUp')
+    expect(wrap.querySelector('[data-block-caption]')).toHaveAttribute('data-block-caption', 'end')
+    expect(within(wrap).getByText('16:30-17:12')).toBeInTheDocument()
+  })
+
+  test('test a short meeting keeps its click from the caption', () => {
+    const spy = vi.fn()
+    useTabs.setState({ openInSidepanel: spy })
+    show()
+    const [standup] = block('meeting')
+    expect(standup).toHaveAttribute('data-short')
+    fireEvent.click(within(standup).getByText('Line 3 standup'))
+    expect(spy).toHaveBeenCalledWith({ kind: 'object', path: 'Meetings/Line 3 standup.md' })
+  })
+
+  test('test captions that would meet take the next row', () => {
+    const b = (start: number, end: number, label: string): DayBlock => ({ start, end, kind: 'meeting', label, path: null })
+    const blocks = [b(9 * 60, 9 * 60 + 15, 'Standup'), b(9 * 60 + 15, 9 * 60 + 30, 'Sync'), b(15 * 60, 15 * 60 + 20, 'Call')]
+    const at640 = blockCaptions(blocks)
+    expect(blocks.map((x) => at640.get(x)?.lane)).toEqual([0, 1, 0])
+    // A long block gets no caption.
+    expect(blockCaptions([b(10 * 60, 11 * 60, 'Long')]).size).toBe(0)
   })
 })
 

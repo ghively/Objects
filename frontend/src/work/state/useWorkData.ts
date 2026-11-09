@@ -167,13 +167,17 @@ const isAlertType = (t: TypeDef) =>
   t.propertyDefinitions.some((p) => p.key === 'alertKey' && p.type === 'text') &&
   t.propertyDefinitions.some((p) => p.key === 'severity' && p.type === 'label')
 
-/** The parts event `e` makes stale (`allLoaded`: the `all` board is in the store). */
-export function partsForEvent(e: ChangeEvent, types: readonly TypeDef[], allLoaded: boolean): WorkPart[] {
+/** The parts event `e` makes stale (`allLoaded`, `winsLoaded`: that part is in the store). */
+export function partsForEvent(e: ChangeEvent, types: readonly TypeDef[], allLoaded: boolean, winsLoaded = false): WorkPart[] {
   if (e.kind === 'work') return ['general']
   if (e.kind === 'workQueue') return ['agent']
+  // Fix pass H: the monitoring folder and its intervals are device settings.
+  if (e.kind === 'settings') return ['alerts']
   if (!OBJECT_EVENTS.has(e.kind)) return []
   const out: WorkPart[] = ['board', 'needsYou']
   if (allLoaded) out.push('all')
+  // Fix pass H: Wins counts steps done, items closed and objects changed: any object change.
+  if (winsLoaded) out.push('wins')
   if (e.kind === 'types') return out
   const paths = [e.path, e.oldPath].filter((p): p is string => typeof p === 'string' && p !== '')
   for (const p of paths) {
@@ -196,7 +200,8 @@ export function useWorkEvents(): void {
     let timer: ReturnType<typeof setTimeout> | null = null
     const off = api.onChange((e) => {
       const types = useSpaceInfo.getState().space?.types ?? []
-      const parts = partsForEvent(e, types, useWorkData.getState().all !== null)
+      const data = useWorkData.getState()
+      const parts = partsForEvent(e, types, data.all !== null, data.wins !== null)
       if (!parts.length) return
       for (const p of parts) pending.add(p)
       if (timer !== null) clearTimeout(timer)

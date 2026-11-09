@@ -182,6 +182,20 @@ def test_sections() -> None:
     assert append_to_section("", None, "Only") == "Only\n"
 
 
+def test_append_joins_the_list_it_follows() -> None:
+    """A list item appended after a list item joins that list (no blank line that would make
+    the list loose); a paragraph, or a different kind of list, still gets its blank line."""
+    body = "## Checklist\r\n\r\n- first\r\n- second\r\n\r\n## Notes\r\n"
+    assert append_to_section(body, "Checklist", "- third") == "## Checklist\r\n\r\n- first\r\n- second\r\n- third\r\n\r\n## Notes\r\n"
+    tasks = "## Todo\n\n- [ ] one\n"
+    assert append_to_section(tasks, "Todo", "- [ ] two") == "## Todo\n\n- [ ] one\n- [ ] two\n"
+    assert append_to_section("1. a\n", None, "2. b") == "1. a\n2. b\n"
+    assert append_to_section("## L\n\n- a\n", "L", "Para") == "## L\n\n- a\n\nPara\n"
+    assert append_to_section("## L\n\n- a\n", "L", "1. b") == "## L\n\n- a\n\n1. b\n"
+    assert append_to_section("## L\n\n- a\n", "L", "* b") == "## L\n\n- a\n\n* b\n"
+    assert append_to_section("- a\n", None, "Para") == "- a\n\nPara\n"
+
+
 def test_sections_keep_crlf() -> None:
     body = "## A\r\n\r\none\r\n\r\n## B\r\n"
     out = append_to_section(body, "A", "two")

@@ -30,6 +30,8 @@ from .watcher import ChangeEvent
 from .workagent import ensure_work_agent, work_agent
 from .workagentmodel import (
     ALREADY_FILED,
+    AUTO_RUN_CAP,
+    AUTO_RUN_HELD,
     CRASHED,
     GONE,
     NOT_FILED,
@@ -302,11 +304,24 @@ class WorkLoop:
     def on_notice(self, space: Space, notice: WorkNotice) -> None:
         if self._key(space) != self._key(self.space):
             return
+        if notice.by.role == "user":
+            # Decision S3: any action of Gene's on the item starts its auto-run count again.
+            try:
+                if self.store.reset_auto_streak(notice.path):
+                    self._event("held")
+            except Exception:
+                log.exception("Resetting the auto-run count of %s failed", notice.path)
         with self._lock:
             cur = self._current
             if cur is not None and notice.by.role == "agent" and notice.path == cur.get("path"):
                 self._notices.append(notice)
         plan = plan_for_notice(notice)
+        if plan is not None and plan.create is not None and not plan.create.get("title"):
+            # The item's title, for the Agent queue row and the run's chat title (a step's or a
+            # note's entry had none, so its row was blank and its chat read "Brain dump").
+            item = self._item(notice.path)
+            if item is not None and item.get("title"):
+                plan.create["title"] = item["title"]
         if plan is not None:
             try:
                 withdrawn, created = self.store.apply(plan, now=self.clock())
@@ -425,16 +440,27 @@ class WorkLoop:
         item = self._item(path)
         if item is not None and not item.get("done"):
             self._requeue_approved(item)
+        step = None if item is None or item.get("done") else next(
+            (s for s in item.get("steps", []) if s.get("current")), None)
+        runnable = step is not None and step.get("kind") == "agent" and step.get("state") == "open"
+        if not runnable and self.store.reset_auto_streak(path, keep_count=True):
+            self._event("held")  # the held step isn't current and Open any more (S3)
         settings = self.read_settings()
         if not settings.get("workAutoRun") or not settings.get("workAgentActs"):
             return False
-        if item is None or item.get("done"):
+        if not runnable:
             return False
-        step = next((s for s in item.get("steps", []) if s.get("current")), None)
-        if step is None or step.get("kind") != "agent" or step.get("state") != "open":
-            return False
+        assert item is not None and step is not None
         key = auto_run_key(path, str(step["id"]), str(step.get("text") or ""))
         if self.store.has_auto_run(key):
+            return False
+        if self.store.auto_streak(path) >= AUTO_RUN_CAP:
+            # Decision S3: the step stays Open, shown in Stuck, until Gene presses Run now.
+            held = {"stepId": step["id"], "stepN": step.get("n"), "stepText": step.get("text"),
+                    "title": item.get("title"), "at": _iso(self.clock())}
+            if self.store.hold_auto_run(path, held):
+                log.info("Auto-run of %s step %s held: %d in a row", path, step["id"], AUTO_RUN_CAP)
+                self._event("held")
             return False
         try:
             self.service.step(path, step["id"], step["rev"], "run", Actor("app", "Object"))
@@ -443,7 +469,7 @@ class WorkLoop:
             return False
         # Recorded only once the step is running: a write that failed (read-only, disk error) is
         # tried again on the next change or scan.
-        self.store.record_auto_run(key)
+        self.store.record_auto_run(key, path)
         return True
 
     def scan_auto_runs(self) -> int:
@@ -767,6 +793,7 @@ class WorkLoop:
             "actsOnApprovals": bool(settings.get("workAgentActs")),
             "carrying": carrying,
             "rows": [_row(e) for e in _ordered(entries, self.clock())],
+            "held": [_held_row(h) for h in self.store.held()],
             "note": problem or self.store.problem(),
         }
 
@@ -792,6 +819,15 @@ def _row(entry: dict[str, Any]) -> dict[str, Any]:
         "notBefore": entry.get("notBefore"), "createdAt": entry.get("createdAt"),
         "claimedAt": entry.get("claimedAt"), "finishedAt": entry.get("finishedAt"),
         "result": entry.get("result"), "error": entry.get("reason"),
+    }
+
+
+def _held_row(held: dict[str, Any]) -> dict[str, Any]:
+    """An Agent step the auto-run cap held back (decision S3), for Stuck."""
+    return {
+        "path": held["path"], "title": held.get("title") or Path(held["path"]).stem,
+        "stepId": held.get("stepId"), "n": held.get("stepN"), "stepText": held.get("stepText"),
+        "heldAt": held.get("at"), "reason": AUTO_RUN_HELD,
     }
 
 

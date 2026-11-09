@@ -14,7 +14,7 @@ import { resetWorkToasts, useWorkToasts } from '../state/workToasts'
 import { workViews } from '../views/registry'
 import { CapturesView } from './CapturesView'
 import './registerView'
-import { resetCaptures } from './useCaptures'
+import { resetCaptures, useCaptures } from './useCaptures'
 
 const mocked = vi.mocked(api)
 const NOW = new Date('2026-11-05T10:00:00.000Z')
@@ -41,6 +41,17 @@ describe('CapturesView', () => {
     expect(screen.queryByText('Tray 2 jams again')).toBeNull()
     expect(screen.getByText('Fix lamp')).toBeTruthy()
     expect(screen.getByRole('button', { name: /Filed to Fix lamp task/ })).toBeTruthy()
+  })
+
+  // Fix pass H: a parked dump picked on Now opens here on Needs you with its reply box focused.
+  test('a capture asked for by Now opens on Needs you with its reply box focused', async () => {
+    useCaptures.getState().reply(ASK.path)
+    show()
+    const box = await screen.findByRole('textbox', { name: 'Reply to the agent' })
+    await waitFor(() => expect(document.activeElement).toBe(box))
+    expect(screen.getByRole('button', { name: 'Needs you' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('Tray 2 jams again')).toBeNull()
+    expect(useCaptures.getState().replyTo).toBeNull()
   })
 
   test('empty state', async () => {

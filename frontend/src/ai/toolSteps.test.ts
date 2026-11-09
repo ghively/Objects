@@ -10,6 +10,25 @@ function step(name: string, input: Record<string, unknown> | null, over: Partial
 const line = (name: string, input: Record<string, unknown> | null = {}) => toolStepLine(step(name, input))
 
 describe('toolStepLine', () => {
+  test('a refused call says it was refused and why, not a past-tense line (fix pass H)', () => {
+    const denied = (name: string, input: Record<string, unknown>, result: string) =>
+      toolStepLine(step(name, input, { isError: true, result }))
+    expect(denied('create_task', { title: 'Researcher forbidden task' }, 'Permission to use mcp__object__create_task has been denied.')).toBe(
+      "Not allowed to create 'Researcher forbidden task' (this agent has the tool switched off)",
+    )
+    expect(denied('Read', { file_path: '/s/Pages/Vault Secret.md' }, 'File is in a directory that is denied by your permission settings.')).toMatch(
+      /^Not allowed to read .*\(the file is outside what this agent may read\)$/,
+    )
+    expect(denied('mcp__fake-stdio__echo', {}, 'Permission to use mcp__fake-stdio__echo has been denied.')).toBe(
+      'Not allowed to use echo (fake-stdio) (this agent has the tool switched off)',
+    )
+    expect(denied('create_task', { title: 'X' }, 'The write was refused: the page is excluded from AI.')).toBe(
+      "Not allowed to create 'X' (The write was refused: the page is excluded from AI)",
+    )
+    // An ordinary error keeps the suffix.
+    expect(denied('create_task', { title: 'X' }, 'Disk full')).toBe("Created 'X' (failed)")
+  })
+
   test("test lines for Object's tools", () => {
     expect(line('search', { query: 'rack' })).toBe("Searched notes for 'rack'")
     expect(line('set_properties', { path: 'Servers/Alpha.md' })).toBe('Edited Servers/Alpha.md')

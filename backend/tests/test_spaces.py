@@ -116,7 +116,8 @@ def test_create_space_writes_only_space_json(tmp_path: Path, state: Path):
     assert path == loc.resolve() / "Field notes"
     assert _tree(loc) == {
         "Field notes/.object/space.json": hashlib.sha256(
-            (json.dumps({"name": "Field notes: 2026"}, indent=2) + "\n").encode()
+            # `setup` records the starting point, so the space never asks on open (fix pass H2).
+            (json.dumps({"name": "Field notes: 2026", "setup": "blank"}, indent=2) + "\n").encode()
         ).hexdigest()
     }
     assert [p.name for p in path.iterdir()] == [".object"]

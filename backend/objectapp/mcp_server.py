@@ -98,6 +98,8 @@ class ObjectClient:
         if res.status_code == 409 and isinstance(body, dict):
             if "currentRevision" in body:
                 raise ApiError(f"Conflict: {detail} Current revision: {body.get('currentRevision')}.")
+            if "currentVersion" not in body:  # a refusal, not a version clash (S5's delete_collection)
+                raise ApiError(f"Conflict: {detail}")
             raise ApiError(
                 f"Conflict: {detail} Current version: {body.get('currentVersion')}."
             )
@@ -540,7 +542,8 @@ def build_server(client: ObjectClient, write: bool = True) -> MCPServer:
     @server.tool(annotations=REPLACE)
     def delete_collection(collection_id: str, confirm: bool = False) -> dict:
         """Move a collection to the trash (restorable); members only in it go too, the
-        others just leave it. Without `confirm` it answers how many objects it affects."""
+        others just leave it. Without `confirm` it answers how many objects it affects. A
+        collection holding a page excluded from AI is refused (delete it in Object)."""
         return client.delete(
             f"/collections/{_seg(collection_id)}", confirm="true" if confirm else None
         )

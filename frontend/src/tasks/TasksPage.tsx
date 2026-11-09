@@ -22,7 +22,7 @@ import { useViewState } from '@/views/useViewState'
 import { QuickAddTask } from './QuickAddTask'
 import { completionToast, type TaskOutcome } from './taskActions'
 import { taskRowExtras } from './taskRowExtras'
-import { DEFAULT_TASK_SECTION, TASK_SECTIONS, isTaskSectionKey, sectionRows } from './taskSections'
+import { DEFAULT_TASK_SECTION, TASK_SECTIONS, isTaskSectionKey, sectionRows, todayOpenCount } from './taskSections'
 import { useTaskRows } from './useTaskRows'
 
 export { findTaskType } from './useTaskRows'
@@ -204,4 +204,10 @@ export function TaskSectionPanel({ sectionKey }: { sectionKey: TaskSectionKey })
 export function sectionCount(sectionKey: TaskSectionKey, now: Date = new Date()): number {
   const { rows, taskType } = useTaskRows.getState()
   return sectionRows(sectionKey, rows, taskType, now).length
+}
+
+/** Today's open tasks (the Today badge; decision T1: the same rule as the Calendar Day view's list). */
+export function todayTaskCount(now: Date = new Date()): number {
+  const { rows, taskType } = useTaskRows.getState()
+  return todayOpenCount(rows, taskType, now)
 }

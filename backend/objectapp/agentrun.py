@@ -54,6 +54,7 @@ from typing import TYPE_CHECKING, Any
 from . import toolcatalog
 from .agentmodel import AGENTS_DIR, PROTECTED, SELF_LOADED, TRASH_DIR
 from .jsonstore import dump_json
+from .tokens import TokenStore
 
 if TYPE_CHECKING:  # agents (T2) imports toolcatalog; this module only needs the type
     from .agents import AgentRecord
@@ -104,10 +105,9 @@ CLI_FLAGS = (
     "--permission-prompts",
     "none",
     "--strict-mcp-config",
-    "--tools",
-    "default",
 )
-"""Every fixed flag of an agent run (checked against ``claude --help`` of 2.1.317)."""
+"""Every fixed flag of an agent run (checked against ``claude --help`` of 2.1.317). ``--tools`` is
+not fixed: `build_run` names the run's built-ins (`toolcatalog.cli_tools`, decisions memo S1)."""
 
 RUN_SETTINGS_BASE: dict[str, Any] = {"autoMemoryEnabled": False}
 """In every ``run-settings.json`` (spike)."""
@@ -322,8 +322,15 @@ def _both_forms(p: Path) -> list[Path]:
 def rule_path(p: Path) -> str:
     """The CLI's absolute rule form of `p`: ``//c/Users/x/My Notes`` on Windows (drive
     lower-cased, ``/`` separators), ``//home/x`` on POSIX. `p` is used as given (callers
-    resolve it); a trailing separator is dropped."""
+    resolve it); a trailing separator is dropped.
+
+    ``[`` and ``]`` are backslash-escaped (sweep finding 18): the CLI reads ``[2024]`` in a rule as
+    a character class, which left a folder named ``Notes [2024]`` unfenced (checked live on
+    2.1.319). ``*``, ``?`` and braces stay as written: the CLI still matches them on the literal
+    name (a wildcard closes a few look-alike folders too), and an escaped ``\\?`` stopped matching.
+    """
     text = str(p).replace("\\", "/").rstrip("/")
+    text = text.replace("[", "\\[").replace("]", "\\]")
     if len(text) > 1 and text[1] == ":":
         return "//" + text[0].lower() + text[2:]
     return "/" + (text if text.startswith("/") else "/" + text)
@@ -396,7 +403,11 @@ def claude_md_excludes(own: Path, home: Path) -> list[str]:
     """(spike) The ``claudeMdExcludes`` of every run: resolved, ``/``-separated absolute paths,
     duplicates removed. ``<home>/.claude/CLAUDE.md`` and ``<home>/.claude/rules/**``, then for
     every ancestor folder of `own` (not `own` itself) up to the drive root its ``CLAUDE.md``,
-    ``.claude/CLAUDE.md`` and ``CLAUDE.local.md``. Never `own`'s own instruction files."""
+    ``.claude/CLAUDE.md`` and ``CLAUDE.local.md``. Never `own`'s own instruction files.
+
+    Never glob-escaped, unlike `rule_path` (sweep finding 18): the CLI matches these on the
+    literal path (an ancestor named ``Notes [2024]`` stays out), and an escaped entry stopped
+    matching (both checked live on 2.1.319)."""
 
     def form(p: Path) -> str:
         return str(p).replace("\\", "/")
@@ -643,6 +654,9 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
     parts = RunParts()
     for _order, _name, fn in contributors():
         fn(scope, parts)
+    # Decisions memo S2: the run's token may call only the agent tools its CLI lists allow, so the
+    # server refuses the rest ("This run can't use {tool}.") whatever the CLI does.
+    TokenStore.narrow_ephemeral(scope.token, toolcatalog.agent_tools_in(parts.allowed))
     own = Path(scope.agent.folder).resolve()
     mcp = {"mcpServers": {n: _without_sign_in(n, s) for n, s in parts.mcp_servers.items()}}
     append = "\n\n".join(p for p in parts.append_prompt if p)
@@ -666,6 +680,7 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
         "--mcp-config", str(tmp / "mcp.json"),
         "--settings", str(tmp / "run-settings.json"),
         "--append-system-prompt-file", str(tmp / "append.md"),
+        "--tools", ",".join(toolcatalog.cli_tools(parts.allowed, parts.disallowed)),
         "--allowedTools", ",".join(parts.allowed),
         "--disallowedTools", ",".join(parts.disallowed),
     ]

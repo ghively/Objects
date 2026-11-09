@@ -2,7 +2,7 @@
 import { describe, expect, test } from 'vitest'
 import type { FocusLine, MeetingSlot } from '@/api/types'
 import { WORK_TEXT } from '../workText'
-import { dayBlocks } from './daySlots'
+import { dayBlocks, dayRange } from './daySlots'
 
 const meeting = (title: string, start: string, end: string): MeetingSlot => ({
   path: `Meetings/${title}.md`,
@@ -60,8 +60,13 @@ describe('day slots', () => {
     expect(show(blocks.filter((b) => b.kind === 'focus'))).toEqual(['focus 14:45-16:27 Focus 1'])
   })
 
-  test('blocks outside 07:00-17:30 are dropped', () => {
-    const blocks = dayBlocks([meeting('Early', '06:00', '06:30'), meeting('Late', '18:00', '18:30')], [], at('08:00'))
-    expect(blocks.map((b) => b.kind)).toEqual(['brief', 'wrapUp'])
+  // Fix pass H: 07:00-17:30 is the least the timeline shows; an earlier or later meeting widens it
+  // to its whole hour, so evening meetings are on it.
+  test('early and late meetings stay and widen the range to their hours', () => {
+    const meetings = [meeting('Early', '06:10', '06:30'), meeting('Late', '22:40', '23:20')]
+    const blocks = dayBlocks(meetings, [], at('08:00'))
+    expect(blocks.map((b) => b.label)).toEqual(['Early', WORK_TEXT.morningBrief, WORK_TEXT.wrapUp, 'Late'])
+    expect(dayRange(meetings)).toEqual({ start: at('06:00'), end: at('24:00') })
+    expect(dayRange([meeting('Mid', '09:00', '10:00')])).toEqual({ start: at('07:00'), end: at('17:30') })
   })
 })

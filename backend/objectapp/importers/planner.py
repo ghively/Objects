@@ -23,7 +23,7 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any
 
 from ..ids import new_ulid
-from ..media import ATTACHMENTS, MAX_ATTACHMENT_BYTES, _safe_attachment_name
+from ..media import ATTACHMENTS, MAX_ATTACHMENT_BYTES, _safe_attachment_name, kind_of
 from ..propvalues import InvalidValue, encode_updates
 from ..resolver import Resolver, fold
 from ..space import _LINK_BREAKING_RE, ObjectSummary, safe_filename, unique_key
@@ -63,6 +63,8 @@ if TYPE_CHECKING:
 __all__ = ["MappingProblem", "Planned", "Target", "importable_type", "plan", "to_preview"]
 
 PAGE_KEY = "page"
+IMAGE_TYPE = "Image"
+IMAGE_FOLDER = "Images"
 TAG_FOLDER = "Tags"
 MAX_PREVIEW_SKIPPED = 500
 MAX_SAMPLES = 20
@@ -102,6 +104,19 @@ def importable_type(t: TypeDefinition) -> bool:
     if t.readOnlyReason:
         return False
     return not t.basic or t.name.casefold() in _IMPORTABLE_BASIC
+
+
+def _imports_as_image(o: ReadObject, key: str, tw: TypeWrite, page_id: str) -> bool:
+    """AC-2 (decisions memo 2026-11-08): an image file the Page type would take becomes an Image
+    object (the design's readers table), not a Page holding the image. Images a mapping puts in
+    another type (a folder or key type, an existing type chosen for the Page row) follow the mapping."""
+    return (
+        bool(o.native)
+        and key == PAGE_KEY
+        and tw.basic
+        and tw.existingTypeId in (None, page_id)
+        and kind_of(o.sourcePath) == "image"
+    )
 
 
 class MappingProblem(ValueError):
@@ -179,6 +194,8 @@ class ObjectWrite:
     lastUpdated: str = ""
     existing: str | None = None
     """M25 re-run: the space path of the object an earlier import made from this source item."""
+    media: str | None = None
+    """"image": the file is an image the Page type would take; the writer makes an Image object (AC-2)."""
 
 
 @dataclass
@@ -221,11 +238,14 @@ _SINGULAR_KEEP = frozenset({"series", "species", "news", "status", "bus", "analy
 _IE_WORDS = frozenset({"movies", "cookies", "pies", "ties", "lies", "zombies", "selfies", "calories", "rookies", "hippies", "goalies", "smoothies", "brownies", "pixies", "aunties", "genies"})
 # -ches words whose singular keeps the "e" (Caches -> Cache).
 _CHES_WORDS = frozenset({"caches", "niches", "aches", "headaches", "avalanches", "moustaches", "mustaches", "cliches", "quiches"})
+# Common irregular plurals (our choice): People -> Person, so a "People" folder joins the Person type.
+_IRREGULAR = {"people": "person", "children": "child", "men": "man", "women": "woman", "mice": "mouse",
+              "geese": "goose", "teeth": "tooth", "feet": "foot", "persons": "person"}
 
 
 def _singular(name: str) -> str:
     """A folder name made singular by a plain English rule (our choice), applied to its last
-    word: ``-ies`` -> ``-y`` (``Stories``; ``Movies`` -> ``Movie``), ``-sses``, ``-xes``,
+    word: a few irregular plurals (``People`` -> ``Person``, ``Children`` -> ``Child``), ``-ies`` -> ``-y`` (``Stories``; ``Movies`` -> ``Movie``), ``-sses``, ``-xes``,
     ``-ches``, ``-shes`` drop ``es`` (``Classes``, ``Boxes``, ``Watches``,
     ``Wishes``), a final ``s`` is dropped unless the word ends ``ss``, ``us`` or ``is``; a few
     words (``Series``, ``Status``, ``News``…) stay as they are. Never answers an empty name."""
@@ -237,6 +257,10 @@ def _singular(name: str) -> str:
         out = stem + (add.upper() if upper else add)
         return f"{head} {out}" if head else out
 
+    if low in _IRREGULAR:
+        stem = _IRREGULAR[low]
+        stem = stem.upper() if upper else (stem.capitalize() if word[:1].isupper() else stem)
+        return f"{head} {stem}" if head else stem
     if len(low) <= 1 or not low.endswith("s") or low in _SINGULAR_KEEP:
         return name
     if low in _IE_WORDS or low in _CHES_WORDS:
@@ -370,6 +394,9 @@ def plan(
                 raise MappingProblem(f"Imported pages can't become {ex.name} objects; choose another type.")
         elif target.kind == "currentSpace" and not force_new:
             match = next((t for t in existing_types if t.name.casefold() == name.casefold() and importable_type(t)), None)
+            if match is None and origin == "folder":
+                # A folder named like an existing type's plural (its folder name) is that type.
+                match = next((t for t in existing_types if t.pluralName.casefold() == plural.casefold() and importable_type(t)), None)
             if key == PAGE_KEY and page_type is not None:
                 match = page_type
             existing_id = match.id if match is not None else None
@@ -586,6 +613,9 @@ def plan(
                 return (f"{folder}/{name}" if folder else name), n > 1
             n += 1
 
+    image_type = next((t for t in existing_types if t.name.casefold() == IMAGE_TYPE.casefold()), None)
+    image_folder = (image_type.folder.strip("/") if image_type is not None else "") or IMAGE_FOLDER
+    page_id = page_type.id if page_type is not None else PAGE_KEY
     objects: list[PlanObject] = []
     writes: list[ObjectWrite] = []
     renamed: list[tuple[str, str]] = []
@@ -595,11 +625,12 @@ def plan(
     tag_folded: set[str] = set()
     for o, pt in kept:
         tw = type_writes[pt.key]
+        as_image = _imports_as_image(o, pt.key, tw, page_id)
         reused = reuse.get(o.sourcePath)
         if reused:
             rel, was_renamed = reused, False
         else:
-            rel, was_renamed = free(tw.folder, safe_filename(o.title))
+            rel, was_renamed = free(image_folder if as_image else tw.folder, safe_filename(o.title))
         po = PlanObject(o.sourcePath, o.title, pt.key, targetPath=rel, mtime=o.mtime)
         if was_renamed:
             po.renamedFrom = o.title
@@ -627,7 +658,7 @@ def plan(
         by_source[o.sourcePath] = po
         w = ObjectWrite(po, o, tw.name, tags=system.get("tags", []), aliases=system.get("aliases", []),
                         description=system.get("description"), createdAt=system["createdAt"],
-                        lastUpdated=system["lastUpdated"], existing=reused)
+                        lastUpdated=system["lastUpdated"], existing=reused, media="image" if as_image else None)
         writes.append(w)
         write_by_source[o.sourcePath] = w
 

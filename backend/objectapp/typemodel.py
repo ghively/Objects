@@ -17,7 +17,7 @@ import copy
 import hashlib
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -28,6 +28,7 @@ from .typedefs import slug
 
 __all__ = [
     "BASIC_MEDIA_TYPES",
+    "basic_media_type",
     "BASIC_TYPE_NAMES",
     "BUILTIN_TYPES",
     "DATA_VIEW_LAYOUTS",
@@ -789,11 +790,17 @@ def type_revision(root: Path, type_id: str) -> str:
         return ""
 
 
-def write_type_json(root: Path, t: TypeDefinition, base_revision: str) -> str:
+def write_type_json(
+    root: Path,
+    t: TypeDefinition,
+    base_revision: str,
+    before_write: Callable[[str, bytes], None] | None = None,
+) -> str:
     """Write `t` to ``types/<id>.json`` if the file is still at `base_revision`.
 
     Returns the new revision. Raises `RevisionConflict` when the file changed and
-    `TypeReadOnly` when the type (or the file on disk) can't be read.
+    `TypeReadOnly` when the type (or the file on disk) can't be read. `before_write` (the
+    space's version-history hook, 2026-11-08) is given the file's current bytes first.
     """
     if t.readOnlyReason:
         raise TypeReadOnly(t.readOnlyReason)
@@ -807,6 +814,11 @@ def write_type_json(root: Path, t: TypeDefinition, base_revision: str) -> str:
     if current != base_revision:
         raise RevisionConflict(current)
     data = _serialize(t)
+    if before_write is not None and current:
+        try:
+            before_write(f".object/types/{t.id}.json", path.read_bytes())
+        except OSError:
+            pass
 
     def unchanged() -> None:
         now = type_revision(root, t.id)
@@ -1078,6 +1090,41 @@ def _media_field_defs(name: str) -> list[PropertyDefinition]:
 def is_task_type(t: TypeDefinition | None) -> bool:
     """True for the basic Task type."""
     return t is not None and t.basic and _basic_name(t.name) == "Task"
+
+
+# The en-US names of the basic media fields, and the media types' plural names (our strings).
+_MEDIA_FIELD_NAMES = {
+    "url": "URL", "domain": "Domain", "iframeUrl": "Embed URL", "previewImage": "Preview image",
+    "mimeType": "MIME type", "fileSize": "File size", "width": "Width", "height": "Height", "source": "Source",
+}  # fmt: skip
+_MEDIA_PLURALS = {
+    "Weblink": "Weblinks", "File": "Files", "Image": "Images", "PDF": "PDFs", "Audio": "Audio", "Video": "Videos",
+    "Tweet": "Tweets",
+}  # fmt: skip
+
+
+def basic_media_type(name: str, type_id: str) -> TypeDefinition:
+    """A fresh basic media type (Image, PDF, File, ...): the system properties, its media fields
+    as read-only system definitions (``id == key``) and the extra fields `topup_task_type` gives
+    it, read as a v1 seed like `BUILTIN_TYPES`. Raises ``KeyError`` for a name that is no media type."""
+    basic = _basic_name(name)
+    if basic not in BASIC_MEDIA_TYPES:
+        raise KeyError(name)
+    plural = _MEDIA_PLURALS[basic]
+    seed = {
+        "id": type_id,
+        "name": basic,
+        "pluralName": plural,
+        "folder": plural,
+        "icon": _TYPE_ICONS.get(basic, _DEFAULT_TYPE_ICON),
+        "color": "gray",
+        "basic": True,
+        "propertyDefinitions": [
+            {"id": k, "key": k, "name": _MEDIA_FIELD_NAMES.get(k, k), "type": kind}
+            for k, kind in BASIC_MEDIA_TYPES[basic].items()
+        ],
+    }
+    return topup_task_type(TypeDefinition.from_json(seed))
 
 
 def topup_task_type(t: TypeDefinition) -> TypeDefinition:

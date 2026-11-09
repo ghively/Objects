@@ -296,6 +296,8 @@ class ImportResult(BaseModel):
     removed: int = 0
     leftOut: int = 0
     failed: int = 0
+    # of ``failed``, the objects not written because the import stopped (the report's "because the import stopped")
+    notWritten: int = 0
     originals: int = 0
     sourceItems: int = 0
 

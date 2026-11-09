@@ -32,6 +32,7 @@ import json
 import os
 import secrets
 import threading
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -101,7 +102,8 @@ class TokenRecord:
     used: int = 0
     """M18: the ``/api/v1`` calls made so far (`TokenStore.spend`); memory-only."""
     tools: tuple[str, ...] | None = None
-    """M18: the agent tools (short names) this run may call; None means all. Memory-only."""
+    """M18: the agent tools (short names) this run may call; None means all. Memory-only. Every
+    agent run's token gets the list its CLI lists allow (`narrow_ephemeral`, decisions memo S2)."""
 
     def to_api(self) -> dict[str, Any]:
         """What the UI sees: everything but the hash and the space key."""
@@ -251,6 +253,21 @@ class TokenStore:
         with _EPHEMERAL_LOCK:
             _EPHEMERAL[record.hash] = record
         return record, secret
+
+    @staticmethod
+    def narrow_ephemeral(secret: str, tools: Iterable[str]) -> bool:
+        """Keep only `tools` in an in-memory token's agent tools (decisions memo S2): a token with
+        no list gets `tools`, one with a list keeps its own order minus what `tools` lacks. Never
+        widens. True when the token existed. ``agentrun.build_run`` calls it with the run's lists
+        before the CLI starts, so the token holds exactly the agent tools the CLI may call."""
+        names = tuple(dict.fromkeys(tools))
+        with _EPHEMERAL_LOCK:
+            record = _EPHEMERAL.get(_hash(secret)) if secret else None
+            if record is None:
+                return False
+            keep = set(names)
+            record.tools = names if record.tools is None else tuple(t for t in record.tools if t in keep)
+            return True
 
     @staticmethod
     def drop_ephemeral(secret: str) -> bool:

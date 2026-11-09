@@ -275,6 +275,13 @@ def test_keep_originals_as_file_objects(client, tmp_path, monkeypatch):
     root = client.space_root
     objs = client.get("/api/objects").json()
     assert {o["type"] for o in objs} >= {"file", "pdf"}
+    # fix pass H: File and PDF are the basic media types (their fields read-only system definitions, as Image),
+    # not custom types whose fields show as loose External properties
+    types = {t["id"]: t for t in client.get("/api/space").json()["types"]}
+    for tid in ("file", "pdf"):
+        assert types[tid]["basic"] is True, types[tid]
+        keys = {p["key"] for p in types[tid]["propertyDefinitions"]}
+        assert {"mimeType", "fileSize", "source"} <= keys, keys
     file_obj = next(o for o in objs if o["title"] == "DNS.docx")
     fm = fm_of(root, file_obj["path"])
     assert fm["source"] == "Attachments/Originals/DNS.docx" and fm["fileSize"] == len(b"PK-docx-bytes")

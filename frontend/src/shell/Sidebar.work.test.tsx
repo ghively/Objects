@@ -1,6 +1,7 @@
 // Gene's redesign: M23's Work entry is gone from the sidebar; the Tasks entry opens the Tasks
-// dashboard (M23's Work page and the task lists as one page) and is active on either target.
-import { render, screen, within } from '@testing-library/react'
+// dashboard (M23's Work page and the task lists as one page) and is active on either target. It
+// stays while the space hides task management, so the work dashboard is never out of reach.
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -11,6 +12,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { resetAgents } from '@/agents/useAgents'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { agent } from '@/test/mockApi'
 import { Sidebar } from './Sidebar'
@@ -51,6 +53,30 @@ describe('Sidebar Tasks entry (the Tasks dashboard)', () => {
     expect(tasksButton()).toHaveAttribute('aria-current', 'page')
     rerender(<Sidebar types={[]} tasksActive />)
     expect(tasksButton()).toHaveAttribute('aria-current', 'page')
+  })
+
+  test('test Tasks stays, and opens the dashboard, while the space hides task management', async () => {
+    resetSpaceInfo()
+    mocked.space.mockResolvedValueOnce({
+      name: 'space',
+      root: '/space',
+      types: [],
+      icon: null,
+      description: null,
+      hideTaskManagement: true,
+      revision: 's1',
+    })
+    const onOpenTarget = vi.fn()
+    const user = userEvent.setup()
+    try {
+      render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
+      await waitFor(() => expect(useSpaceInfo.getState().space?.hideTaskManagement).toBe(true))
+      await user.click(tasksButton())
+      expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'work' }, { newTab: false })
+      expect(screen.queryByRole('button', { name: 'Work' })).toBeNull()
+    } finally {
+      resetSpaceInfo()
+    }
   })
 
   test('test Tasks shows while AI features are hidden', () => {

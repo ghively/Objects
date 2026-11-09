@@ -220,6 +220,9 @@ def test_filing_trial_continue_normalise(client, tmp_path, monkeypatch, fake):
     ok = {v["key"]: v["ok"] for v in first["values"]}
     assert ok["environment"] is True and ok["nope"] is False
     assert [v["ok"] for v in first["values"] if v["key"] == "owner"] == [True, False]
+    # the tags a result adds show in the trial too (fix pass H)
+    assert first["tags"] == [{"value": "Prod", "quote": "Environment: Prod", "ok": True}]
+    assert first["collections"] == []
     root = client.root
     assert _fm(root, first["path"])["environment"] == "Prod"
     assert _fm(root, first["path"]).get("owner") == "Ann"

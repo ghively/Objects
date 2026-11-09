@@ -215,7 +215,7 @@ class M15:
         commit(self.root, "before import")
         folder = self.tmp / "into-here"
         (folder / "Notes").mkdir(parents=True)
-        existing = sorted(p for p in self.root.rglob("*.md") if not any(x.startswith(".") for x in p.parts))
+        existing = sorted(p for p in self.root.rglob("*.md") if not any(x.startswith(".") for x in p.relative_to(self.root).parts))
         clash = existing[0]
         (folder / "Notes" / f"{clash.stem}.md").write_text("---\nfrom: import\n---\nAn imported page.\n", encoding="utf-8")
         (folder / "Notes" / "Brand new.md").write_text("Fresh [[" + clash.stem + "]].\n", encoding="utf-8")

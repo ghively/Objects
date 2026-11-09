@@ -29,15 +29,23 @@ __all__ = [
     "SpaceConfigProblem",
     "patch",
     "read",
+    "ensure_space_id",
     "set_internal",
     "space_fields",
+    "space_id",
+    "needs_setup",
 ]
 
 SPACE_REL = ".object/space.json"
 MAX_NAME_LENGTH = 120
 PATCH_KEYS = ("name", "icon", "description", "hideTaskManagement", "jiraSite")
-INTERNAL_KEYS = ("deskSyncRuleId",)
-"""M24: keys Object keeps in ``space.json`` for itself; never in `PATCH_KEYS`, never in `space_fields`."""
+INTERNAL_KEYS = ("deskSyncRuleId", "spaceId", "setup")
+"""M24: keys Object keeps in ``space.json`` for itself; never in `PATCH_KEYS`, never in `space_fields`.
+``spaceId`` (2026-11-08): the space's stable id (`space_id`), which keys its version history and
+its version-control settings, so moving or renaming the folder keeps both.
+``setup`` (fix pass H2): M8's "Pick a starting point" answer (``basic`` / ``blank``), so a new or
+empty space is asked once (`needs_setup`)."""
+_SPACE_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 MAX_JIRA_SITE_LENGTH = 300
 JIRA_SITE_PROBLEM = "The Jira site is a web address (https://…)."
 _WEB_ADDRESS = re.compile(r"https?://\S+", re.IGNORECASE)
@@ -190,3 +198,61 @@ def set_internal(root: Path, key: str, value: str) -> str:
 
         atomic_write(path, payload, check=unchanged)
         return hashlib.sha256(payload).hexdigest()
+
+
+def _has_visible_file(root: Path) -> bool:
+    """True as soon as the folder holds any file outside hidden (dot) folders."""
+    import os
+
+    for _dir, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        if any(not f.startswith(".") for f in files):
+            return True
+    return False
+
+
+def needs_setup(root: Path) -> bool:
+    """Fix pass H2: whether the space should offer "Pick a starting point" on open.
+
+    True only for a space that was never asked (no ``setup`` in ``space.json``), holds none of
+    the basic-setup types (a space made with "Start with basic setup" before the marker existed)
+    and no visible file (no objects). Reading never writes.
+    """
+    from .basicsetup import BASIC_TYPE_IDS
+
+    data, _rev, error = read(root)
+    if error is not None or data.get("setup") is not None:
+        return False
+    types_dir = Path(root) / ".object" / "types"
+    if any((types_dir / f"{tid}.json").exists() for tid in BASIC_TYPE_IDS):
+        return False
+    return not _has_visible_file(Path(root))
+
+
+def space_id(root: Path) -> str | None:
+    """The space's stable id from ``space.json`` (``spaceId``), or None when it has none yet.
+    Reads only."""
+    value = read(root)[0].get("spaceId")
+    return value if isinstance(value, str) and _SPACE_ID_RE.match(value) else None
+
+
+def ensure_space_id(root: Path, wanted: str | None = None, create: bool = True) -> str | None:
+    """The space's id, written to ``space.json`` (every other key kept) when it has none.
+
+    Called only by a write the user made: turning on version control, or the next app write
+    (the history snapshot), never by opening a space. `wanted` puts a known id back (a restore
+    to a commit from before the id existed). Without `create` a space that has no ``space.json``
+    yet is left as it is (None): an ordinary edit never adds a file to the space. Raises
+    `ReadOnly` for an unreadable ``space.json``.
+    """
+    import uuid
+
+    with _lock:
+        current = space_id(root)
+        if current is not None and (wanted is None or wanted == current):
+            return current
+        if not create and not _path(root).is_file():
+            return None
+        new = wanted if wanted and _SPACE_ID_RE.match(wanted) else uuid.uuid4().hex
+        set_internal(root, "spaceId", new)
+        return new
