@@ -14,8 +14,8 @@ export interface ViewGroup {
 }
 
 export const VIEW_GROUPS: readonly ViewGroup[] = [
-  { id: 'drive', label: 'Drive', ids: ['now', 'list-inbox', 'list-today', 'queues', 'agent', 'captures'] },
-  { id: 'plan', label: 'Plan', ids: ['list-scheduled', 'today', 'flow', 'projects', 'floor'] },
+  { id: 'drive', label: 'Drive', ids: ['now', 'list-inbox', 'today', 'queues', 'agent', 'captures'] },
+  { id: 'plan', label: 'Plan', ids: ['list-scheduled', 'flow', 'projects', 'floor'] },
   {
     id: 'manage',
     label: 'Manage',

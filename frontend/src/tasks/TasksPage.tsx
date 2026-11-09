@@ -1,14 +1,15 @@
-// The Tasks page: "Tasks" heading, "Create task", the quick add, and one tab per section
-// (`taskSections.ts`). Each tab is a `DataView` over the section's Task rows; the section's view
-// starts from its preset and the user's changes are saved per section in `ui.tasks.views`
-// (debounced, with M3's 409 refetch and re-apply); the active tab is `ui.tasks.activeTab`.
-// Status writes (checkbox, kanban drop) reload the row, patch it in and show what happened.
+// The Tasks dashboard's list views (Gene's redesign, phase 2: the old Tasks page — its header and
+// section tabs — is retired; the dashboard in `work/` is the one Tasks page). Each task section
+// (`taskSections.ts`) is a `DataView` over the section's Task rows, with the quick add on top; the
+// section's view starts from its preset and the user's changes are saved per section in
+// `ui.tasks.views` (debounced, with M3's 409 refetch and re-apply). Status writes (checkbox, kanban
+// drop) reload the row, patch it in and show what happened. The rows come from the page's one feed
+// (`useTaskRows`).
 import { useCallback, useMemo, useState } from 'react'
-import { api, ConflictError } from '@/api/client'
+import { api } from '@/api/client'
 import type { Row, TaskSectionKey, TasksUi, TypeDef, UpdateResult, ViewState } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { createAndOpen } from '@/create/createAndOpen'
-import { cn } from '@/lib/utils'
 import { useZonedToday } from '@/lib/zonedShell'
 import { useLinkIndex } from '@/links/linkIndex'
 import { enqueueUiSave, reloadUi, usePinned, useUiStore } from '@/shell/usePinned'
@@ -17,23 +18,20 @@ import type { CustomizePage } from '@/views/CustomizeMenu'
 import { DataView } from '@/views/DataView'
 import { matchingValues } from '@/views/matching'
 import { FULL_VIEW_LAYOUTS } from '@/views/model'
-import { useRows } from '@/views/useRows'
 import { useViewState } from '@/views/useViewState'
 import { QuickAddTask } from './QuickAddTask'
 import { completionToast, type TaskOutcome } from './taskActions'
 import { taskRowExtras } from './taskRowExtras'
-import { DEFAULT_TASK_SECTION, TASK_SECTIONS, TASK_SECTION_KEYS, isTaskSectionKey, sectionRows } from './taskSections'
+import { DEFAULT_TASK_SECTION, TASK_SECTIONS, isTaskSectionKey, sectionRows } from './taskSections'
+import { useTaskRows } from './useTaskRows'
+
+export { findTaskType } from './useTaskRows'
 
 export const TASKS_TEXT = {
   heading: 'Tasks',
   createTask: 'Create task', // our string
   resetView: 'Reset view', // our string
   resetHint: 'Go back to the section’s original view.', // our string
-}
-
-/** The basic Task type among `types` (by flag and name, as the server infers it). */
-export function findTaskType(types: TypeDef[]): TypeDef | undefined {
-  return types.find((t) => t.basic && t.name.toLowerCase() === 'task') ?? types.find((t) => t.id === 'task')
 }
 
 // ---- ui.tasks: saved in order with the latest revision ------------------------------------
@@ -60,27 +58,6 @@ function saveTasks(edit: (cur: TasksUi) => TasksUi): Promise<void> {
     const cur = useUiStore.getState().ui
     useUiStore.setState({ ui: { ...cur, tasks: res?.ui?.tasks ?? next }, revision: res?.revision ?? revision })
   })
-}
-
-/** The active tab: optimistic, saved; on a 409 the fresh ui is fetched and the tab saved again once. */
-async function saveActiveTab(key: TaskSectionKey): Promise<void> {
-  const cur = useUiStore.getState().ui
-  useUiStore.setState({ ui: { ...cur, tasks: { ...tasksOf(cur), activeTab: key } } })
-  const edit = (t: TasksUi): TasksUi => ({ ...t, activeTab: key })
-  try {
-    await saveTasks(edit)
-  } catch (e) {
-    if (!(e instanceof ConflictError)) {
-      console.warn('Could not save the Tasks tab:', e)
-      return
-    }
-    try {
-      await reloadUi()
-      await saveTasks(edit)
-    } catch (e2) {
-      console.warn('Could not save the Tasks tab:', e2)
-    }
-  }
 }
 
 // ---- one section ---------------------------------------------------------------------------
@@ -182,24 +159,30 @@ function SectionView({
   )
 }
 
-// ---- one section on its own (the Tasks dashboard's list views) ------------------------------
+// ---- one section: a list view of the Tasks dashboard -------------------------------------
 
 /**
- * One task section without the page's header and tabs: the Tasks dashboard (`work/`) shows each
- * section as one of its views (Inbox, Today's list, Scheduled, ...), so the lists and the
- * dashboard are one page over the same Task objects.
+ * One task section as a view of the Tasks dashboard (Inbox, Today's list, Scheduled, ...): the
+ * quick add (a new task gets the values the section's filter implies, so it lands in this list),
+ * the status line and the section's `DataView`. The rows are the page's (`useTaskRowsFeed`).
  */
 export function TaskSectionPanel({ sectionKey }: { sectionKey: TaskSectionKey }) {
   usePinned() // loads `ui.json`
   const types = useLinkIndex((s) => s.types)
-  const taskType = useMemo(() => findTaskType(types), [types])
+  const { collections } = useDefinitions()
+  const { rows, loading, patchRow, taskType } = useTaskRows()
   const [toast, setToast] = useState<string | null>(null)
-  const scope = useMemo(() => ({ typeIds: [taskType?.id ?? 'task'] }), [taskType])
-  const { rows, loading, patchRow } = useRows(scope)
+  const typeList = types.length > 0 ? types : taskType ? [taskType] : []
+  const quickValues = () => {
+    if (!taskType) return {}
+    const state = tasksOf(useUiStore.getState().ui).views[sectionKey] ?? TASK_SECTIONS[sectionKey].preset(new Date())
+    return matchingValues(state.filterGroup, typeList, taskType.id, collections)
+  }
   return (
-    <div data-task-section={sectionKey} className="flex flex-col">
+    <div data-task-section={sectionKey} className="flex flex-col gap-2">
+      <QuickAddTask taskTypeId={taskType?.id} values={quickValues} />
       {toast && (
-        <p role="status" className="pb-2 text-[13px] text-fg-muted">
+        <p role="status" className="text-[13px] text-fg-muted">
           {toast}
         </p>
       )}
@@ -208,7 +191,7 @@ export function TaskSectionPanel({ sectionKey }: { sectionKey: TaskSectionKey })
         sectionKey={sectionKey}
         rows={rows}
         loading={loading}
-        types={types.length > 0 ? types : taskType ? [taskType] : []}
+        types={typeList}
         taskType={taskType}
         patchRow={patchRow}
         onToast={setToast}
@@ -217,86 +200,8 @@ export function TaskSectionPanel({ sectionKey }: { sectionKey: TaskSectionKey })
   )
 }
 
-// ---- the page ------------------------------------------------------------------------------
-
-export function TasksPage() {
-  usePinned() // loads `ui.json`
-  const types = useLinkIndex((s) => s.types)
-  const { collections } = useDefinitions()
-  const taskType = useMemo(() => findTaskType(types), [types])
-  const active = useUiStore((s) => tasksOf(s.ui).activeTab)
-  const [toast, setToast] = useState<string | null>(null)
-
-  const scope = useMemo(() => ({ typeIds: [taskType?.id ?? 'task'] }), [taskType])
-  const { rows, loading, patchRow } = useRows(scope)
-  const quickValues = () => {
-    if (!taskType) return {}
-    const state = tasksOf(useUiStore.getState().ui).views[active] ?? TASK_SECTIONS[active].preset(new Date())
-    return matchingValues(state.filterGroup, types.length > 0 ? types : [taskType], taskType.id, collections)
-  }
-
-  return (
-    <div className="mx-auto w-full max-w-5xl px-6 pt-5 pb-16">
-      <header className="flex flex-col gap-3 pb-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-hover-2">
-            <Icon name="ph-check-circle" size={20} />
-          </span>
-          <h1 className="dataview-heading min-w-0 flex-1 text-[20px] font-bold md:text-[22px]">{TASKS_TEXT.heading}</h1>
-          <button
-            type="button"
-            disabled={!taskType}
-            onClick={(e) =>
-              taskType &&
-              void createAndOpen(taskType.id, {}, { ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey }).catch(
-                (err: unknown) => console.warn('Could not create a task:', err),
-              )
-            }
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[14px] font-medium hover:bg-hover disabled:opacity-50"
-          >
-            <Icon name="ph-plus" size={14} />
-            {TASKS_TEXT.createTask}
-          </button>
-        </div>
-        <QuickAddTask taskTypeId={taskType?.id} values={quickValues} />
-      </header>
-      <nav role="tablist" aria-label="Task sections" className="flex flex-wrap items-center gap-1 pb-3">
-        {TASK_SECTION_KEYS.map((key) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={active === key}
-            title={TASK_SECTIONS[key].description}
-            onClick={() => {
-              setToast(null)
-              if (key !== active) void saveActiveTab(key)
-            }}
-            className={cn(
-              'flex h-7 items-center gap-1.5 rounded-full px-3 text-[14px] font-medium',
-              active === key ? 'bg-hover-2 text-fg' : 'text-fg-muted hover:bg-hover',
-            )}
-          >
-            <Icon name={TASK_SECTIONS[key].icon} size={14} />
-            {TASK_SECTIONS[key].title}
-          </button>
-        ))}
-      </nav>
-      {toast && (
-        <p role="status" className="pb-2 text-[13px] text-fg-muted">
-          {toast}
-        </p>
-      )}
-      <SectionView
-        key={active}
-        sectionKey={active}
-        rows={rows}
-        loading={loading}
-        types={types.length > 0 ? types : taskType ? [taskType] : []}
-        taskType={taskType}
-        patchRow={patchRow}
-        onToast={setToast}
-      />
-    </div>
-  )
+/** How many Task rows a section holds now (the dashboard's count badges). */
+export function sectionCount(sectionKey: TaskSectionKey, now: Date = new Date()): number {
+  const { rows, taskType } = useTaskRows.getState()
+  return sectionRows(sectionKey, rows, taskType, now).length
 }

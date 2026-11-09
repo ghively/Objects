@@ -1,7 +1,8 @@
 // The Tasks dashboard (Gene's redesign of M23's Work page): one page for every task — the Tasks
 // header (search, Create task), the brain-dump bar, the focus rail (when today has focus lines),
-// then the grouped view switcher with the energy controls, and the selected view. The task lists
-// (Inbox, Today, Scheduled, ...) are views here too (`work/tasklists/registerView.ts`). Every
+// then the grouped view switcher, and the selected view. The task lists (Inbox, Scheduled, ...) are
+// views here too (`work/tasklists/registerView.ts`); Today is the day timeline with today's tasks.
+// The Task rows load once for the page (`useTaskRowsFeed`). Every
 // dashboard view is computed from `useWorkData`; the page's own state (energy, Just one thing,
 // view, the focus line) is `useWorkUi`, browser storage only.
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
@@ -9,8 +10,8 @@ import type { WorkBoard, WorkBoardItem, WorkViewId } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { createAndOpen } from '@/create/createAndOpen'
 import { zonedParts } from '@/lib/zonedTime'
-import { useLinkIndex } from '@/links/linkIndex'
-import { findTaskType, TASKS_TEXT } from '@/tasks/TasksPage'
+import { TASKS_TEXT } from '@/tasks/TasksPage'
+import { useTaskRows, useTaskRowsFeed } from '@/tasks/useTaskRows'
 import { useWorkKeys } from '../keys/useWorkKeys'
 import { DEFAULT_PARTS, useWorkData, useWorkEvents, type WorkDataState, type WorkPart } from '../state/useWorkData'
 import { useWorkUi } from '../state/useWorkUi'
@@ -63,6 +64,9 @@ export function focusWorkSearch(): void {
 export function WorkPage({ view }: { view?: WorkViewId }): JSX.Element {
   useWorkEvents()
   useWorkKeys()
+  // Phase 2: the page's one Task rows feed (every list view and the count badges read it).
+  useTaskRowsFeed()
+  useTaskRows((s) => s.rows)
   const data = useWorkData()
   const now = useNow()
   const calm = useWorkUi((s) => s.calm)
@@ -117,8 +121,7 @@ export function WorkPage({ view }: { view?: WorkViewId }): JSX.Element {
   )
 
   const View = current?.Component
-  const types = useLinkIndex((s) => s.types)
-  const taskType = useMemo(() => findTaskType(types), [types])
+  const taskType = useTaskRows((s) => s.taskType)
   // The focus rail only when today has focus lines (Now's side keeps its Edit for adding them).
   const hasFocusLines = (data.focus?.lines.length ?? 0) > 0
   return (
