@@ -115,6 +115,7 @@ Icons, colours and the exact option lists are our choice, listed for Gene in the
 - **Read-only in the app**: shown with the source and a "Refreshed {time ago}" line. Edits are offered nowhere, and a hand-edit to the file is overwritten on the next refresh.
 - **Written only through the API** (`/api/v1`, a `read-write` token, and a new `sync` scope for these fields) or MCP: a script or agent sends values per object, matched by title, alias, or a stable key such as FQDN.
 - **Stored outside the Markdown file** (our call): in `.object/synced/<type>.json`, keyed by object id, with a refreshed time per object. They are indexed like properties, so views, filters and queries use them, but a refresh never touches the `.md` file. That keeps edits line-minimal and stops git-backed spaces committing on every refresh. Exports include them.
+- **One exception** (Gene, 2026-11-09): an object that has no `id` yet gets its `id` line on its first sync (one line, once); every later refresh leaves the file alone.
 - **Stale marking**: a value older than the property's "stale after" (default 7 days; our value) shows muted with "Stale".
 
 ### 4. Creating an object: type suggestion and templates
