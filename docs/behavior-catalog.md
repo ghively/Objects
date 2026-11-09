@@ -425,7 +425,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   imported + updated + unchanged + changed in both + left out + failed), **Changed in both** (**Take source** /
   **Keep mine**, and **Take source for all** / **Keep mine for all**), **Removed at source** (listed, never trashed).
   **Move batch to Trash** moves the objects the batch created (not the ones it only updated) to the Trash.
-- **Proposed schema** (finish step offers **Review proposed schema**): each group is **Use existing type**, **Extend
+- **Proposed schema** (finish step offers **Review proposed schema**; so does each row of **Settings > Import Content >
+  Import history**, the open space's import batches newest first (source, date, objects; trashed batches left out), which
+  reopens the same Proposed schema, Trial, Normalise and Import inbox steps after the dialog was closed or the app
+  reloaded): each group is **Use existing type**, **Extend
   existing type** or **Create type**, with document counts, examples, "N% have a value" fill rates, options and merges;
   **Accept**, **Edit** (Name, Plural name, Keep <property>) or **Turn down**; **Apply** stays disabled until every
   item is decided and creates only what was accepted. A new type needs 10 documents; a property needs 30% of its

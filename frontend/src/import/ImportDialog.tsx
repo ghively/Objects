@@ -164,6 +164,8 @@ export function ImportDialog() {
     setJob(null)
     setStopping(false)
     setLost(false)
+    // Settings > Import Content > Import history: back to the agent workflow of an earlier batch.
+    if (preset.reviewBatch) setStep('agent')
   }, [isOpen, preset])
 
   // M25: a source never imported into this space before starts on a copy of it (design section 7).
@@ -554,7 +556,9 @@ export function ImportDialog() {
           </div>
         )}
 
-        {step === 'agent' && result?.batch && <AgentFlow batch={result.batch} onClose={close} />}
+        {step === 'agent' && (preset.reviewBatch ?? result?.batch) && (
+          <AgentFlow batch={(preset.reviewBatch ?? result?.batch) as string} onClose={close} />
+        )}
 
         {step === 'running' && <Progress job={job} stopping={stopping} onStop={stop} error={error} />}
 

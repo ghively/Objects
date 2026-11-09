@@ -9,6 +9,8 @@ export interface ImportDialogPreset {
   /** The new space's name and location, carried over from "Create new space". */
   name?: string
   location?: string
+  /** Reopen the agent workflow (Proposed schema, Trial, Normalise, Import inbox) for this batch of the open space. */
+  reviewBatch?: string
 }
 
 export interface ImportDialogState {

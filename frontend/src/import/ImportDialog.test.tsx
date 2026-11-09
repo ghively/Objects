@@ -720,6 +720,14 @@ describe('ImportDialog: target, progress and finish', () => {
     expect(mocked.importProposal).toHaveBeenCalledWith('batch-1')
   })
 
+  test('test the agent workflow reopens for an earlier batch (Settings > Import history)', async () => {
+    mocked.importProposal.mockResolvedValue({ proposal: null, review: null })
+    await openDialog({ reviewBatch: 'batch-9' })
+    expect(await screen.findByRole('heading', { name: 'Proposed schema' })).toBeInTheDocument()
+    expect(mocked.importProposal).toHaveBeenCalledWith('batch-9')
+    expect(screen.queryByRole('textbox', { name: T.source })).toBeNull()
+  })
+
   test('test stop import cancels the job and the finish says it stopped', async () => {
     let cancelled = false
     mocked.importJob.mockImplementation(async () =>
