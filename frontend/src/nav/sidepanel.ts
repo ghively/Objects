@@ -130,11 +130,12 @@ export function openInArea(entries: SidepanelEntry[], target: SidepanelTarget, a
   }
   if (isAiChatTarget(target)) {
     // Our choice: one AI chat per tab. The open one (else any) is revealed; a saved chat asked for
-    // by path is shown in it.
+    // by path, an agent (a sidebar row) or an agent's transcript (a Chats tab row) is shown in it.
     const shown = entries.find((e) => e.isOpen && isAiChatTarget(e.target)) ?? entries.find((e) => isAiChatTarget(e.target))
     if (shown) {
       const revealed = openOnly(entries, shown.id)
-      return target.path ? revealed.map((e) => (e.id === shown.id ? pushTarget(e, target) : e)) : revealed
+      const named = !!(target.path || target.agentId || target.chatId)
+      return named ? revealed.map((e) => (e.id === shown.id ? pushTarget(e, target) : e)) : revealed
     }
   }
   const open = openEntryIn(entries, area)

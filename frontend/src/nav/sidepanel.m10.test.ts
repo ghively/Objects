@@ -50,6 +50,21 @@ describe('AI chat side-panel entry', () => {
     expect(openEntryIn(entries, 'area1')?.target).toEqual({ kind: 'aiChat', path: 'AI Chats/One.md' })
   })
 
+  test('test an agent or a transcript asked for is shown in the chat already there', () => {
+    // accept-m17.5: a sidebar agent row (agentId) and a Chats tab row (agentId + chatId) reach the open chat.
+    let entries = openInArea([], AI, 'area1', id)
+    entries = openInArea(entries, { kind: 'aiChat', agentId: 'researcher' }, 'area1', id)
+    expect(entries).toHaveLength(1)
+    expect(openEntryIn(entries, 'area1')?.target).toEqual({ kind: 'aiChat', agentId: 'researcher' })
+    entries = openInArea(entries, { kind: 'aiChat', agentId: 'researcher', chatId: 'c1' }, 'area1', id)
+    expect(entries).toHaveLength(1)
+    expect(openEntryIn(entries, 'area1')?.target).toEqual({ kind: 'aiChat', agentId: 'researcher', chatId: 'c1' })
+    // Asking for the chat that is already shown adds no history step.
+    const before = entries[0].history?.length
+    entries = openInArea(entries, { kind: 'aiChat', agentId: 'researcher', chatId: 'c1' }, 'area1', id)
+    expect(entries[0].history?.length).toBe(before)
+  })
+
   test('test replace keeps the entry history length', () => {
     let entries = openInArea([], obj('A.md'), 'area1', id)
     entries = openInArea(entries, AI, 'area1', id)
