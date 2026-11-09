@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useCollections } from '@/collections/useCollections'
 import { Icon, IconOrEmoji, iconName } from '@/components/Icon'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -12,6 +12,9 @@ import { cn } from '@/lib/utils'
 import { WorkspaceSections } from './SidebarSections'
 import { HelpSection } from '@/help/HelpSection'
 import { AgentsSection } from '@/agents/AgentsSection'
+import { AssistantNavButton } from '@/agents/AssistantNavButton'
+import { MainNavButton } from './MainNavButton'
+import { SectionHeader } from './SectionHeader'
 import { chipStyle } from './typeColor'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { usePalette } from '@/palette/usePalette'
@@ -62,8 +65,6 @@ export interface SidebarProps {
   onOpenTarget?: (target: Target, opts: { newTab?: boolean }) => void
   /** Highlights the "Queries" entry. */
   queriesActive?: boolean
-  /** Highlights the "All notes" entry. */
-  allNotesActive?: boolean
   /** Highlights the "Calendar" entry. */
   calendarActive?: boolean
   /** Highlights the "Tasks" entry. */
@@ -135,9 +136,6 @@ export const SHORTCUTS_TOOLTIP = 'Shortcuts'
 /** The square search button's tooltip. */
 export const SEARCH_THIS_SPACE = 'Search this space'
 
-/** The sidebar entry for the All notes view. */
-export const ALL_NOTES_LABEL = 'All notes'
-
 /** M23: the sidebar entry for the Work section. */
 export const WORK_LABEL = 'Work'
 
@@ -162,59 +160,6 @@ export function TypeChip({ type, size = 22 }: { type: Pick<TypeDef, 'icon' | 'co
     >
       <IconOrEmoji icon={type.icon} fallback="ph-cube" size={Math.round(size * 0.68)} />
     </span>
-  )
-}
-
-function SectionHeader({
-  id,
-  icon,
-  children,
-  action,
-}: {
-  id: string
-  icon?: string
-  children: ReactNode
-  action?: ReactNode
-}) {
-  return (
-    <div className="group/sh flex items-center pr-1">
-      <h2
-        id={id}
-        className="flex flex-1 items-center gap-1.5 px-2 pt-5 pb-2 text-[14px] font-semibold text-[var(--text-section)]"
-      >
-        {icon && <Icon name={icon} size={14} />}
-        {children}
-      </h2>
-      {action && <div className="pt-3">{action}</div>}
-    </div>
-  )
-}
-
-/** A live entry of the sidebar's navigation (All notes, Calendar, Tasks; Graph below the types); Ctrl+click opens a new tab. */
-function MainNavButton({
-  icon,
-  label,
-  active,
-  onClick,
-}: {
-  icon: string
-  label: string
-  active?: boolean
-  onClick: (e: MouseEvent<HTMLButtonElement>) => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={active ? 'page' : undefined}
-      className={cn(
-        'flex h-[38px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg hover:bg-hover',
-        active && 'bg-hover',
-      )}
-    >
-      <Icon name={icon} size={16} />
-      <span>{label}</span>
-    </button>
   )
 }
 
@@ -282,7 +227,6 @@ export function Sidebar({
   trashActive,
   onOpenTarget,
   queriesActive,
-  allNotesActive,
   calendarActive,
   tasksActive,
   graphActive,
@@ -491,26 +435,8 @@ export function Sidebar({
         </button>
       </div>
 
-      {/* M17: the agents, at the top, directly above the main navigation (nothing while AI is hidden). */}
-      <AgentsSection onOpenTarget={onOpenTarget} />
-
-      {/* M23: the Work section, directly below the agents (shown while AI features are hidden too). */}
-      <nav aria-label="Work" className="flex flex-col gap-0.5">
-        <MainNavButton
-          icon="ph-briefcase"
-          label={WORK_LABEL}
-          active={workActive}
-          onClick={(e) => onOpenTarget?.({ kind: 'work' }, { newTab: e.ctrlKey || e.metaKey })}
-        />
-      </nav>
-
+      {/* The main navigation, always visible at the top: Calendar, Tasks, Graph. */}
       <nav aria-label="Main" className="flex flex-col gap-0.5">
-        <MainNavButton
-          icon="ph-note"
-          label={ALL_NOTES_LABEL}
-          active={allNotesActive}
-          onClick={(e) => onOpenTarget?.({ kind: 'allNotes' }, { newTab: e.ctrlKey || e.metaKey })}
-        />
         <MainNavButton
           icon="ph-calendar-blank"
           label="Calendar"
@@ -525,24 +451,39 @@ export function Sidebar({
             onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
           />
         )}
+        <MainNavButton
+          icon="ph-graph"
+          label="Graph"
+          active={graphActive}
+          onClick={(e) => onOpenTarget?.({ kind: 'graph' }, { newTab: e.ctrlKey || e.metaKey })}
+        />
+        {/* The built-in Assistant, not an agent: directly under Graph. */}
+        <AssistantNavButton />
+      </nav>
+
+      {/* M17: the agents, a section of their own; M23: Work, the agent loop's dashboard, right
+          below them (Work shows while AI features are hidden too). */}
+      <AgentsSection onOpenTarget={onOpenTarget} />
+      <nav aria-label="Work" className="flex flex-col gap-0.5 pb-2">
+        <MainNavButton
+          icon="ph-briefcase"
+          label={WORK_LABEL}
+          active={workActive}
+          onClick={(e) => onOpenTarget?.({ kind: 'work' }, { newTab: e.ctrlKey || e.metaKey })}
+        />
       </nav>
 
       <ScrollArea className="min-h-0 flex-1">
         {/* The custom sections, Pinned and the object types, in `ui.workspaceOrder` (M9). */}
         <WorkspaceSections onOpenTarget={onOpenTarget} objects={objectTypes} />
 
-        <nav aria-label="Space" className="flex flex-col gap-0.5 pb-3">
-          <MainNavButton
-            icon="ph-graph"
-            label="Graph"
-            active={graphActive}
-            onClick={(e) => onOpenTarget?.({ kind: 'graph' }, { newTab: e.ctrlKey || e.metaKey })}
-          />
-          <MainNavButton icon="ph-trash" label="Trash" active={trashActive} onClick={() => onOpenTrash?.()} />
-        </nav>
-
         <HelpSection />
       </ScrollArea>
+
+      {/* Trash, on its own at the very bottom. */}
+      <nav aria-label="Space" className="flex flex-col gap-0.5 pb-1">
+        <MainNavButton icon="ph-trash" label="Trash" active={trashActive} onClick={() => onOpenTrash?.()} />
+      </nav>
 
       {collectionFor && (
         <CreateCollectionDialog

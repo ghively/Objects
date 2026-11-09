@@ -45,11 +45,11 @@ beforeEach(() => {
 
 describe('navigation wiring', () => {
   test('test opening collection, query and allNotes targets renders their pages and tab labels', async () => {
-    const user = userEvent.setup()
     render(<App />)
     const strip = screen.getByRole('tablist', { name: 'Tabs' })
 
-    await user.click(await screen.findByRole('button', { name: 'All notes' }))
+    // All notes left the sidebar (many note types); its target and page still exist.
+    useTabs.getState().open({ kind: 'allNotes' })
     await waitFor(() => expect(within(strip).getByText('All notes')).toBeInTheDocument())
     expect(await screen.findByRole('heading', { name: 'All notes' })).toBeInTheDocument()
 
