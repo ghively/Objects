@@ -29,6 +29,7 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 | Views: layouts, toolbar, Overview | specified (sections 8, 9); the inner screens of the filter, sort and group editors and Customize are not specified yet |
 | Object page: header, properties, side panel | specified (section 5); outline and stats in section 9; backlinks in section 10; unlinked mentions in section 11 |
 | Editor: block menu, selection toolbar, slash, @ | specified (section 6); the default table in section 10; the look of Two Columns, Code, Math, Toggle, Group and Horizontal line blocks is not specified yet |
+| Version control and backup (git) | specified (section 12) |
 | Graph, Trash, Explore panel, shortcuts | specified (section 7); export dialog in section 10 (PDF, Markdown; Word and LaTeX options not specified yet); the import dialog is described in section 10c |
 
 ## 1. Settings
@@ -397,3 +398,53 @@ Object builds it in full (M5): `backend/objectapp/references.py` (matching on Un
 boundaries, titles and aliases of at least a minimum length, longest name first, linking a mention from the
 list), `frontend/src/references/` and the Editor settings. **Gene wants this kept**; it is a ground rule in
 `CLAUDE.md`.
+
+## 12. Version control and backup
+
+Gene, 2026-11-08: "I want the entire object workspace gitbacked for backup to github or lab and version control
+and rollbacks." Object's own feature (no counterpart in the reference app); design note
+`docs/superpowers/specs/2026-11-08-git-backed-spaces-design.md`. Remote-agnostic: any git remote address (https or
+ssh: GitHub, GitLab, a self-hosted server).
+
+- **Off until turned on.** Opening a space never starts it and never writes a file. **Settings > Space > Version
+  control** (after Space Settings): "Turn on version control" puts the space folder in its own git repository
+  (`git init`, or a folder that already is a repository is adopted with its history and branch), keeps a managed
+  block in `.gitignore` (`.object-cache/`, the app's `.*.tmp` temp files, `.DS_Store`, `Thumbs.db`; `.object/` is
+  content and never ignored) and makes the first commit ("Object: start version control"). A folder tracked by a
+  repository in a parent folder is refused. Without git installed the section says "Git is not installed" and it
+  stays off. Turning it off stops the commits; the repository and its history stay.
+- **Commits** happen after a quiet spell ("Commit after", default 2 minutes, from 30 seconds to 30 minutes) with
+  no app write and no change seen on disk, and when the app stops (switching or closing the space, quitting).
+  Other programs' edits are committed too. Messages summarise: "Object: edit 3 objects (Printer jams, Rack, Tape)",
+  "Object: add 1 object (…)", "Object: update 2 files (…)", the paths in the body. The author is the user's git
+  identity, else "Object <object@localhost>". Object stages only the paths it found changed, never commits a change
+  another program staged (it stays staged and the section says so), waits for `.git/index.lock` (never deletes
+  it), and does not commit during a merge, rebase or on a detached HEAD. "Commit now" commits at once.
+- **Remote**: a "Remote" address and an optional "Branch" (default: the current branch), "Save remote", and when
+  set "Push now", "Update from remote" and "Push automatically" (on: push 10 minutes after the first unpushed
+  commit, "Push after" 5 / 10 / 30 / 60 minutes). Unset by default; then the status just says "No remote set".
+  Object uses the system's git credentials (credential helper, SSH agent) and never stores a token or password; git
+  never waits on a prompt. On start a space with a remote is fetched and fast-forwarded only when the folder has no
+  uncommitted changes and the remote is simply ahead; a remote that has diverged shows "Remote has diverged: N
+  commits there and M here. Object never overwrites either side; merge them with git." Nothing is ever force-pushed.
+- **Space history** (a page; from the spaces menu under "Space settings", the palette's "Open space history", the
+  section's button and the sidebar's backup line): the commits newest first (message, time, "N files changed"); a
+  picked commit shows its changes as text diffs per file; **Restore space to this point** asks "Restore the whole
+  space?" and makes every file what it was at that commit as a new commit ("Object: restore to <short> (<date>)"),
+  committing pending changes first; the space's index reloads. History is never rewritten.
+- **Version History dialog** (an object's `…` menu): under the saved versions, "In version control" lists the
+  object's commits (following renames) as "Commit <short>"; one previews and restores like a saved version, as a new
+  commit ("Object: restore "<title>" to <short> (<date>)").
+- **Saved versions** (M8) stay the fine-grained layer. Their folder in the state dir is keyed by the space's stable
+  id (`spaceId` in `.object/space.json`, written when version control is turned on or on the next app save in a
+  space that has a `space.json`), so moving or renaming the folder keeps them; older path-keyed history is moved over.
+  Type, collection, query and view definitions keep a saved version before each app save too.
+- **Settings > Offline & Sync > Backup**: "Back up all spaces" (version control on for every space on this device,
+  with a line per space that couldn't) and the "Back up agents and settings" switch: the per-user state folder
+  (agents, automations, device settings, the spaces list) in its own repository, with a remote field and "Push now".
+  Secrets and token files, caches, saved-version snapshots, logs and run ledgers are never committed, even when the
+  `.gitignore` block is edited away.
+- **Sidebar footer**: while version control is on, a quiet line at the right: "Saved 5 min ago", "Backed up 2 min
+  ago" after a push, "Changes waiting", or "Backup problem" in the danger colour; its tooltip has the detail, a
+  click opens Space history. Nothing shows while it is off.
+- Agent runs can't reach any of this (the run fence covers `/api/vcs`); it is not an MCP tool.

@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useUiStore } from './usePinned'
+import { VcsStatusIndicator } from '@/vcs/VcsStatusIndicator'
 import {
   orderTypeEntries,
   saveTypeOrder,
@@ -507,6 +508,8 @@ export function Sidebar({
         >
           <Icon name="ph-keyboard" size={17} />
         </button>
+        {/* 2026-11-08: the backup line, shown only while version control is on. */}
+        <VcsStatusIndicator />
       </footer>
     </aside>
   )

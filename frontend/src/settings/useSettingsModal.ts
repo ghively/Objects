@@ -13,6 +13,8 @@ export type SettingsSectionId =
   | 'importContent'
   | 'notifications'
   | 'space'
+  /** 2026-11-08: version control and backup */
+  | 'versionControl'
   | 'objectTypes'
   | 'taskManagement'
   /** M14 */

@@ -20,6 +20,7 @@ import { NOTIFICATIONS_SEARCH, NOTIFICATIONS_TEXT, NotificationsSection } from '
 import { OFFLINE_SYNC_SEARCH, OFFLINE_SYNC_TEXT, OfflineSyncSection } from './sections/OfflineSync'
 import { OBJECT_TYPES_SEARCH, OBJECT_TYPES_TEXT, ObjectTypesSection } from './sections/ObjectTypes'
 import { SPACE_SETTINGS_SEARCH, SPACE_SETTINGS_TEXT, SpaceSettingsSection } from './sections/SpaceSettings'
+import { VERSION_CONTROL_SEARCH, VERSION_CONTROL_TEXT, VersionControlSection } from './sections/VersionControl'
 import { TASK_MANAGEMENT_SEARCH, TASK_MANAGEMENT_TEXT, TaskManagementSection } from './sections/TaskManagement'
 import { WORK_SEARCH, WORK_TEXT, WorkSection } from './sections/Work'
 import { SHORTCUTS_TEXT } from './ShortcutsSheet'
@@ -80,6 +81,15 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     Component: NotificationsSection,
   },
   { id: 'space', group: 'space', label: SPACE_SETTINGS_TEXT.heading, icon: 'ph-gear-six', search: SPACE_SETTINGS_SEARCH, Component: SpaceSettingsSection },
+  // 2026-11-08 (our section): the space's git repository, its remote and Space history.
+  {
+    id: 'versionControl',
+    group: 'space',
+    label: VERSION_CONTROL_TEXT.heading,
+    icon: 'ph-git-branch',
+    search: VERSION_CONTROL_SEARCH,
+    Component: VersionControlSection,
+  },
   { id: 'objectTypes', group: 'space', label: OBJECT_TYPES_TEXT.heading, icon: 'ph-cube', search: OBJECT_TYPES_SEARCH, Component: ObjectTypesSection },
   {
     id: 'taskManagement',

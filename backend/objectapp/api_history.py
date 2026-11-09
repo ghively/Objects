@@ -3,6 +3,10 @@
 - ``GET /api/history?path=`` -> ``{versions: VersionInfo[]}`` newest first
 - ``GET /api/history/version?path=&id=`` -> ``VersionContent``
 - ``POST /api/history/restore`` ``{path, id, baseVersion, clientId?}`` -> ``{version}`` (boards: ``{revision, version}``: the board revision and the `.md` version)
+- ``GET /api/history/definition?path=.object/<kind>/<id>.json`` -> ``{versions}`` and
+  ``GET /api/history/definition/version?path=&id=`` -> ``{id, text}`` (2026-11-08): the versions a
+  type, collection, query or view definition kept before each app save. Read only; a definition
+  is restored from the space's git history (``api_vcs``).
 
 The router factory builds the space's `HistoryStore` and installs it as
 ``space.before_write``, so every app write of an object file or a board sidecar keeps a
@@ -10,6 +14,8 @@ version first (`history` has the rules). The GET routes read only.
 """
 
 from __future__ import annotations
+
+import re
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -21,6 +27,8 @@ from .space import Conflict
 from .watcher import ChangeEvent
 
 __all__ = ["router"]
+
+_DEFINITION_RE = re.compile(r"^\.object/(types|collections|queries|views)/[A-Za-z0-9_][A-Za-z0-9_.-]{0,120}\.json$")
 
 
 class RestoreRequest(BaseModel):
@@ -73,6 +81,27 @@ def router(ctx: ApiContext) -> APIRouter:
             return _error(404, f'There is no version "{id}" of "{path}".')
         except KeyError:
             return _error(404, f'There is no object at "{path}".')
+
+    def definition_rel(path: str) -> str | None:
+        rel = path.replace("\\", "/")
+        return rel if _DEFINITION_RE.match(rel) and ".." not in rel else None
+
+    @r.get("/history/definition")
+    def get_definition_history(path: str):
+        rel = definition_rel(path)
+        if rel is None:
+            return _error(400, f'"{path}" is not a type, collection, query or view file.')
+        return {"versions": store.versions(rel)}
+
+    @r.get("/history/definition/version")
+    def get_definition_version(path: str, id: str):
+        rel = definition_rel(path)
+        if rel is None:
+            return _error(400, f'"{path}" is not a type, collection, query or view file.')
+        try:
+            return store.content(rel, id)
+        except VersionNotFound:
+            return _error(404, f'There is no version "{id}" of "{path}".')
 
     @r.post("/history/restore")
     def post_restore(req: RestoreRequest):

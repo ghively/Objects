@@ -2,8 +2,14 @@
 
 Snapshots live outside the space, in the per-user state dir::
 
-    <state dir>/history/<sha1(space root)[:16]>/<key>/<UTC stamp>.<ext>
-    <state dir>/history/<sha1(space root)[:16]>/<key>/index.json   [{id, at, rel, files, ...}]
+    <state dir>/history/<space id>/<key>/<UTC stamp>.<ext>
+    <state dir>/history/<space id>/<key>/index.json   [{id, at, rel, files, ...}]
+
+``<space id>`` is the space's stable id (``.object/space.json`` ``spaceId``, 2026-11-08), so
+moving or renaming the folder keeps the history. A space without one yet gets it on the next
+app write (`snapshot`) or when version control is turned on, never on open. Older history was
+kept under ``sha1(space root)[:16]``: while the id's folder doesn't exist that folder is read,
+and the first write moves it to the id's folder.
 
 ``<key>`` is the object's frontmatter ``id``, else ``path-<sha1(rel)[:16]>``, so the history
 follows a rename. The rules (the plan's Global Constraints, "our rules", listed for Gene):
@@ -21,6 +27,10 @@ follows a rename. The rules (the plan's Global Constraints, "our rules", listed 
 - A whiteboard's version holds its ``.md`` and both sidecars (whichever exist), whichever of
   the three is being written. Boards are restore-only (no preview text).
 - Reading (`versions`, `content`) writes nothing and creates no folder.
+- Definitions (2026-11-08): a type, collection, query or view file (``.object/<kind>/<id>.json``)
+  keeps a version before each app save too (`snapshot` with the file's path; its key is the
+  path key). They are listed by `versions` and read by `content` like an object's; restoring
+  one is done from the space's git history (`api_vcs`).
 - `restore` refuses a stale ``base_version`` (`Conflict`), keeps the current state as a version
   first, then puts the version's bytes back except the current ``id`` and ``title`` (and the
   file name, which a restore never changes). Attachments are left as they are.
@@ -225,9 +235,40 @@ class HistoryStore:
     # -- layout ---------------------------------------------------------------
 
     @property
-    def dir(self) -> Path:
-        """This space's history folder (read from the state dir on each access; not created)."""
+    def legacy_dir(self) -> Path:
+        """Where history was kept before spaces had an id: keyed by the folder's path."""
         return state_dir() / "history" / _sha1(str(self.root))[:16]
+
+    @property
+    def dir(self) -> Path:
+        """This space's history folder (read from the state dir on each access; not created):
+        the space id's folder, or the older path-keyed one while only that exists."""
+        from .spaceconfig import space_id
+
+        sid = space_id(self.root)
+        if sid is None:
+            return self.legacy_dir
+        new = state_dir() / "history" / sid
+        if not new.exists() and self.legacy_dir.is_dir():
+            return self.legacy_dir
+        return new
+
+    def migrate(self, create: bool = True) -> None:
+        """Give the space its id (when it has none) and move older path-keyed history to the id's
+        folder. Writes; called only from a write (`snapshot`, turning on version control).
+        Without `create` (an app write) a space with no ``space.json`` is left without an id."""
+        from .spaceconfig import ensure_space_id
+
+        sid = ensure_space_id(self.root, create=create)
+        if sid is None:
+            return
+        new = state_dir() / "history" / sid
+        old = self.legacy_dir
+        if old.is_dir() and not new.exists():
+            try:
+                old.replace(new)
+            except OSError:
+                _log.warning("The history folder %s couldn't be moved to %s", old, new)
 
     @staticmethod
     def _path_key(md_rel: str) -> str:
@@ -364,6 +405,10 @@ class HistoryStore:
         rel = PurePosixPath(rel).as_posix()
         md_rel = _md_of(rel)
         with self._lock:
+            try:
+                self.migrate(create=False)
+            except Exception:  # noqa: BLE001 - an unreadable space.json keeps the older key
+                _log.debug("The space id couldn't be set for %s", self.root)
             # `data` is the .md as it stands on disk (the bytes before the write), so the
             # object's id comes from it: one parse, no second read of the file.
             md_data = data if rel == md_rel else _read(self.root / md_rel)

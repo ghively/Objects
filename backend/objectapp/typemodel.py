@@ -17,7 +17,7 @@ import copy
 import hashlib
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -789,11 +789,17 @@ def type_revision(root: Path, type_id: str) -> str:
         return ""
 
 
-def write_type_json(root: Path, t: TypeDefinition, base_revision: str) -> str:
+def write_type_json(
+    root: Path,
+    t: TypeDefinition,
+    base_revision: str,
+    before_write: Callable[[str, bytes], None] | None = None,
+) -> str:
     """Write `t` to ``types/<id>.json`` if the file is still at `base_revision`.
 
     Returns the new revision. Raises `RevisionConflict` when the file changed and
-    `TypeReadOnly` when the type (or the file on disk) can't be read.
+    `TypeReadOnly` when the type (or the file on disk) can't be read. `before_write` (the
+    space's version-history hook, 2026-11-08) is given the file's current bytes first.
     """
     if t.readOnlyReason:
         raise TypeReadOnly(t.readOnlyReason)
@@ -807,6 +813,11 @@ def write_type_json(root: Path, t: TypeDefinition, base_revision: str) -> str:
     if current != base_revision:
         raise RevisionConflict(current)
     data = _serialize(t)
+    if before_write is not None and current:
+        try:
+            before_write(f".object/types/{t.id}.json", path.read_bytes())
+        except OSError:
+            pass
 
     def unchanged() -> None:
         now = type_revision(root, t.id)

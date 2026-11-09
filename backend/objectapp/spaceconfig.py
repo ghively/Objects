@@ -29,15 +29,20 @@ __all__ = [
     "SpaceConfigProblem",
     "patch",
     "read",
+    "ensure_space_id",
     "set_internal",
     "space_fields",
+    "space_id",
 ]
 
 SPACE_REL = ".object/space.json"
 MAX_NAME_LENGTH = 120
 PATCH_KEYS = ("name", "icon", "description", "hideTaskManagement", "jiraSite")
-INTERNAL_KEYS = ("deskSyncRuleId",)
-"""M24: keys Object keeps in ``space.json`` for itself; never in `PATCH_KEYS`, never in `space_fields`."""
+INTERNAL_KEYS = ("deskSyncRuleId", "spaceId")
+"""M24: keys Object keeps in ``space.json`` for itself; never in `PATCH_KEYS`, never in `space_fields`.
+``spaceId`` (2026-11-08): the space's stable id (`space_id`), which keys its version history and
+its version-control settings, so moving or renaming the folder keeps both."""
+_SPACE_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 MAX_JIRA_SITE_LENGTH = 300
 JIRA_SITE_PROBLEM = "The Jira site is a web address (https://…)."
 _WEB_ADDRESS = re.compile(r"https?://\S+", re.IGNORECASE)
@@ -190,3 +195,32 @@ def set_internal(root: Path, key: str, value: str) -> str:
 
         atomic_write(path, payload, check=unchanged)
         return hashlib.sha256(payload).hexdigest()
+
+
+def space_id(root: Path) -> str | None:
+    """The space's stable id from ``space.json`` (``spaceId``), or None when it has none yet.
+    Reads only."""
+    value = read(root)[0].get("spaceId")
+    return value if isinstance(value, str) and _SPACE_ID_RE.match(value) else None
+
+
+def ensure_space_id(root: Path, wanted: str | None = None, create: bool = True) -> str | None:
+    """The space's id, written to ``space.json`` (every other key kept) when it has none.
+
+    Called only by a write the user made: turning on version control, or the next app write
+    (the history snapshot), never by opening a space. `wanted` puts a known id back (a restore
+    to a commit from before the id existed). Without `create` a space that has no ``space.json``
+    yet is left as it is (None): an ordinary edit never adds a file to the space. Raises
+    `ReadOnly` for an unreadable ``space.json``.
+    """
+    import uuid
+
+    with _lock:
+        current = space_id(root)
+        if current is not None and (wanted is None or wanted == current):
+            return current
+        if not create and not _path(root).is_file():
+            return None
+        new = wanted if wanted and _SPACE_ID_RE.match(wanted) else uuid.uuid4().hex
+        set_internal(root, "spaceId", new)
+        return new
