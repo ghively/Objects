@@ -35,6 +35,8 @@ function dailyNoteDay(frontmatter: Record<string, unknown>, title: string, path:
  */
 function DailyNoteControls({ path, version, onDismiss }: { path: string; version: string | undefined; onDismiss(): void }) {
   const [note, setNote] = useState<{ path: string; reviewed: boolean; day: string | null } | null>(null)
+  // Bumped after a Reviewed write: a 409 (the note changed meanwhile) re-reads `reviewed` as it is.
+  const [reloads, setReloads] = useState(0)
   useEffect(() => {
     let live = true
     api
@@ -49,7 +51,7 @@ function DailyNoteControls({ path, version, onDismiss }: { path: string; version
     return () => {
       live = false
     }
-  }, [path, version])
+  }, [path, version, reloads])
   if (!note || note.path !== path) return null
   const openCalendar = () => {
     if (note.day) {
@@ -62,7 +64,7 @@ function DailyNoteControls({ path, version, onDismiss }: { path: string; version
   }
   return (
     <div className="absolute top-3.5 left-1/2 z-10 flex h-10 -translate-x-1/2 items-center gap-0.5 rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] px-1">
-      <ReviewedButton note={note} version={version} />
+      <ReviewedButton note={note} version={version} onWritten={() => setReloads((n) => n + 1)} />
       <button
         type="button"
         onClick={openCalendar}

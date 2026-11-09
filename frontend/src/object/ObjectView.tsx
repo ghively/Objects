@@ -385,6 +385,16 @@ export function ObjectView({
         return
       }
       const mine = h?.getBody() ?? null
+      if (h && mine !== null && !h.isDirty() && theirs.body === h.savedBody()) {
+        // Only the frontmatter changed (a property write outside this view's own write path: the
+        // peek's Reviewed, another window): adopt the version and keep the editor's document
+        // (a reload would drop its selection, scroll and undo history for nothing).
+        setDetail(theirs)
+        adoptVersion(theirs.version)
+        void h.resume(theirs.version)
+        unblockRef.current()
+        return
+      }
       if (!h || mine === null || !h.isDirty()) {
         h?.reload(theirs.body, theirs.version)
         setDetail(theirs)
