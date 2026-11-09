@@ -19,11 +19,21 @@ export function armPlainPaste(): void {
   armed = true
 }
 
-/** Insert `text` as plain text at the selection: one paragraph per line. */
+/**
+ * Insert `text` as plain text at the selection: one paragraph per line. In a code block (or any
+ * block whose text is code: `rawBlock`) the lines stay in the block as text with its newlines,
+ * as ProseMirror's own code paste does; paragraphs cannot go there and would split the fence.
+ */
 export function pastePlainText(view: EditorView, text: string): boolean {
+  const { schema, selection } = view.state
+  if (selection.$from.parent.type.spec.code) {
+    const code = text.replace(/\r\n?/g, '\n')
+    if (!code) return false
+    view.dispatch(view.state.tr.insertText(code).scrollIntoView().setMeta('paste', true).setMeta('uiEvent', 'paste'))
+    return true
+  }
   const lines = text.split(/(?:\r\n?|\n)+/).filter((line) => line.length > 0)
   if (lines.length === 0) return false
-  const { schema } = view.state
   const paragraphs = lines.map((line) => schema.nodes.paragraph.create(null, schema.text(line)))
   const slice = new Slice(Fragment.from(paragraphs), 1, 1)
   view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView().setMeta('paste', true).setMeta('uiEvent', 'paste'))
