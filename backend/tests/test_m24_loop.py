@@ -21,6 +21,7 @@ from objectapp import settings as device_settings
 from objectapp.agents import AgentRegistry
 from objectapp.server import create_app
 from objectapp.space import Space
+from objectapp.watcher import ChangeEvent
 from objectapp.workagent import create_work_agent
 from objectapp.workagentmodel import (
     CRASHED,
@@ -771,11 +772,8 @@ def test_an_approved_step_is_queued_again_when_its_item_is_reopened_by_status(
     assert len([x for x in env.entries() if x["kind"] == "approve"]) == 2
 
 
-def test_auto_runs_stop_after_three_in_a_row(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Decision S3 (2026-11-08): an agent that keeps adding "next" Agent steps gets at most three
-    auto-runs of one item since Gene last acted on it; the fourth Agent step stays Open, is shown
-    in Stuck with a reason, and waits for Run now. The count is kept in the queue file (a restart
-    doesn't reset it); any action of Gene's on the item does."""
+def _held_after_three(env: Env, monkeypatch: pytest.MonkeyPatch) -> dict:
+    """Run B's Agent steps until the auto-run cap holds the fourth (decision S3); returns that step."""
     steps = env.service.item(B)["steps"]
     env.service.edit_steps(B, [{"op": "remove", "stepId": s["id"], "stepRev": s["rev"]} for s in steps]
                            + [{"op": "add", "kind": "do", "text": "Gene checks"}], GENE)
@@ -788,14 +786,23 @@ def test_auto_runs_stop_after_three_in_a_row(env: Env, monkeypatch: pytest.Monke
     env.acts()
     env.service.edit_steps(B, [{"op": "add", "kind": "agent", "text": "Look first", "before": do_id}], GENE)
     env.idle()
+    assert [(e["auto"], e["state"]) for e in env.entries() if e["kind"] == "run"] == [(True, "done")] * 3
+    assert len(env.runs()) == 3
+    current = next(s for s in env.service.item(B)["steps"] if s["current"])
+    assert current["kind"] == "agent" and current["state"] == "open" and current["text"] == "Look again"
+    return current
+
+
+def test_auto_runs_stop_after_three_in_a_row(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Decision S3 (2026-11-08): an agent that keeps adding "next" Agent steps gets at most three
+    auto-runs of one item since Gene last acted on it; the fourth Agent step stays Open, is shown
+    in Stuck with a reason, and waits for Run now. The count is kept in the queue file (a restart
+    doesn't reset it); any action of Gene's on the item does."""
+    current = _held_after_three(env, monkeypatch)
 
     def runs() -> list[dict]:
         return [e for e in env.entries() if e["kind"] == "run"]
 
-    assert [(e["auto"], e["state"]) for e in runs()] == [(True, "done")] * 3
-    assert len(env.runs()) == 3
-    current = next(s for s in env.service.item(B)["steps"] if s["current"])
-    assert current["kind"] == "agent" and current["state"] == "open" and current["text"] == "Look again"
     [held] = env.loop.agent_status()["held"]
     assert held["path"] == B and held["stepId"] == current["id"] and held["stepText"] == "Look again"
     assert held["reason"] == "The agent ran 3 steps of this item in a row by itself. Press Run now to let it go on."
@@ -809,3 +816,37 @@ def test_auto_runs_stop_after_three_in_a_row(env: Env, monkeypatch: pytest.Monke
     env.idle()
     assert [e["auto"] for e in runs()] == [True] * 3 + [False] + [True] * 3
     assert [h["path"] for h in env.loop.agent_status()["held"]] == [B]
+
+
+def test_genes_property_edit_lets_a_held_item_go(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Decision S3, fix pass 2026-11-09: editing one of the item's properties in the editor is Gene's
+    action on it too. The change event of his window (its origin is the window's client id) starts
+    the count again and lets the held step go: it runs, and three more auto-runs follow. A write of
+    an agent's run or another program (origin ``api:<token>``), an automation's, or one from outside
+    the app (no origin) leaves the item held; his edit of an object that isn't a work item changes
+    nothing."""
+    _held_after_three(env, monkeypatch)
+    space = env.loop.space
+    assert [h["path"] for h in env.loop.agent_status()["held"]] == [B]
+    note, _v = space.create_object("page", "Notes")
+
+    def edit(path: str, origin: str | None, **values: Any) -> None:
+        version = space.update_properties(path, values, space.read(path)[2]).version
+        workloop.on_change_event(space, ChangeEvent("changed", path, version, origin=origin))
+        env.idle()
+
+    edit(B, "api:Work agent", priority=["Low"])
+    edit(B, "automation:01RULE", priority=["Medium"])
+    edit(B, None, priority=["High"])
+    edit(note, "3f1c2b4e-window", description="not a work item")
+    assert [h["path"] for h in env.loop.agent_status()["held"]] == [B]
+    assert workloop.QueueStore(env.root).auto_streak(B) == 3
+    assert len([e for e in env.entries() if e["kind"] == "run"]) == 3
+
+    edit(B, "3f1c2b4e-window", priority=["Low"])
+    assert workloop.QueueStore(env.root).auto_streak(B) == 3  # three new auto-runs since Gene's edit
+    assert [e["auto"] for e in env.entries() if e["kind"] == "run"] == [True] * 6
+    assert [h["path"] for h in env.loop.agent_status()["held"]] == [B]
+    # an event for a space with no loop, or an object that is gone, is nothing
+    workloop.on_change_event(Space(env.root / "Projects"), ChangeEvent("changed", B, None, origin="x"))
+    env.loop.on_change(ChangeEvent("changed", "Tasks/Gone.md", None, origin="3f1c2b4e-window"))

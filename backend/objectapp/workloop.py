@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from . import captures, headless
+from . import captures, headless, writeorigin
 from . import settings as device_settings
 from .agentrun import RunRefused
 from .agents import AgentRegistry, effective_model
@@ -70,6 +70,7 @@ __all__ = [
     "QueueRefused",
     "WorkLoop",
     "loop_for",
+    "on_change_event",
     "outcome",
     "precheck",
     "run_timeout",
@@ -92,6 +93,26 @@ say so; a changed step says `CHANGED_409`."""
 
 _loops: dict[str, WorkLoop] = {}
 _loops_lock = threading.Lock()
+
+_FOREIGN_ORIGINS = ("api:", "automation:")
+"""Change-event origins that aren't one of Gene's windows: ``api:<token name>`` (`v1guard`: an
+agent's run, or another program's) and ``automation:<rule id>`` (`automations_model.origin_for`)."""
+
+
+def _from_ui(origin: str | None) -> bool:
+    """Whether a change event's origin is one of Gene's windows (its ``clientId``, `server`'s
+    routes). None is the app's own write, or one made outside the app (no client at all);
+    `writeorigin.ALERTS` is the monitoring folder watch's."""
+    return bool(origin) and not origin.startswith(_FOREIGN_ORIGINS) and origin != writeorigin.ALERTS
+
+
+def on_change_event(space: Space, event: ChangeEvent) -> None:
+    """`server`'s ``announce`` hands every change event to the space's loop (`WorkLoop.on_change`);
+    nothing when the space has no loop yet."""
+    with _loops_lock:
+        loop = _loops.get(WorkLoop._key(space))
+    if loop is not None:
+        loop.on_change(event)
 
 
 def run_timeout() -> float:
@@ -344,6 +365,30 @@ class WorkLoop:
             self._auto_check(notice.path)
         except Exception:
             log.exception("Auto-run check failed for %s", notice.path)
+
+    def on_change(self, event: ChangeEvent) -> None:
+        """A change event the app announces (`on_change_event`): a write of Gene's own to a work
+        item, one of his windows' ``clientId`` as its origin (a property set in the editor, a body
+        save), is his action on the item, so its auto-run count starts again and a held step is let
+        go, then the item is looked at for auto-run as after a notice (decision S3). The writes of
+        an agent's run or another program (``api:``), an automation's, the alert watch's and ones
+        with no origin (made outside the app) count for nothing."""
+        if event.kind != "changed" or not _from_ui(event.origin):
+            return
+        path = event.path
+        try:
+            summary = self.space.get(path)
+        except KeyError:
+            return
+        if not is_work_type(self.space.type_by_id(summary.type)):
+            return
+        try:
+            if not self.store.reset_auto_streak(path):
+                return
+            self._event("held")
+            self._auto_check(path)
+        except Exception:
+            log.exception("Resetting the auto-run count of %s failed", path)
 
     def _on_space_change(self, change: SpaceChange) -> None:
         """`Space.add_listener`: a work item written any way (a status set back in the property
