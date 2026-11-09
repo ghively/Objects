@@ -9,8 +9,8 @@ The sources are walked with ``ast``: the string literals and f-strings passed to
 routers' ``_error``/``error`` helpers and to the detail-carrying exceptions (``Problem``,
 ``RuleRefused``, ``_Hide``, ``HTTPException``), the ``{"detail": ...}`` dict entries, and the
 module-level constants those sites use (``NO_BATCH``, ``media.UPLOAD_LIMIT_DETAIL``, ...).
-Messages built by domain code and forwarded with ``str(exc)`` are not literals at those sites
-and are out of this test's reach.
+Messages built by domain code and forwarded with ``str(exc)`` are checked where they are made:
+the literals passed to the constructors of those domain exceptions (``DETAIL_EXCEPTIONS``).
 """
 
 from __future__ import annotations
@@ -24,10 +24,42 @@ PACKAGE = Path(objectapp.__file__).parent
 SOURCES = sorted(PACKAGE.glob("*.py")) + sorted((PACKAGE / "importers").glob("*.py"))
 
 DETAIL_HELPERS = {"_error", "error", "Problem", "RuleRefused", "_Hide", "HTTPException"}
+# Domain exceptions whose text the routers forward as the detail (`str(exc)` / `exc.message` /
+# `exc.detail`); review 2026-11-08, NIT 8. Their constructor's literal is the message the user reads.
+DETAIL_EXCEPTIONS = {
+    "InvalidValue", "TemplateError", "AgentNotFound", "AgentInvalid", "AgentConflict", "AgentReadOnly",
+    "SpaceNotFound", "SpaceIsCurrent", "SpaceFolderChanged", "SpaceNameProblem", "TrashUnavailable",
+    "QueueRefused", "SeamRefused", "SeamUnavailable", "NotWorkItem", "IllegalMove", "ApiError",
+    "FormulaError", "ProposalInvalid", "MappingProblem", "BoardInvalid", "BoardReadOnly",
+    "NotAWhiteboard", "FrontmatterError", "SettingsProblem", "SpaceConfigProblem", "ConfirmRequired",
+    "DailyNoteExists", "RestoreConflict", "ReadOnly", "TypeReadOnly", "RunRefused", "SkillError",
+    "SkillConflict", "LearningInvalid", "Busy", "Denied", "LimitExceeded", "NotASource",
+    "DelegationError",
+}
+# Not here: `SourceDamaged` (its text is a skipped file's note in the import report, not a detail)
+# and `SourceMissing` (the route answers its own sentence).
+DETAIL_HELPERS = DETAIL_HELPERS | DETAIL_EXCEPTIONS
+# Constructors whose message is not their first argument: only that argument is the message
+# (``SettingsProblem(key, message)``, ``ConfirmRequired(affected, detail)``, ...).
+MESSAGE_ARG = {"SettingsProblem": 1, "SpaceConfigProblem": 1, "ConfirmRequired": 1, "DailyNoteExists": 1}
+# Names that open a message and always hold a capitalised subject built next to it:
+# whiteboardfile's ``owner = f"Block {key}"``, automations' ``where = f"Action {n}"``,
+# workvalues' ``_one_line(..., "A step", ...)``.
+SUBJECTS = {"owner", "where", "what"}
+# Names that close a message and hold another message this walk checks where it is made
+# (``f"{where}: {exc}"`` forwards an `InvalidValue`).
+FORWARDED = {"exc"}
+# Messages that put a status code before the app's own detail, which is checked at its source
+# (the MCP tools answer "403: This token can only read.").
+STATUS_PREFIXED = {
+    "f'{res.status_code}: {detail} {json.dumps(extra, default=str)}'",
+    "f'{res.status_code}: {detail or body}'",
+}
 DETAIL_KEYWORDS = {"detail", "message"}
 
 # Messages that must keep their exact text (the frontend compares against them). Each entry
 # names the file that compares; keep the list to those, so the style covers everything else.
+# None today: the 2026-11-08 sweep found no frontend comparison against a detail it changed.
 KEPT_FOR_FRONTEND: dict[str, str] = {}
 
 
@@ -105,7 +137,10 @@ def collect_messages() -> list[tuple[str, ast.AST]]:
                 fn = node.func
                 name = fn.id if isinstance(fn, ast.Name) else fn.attr if isinstance(fn, ast.Attribute) else None
                 if name in DETAIL_HELPERS:
-                    for arg in node.args:
+                    args = node.args
+                    if name in MESSAGE_ARG:
+                        args = args[MESSAGE_ARG[name] : MESSAGE_ARG[name] + 1]
+                    for arg in args:
                         if not (isinstance(arg, ast.Constant) and isinstance(arg.value, int)):
                             resolve(arg)
                     for kw in node.keywords:
@@ -116,6 +151,16 @@ def collect_messages() -> list[tuple[str, ast.AST]]:
                     if isinstance(key, ast.Constant) and key.value == "detail" and value is not None:
                         resolve(value)
     return found
+
+
+def _names(part: ast.AST, names: set[str]) -> bool:
+    """`part` is ``{name}`` or ``{str(name)}`` for a name in `names`."""
+    if not isinstance(part, ast.FormattedValue) or part.conversion != -1:
+        return False
+    value = part.value
+    if isinstance(value, ast.Call) and isinstance(value.func, ast.Name) and value.func.id == "str":
+        value = value.args[0] if len(value.args) == 1 else value
+    return isinstance(value, ast.Name) and value.id in names
 
 
 def _problems(node: ast.AST) -> list[str]:
@@ -132,8 +177,11 @@ def _problems(node: ast.AST) -> list[str]:
                 break
         head, tail = parts[0], parts[-1]
         first = head.value[:1] if isinstance(head, ast.Constant) else ""
+        if _names(head, SUBJECTS):
+            first = "A"
         last = tail.value[-1:] if isinstance(tail, ast.Constant) else ""
-        text = ast.unparse(node)
+        if _names(tail, FORWARDED):
+            last = "."
     if not (first.isupper() or first == '"'):
         problems.append("does not start with a capital letter or a quote")
     if last not in {".", "?", "!"}:
@@ -147,7 +195,7 @@ def test_detail_messages_are_full_sentences():
     bad: list[str] = []
     for where, node in messages:
         text = node.value if isinstance(node, ast.Constant) else ast.unparse(node)
-        if text in KEPT_FOR_FRONTEND:
+        if text in KEPT_FOR_FRONTEND or text in STATUS_PREFIXED:
             continue
         problems = _problems(node)
         if problems:
@@ -166,11 +214,14 @@ def test_no_repr_quoting_in_any_detail_fstring():
     assert not bad, "\n".join(["details with !r:", *bad])
 
 
-def test_kept_messages_still_exist():
-    """Every allow-listed message is still answered somewhere (the list does not go stale)."""
+def test_allow_listed_messages_still_exist():
+    """Every allow-listed message is still made somewhere, so the lists do not go stale and hide
+    a new message that happens to share an old text."""
+    allowed = {**KEPT_FOR_FRONTEND, **dict.fromkeys(STATUS_PREFIXED, "")}
+    assert allowed, "nothing is allow-listed; drop this test with the lists"
     texts = {
         node.value if isinstance(node, ast.Constant) else ast.unparse(node)
         for _where, node in collect_messages()
     }
-    for text in KEPT_FOR_FRONTEND:
-        assert text in texts, text
+    stale = sorted(text for text in allowed if text not in texts)
+    assert not stale, stale
