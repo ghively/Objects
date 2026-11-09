@@ -151,9 +151,10 @@ def status(setting: str | None) -> dict[str, Any]:
         detail = (out.stderr or out.stdout or "").strip()[-500:]
         return {"available": False, "reason": "error", "claudePath": claude, "version": None,
                 "message": f"`claude --version` failed (exit {out.returncode}): {detail}".strip()}
-    version = (out.stdout or "").strip().splitlines()
-    return {"available": True, "reason": "ok", "claudePath": claude,
-            "version": version[0].strip() if version else None, "message": None}
+    # The CLI's own line: a version-manager wrapper (mise) can print a line of its own first.
+    lines = [ln.strip() for ln in (out.stdout or "").splitlines() if ln.strip()]
+    version = next((ln for ln in lines if "Claude Code" in ln), lines[-1] if lines else None)
+    return {"available": True, "reason": "ok", "claudePath": claude, "version": version, "message": None}
 
 
 # -- context and prompt ---------------------------------------------------------------

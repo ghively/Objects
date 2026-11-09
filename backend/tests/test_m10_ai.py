@@ -186,6 +186,19 @@ def test_status_error(api, monkeypatch) -> None:
     assert "broken install" in body["message"]
 
 
+def test_status_version_skips_a_wrapper_line(api, monkeypatch) -> None:
+    """Found on the live CLI: a version-manager wrapper (mise) prints its own line before the
+    CLI's, and Settings showed that line as the version."""
+    import subprocess
+
+    _space, client, _ = api
+    out = "mise ~/.config/mise/config.toml tools: claude@2.1.319\n2.1.319 (Claude Code)\n"
+    monkeypatch.setattr(ai.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, out, ""))
+    assert client.get("/api/ai/status").json()["version"] == "2.1.319 (Claude Code)"
+    monkeypatch.setattr(ai.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, "wrapper\n3.0.0\n", ""))
+    assert client.get("/api/ai/status").json()["version"] == "3.0.0"
+
+
 # -- a turn ---------------------------------------------------------------------------
 
 
