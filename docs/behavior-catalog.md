@@ -389,7 +389,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   Steps in order: source, **Check for sensitive content** (scan), **Review mappings** (types, properties, options),
   progress with **Stop import**, finish. **Import into**: A new space | This space; the review step also offers
   **Keep originals as** Attachments (default) | File objects, and **Try on a copy of this space** (imports into a copy
-  named "<space> (trial)" next to the open space; on by default for a first run into this space).
+  named "<space> (trial)" next to the open space; on by default for a first run into this space). A finished import into
+  the copy offers **Switch and review proposed schema** (the batch lives in the copy): it switches to the copy and opens
+  that batch's Proposed schema there.
 - **Source line** (object page, under the properties; hidden when the object was not imported): **Source**
   "Imported from <system> (author, modified <date>, version <v>)", **Open original** (the web url, else the kept
   file) and **Show file** (shows the kept original in the file manager). Every imported object carries the system

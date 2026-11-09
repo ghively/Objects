@@ -32,7 +32,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { openObject } from '@/create/createAndOpen'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { parentFolder } from '@/spaces/CreateSpaceDialog'
-import { switchSpace } from '@/spaces/switchSpace'
+import { samePath, switchSpace } from '@/spaces/switchSpace'
 import { AgentFlow } from './agent/AgentFlow'
 import { AGENT_TEXT } from './agent/text'
 import { BatchPanel } from './BatchPanel'
@@ -81,6 +81,19 @@ function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+/** A review to open once the app has switched to a trial copy (the switch reloads the window). */
+export const PENDING_REVIEW_KEY = 'object.import.pendingReview'
+
+function readPendingReview(): { path: string; batch: string } | null {
+  try {
+    const raw = localStorage.getItem(PENDING_REVIEW_KEY)
+    const v = raw ? (JSON.parse(raw) as { path?: unknown; batch?: unknown }) : null
+    return v && typeof v.path === 'string' && typeof v.batch === 'string' ? { path: v.path, batch: v.batch } : null
+  } catch {
+    return null
+  }
+}
+
 export function ImportDialog() {
   const isOpen = useImportDialog((s) => s.isOpen)
   const preset = useImportDialog((s) => s.preset)
@@ -122,6 +135,8 @@ export function ImportDialog() {
   const [job, setJob] = useState<ImportJob | null>(null)
   const [stopping, setStopping] = useState(false)
   const [lost, setLost] = useState(false)
+  /** The last start imported into a trial copy of this space ("Try on a copy of this space"). */
+  const [copied, setCopied] = useState(false)
 
   const seq = useRef(0)
   const lastStep = useRef<Step>('source')
@@ -164,6 +179,7 @@ export function ImportDialog() {
     setJob(null)
     setStopping(false)
     setLost(false)
+    setCopied(false)
     // Settings > Import Content > Import history: back to the agent workflow of an earlier batch.
     if (preset.reviewBatch) setStep('agent')
   }, [isOpen, preset])
@@ -322,6 +338,7 @@ export function ImportDialog() {
       setJobId(res.jobId)
       setTargetPath(res.targetPath)
       setStartedInto(into.kind === 'currentSpace' ? 'currentSpace' : 'newSpace')
+      setCopied(into.kind === 'spaceCopy')
       setJob(null)
       setStep('running')
     } catch (err) {
@@ -341,6 +358,25 @@ export function ImportDialog() {
       setStarting(false)
     }
   }
+
+  // After "Switch and review proposed schema" reloaded the window into the trial copy: open its review.
+  useEffect(() => {
+    const pending = readPendingReview()
+    if (!pending) return
+    let alive = true
+    void useSpaceInfo
+      .getState()
+      .ensure()
+      .then(() => {
+        const root = useSpaceInfo.getState().space?.root
+        if (!alive || !root) return
+        localStorage.removeItem(PENDING_REVIEW_KEY)
+        if (samePath(root, pending.path)) useImportDialog.getState().open({ reviewBatch: pending.batch })
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // ---- Running: poll the job until it is over ----
 
@@ -402,6 +438,15 @@ export function ImportDialog() {
     if (!finalPath) return
     useImportDialog.getState().close()
     void switchSpace(finalPath)
+  }
+  const switchAndReview = () => {
+    if (!finalPath || !result?.batch) return
+    try {
+      localStorage.setItem(PENDING_REVIEW_KEY, JSON.stringify({ path: finalPath, batch: result.batch }))
+    } catch {
+      // No storage: the review is still in Settings > Import Content > Import history after the switch.
+    }
+    switchNow()
   }
   const openReport = () => {
     if (!result?.reportPath) return
@@ -594,6 +639,17 @@ export function ImportDialog() {
                 <div>
                   <Button type="button" variant="outline" onClick={() => setStep('agent')}>
                     {AGENT_TEXT.continueButton}
+                  </Button>
+                </div>
+              </div>
+            )}
+            {copied && offerSwitch && result?.batch && job?.phase === 'done' && (
+              <div className="flex flex-col gap-1 rounded-md border border-line p-3">
+                <h4 className="text-[13px] font-semibold">{AGENT_TEXT.continueHeading}</h4>
+                <p className="text-[13px] text-fg-muted">{AGENT_TEXT.continueCopyIntro}</p>
+                <div>
+                  <Button type="button" variant="outline" onClick={switchAndReview}>
+                    {AGENT_TEXT.continueCopyButton}
                   </Button>
                 </div>
               </div>

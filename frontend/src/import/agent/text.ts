@@ -7,6 +7,9 @@ export const AGENT_TEXT = {
   continueIntro:
     'An agent can propose types and properties for what was imported. You review the proposal, try it on 50 objects, and nothing is applied without your say.',
   continueButton: 'Review proposed schema',
+  // A trial copy: the batch lives in the copy, so the review opens there after the switch.
+  continueCopyIntro: 'The proposal belongs to the copy. Switch to it to review the proposed schema, try it on 50 objects and see the Import inbox.',
+  continueCopyButton: 'Switch and review proposed schema',
   skip: 'Skip',
 
   // Proposed schema.

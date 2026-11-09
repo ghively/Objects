@@ -31,7 +31,7 @@ import type { ImportJob, ImportMapping, ImportPlannedType, ImportPreview, Import
 import { openObject } from '@/create/createAndOpen'
 import { resetSpaceInfo } from '@/settings/useSpaceInfo'
 import { switchSpace } from '@/spaces/switchSpace'
-import { IMPORT_TEXT, ImportDialog, importTiming } from './ImportDialog'
+import { IMPORT_TEXT, ImportDialog, importTiming, PENDING_REVIEW_KEY } from './ImportDialog'
 import { resetImportDialog, useImportDialog, type ImportDialogPreset } from './useImportDialog'
 
 const T = IMPORT_TEXT
@@ -718,6 +718,29 @@ describe('ImportDialog: target, progress and finish', () => {
     await user.click(await screen.findByRole('button', { name: 'Review proposed schema' }))
     expect(await screen.findByRole('heading', { name: 'Proposed schema' })).toBeInTheDocument()
     expect(mocked.importProposal).toHaveBeenCalledWith('batch-1')
+  })
+
+  test('test a trial-copy import offers the review in the copy: switch, then reopen it there', async () => {
+    mocked.importJob.mockResolvedValue(
+      job({ phase: 'done', targetPath: '/home/gene/Spaces/Work (trial)', result: { ...RESULT, targetPath: '/home/gene/Spaces/Work (trial)', batch: 'batch-c' } }),
+    )
+    const user = await previewVault()
+    await user.click(screen.getByRole('radio', { name: T.thisSpaceNamed('Work') }))
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: T.tryCopy })).toBeChecked())
+    await waitFor(() => expect(screen.getByRole('button', { name: T.import })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: T.import }))
+    await user.click(await screen.findByRole('button', { name: 'Switch and review proposed schema' }))
+    expect(switchSpace).toHaveBeenCalledWith('/home/gene/Spaces/Work (trial)')
+    expect(JSON.parse(localStorage.getItem(PENDING_REVIEW_KEY) ?? 'null')).toEqual({ path: '/home/gene/Spaces/Work (trial)', batch: 'batch-c' })
+  })
+
+  test('test after the switch into the copy its review opens by itself', async () => {
+    localStorage.setItem(PENDING_REVIEW_KEY, JSON.stringify({ path: '/home/gene/Spaces/Work', batch: 'batch-c' }))
+    mocked.importProposal.mockResolvedValue({ proposal: null, review: null })
+    render(<ImportDialog />)
+    expect(await screen.findByRole('heading', { name: 'Proposed schema' })).toBeInTheDocument()
+    expect(mocked.importProposal).toHaveBeenCalledWith('batch-c')
+    expect(localStorage.getItem(PENDING_REVIEW_KEY)).toBeNull()
   })
 
   test('test the agent workflow reopens for an earlier batch (Settings > Import history)', async () => {
