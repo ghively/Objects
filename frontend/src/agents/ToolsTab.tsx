@@ -48,6 +48,20 @@ export function ToolsTab({ agent }: { agent: Agent }) {
     }
   }, [id])
 
+  // Fix pass H (M19.6): a server turned on or off, or a secret set, elsewhere (Settings >
+  // Integrations, another window) changes the groups: read them again.
+  useEffect(() => {
+    let live = true
+    const off = api.onChange((e) => {
+      if (e.kind !== 'mcpServers') return
+      void api.agentTools(id).then((g) => live && setGroups(g ?? []), () => undefined)
+    })
+    return () => {
+      live = false
+      off?.()
+    }
+  }, [id])
+
   // A reload (after a conflict, or a change from elsewhere) shows the agent's own switches.
   const offKey = agent.toolsOff.join('\n')
   useEffect(() => setOff(offKey ? offKey.split('\n') : []), [offKey])

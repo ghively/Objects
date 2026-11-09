@@ -37,6 +37,9 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 
 A two-pane modal: left nav with a "Search settings" field, right pane for the chosen page. Groups:
 Account, General, Space, Integrations. Footer of the nav: version, Reload (Object has no Diagnostics row).
+Device settings changed elsewhere (another window, the API) load into an open window without a reload (a
+`settings` change event), and an open agent's Tools tab reads its groups again when an outside server is turned
+on or off or a secret is set.
 
 **Account** **(out of scope)**: account, password and authentication, active sessions, subscription and billing.
 Object has no accounts.
