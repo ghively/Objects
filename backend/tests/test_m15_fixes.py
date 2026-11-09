@@ -265,6 +265,21 @@ def test_5_special_types_are_not_matched_by_name(tmp_path):
                  Target("currentSpace", space))
 
 
+def test_people_folder_joins_the_person_type(tmp_path):
+    """Fix pass H: an Obsidian 'People' folder joins Person instead of becoming 'People (2)'; a folder named
+    like an existing type's plural joins that type even when the plain rule misses (Indices -> Index)."""
+    space = Space(_whiteboard_space(tmp_path))
+    index = space.create_type("Index", "Indices", None, None)
+    src = tmp_path / "v"
+    for folder in ("People", "Indices"):
+        (src / folder).mkdir(parents=True)
+        (src / folder / f"In {folder}.md").write_text("hello\n")
+    p = plan(_read(src), None, Target("currentSpace", space))
+    got = {t.key: (t.name, t.existingTypeId) for t in p.plan.types}
+    assert got["folder:People"] == ("Person", "person")
+    assert got["folder:Indices"] == ("Index", index.id)
+
+
 def test_5_explicit_special_type_answers_422(tmp_path):
     root = _whiteboard_space(tmp_path)
     app = create_app(Space(root), watch=False)
@@ -544,7 +559,8 @@ def test_16_system_keys_ignore_case(tmp_path):
     ("plural", "singular"),
     [
         ("Movies", "Movie"), ("Classes", "Class"), ("Boxes", "Box"), ("Watches", "Watch"),
-        ("Wishes", "Wish"), ("Stories", "Story"), ("Books", "Book"), ("People", "People"),
+        ("Wishes", "Wish"), ("Stories", "Story"), ("Books", "Book"), ("People", "Person"),
+        ("PEOPLE", "PERSON"), ("Key People", "Key Person"), ("Children", "Child"), ("Women", "Woman"),
         ("Series", "Series"), ("Status", "Status"), ("News", "News"), ("Analysis", "Analysis"),
         ("Bus", "Bus"), ("Glass", "Glass"), ("STORIES", "STORY"), ("s", "s"), ("ies", "ies"),
         ("Notes", "Note"), ("Cookies", "Cookie"), ("Address", "Address"), ("Taxes", "Tax"),

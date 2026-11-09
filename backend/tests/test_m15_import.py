@@ -81,7 +81,7 @@ def test_planner_defaults_and_mapping(tmp_path):
     read = _read(copy_fixture("import-obsidian", tmp_path / "v"))
     p = plan(read, None, Target("newSpace"))
     types = {t.key: t for t in p.plan.types}
-    assert types["folder:Books"].name == "Book" and types["folder:People"].name == "People"
+    assert types["folder:Books"].name == "Book" and types["folder:People"].name == "Person"
     assert types["folder:Movies"].pluralName == "Movies"
     props = {pp.key: pp for pp in types["folder:Books"].properties}
     assert props["date_"].sourceName == "date"  # a reserved key gets a free one

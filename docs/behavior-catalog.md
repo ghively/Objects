@@ -387,7 +387,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **Import dialog** ("Import from another app"): **Zip file or folder** path; **Exported from** Detect automatically
   | Notion | Obsidian | Anytype | Files (a folder, with an optional `_manifest.jsonl`); **Preview** writes nothing.
   Steps in order: source, **Check for sensitive content** (scan), **Review mappings** (types, properties, options),
-  progress with **Stop import**, finish. **Import into**: A new space | This space; the review step also offers
+  progress with **Stop import**, finish. A folder's type name is its singular (Books -> Book, Stories -> Story,
+  People -> Person, Children -> Child); into this space a folder joins an existing type with that name, or one whose
+  plural is the folder's name (so a "People" folder joins Person instead of making "People (2)").
+  **Import into**: A new space | This space; the review step also offers
   **Keep originals as** Attachments (default) | File objects, and **Try on a copy of this space** (imports into a copy
   named "<space> (trial)" next to the open space; on by default for a first run into this space). A finished import into
   the copy offers **Switch and review proposed schema** (the batch lives in the copy): it switches to the copy and opens
