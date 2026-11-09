@@ -365,6 +365,14 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **Files source**: every non-Markdown file is one page (text and images where they appeared) with the untouched
   original kept in `Attachments/Originals/` (over 100 MB: not copied, listed in the report). A file that cannot be
   read becomes an "Original only" page. Sheets over 200 rows or 20 columns are not shown ("see the original").
+  An image (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`) is an **Image object** in the Image type's folder
+  (`Images/`): MIME type, file size, width, height and source (the kept original) as its system fields, the image
+  in its body (the design's call, approved by Gene as AC-2 on 2026-11-08; not a Page holding the image). Only images
+  the Page row would take: a mapping that puts them in a folder or key type, or the Page row into another type, wins.
+  The report's Originals section says "1 image became an Image object."; File objects mode makes no second object for
+  an image. An image an earlier import made into a Page stays that Page on a re-run (matched by source id, updated in
+  place, never duplicated or migrated) and the report notes "Kept as a Page: an earlier import made it before images
+  became Image objects".
 - **Scanned PDF pages (OCR)**: a page with no text layer (or one under 32 characters) that holds an image is read with
   a local `tesseract`, English only, and its text merged in page order, so a PDF mixing text and scanned pages keeps
   every page's text (Gene's call, 2026-11-08). The report names the pages: "Needs OCR: page 2 read with the local OCR

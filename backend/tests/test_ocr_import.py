@@ -59,16 +59,19 @@ def _page(lines: list[str]) -> Image.Image:
     return im
 
 
-def test_image_original_only_is_reported_once(client, tmp_path):
-    """An image has no readable page: the report says "Original only" once, not three times
-    (the reader's note, the Files page's note and the writer's line)."""
-    src = tmp_path / "Photos"
+def test_original_only_is_reported_once(client, tmp_path):
+    """A file with no readable page: the report says "Original only" once, not three times
+    (the reader's note, the Files page's note and the writer's line). An image is an Image
+    object (AC-2), never "Original only"."""
+    src = tmp_path / "Media"
     src.mkdir()
+    (src / "clip.mp3").write_bytes(b"ID3 synthetic audio bytes")
     _page(["Hello"]).save(src / "photo.png")
     res = run(client, src)
     report = (client.space_root / res["reportPath"]).read_text(encoding="utf-8")
-    lines = [ln for ln in report.splitlines() if "`photo.png`" in ln]
-    assert lines == ["- [[photo]] (`photo.png`): `Original only: no readable page could be made`"], lines
+    lines = [ln for ln in report.splitlines() if "`clip.mp3`" in ln]
+    assert lines == ["- [[clip]] (`clip.mp3`): `Original only: no readable page could be made`"], lines
+    assert not [ln for ln in report.splitlines() if "`photo.png`" in ln]
 
 
 def _has_eng() -> bool:
