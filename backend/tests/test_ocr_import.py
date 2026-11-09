@@ -5,6 +5,7 @@ The OCR test needs a local ``tesseract`` with English data and is skipped withou
 
 from __future__ import annotations
 
+import io
 import shutil
 import subprocess
 import time
@@ -13,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 from m15_helpers import wait_job
 from PIL import Image, ImageDraw, ImageFont
+from pypdf import PdfReader, PdfWriter
 
 from objectapp.server import create_app
 from objectapp.space import Space
@@ -100,3 +102,113 @@ def test_scanned_pdf_is_ocrd_and_searchable(client, tmp_path):
             break
         time.sleep(0.1)
     assert any(h.get("path") == "Pages/scan.md" for h in hits["results"]), hits
+
+
+# -- mixed PDFs and OCR once per page (decisions memo 2026-11-08, OCR) ------------------------------
+
+
+def _text_pdf(text: str) -> bytes:
+    """A one-page PDF with a real text layer (Helvetica), written by hand."""
+    stream = b"BT /F1 14 Tf 20 60 Td (" + text.encode("latin-1") + b") Tj ET"
+    objs = [
+        b"<</Type/Catalog/Pages 2 0 R>>",
+        b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
+        b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 600 120]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>",
+        b"<</Length %d>>\nstream\n" % len(stream) + stream + b"\nendstream",
+        b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+    ]
+    out = io.BytesIO(b"%PDF-1.4\n")
+    offs = []
+    for i, o in enumerate(objs, 1):
+        offs.append(out.tell())
+        out.write(b"%d 0 obj\n" % i + o + b"\nendobj\n")
+    x = out.tell()
+    out.write(b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1))
+    for o in offs:
+        out.write(b"%010d 00000 n \n" % o)
+    out.write(b"trailer\n<</Size %d/Root 1 0 R>>\nstartxref\n%d\n%%%%EOF" % (len(objs) + 1, x))
+    return out.getvalue()
+
+
+def _scan_pdf(lines: list[str]) -> bytes:
+    buf = io.BytesIO()
+    _page(lines).save(buf, format="PDF", resolution=200)
+    return buf.getvalue()
+
+
+def mixed_pdf(path, scanned_lines: list[str]) -> None:
+    """Three pages: text, scanned (an image, no text layer), text."""
+    w = PdfWriter()
+    for part in (_text_pdf("Alpha text layer page one about kestrels"), _scan_pdf(scanned_lines),
+                 _text_pdf("Gamma text layer page three about otters")):
+        w.append(PdfReader(io.BytesIO(part)))
+    with open(path, "wb") as f:
+        w.write(f)
+
+
+class FakeTesseract:
+    """Stands in for ``tesseract`` (``subprocess.run`` in the PDF reader): counts calls."""
+
+    def __init__(self, text: str):
+        self.text = text
+        self.calls = 0
+
+    def __call__(self, args, **_kw):
+        self.calls += 1
+        return subprocess.CompletedProcess(args, 0, stdout=self.text + "\n", stderr="")
+
+
+@pytest.fixture
+def fake_ocr(monkeypatch):
+    from objectapp.readers import pdf
+
+    fake = FakeTesseract("Beta scanned page about herons")
+    monkeypatch.setattr(pdf, "ocr_engine", lambda: "/fake/tesseract")
+    monkeypatch.setattr(pdf.subprocess, "run", fake)
+    if hasattr(pdf, "clear_ocr_cache"):
+        pdf.clear_ocr_cache()
+    yield fake
+    if hasattr(pdf, "clear_ocr_cache"):
+        pdf.clear_ocr_cache()
+
+
+def test_mixed_pdf_ocrs_the_scanned_page_in_order(tmp_path, fake_ocr):
+    from objectapp import readers
+
+    p = tmp_path / "mixed.pdf"
+    mixed_pdf(p, ["Beta"])
+    r = readers.read_file(p)
+    md = r.markdown
+    assert "Alpha" in md and "herons" in md and "Gamma" in md, md
+    assert md.index("Alpha") < md.index("herons") < md.index("Gamma")
+    assert fake_ocr.calls == 1  # only the scanned page; text pages are never OCR'd
+    assert r.notes == ["Needs OCR: page 2 read with the local OCR engine"]
+
+
+def test_mixed_pdf_without_an_engine_says_which_page(tmp_path, monkeypatch):
+    from objectapp import readers
+    from objectapp.readers import pdf
+
+    monkeypatch.setattr(pdf, "ocr_engine", lambda: None)
+    p = tmp_path / "mixed.pdf"
+    mixed_pdf(p, ["Beta"])
+    r = readers.read_file(p)
+    assert "Alpha" in r.markdown and "Gamma" in r.markdown
+    assert r.notes == ["Needs OCR: page 2 has no text layer"]
+
+
+@pytest.mark.skipif(not _has_eng(), reason="needs a local tesseract with English data")
+def test_mixed_pdf_import_with_real_tesseract(client, tmp_path):
+    from objectapp.readers import pdf
+
+    if hasattr(pdf, "clear_ocr_cache"):
+        pdf.clear_ocr_cache()
+    src = tmp_path / "Mixed"
+    src.mkdir()
+    mixed_pdf(src / "mixed.pdf", ["Scanned middle page", "Marmalade protocol checklist"])
+    res = run(client, src)
+    page = (client.space_root / "Pages" / "mixed.md").read_text(encoding="utf-8")
+    assert page.index("Alpha") < page.index("Marmalade") < page.index("Gamma"), page
+    report = (client.space_root / res["reportPath"]).read_text(encoding="utf-8")
+    assert "`Needs OCR: page 2 read with the local OCR engine`" in report
+
