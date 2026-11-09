@@ -34,7 +34,8 @@ export function useTaskRowsFeed(): void {
   const types = useLinkIndex((s) => s.types)
   const taskType = useMemo(() => findTaskType(types), [types])
   const scope = useMemo(() => ({ typeIds: [taskType?.id ?? 'task'] }), [taskType])
-  const { rows, loading, patchRow } = useRows(scope)
+  // The rows' backlinks feed the Context grouping: keep them current (fix pass H, M5#5).
+  const { rows, loading, patchRow } = useRows(scope, { backlinks: true })
   useEffect(() => {
     useTaskRows.setState({ rows, loading, taskType, patchRow })
   }, [rows, loading, taskType, patchRow])

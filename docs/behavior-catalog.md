@@ -344,6 +344,9 @@ Each starter template pre-fills the new type's properties.
   objects show the linking block with its parent context. A leading radio-dot marks each reference; hovering shows
   small action icons (expand, `...`, and three more at the right). Unlinked Mentions is a separate section
   (section 11).
+- **Backlinks stay live**: when another object gains or loses a link to the open one (Link on a mention, an
+  outside edit adding `[[X]]`), the Properties panel's Backlinks chips and the Tasks dashboard's Context grouping
+  update without a reload (a change to any other object re-reads them).
 - **Inline tag**: a `#tag` typed in a paragraph renders as a colored chip in the text.
 - **Export dialog** (object `...` > Export, Ctrl+E): a modal with format tiles PDF, Markdown, Microsoft Word,
   Latex. PDF: Style cards (Notes: matches the page's styling; Essay and Academic, both Experimental),

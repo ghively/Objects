@@ -116,6 +116,20 @@ describe('ObjectView: computed values stay fresh', () => {
     expect(await screen.findByText('24')).toBeInTheDocument()
   })
 
+  // Fix pass H (M5#5): another object gaining a link to this one updates the Backlinks chips.
+  test('a change to another object refreshes the backlinks property', async () => {
+    const BACKLINKS = propertyDef({ id: 'p-back', key: 'backlinks', name: 'Backlinks', type: 'entity_backlinks' })
+    setup([STAGE, DOUBLE, BACKLINKS])
+    onDisk = { ...detail('v1', { double: num(8) }), backlinks: [] }
+    await openPage()
+    expect(screen.queryAllByTestId('backlink-chip')).toHaveLength(0)
+    mocked.objects.mockResolvedValue([onDisk.summary, objectSummary({ path: 'Pages/Notes.md', title: 'Notes' })])
+    onDisk = { ...detail('v1', { double: num(8) }), body: 'Not taken.\n', backlinks: [{ target: 'Notes', path: 'Pages/Notes.md' }] }
+    emit({ kind: 'changed', path: 'Pages/Notes.md', version: 'n2' })
+    await waitFor(() => expect(screen.getAllByTestId('backlink-chip')).toHaveLength(1))
+    expect(screen.queryByText('Not taken.')).not.toBeInTheDocument()
+  })
+
   test('without a rollup, other objects changing read nothing', async () => {
     setup([STAGE, DOUBLE])
     onDisk = detail('v1', { double: num(8) })
