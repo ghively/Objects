@@ -21,7 +21,7 @@ against a scratch server. **No box in Gene's `mN-acceptance.md` files was ticked
   36 `[ok]` RESULT: PASS; m22 44 ok PASS; m23 40 ok PASS; m24 72 ok PASS; m25 37 ok "All checks passed"; m26 13 ok
   PASS; m27 21 ok PASS. Zero `[FAIL]` lines.
 
-**Result:** 83 boxes: PASS 44, NOT-RUN 31, PARTIAL 2, DEFERRED-live-CLI 2, MANUAL 2, SUPERSEDED 1, FAIL 1.
+**Result:** 83 boxes: PASS 56, NOT-RUN 15, PARTIAL 5, MANUAL 3, DEFERRED-live-CLI 2, SUPERSEDED 1, FAIL 1.
 
 Result key: PASS / FAIL / PARTIAL / SUPERSEDED (the box assumes the pre-redesign layout; the feature was checked at
 its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) / DEFERRED-live-CLI / NOT-RUN.
@@ -104,27 +104,27 @@ its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) 
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M25-1 | Import a Markdown/Obsidian folder into a **copy** of the space ("Try on a copy of this space", the default for a first run); open an imported page: t… | NOT-RUN | (not reached) |
-| M25-2 | Import a Files folder (a few `.docx`, `.pdf`, `.xlsx`, an image, a `.vsdx`) with a `_manifest.jsonl` giving a SharePoint url: each page opens with it… | NOT-RUN | (not reached) |
-| M25-3 | "Keep originals as" File objects: each original also appears as a File/PDF/Image object, linked at the end of the page. | NOT-RUN | (not reached) |
-| M25-4 | Run the same import again: everything is unchanged, no duplicate pages or attachments; the report counts add up. | NOT-RUN | (not reached) |
-| M25-5 | Edit a source file, run again: that page updates in place and the old text is in Version history. | NOT-RUN | (not reached) |
-| M25-6 | Edit a page in Object, then change its source and run again: it is listed under **Changed in both** (finish step and report); **Take source** brings … | NOT-RUN | (not reached) |
-| M25-7 | Remove a source file, run again: **Removed at source** lists it; the page stays. | NOT-RUN | (not reached) |
-| M25-8 | **Move batch to Trash** on a batch: the pages it created go to the Trash and can be restored; pages it only updated stay. | NOT-RUN | (not reached) |
-| M25-9 | In a query or a view filter, choose **Imported from**, **Import batch**, **Source modified**. | NOT-RUN | (not reached) |
-| M25-10 | A copy of a work export (outside the repo): the report's counts add up, and nothing in the source folder changed. | NOT-RUN | (not reached) |
+| M25-1 | Import a Markdown/Obsidian folder into a **copy** of the space ("Try on a copy of this space", the default for a first run); open an imported page: t… | **PASS** | Obsidian vault -> wizard: source, then "Check for sensitive content" (6 scanned, 0 flagged), mapping step; "This space (sample)" shows "Try on a copy of this space" ticked by default; import (same routes, target spaceCopy "sample trial") made the copy next to the space; original space got no pages. Dune in the copy: Source line "Imported from Obsidian (modified 2026-11-09)", no Open original/Show file (folder source) |
+| M25-2 | Import a Files folder (a few `.docx`, `.pdf`, `.xlsx`, an image, a `.vsdx`) with a `_manifest.jsonl` giving a SharePoint url: each page opens with it… | **PARTIAL** | Files folder (DNS.docx w/ image, Inventory.xlsx, Plan.pptx, Backup manual.pdf, diagram.png, Network.vsdx, _manifest.jsonl SharePoint url) -> 7 objects; DNS page has its text + ![](Attachments/file-image1.png); Source "Imported from SharePoint (Ann Author, modified 2026-10-30, version 3.0)"; Open original -> window.open https://sp.example/sites/ops/dns; Network report line "Original only: no readable page could be made". Show file calls /import/original/reveal — the file manager opening is MANUAL. My hand-made PDF gave no text (page holds only the embed) |
+| M25-3 | "Keep originals as" File objects: each original also appears as a File/PDF/Image object, linked at the end of the page. | **PASS** | keepOriginals fileObjects: Files/DNS.docx.md, Inventory.xlsx.md, Network.vsdx.md, Plan.pptx.md, Images/diagram.png.md, PDFs/Backup manual.pdf.md; pages end with "Original: [[Files/DNS.docx]]" etc. |
+| M25-4 | Run the same import again: everything is unchanged, no duplicate pages or attachments; the report counts add up. | **PASS** | Same import again: objects 0, updated 0, unchanged 7, leftOut 1 = sourceItems 8; git status shows only the new batch dir + Import report (2); no new pages or attachments |
+| M25-5 | Edit a source file, run again: that page updates in place and the old text is in Version history. | **PASS** | Edited source deploy.md, re-ran: updated 1, unchanged 6; Pages/deploy.md updated in place (git diff 1 file); GET /history: version 1 holds the old text |
+| M25-6 | Edit a page in Object, then change its source and run again: it is listed under **Changed in both** (finish step and report); **Take source** brings … | **PASS** | Edited deploy + runbook2 in Object (PUT /object/body, the editor route) and at the source: re-run changedInBoth 2, report "## Changed in both — [[deploy]] … choose Take source or Keep mine"; resolve take deploy -> source text, history 2 versions (edit kept there); keep runbook2 -> my edit stays; next run unchanged 8, changedInBoth 0. Finish-step buttons themselves (BatchPanel) not driven |
+| M25-7 | Remove a source file, run again: **Removed at source** lists it; the page stays. | **PASS** | Removed runbook2.md at the source, re-ran: removed 1; report "## Removed at source — [[Pages/runbook2]]: no longer in the source; left in the space"; page still there |
+| M25-8 | **Move batch to Trash** on a batch: the pages it created go to the Trash and can be restored; pages it only updated stay. | **PASS** | POST /import/batches/{id}/trash (the BatchPanel "Move batch to Trash" route): the batch that only updated deploy trashed 0 (deploy stays); the batch that created runbook2 trashed 1, Trash lists it, restore brings it back. Button on the wizard finish step not clicked |
+| M25-9 | In a query or a view filter, choose **Imported from**, **Import batch**, **Source modified**. | **PASS** | Pages type view > Filter > + Filter > property picker lists "Imported from", "Import batch", "Source modified" |
+| M25-10 | A copy of a work export (outside the repo): the report's counts add up, and nothing in the source folder changed. | **MANUAL** | Needs a copy of Gene's real work export (outside the repo). Source-unchanged and reconciling counts were checked on synthetic sources (sha1 tree equal before/after; "Check: 9 accounted for of 9") |
 
 ### M26 (`m26-acceptance.md`, 6 boxes)
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M26-1 | Run the acceptance script and a real folder of Word/Excel/PowerPoint/PDF through `read_file`; the pages read sensibly. | NOT-RUN | (not reached) |
-| M26-2 | A scanned PDF is flagged "Needs OCR"; with Tesseract installed it gets text. | NOT-RUN | (not reached) |
-| M26-3 | Scan a copy of a work export: findings list file, kind and line, no values. | NOT-RUN | (not reached) |
-| M26-4 | A "Credentials" folder in Leave out is never read (and listed as left out). | NOT-RUN | (not reached) |
-| M26-5 | Flagged files default to "Import, excluded from AI"; switching one to "Leave out" is carried in the result. | NOT-RUN | (not reached) |
-| M26-6 | Speaker notes show as a toggle in the editor. | NOT-RUN | (not reached) |
+| M26-1 | Run the acceptance script and a real folder of Word/Excel/PowerPoint/PDF through `read_file`; the pages read sensibly. | **PARTIAL** | m26_acceptance RESULT: PASS (13 ok). Synthetic docs read sensibly: DNS.docx -> heading + paragraph + image; Inventory.xlsx -> "\| Host \| Role \| … dns-01 \| resolver \|"; Plan.pptx -> "## Slide 1: Quarterly plan" + speaker notes. Gene's real Word/Excel/PowerPoint/PDF folder: MANUAL |
+| M26-2 | A scanned PDF is flagged "Needs OCR"; with Tesseract installed it gets text. | **PASS** | Tesseract is installed here (/usr/sbin/tesseract; the M26 doc calls this path untested): readers.read_file on an image-only PDF (Pillow-rendered "INVOICE NUMBER 4471") -> text "INVOICE NUMBER 4471", note "Needs OCR: read with the local OCR engine"; a blank PDF -> note "Needs OCR", no text |
+| M26-3 | Scan a copy of a work export: findings list file, kind and line, no values. | **PARTIAL** | POST /api/import/scan on the synthetic folder: {"deploy.md": [{"kind": "password", "line": 2}]} — file, kind and line, no value. A copy of Gene's work export: MANUAL |
+| M26-4 | A "Credentials" folder in Leave out is never read (and listed as left out). | **PASS** | Leave out "Credentials": scan leftOut ["Credentials/keys.txt"], counts leftOut 1; the import reports "Left out: 1" and no object/attachment holds the AKIA key (grep); m26_acceptance checks it is never read |
+| M26-5 | Flagged files default to "Import, excluded from AI"; switching one to "Leave out" is carried in the result. | **PASS** | Scan defaultChoice "excludeFromAi": deploy.md (flagged) imported with excludeFromAI: true; with scan.leaveOutFiles ["deploy.md"] into a new space: objects 6, leftOut 2, no deploy page, grep hunter2 finds nothing |
+| M26-6 | Speaker notes show as a toggle in the editor. | **PASS** | Plan.pptx page: <!-- toggle --> Speaker notes block renders in the editor as div.block-toggle[data-toggle][data-open=false] titled "Speaker notes" |
 
 ### M27 (`m27-acceptance.md`, 6 boxes)
 
