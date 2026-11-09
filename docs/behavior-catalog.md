@@ -163,11 +163,15 @@ Each starter template pre-fills the new type's properties.
 
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
-- Main navigation, always visible at the top: Calendar, Tasks, Graph (Gene's 2026-11-08 redesign; Calendar is
-  the space's opening view). "All notes" is gone from the sidebar — with many note types it was a dumping
-  ground; the view stays reachable through queries and the palette.
+- Main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant (Gene's 2026-11-08 redesign;
+  Calendar is the space's opening view). The Assistant is the built-in, always-on helper — a program
+  feature, not an "agent" — shown with its own icon; a click opens its chat. "All notes" is gone from the
+  sidebar — with many note types it was a dumping ground; the view stays reachable through queries and the
+  palette.
 - Agents (M17), a section of its own with the standard section header, directly below the main navigation;
-  Work (M23) is one entry directly below it, opening the Work page; it shows while AI features are hidden.
+  it lists only the user's own agents (the built-in Assistant is not in it), and the header's `+` menu —
+  not a "+ New agent" row — is the way to add one. Work (M23) is one entry directly below it, opening the
+  Work page; it shows while AI features are hidden.
 - Object Types header: fold chevron, count, a `...` menu (Sort manually with a check, Sort alphabetically) and
   a `+` (the gallery above) on hover.
 - "Add section" opens a small form (a one-line explanation that a section is a named heading for pages

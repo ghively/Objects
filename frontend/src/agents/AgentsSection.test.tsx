@@ -33,20 +33,21 @@ describe('AgentsSection', () => {
     resetAgents()
   })
 
-  test('test the section sits below the main navigation and lists the default agent first', async () => {
+  test('test the section sits below the main navigation and lists only the user’s agents', async () => {
     render(<Sidebar types={[]} />)
     const section = await screen.findByRole('region', { name: AGENT_TEXT.heading })
     const nav = screen.getByRole('navigation', { name: 'Main' })
     // Directly below the main navigation; the next element after the section is the Work entry.
     expect(nav.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(section.nextElementSibling).toBe(screen.getByRole('navigation', { name: 'Work' }))
-    await waitFor(() => expect(section.querySelectorAll('[data-agent]')).toHaveLength(2))
+    // The built-in Assistant is not an agent row: it is in the main navigation, under Graph.
+    await waitFor(() => expect(section.querySelectorAll('[data-agent]')).toHaveLength(1))
     const rows = [...section.querySelectorAll('[data-agent]')].map((r) => r.getAttribute('data-agent'))
-    expect(rows).toEqual(['assistant', RESEARCHER])
-    expect(within(section).getByRole('button', { name: 'Assistant' })).toBeInTheDocument()
-    // "+ New agent" is the last row.
-    const items = within(within(section).getByRole('list', { name: AGENT_TEXT.heading })).getAllByRole('listitem')
-    expect(items.at(-1)?.querySelector('[data-new-agent-row]')).not.toBeNull()
+    expect(rows).toEqual([RESEARCHER])
+    expect(within(section).queryByRole('button', { name: 'Assistant' })).toBeNull()
+    expect(within(nav).getByRole('button', { name: 'Assistant' })).toBeInTheDocument()
+    // The "+ New agent" row is gone: the header `+` menu is the one way to add an agent.
+    expect(within(section).queryByText(AGENT_TEXT.newAgent)).toBeNull()
   })
 
   test('test the section is hidden while AI features are hidden', async () => {
@@ -64,8 +65,15 @@ describe('AgentsSection', () => {
     render(<AgentsSection />)
     await user.click(await screen.findByRole('button', { name: 'Researcher' }))
     expect(openInSidepanel).toHaveBeenCalledWith({ kind: 'aiChat', agentId: RESEARCHER })
-    await user.click(screen.getByRole('button', { name: 'Assistant' }))
-    expect(openInSidepanel).toHaveBeenLastCalledWith({ kind: 'aiChat', agentId: 'assistant' })
+  })
+
+  test('test the Assistant nav row (main navigation, not an agent) opens its chat', async () => {
+    const openInSidepanel = vi.fn()
+    useTabs.setState({ openInSidepanel })
+    const user = userEvent.setup()
+    render(<Sidebar types={[]} />)
+    await user.click(await screen.findByRole('button', { name: 'Assistant' }))
+    expect(openInSidepanel).toHaveBeenCalledWith({ kind: 'aiChat', agentId: 'assistant' })
   })
 
   test('test the row menu items', async () => {
@@ -95,14 +103,6 @@ describe('AgentsSection', () => {
     expect(labels.indexOf('Memory & skills')).toBe(labels.indexOf('Settings') + 1)
     await user.click(within(menu).getByRole('menuitem', { name: 'Memory & skills' }))
     expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'agent', id: RESEARCHER, tab: 'memory' }, {})
-  })
-
-  test('test the default agent cannot be deleted from its menu', async () => {
-    const user = userEvent.setup()
-    render(<AgentsSection />)
-    await user.click(await screen.findByRole('button', { name: AGENT_TEXT.rowMenu('Assistant') }))
-    const menu = await screen.findByRole('menu')
-    expect(within(menu).getByRole('menuitem', { name: 'Delete' })).toHaveAttribute('data-disabled')
   })
 
   test('test Delete of an outside agent shows the left-in-place notice', async () => {

@@ -8,7 +8,6 @@ export const AGENT_TEXT = {
   newAgent: 'New agent',
   addFolder: 'Add agent folder…',
   deletedAgents: 'Deleted agents…',
-  newAgentRow: 'New agent',
   rowMenu: (name: string) => `${name} actions`,
   openChat: 'Open chat',
   settings: 'Settings',

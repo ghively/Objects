@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useCollections } from '@/collections/useCollections'
 import { Icon, IconOrEmoji, iconName } from '@/components/Icon'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils'
 import { WorkspaceSections } from './SidebarSections'
 import { HelpSection } from '@/help/HelpSection'
 import { AgentsSection } from '@/agents/AgentsSection'
+import { AssistantNavButton } from '@/agents/AssistantNavButton'
+import { MainNavButton } from './MainNavButton'
 import { SectionHeader } from './SectionHeader'
 import { chipStyle } from './typeColor'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
@@ -158,34 +160,6 @@ export function TypeChip({ type, size = 22 }: { type: Pick<TypeDef, 'icon' | 'co
     >
       <IconOrEmoji icon={type.icon} fallback="ph-cube" size={Math.round(size * 0.68)} />
     </span>
-  )
-}
-
-/** A live entry of the sidebar's main navigation (Calendar, Tasks, Graph, Work, Trash); Ctrl+click opens a new tab. */
-function MainNavButton({
-  icon,
-  label,
-  active,
-  onClick,
-}: {
-  icon: string
-  label: string
-  active?: boolean
-  onClick: (e: MouseEvent<HTMLButtonElement>) => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={active ? 'page' : undefined}
-      className={cn(
-        'flex h-[38px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg hover:bg-hover',
-        active && 'bg-hover',
-      )}
-    >
-      <Icon name={icon} size={16} />
-      <span>{label}</span>
-    </button>
   )
 }
 
@@ -483,6 +457,8 @@ export function Sidebar({
           active={graphActive}
           onClick={(e) => onOpenTarget?.({ kind: 'graph' }, { newTab: e.ctrlKey || e.metaKey })}
         />
+        {/* The built-in Assistant, not an agent: directly under Graph. */}
+        <AssistantNavButton />
       </nav>
 
       {/* M17: the agents, a section of their own; M23: Work, the agent loop's dashboard, right

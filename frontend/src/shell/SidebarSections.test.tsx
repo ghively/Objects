@@ -172,12 +172,12 @@ describe('SidebarSections', () => {
     expect(onOpenTypeSettings).toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Queries' }))
     expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'queries' }, { newTab: false })
-    // All notes is gone from the sidebar; the main navigation is Calendar, Tasks, Graph.
+    // All notes is gone from the sidebar; the main navigation is Calendar, Tasks, Graph, Assistant.
     expect(screen.queryByRole('button', { name: 'All notes' })).toBeNull()
     const main = screen.getByRole('navigation', { name: 'Main' })
     const names = within(main)
       .getAllByRole('button')
       .map((b) => b.getAttribute('aria-label') ?? b.textContent)
-    expect(names).toEqual(['Calendar', 'Tasks', 'Graph'])
+    expect(names).toEqual(['Calendar', 'Tasks', 'Graph', 'Assistant'])
   })
 })

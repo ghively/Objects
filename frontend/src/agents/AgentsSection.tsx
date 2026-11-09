@@ -1,11 +1,13 @@
 /**
- * M17: the Agents section at the top of the sidebar (spec section 2), directly above the main
- * navigation. Each row is an agent's icon and name, the default agent first; a click opens that
- * agent's chat in the side panel. A row's `…` menu holds Open chat, Settings (the agent page),
- * Memory & skills (M18: the agent page's Memory tab), Duplicate (New agent, started from it) and Delete (no confirm: restorable from "Deleted
+ * M17: the Agents section of the sidebar (spec section 2), directly below the main navigation.
+ * Each row is one of the user's own agents — the built-in default agent (the Assistant) is NOT
+ * here: it is a row of the main navigation (`AssistantNavButton`), a built-in part of the program
+ * rather than an "agent". A click opens that agent's chat in the side panel. A row's `…` menu holds
+ * Open chat, Settings (the agent page), Memory & skills (M18: the agent page's Memory tab),
+ * Duplicate (New agent, started from it) and Delete (no confirm: restorable from "Deleted
  * agents…"; an agent outside the state dir is only unregistered, and the section says so). The
- * heading's `+` menu holds New agent, Add agent folder… and Deleted agents…; "+ New agent" is
- * also the last row. Nothing renders while AI features are hidden.
+ * heading's `+` menu holds New agent, Add agent folder… and Deleted agents…. Nothing renders while
+ * AI features are hidden.
  *
  * M20: the `+` menu gains "Add remote agent…" after "Add agent folder…". A remote agent's row
  * carries the "remote" mark, and its menu holds only Open chat, Settings and Delete (no Duplicate,
@@ -196,33 +198,24 @@ export function AgentsSection({ onOpenTarget }: AgentsSectionProps) {
         {T.heading}
       </SectionHeader>
       <ul aria-label={T.heading} className="flex flex-col gap-0.5">
-        {agents.map((a) => (
-          <AgentRow
-            key={a.id}
-            agent={a}
-            onOpen={() => openAgentChat(a)}
-            onSettings={() => open({ kind: 'agent', id: a.id }, {})}
-            onMemory={() => {
-              requestAgentTab(a.id, 'memory')
-              open({ kind: 'agent', id: a.id, tab: 'memory' }, {})
-            }}
-            onDuplicate={() => newAgent(a)}
-            onDelete={() => void remove(a)}
-          />
-        ))}
-        <li>
-          <button
-            type="button"
-            data-new-agent-row=""
-            onClick={() => newAgent(null)}
-            className="flex h-[36px] w-full items-center gap-2 rounded-lg px-1.5 text-left text-[15px] font-medium text-fg-muted hover:bg-hover hover:text-fg"
-          >
-            <span className="inline-flex size-[22px] shrink-0 items-center justify-center">
-              <Icon name="ph-plus" size={16} />
-            </span>
-            <span>{T.newAgentRow}</span>
-          </button>
-        </li>
+        {/* The built-in Assistant is not here: it is a row of the main navigation
+            (AssistantNavButton). This section lists only the user's own agents. */}
+        {agents
+          .filter((a) => !a.default)
+          .map((a) => (
+            <AgentRow
+              key={a.id}
+              agent={a}
+              onOpen={() => openAgentChat(a)}
+              onSettings={() => open({ kind: 'agent', id: a.id }, {})}
+              onMemory={() => {
+                requestAgentTab(a.id, 'memory')
+                open({ kind: 'agent', id: a.id, tab: 'memory' }, {})
+              }}
+              onDuplicate={() => newAgent(a)}
+              onDelete={() => void remove(a)}
+            />
+          ))}
       </ul>
       {notice && (
         <p role="status" className="px-2 pt-1 text-[13px] text-fg-muted">
