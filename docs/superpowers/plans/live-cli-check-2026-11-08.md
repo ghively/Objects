@@ -191,3 +191,24 @@ About 25 real CLI turns in all:
 | `npm run build` | clean |
 
 The front end is unchanged on this branch. The acceptance scripts were not rerun.
+
+## Lane G1 follow-up: the explicit `--tools` list (decisions memo S1)
+
+Same box and CLI (2.1.319), branch `lane/g1-agent-tools`. Four short `haiku` turns, `--no-session-persistence`.
+
+- **`--tools default` vs an explicit list.** Two direct probes in an empty scratch folder with the run's fixed flags,
+  "Say hi.":
+  - `--tools default`: `Task, Bash, CronCreate, CronDelete, CronList, DesignSync, Edit, EnterWorktree, ExitWorktree,
+    ListAgents, Monitor, NotebookEdit, PushNotification, Read, RemoteTrigger, ReportFindings, ScheduleWakeup,
+    SendMessage, Skill, TaskStop, ToolSearch, WebFetch, WebSearch, Workflow, Write` (no `Glob`, no `Grep`).
+  - Every `BUILTINS` CLI name plus `Skill,ToolSearch`: `Task, Bash, Edit, Glob, Grep, NotebookEdit, Read, Skill,
+    TaskCreate, TaskGet, TaskList, TaskUpdate, ToolSearch, WebFetch, WebSearch, Write`. Names this CLI doesn't have
+    (`PowerShell` on Linux, `MultiEdit`, `Agent`, `TodoWrite`) are ignored without an error.
+- **So the "No Glob or Grep with the shell on" observation above was a property of `--tools default`.** With the
+  explicit list a shell-on run gets `Glob` and `Grep` beside `Bash`, and their switches work. A-1 (grey the two
+  switches when the shell is on) is therefore not built; see the lane's report.
+- `test_object_tool_is_callable` (one turn through `agentrun.build_run`, real `objectapp-mcp`): **PASS**. `init.tools`
+  held the on built-ins, `Skill`, `ToolSearch`, the 25 Object read tools and the `object-agent` tools, and none of
+  `CronCreate`, `RemoteTrigger`, `SendMessage`, `ScheduleWakeup`, `Workflow`, `Monitor`. The model called
+  `ToolSearch`, then `mcp__object__search` (5 results), nothing refused.
+- `test_builtin_names` (shell on, the explicit list): **PASS**, every row present, nothing offered outside the rows.

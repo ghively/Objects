@@ -24,6 +24,7 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 | Calendar Month and Week views, backlinks, Export dialog | specified (section 10) |
 | Unlinked mentions | specified (section 11) |
 | Brain dump, Work agent | specified (section 10b) |
+| Agents: run tools and the fence | specified in part (section 10d) |
 | Import: Source line, Files source, scan, proposal, trial, normalise, Import inbox | specified (section 10c); the exact strings live in the code |
 | Tab and sidebar context menus, Overview tab, collection page, outline | specified (section 9) |
 | Views: layouts, toolbar, Overview | specified (sections 8, 9); the inner screens of the filter, sort and group editors and Customize are not specified yet |
@@ -390,6 +391,14 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **MCP**: `import_scan`, `import_proposal`, `import_report` (read) and `save_import_proposal`, `save_import_decisions`
   (write), the prompt `migrate_a_source` and the resource `object://skills/migrate-a-source` let an outside agent run the
   same workflow; `start_import` refuses a mapping that creates types outside an approved proposal (for the open space or a trial copy; a brand-new space is not checked).
+
+## 10d. Agents: tools and the fence (M17-M18)
+
+- **Built-in tools** (decisions memo S1): a run is offered only the Claude Code built-ins whose Tools-tab row is on,
+  plus the skill tool and `ToolSearch` (which Object's MCP tools load behind); the run passes them as an explicit
+  `--tools` list, never `--tools default`. A built-in the CLI adds later (on 2.1.319: CronCreate, RemoteTrigger,
+  SendMessage, ScheduleWakeup, Workflow, Monitor...) stays off until it gets a Tools-tab row. Read-only work runs
+  get only Web fetch and the skill tool; an import filing run gets none.
 
 ## 11. Unlinked mentions
 

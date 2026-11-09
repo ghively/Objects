@@ -36,7 +36,9 @@ __all__ = [
     "ToolGroup",
     "ToolLists",
     "WORK_STEP_TOOLS",
+    "CLI_ALWAYS",
     "catalogue",
+    "cli_tools",
     "default_off",
     "groups_out",
     "run_tool_lists",
@@ -156,6 +158,11 @@ list is ``TaskCreate``/``TaskGet``/``TaskList``/``TaskUpdate``, and only in some
 ALWAYS_ALLOWED: tuple[str, ...] = ("Skill",)
 """Allowed in every run; not a switch."""
 
+CLI_ALWAYS: tuple[str, ...] = ("Skill", "ToolSearch")
+"""Built-ins named in every run's ``--tools`` list besides the on rows (decisions memo S1): the
+skill tool, unless the run disallows it, and ``ToolSearch``, which the CLI defers MCP tools behind
+(``m17-cli-spike.md``)."""
+
 GROUP_LABELS = {
     "object-read": "Object read",
     "object-write": "Object write",
@@ -230,6 +237,19 @@ def _add(out: list[str], names: Iterable[str]) -> None:
     for n in names:
         if n not in out:
             out.append(n)
+
+
+def cli_tools(allowed: Iterable[str], disallowed: Iterable[str]) -> list[str]:
+    """A run's ``--tools`` list (decisions memo S1): each `BUILTINS` CLI name in `allowed`, in
+    catalogue order, then `CLI_ALWAYS` minus `disallowed`. A built-in that has no Tools-tab row
+    (``CronCreate``, ``RemoteTrigger``, ``SendMessage``...) is never offered."""
+    allowed_set = set(allowed)
+    disallowed_set = set(disallowed)
+    out: list[str] = []
+    for entry in BUILTINS:
+        _add(out, [c for c in entry.cli if c in allowed_set and c not in disallowed_set])
+    _add(out, [n for n in CLI_ALWAYS if n not in disallowed_set])
+    return out
 
 
 def run_tool_lists(off: Iterable[str], *, write: bool, folder_servers: Iterable[str]) -> ToolLists:

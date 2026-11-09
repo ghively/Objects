@@ -187,6 +187,7 @@ def run_live(
     allowed: list[str] | None = None,
     disallowed: list[str] | None = None,
     env: dict[str, str] | None = None,
+    tools: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], str]:
     """One real ``claude -p`` run in `folder`; (stream events, debug log text).
 
@@ -215,6 +216,8 @@ def run_live(
         "--append-system-prompt-file", str(run / "append.md"),
         "--allowedTools", ",".join(allowed if allowed is not None else lists.allowed),
         "--disallowedTools", ",".join(disallowed if disallowed is not None else lists.disallowed),
+        # As `agentrun.build_run` (decisions memo S1): an explicit built-in list, never "default".
+        "--tools", ",".join(tools if tools is not None else toolcatalog.cli_tools(lists.allowed, lists.disallowed)),
         "--model", MODEL, "--no-session-persistence", "--debug-file", str(debug),
     ]
     run_env = {k: v for k, v in os.environ.items()
@@ -481,17 +484,22 @@ def test_claude_md_excludes_on_brackets(tmp_path: Path) -> None:
 @live
 def test_builtin_names(tmp_path: Path) -> None:
     state, folder = make_agent(tmp_path, tools_off=[])
-    events, _ = run_live(tmp_path, folder, "Say hi.", allowed=["Skill"], disallowed=[])
+    every = [c for entry in toolcatalog.BUILTINS for c in entry.cli]
+    events, _ = run_live(tmp_path, folder, "Say hi.", allowed=["Skill"], disallowed=[],
+                         tools=[*every, *toolcatalog.CLI_ALWAYS])
     tools = _init(events).get("tools") or []
     print("init tools:", tools)
     missing = [entry.id for entry in toolcatalog.BUILTINS if not set(entry.cli) & set(tools)]
     print("rows with no tool in this run:", missing)
-    # 2.1.317 lists its to-do tools (TaskCreate...) only in some runs (m17-cli-spike.md). 2.1.319
-    # offers no Glob or Grep when the shell is on (its search goes through Bash).
-    allowed_missing = {"TodoWrite"} | ({"Glob", "Grep"} if "Bash" in tools else set())
-    assert set(missing) <= allowed_missing, missing
-    for name in toolcatalog.ALWAYS_ALLOWED:
+    # 2.1.317 lists its to-do tools (TaskCreate...) only in some runs (m17-cli-spike.md). Under
+    # `--tools default` 2.1.319 drops Glob and Grep when the shell is on; with the explicit list
+    # (decisions memo S1) it offers them beside Bash, so no row may be missing for that.
+    assert "Bash" in tools
+    assert set(missing) <= {"TodoWrite"}, missing
+    for name in toolcatalog.CLI_ALWAYS:
         assert name in tools
+    # Nothing outside the Tools tab's rows is offered (decisions memo S1).
+    assert not set(tools) - set(every) - set(toolcatalog.CLI_ALWAYS), tools
 
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -571,4 +579,9 @@ def test_object_tool_is_callable(tmp_path: Path) -> None:
     print("answer:", _final(events)[:300])
     searches = [(u, r) for u, r in calls if u.get("name") == "mcp__object__search"]
     assert searches, f"search was never called; tools offered: {tools}"
+    # Decisions memo S1: the explicit --tools list still loads Object's MCP tools (behind
+    # ToolSearch) and offers no CLI built-in without a Tools-tab row.
+    assert "ToolSearch" in tools and "mcp__object__search" in tools and "mcp__object-agent__agent_info" in tools
+    for name in ("CronCreate", "CronDelete", "RemoteTrigger", "ScheduleWakeup", "SendMessage", "Workflow", "Monitor"):
+        assert name not in tools, name
     assert all(r is not None and not r.get("is_error") for _u, r in searches), searches

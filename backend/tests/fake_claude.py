@@ -667,7 +667,9 @@ def main(argv: list[str]) -> int:
         mcp_tools = [t for t in allowed if t.startswith("mcp__")]
     else:
         mcp_tools = ["mcp__object__search", "mcp__object__read"]
-    init_tools = [t for t in BUILTIN_NAMES if t not in disallowed] + mcp_tools
+    named = _arg(argv, "--tools")  # an explicit list offers only those built-ins (decisions memo S1)
+    offered = BUILTIN_NAMES if named in (None, "default") else tuple(n for n in BUILTIN_NAMES if n in named.split(","))
+    init_tools = [t for t in offered if t not in disallowed] + mcp_tools
     servers = (config or {}).get("mcpServers") if isinstance(config, dict) else None
     names = sorted(servers) if isinstance(servers, dict) and servers else ["object"]
     _out({"type": "system", "subtype": "init", "session_id": session, "cwd": os.getcwd(),

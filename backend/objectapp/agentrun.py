@@ -104,10 +104,9 @@ CLI_FLAGS = (
     "--permission-prompts",
     "none",
     "--strict-mcp-config",
-    "--tools",
-    "default",
 )
-"""Every fixed flag of an agent run (checked against ``claude --help`` of 2.1.317)."""
+"""Every fixed flag of an agent run (checked against ``claude --help`` of 2.1.317). ``--tools`` is
+not fixed: `build_run` names the run's built-ins (`toolcatalog.cli_tools`, decisions memo S1)."""
 
 RUN_SETTINGS_BASE: dict[str, Any] = {"autoMemoryEnabled": False}
 """In every ``run-settings.json`` (spike)."""
@@ -677,6 +676,7 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
         "--mcp-config", str(tmp / "mcp.json"),
         "--settings", str(tmp / "run-settings.json"),
         "--append-system-prompt-file", str(tmp / "append.md"),
+        "--tools", ",".join(toolcatalog.cli_tools(parts.allowed, parts.disallowed)),
         "--allowedTools", ",".join(parts.allowed),
         "--disallowedTools", ",".join(parts.disallowed),
     ]
