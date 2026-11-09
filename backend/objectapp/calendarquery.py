@@ -68,9 +68,9 @@ def _parse_range(from_day: Any, to_day: Any) -> tuple[date, date]:
     start = parse_day(from_day) if isinstance(from_day, str) else None
     end = parse_day(to_day) if isinstance(to_day, str) else None
     if start is None or start != from_day.strip():
-        raise InvalidValue(f"Not a day (YYYY-MM-DD): {from_day!r}")
+        raise InvalidValue(f'"{from_day}" is not a day (YYYY-MM-DD).')
     if end is None or end != to_day.strip():
-        raise InvalidValue(f"Not a day (YYYY-MM-DD): {to_day!r}")
+        raise InvalidValue(f'"{to_day}" is not a day (YYYY-MM-DD).')
     a, b = date.fromisoformat(start), date.fromisoformat(end)
     if a > b:
         raise InvalidValue("The range starts after it ends.")

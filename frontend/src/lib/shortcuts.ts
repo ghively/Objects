@@ -53,6 +53,34 @@ export const CATEGORY_LABELS: Record<string, string> = {
   work: 'Work',
 }
 
+/**
+ * The order the Shortcuts sheet shows the groups in (the catalog's section 2). A category not
+ * listed here (Whiteboard, Work) follows, in first-registration order.
+ */
+export const CATEGORY_ORDER: readonly string[] = [
+  'global',
+  'text',
+  'markdown',
+  'block',
+  'page',
+  'navigation',
+  'calendar',
+  'ai',
+  'table',
+  'date',
+  'pdf',
+  'weblink',
+]
+
+/** `categories` sorted for the sheet: `CATEGORY_ORDER` first, the rest in the order given. */
+export function sortCategories(categories: readonly string[]): string[] {
+  const rank = (c: string) => {
+    const i = CATEGORY_ORDER.indexOf(c)
+    return i === -1 ? CATEGORY_ORDER.length : i
+  }
+  return [...categories].sort((a, b) => rank(a) - rank(b))
+}
+
 const registry = new Map<string, ShortcutDef>()
 
 /** Add `defs` (an entry with an id already registered replaces it, keeping its place). */
@@ -175,6 +203,11 @@ export function matches(e: KeyEventLike, keys: string[]): boolean {
 
 const ARROW_GLYPHS: Record<string, string> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }
 
+/** Keys the sheet names rather than prints: the catalog's Ctrl+Plus / Ctrl+Minus (`+` is Shift+= on most layouts). */
+const KEY_NAMES: Record<string, string> = { '=': 'Plus', '+': 'Plus', '-': 'Minus' }
+/** On macOS the glyphs read on their own (⌘+ / ⌘-). */
+const MAC_KEY_NAMES: Record<string, string> = { '=': '+' }
+
 /** Whether `spec` is a two-key sequence (`g n`). */
 export function isSequence(spec: string): boolean {
   return spec.includes(' ')
@@ -193,7 +226,10 @@ export function formatKeys(spec: string, mac = isMacPlatform()): string {
       .join(' then ')
   }
   const c = parseKeys(spec, mac)
-  const key = ARROW_GLYPHS[c.key] ?? (c.key === 'Space' ? 'Space' : c.key.length === 1 ? c.key.toUpperCase() : c.key)
+  const key =
+    ARROW_GLYPHS[c.key] ??
+    (mac ? MAC_KEY_NAMES[c.key] : KEY_NAMES[c.key]) ??
+    (c.key === 'Space' ? 'Space' : c.key.length === 1 ? c.key.toUpperCase() : c.key)
   if (mac) return `${c.ctrl ? '⌃' : ''}${c.alt ? '⌥' : ''}${c.shift ? '⇧' : ''}${c.meta ? '⌘' : ''}${key}`
   return [c.ctrl && 'Ctrl', c.meta && 'Meta', c.alt && 'Alt', c.shift && 'Shift', key].filter(Boolean).join('+')
 }
@@ -286,10 +322,11 @@ const def = (
 export const M7_SHORTCUTS: ShortcutDef[] = [
   def('bold', 'text', 'Format bold', ['Mod-b'], 'editor', V),
   def('italic', 'text', 'Italicize', ['Mod-i'], 'editor', V),
-  def('underline', 'text', 'Underline', ['Mod-u'], 'editor', V),
+  // The table leaves Underline unbound: Ctrl+U is "Add new content" (`openAddEntityMenu`).
+  def('underline', 'text', 'Underline', [], 'editor', V),
   def('strikethrough', 'text', 'Strikethrough', ['Mod-Shift-s'], 'editor', V),
   def('codeToken', 'text', 'Format as code', ['Mod-e'], 'editor', V),
-  def('mathToken', 'text', 'Format as TeX-formula', ['Mod-m'], 'editor', V),
+  def('mathToken', 'text', 'Format as TeX formula', ['Mod-m'], 'editor', V),
 
   def('heading1', 'block', 'Make the selected blocks heading 1', [], 'editor', V),
   def('heading2', 'block', 'Make the selected blocks heading 2', [], 'editor', V),
@@ -327,7 +364,8 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
     'toggleToggleInBlockWithCursor',
     'block',
     'Expand or collapse the toggle in this block; with no children yet, it adds one and puts the cursor there. In a to-do, add ⇧.',
-    ['Mod-Enter', 'Mod-Shift-Enter'],
+    // The table's keys are Ctrl+Up/Down; Mod-Enter and Mod-Shift-Enter stay for the hands used to them.
+    ['Mod-Enter', 'Mod-Shift-Enter', 'Mod-ArrowUp', 'Mod-ArrowDown'],
     'editor',
     V,
   ),
@@ -342,12 +380,12 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
   def('navigateBack', 'navigation', 'Navigate back', ['Mod-ArrowLeft', 'Mod-['], 'global', V),
   def('navigateForward', 'navigation', 'Navigate forward', ['Mod-ArrowRight', 'Mod-]'], 'global', V),
 
-  def('toggleSidepanel', 'global', 'Toggle right sidepanel', ['Mod-Shift-ArrowRight'], 'global', V),
+  def('toggleSidepanel', 'global', 'Toggle right side panel', ['Mod-Shift-ArrowRight'], 'global', V),
   def('toggleLeftSidebar', 'global', 'Toggle left sidebar', ['Mod-Shift-ArrowLeft'], 'global', V),
   def('toggleCalendarSidebar', 'global', 'Toggle calendar sidebar', ['Mod-Alt-s'], 'global', V),
   def('toggleDarkMode', 'global', 'Toggle dark mode', ['Mod-Shift-l'], 'global', V),
   def('openSettings', 'global', 'Open settings', ['Mod-,'], 'global', V),
-  def('toggleShortcutsMenu', 'global', 'Toggle the shortcuts list', ['Mod-Shift-b'], 'global', V),
+  def('toggleShortcutsMenu', 'global', 'Show or hide the shortcuts list', ['Mod-Shift-b'], 'global', V),
 ]
 
 /**
@@ -432,8 +470,10 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def('whiteboardCycle', 'whiteboard', 'Cycle selected objects', ['Tab'], 'whiteboard', false, false),
   def('whiteboardCycleBack', 'whiteboard', 'Select the previous item', ['Shift-Tab'], 'whiteboard', false, false),
   def('whiteboardPan', 'whiteboard', 'Pan', ['Space'], 'whiteboard', false, false),
-  def('undo', 'whiteboard', 'Undo last change', ['Mod-z'], 'whiteboard', false, false),
-  def('redo', 'whiteboard', 'Redo last change', ['Mod-Shift-z', 'Mod-y'], 'whiteboard', false, false),
+  // The catalog lists Undo and Redo under General: display-only, the editor (its history) and the
+  // whiteboard (`whiteboard/shortcuts.ts`) handle the keys themselves.
+  def('undo', 'global', 'Undo', ['Mod-z'], 'global', false, false),
+  def('redo', 'global', 'Redo', ['Mod-Shift-z', 'Mod-y'], 'global', false, false),
 ]
 
 /**
@@ -486,6 +526,8 @@ export const SHARED_KEY_IDS: readonly (readonly string[])[] = [
   ['codeToken', 'toggleCodeBlock'],
   ['mathToken', 'toggleMathBlock'],
   ['toggleTodoInBlockWithCursor', 'toggleToggleInBlockWithCursor'],
+  // Ctrl+Shift+T: a new task outside the editor (the window), the block made a task inside it.
+  ['createNewTask', 'turnBlockIntoTaskObject'],
   ['moveSelectedBlocksUp', 'moveUpBlockWithCursor'],
   ['moveSelectedBlocksDown', 'moveDownBlockWithCursor'],
   ['moveSelectedBlocksUpOnSameLevel', 'moveUpBlockWithCursorOnSameLevel'],
@@ -516,7 +558,8 @@ export const POLISH_SHORTCUTS: ShortcutDef[] = [
  */
 export const OBJECT_MENU_SHORTCUTS: ShortcutDef[] = [
   def('openExportMenu', 'page', 'Export this page', ['Mod-e'], 'global', V, false),
-  def('openImportMenu', 'page', 'Import into this page', ['Mod-i'], 'global', V, false),
+  // "Import": on a type page Ctrl+I opens the type's CSV import, not a page's.
+  def('openImportMenu', 'page', 'Import', ['Mod-i'], 'global', V, false),
   def('toggleFavorite', 'page', 'Favorite or unfavorite this page', ['Mod-Shift-*'], 'global', V, false),
 ]
 
@@ -541,9 +584,41 @@ export const AI_SHORTCUTS: ShortcutDef[] = [
   def('aiRephrase', 'ai', 'Rephrase', ['Mod-Alt-u'], 'aiChat', V, true),
 ]
 
+/**
+ * The 2026-11-08 sweep: catalogued keys Object had not bound ("bind the easy ones", Gene).
+ * `createNewTask` (General, Ctrl+Shift+T) is bound by `shell/shortcuts.ts` outside editable
+ * targets; inside the editor the key stays `turnBlockIntoTaskObject` (a shared pair).
+ * `pasteAsPlainText` (Text editing, Ctrl+Shift+V) is bound by `editor/shortcuts.ts` through
+ * `editor/extensions/pasteAsPlainText.ts`. `goToCalendar` (General, Ctrl+Alt+H: "press twice to
+ * jump to today") is bound by `shell/shortcuts.ts` anywhere in the window. `toggleAllToggles`
+ * (Block editing, Ctrl+O) is bound by `editor/shortcuts.ts` through `editor/extensions/toggleAll.ts`.
+ * `increaseTextHierarchy` / `decreaseTextHierarchy` (Block editing, Ctrl+Plus / Ctrl+Minus) are
+ * bound by `editor/shortcuts.ts` through `editor/extensions/textHierarchy.ts`; the registry
+ * holds `Mod-=` (shown Ctrl+Plus) and the editor's key map answers the shifted `+` too. The
+ * whiteboard's zoom keys are the same chords in their own scope. `mergeTextBlocks` (Block
+ * editing, Ctrl+Shift+G; Ctrl+G stays `groupBlocks`) is bound by `editor/shortcuts.ts` through
+ * `editor/extensions/mergeTextBlocks.ts`. `removeBlockStyles` (Block editing, Ctrl+Shift+X) is
+ * bound by `editor/shortcuts.ts` through `editor/extensions/removeBlockStyles.ts`. `openBlockStyling`
+ * (Block editing, Ctrl+Shift+E; Ctrl+E stays `openExportMenu`) is bound by `editor/shortcuts.ts`
+ * through `editor/extensions/openBlockStyling.ts`, which asks the handles overlay
+ * (`editor/handles/BlockHandles.tsx`) to open the block menu for the target blocks.
+ */
+export const SWEEP_SHORTCUTS: ShortcutDef[] = [
+  def('createNewTask', 'global', 'Create new task', ['Mod-Shift-t'], 'global', V, true),
+  def('pasteAsPlainText', 'text', 'Paste as plain text', ['Mod-Shift-v'], 'editor', V, true),
+  def('goToCalendar', 'global', 'Go to Calendar', ['Mod-Alt-h'], 'global', V, true),
+  def('toggleAllToggles', 'block', 'Open or close all toggles on the page', ['Mod-o'], 'editor', V, true),
+  def('increaseTextHierarchy', 'block', 'Increase text hierarchy', ['Mod-='], 'editor', V, true),
+  def('decreaseTextHierarchy', 'block', 'Decrease text hierarchy', ['Mod--'], 'editor', V, true),
+  def('mergeTextBlocks', 'block', 'Merge the selected text blocks', ['Mod-Shift-g'], 'editor', V, true),
+  def('removeBlockStyles', 'block', 'Remove block styles', ['Mod-Shift-x'], 'editor', V, true),
+  def('openBlockStyling', 'block', 'Open block styling', ['Mod-Shift-e'], 'editor', V, true),
+]
+
 registerShortcuts(EXISTING_SHORTCUTS)
 registerShortcuts(M7_SHORTCUTS)
 registerShortcuts(M8_SHORTCUTS)
 registerShortcuts(POLISH_SHORTCUTS)
 registerShortcuts(OBJECT_MENU_SHORTCUTS)
 registerShortcuts(AI_SHORTCUTS)
+registerShortcuts(SWEEP_SHORTCUTS)

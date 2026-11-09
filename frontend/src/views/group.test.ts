@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { Row, TypeDef } from '@/api/types'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { collection, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 import { GROUP_OPTIONS, GROUP_SORT_OPTIONS, canDropRow, groupRows, isGroupable, valueForGroup, type GroupCtx } from './group'
 
@@ -104,6 +105,20 @@ describe('groupRows', () => {
     const rows = [R('today', { due: d(23) }), R('yest', { due: d(22) }), R('tom', { due: d(24) }), R('lastw', { due: d(15) }), R('nextw', { due: d(28) }), R('old', { due: d(1) }), R('none', {})]
     const { groups } = groupRows(rows, by('due', 'relative'), undefined, ctx())
     expect(labels(groups)).toEqual(['Earlier', 'Last week', 'Yesterday', 'Today', 'Tomorrow', 'Next week', 'Other'])
+  })
+
+  test('By Hour labels follow the Time format setting, read from the group context', () => {
+    const rows = [R('a', { due: { start: '2026-11-08T14:05:00.000Z', resolution: 'time' } })]
+    try {
+      useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'UTC' } })
+      expect(labels(groupRows(rows, by('due', 'hour'), undefined, ctx()).groups)).toEqual(['Nov 8, 2026, 2 PM'])
+      expect(labels(groupRows(rows, by('due', 'hour'), undefined, ctx({ twentyFourHourTime: true })).groups)).toEqual(['Nov 8, 2026, 14:00'])
+      // The pure function reads the context, not the store (the view puts the setting on the context).
+      useSettings.setState({ settings: { ...settingsDefaults, timeZone: 'UTC', twentyFourHourTime: true } })
+      expect(labels(groupRows(rows, by('due', 'hour'), undefined, ctx({ twentyFourHourTime: false })).groups)).toEqual(['Nov 8, 2026, 2 PM'])
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 
   test('hideEmptyGroups drops empty label options', () => {
@@ -377,6 +392,38 @@ describe('task groupings (M4)', () => {
     const rows = [T('mon', { date: d('2026-10-26') }), T('tue', { date: d('2026-10-27') })]
     const { groups } = groupRows(rows, { groups: [{ propertyId: 'date', option: 'scheduled' }] }, undefined, { ...tctx(), now: sunday })
     expect(labels(groups)).toEqual(['Tomorrow', 'Next week'])
+  })
+
+  test('scheduled on a Sunday with the week starting on Sunday: the Saturday after is this week', () => {
+    const sunday = new Date(2026, 9, 25, 9, 0)
+    const d = (s: string) => ({ start: s, resolution: 'day' })
+    const by2 = { groups: [{ propertyId: 'date', option: 'scheduled' }] }
+    const rows = [T('tue', { date: d('2026-10-27') }), T('sat', { date: d('2026-10-31') }), T('nextSun', { date: d('2026-11-01') })]
+    const sun = groupRows(rows, by2, undefined, { ...tctx(), now: sunday, weekStart: 'sunday' }).groups
+    expect(labels(sun)).toEqual(['This week', 'Next week'])
+    expect(paths(sun[0].rows)).toEqual(['tue', 'sat'])
+    expect(paths(sun[1].rows)).toEqual(['nextSun'])
+    // Monday weeks (the default) put every one of them in next week.
+    const mon = groupRows(rows, by2, undefined, { ...tctx(), now: sunday, weekStart: 'monday' }).groups
+    expect(labels(mon)).toEqual(['Next week'])
+    expect(labels(groupRows(rows, by2, undefined, { ...tctx(), now: sunday }).groups)).toEqual(['Next week'])
+  })
+
+  test('By Week and Relative buckets follow the week start', () => {
+    const d = (s: string) => ({ start: s, resolution: 'day' })
+    const rows = [T('sun', { date: d('2026-10-25') }), T('sat', { date: d('2026-10-31') })]
+    const week = { groups: [{ propertyId: 'date', option: 'week' }] }
+    const sun = groupRows(rows, week, undefined, { ...tctx(), weekStart: 'sunday' }).groups
+    expect(ids(sun)).toEqual(['2026-10-25'])
+    expect(labels(sun)).toEqual(['Oct 25 – Oct 31, 2026'])
+    const mon = groupRows(rows, week, undefined, tctx()).groups
+    expect(ids(mon)).toEqual(['2026-10-19', '2026-10-26'])
+    // Relative, seen from Thursday 22 Oct: Sunday 25 Oct is this week on Monday weeks, next week on Sunday weeks.
+    const thursday = new Date(2026, 9, 22, 12, 0)
+    const rel = { groups: [{ propertyId: 'date', option: 'relative' }] }
+    const sunRow = [T('sun', { date: d('2026-10-25') })]
+    expect(ids(groupRows(sunRow, rel, undefined, { ...tctx(), now: thursday }).groups)).toEqual(['thisWeek'])
+    expect(ids(groupRows(sunRow, rel, undefined, { ...tctx(), now: thursday, weekStart: 'sunday' }).groups)).toEqual(['nextWeek'])
   })
 })
 

@@ -71,7 +71,7 @@ def router(ctx: ApiContext, loop: WorkLoop, service: WorkService) -> APIRouter:
         except InvalidValue as exc:
             return _error(422, str(exc))
         except (KeyError, FileNotFoundError, ValueError):
-            return _error(404, f"No brain dump at {req.path!r}")
+            return _error(404, f'There is no brain dump at "{req.path}".')
 
     @api.post("/work/captures/reply")
     def reply(req: ReplyRequest):

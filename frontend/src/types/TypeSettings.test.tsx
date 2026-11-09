@@ -52,7 +52,7 @@ describe('TypeSettings', () => {
     expect(nav).toHaveTextContent('Object Types')
     expect(nav).toHaveTextContent('Project')
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Properties', 'Templates', 'Work', 'Configuration', 'Delete Object Type'])
+    expect(headings).toEqual(['Properties', 'Templates', 'Work', 'Configuration', 'Delete object type'])
     // The basics come first, in order.
     const labels = ['Type icon', 'Name', 'Plural of name', 'Color', 'Description']
     const nodes = labels.map((l) => screen.getByLabelText(l))
@@ -105,8 +105,8 @@ describe('TypeSettings', () => {
     expect(screen.getByRole('note')).toHaveTextContent(BASIC_TYPE_INFO)
     expect(screen.getByRole('button', { name: 'Add Property' })).toBeDisabled()
     expect(screen.getByRole('textbox', { name: 'Name' })).toBeDisabled()
-    expect(screen.queryByRole('heading', { name: 'Delete Object Type' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Delete Object Type' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Delete object type' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete object type' })).not.toBeInTheDocument()
     // The description, colour and layout stay editable.
     expect(screen.getByRole('textbox', { name: 'Description' })).toBeEnabled()
     expect(screen.getByRole('combobox', { name: 'Font' })).toBeEnabled()
@@ -120,7 +120,7 @@ describe('TypeSettings', () => {
     expect(screen.getByText('The type file is not valid JSON.')).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Description' })).toBeDisabled()
     expect(screen.getByRole('combobox', { name: 'Font' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Delete Object Type' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete object type' })).toBeDisabled()
   })
 
   test('layout settings save at once', async () => {

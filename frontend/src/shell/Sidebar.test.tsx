@@ -67,10 +67,10 @@ describe('Sidebar', () => {
     expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
       'Open',
       'Create Server',
-      'New from Template',
-      'New Collection',
-      'Pin to Sidebar',
-      'Object Type Settings',
+      'New from template',
+      'New collection',
+      'Pin to sidebar',
+      'Object type settings',
       'Import CSV',
       'Delete object type',
     ])
@@ -81,7 +81,7 @@ describe('Sidebar', () => {
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Pages' }))
     menu = await screen.findByRole('menu')
     expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).not.toContain('Delete object type')
-    await user.click(within(menu).getByRole('menuitem', { name: 'Object Type Settings' }))
+    await user.click(within(menu).getByRole('menuitem', { name: 'Object type settings' }))
     expect(onOpenTypeSettings).toHaveBeenCalledWith(expect.objectContaining({ id: 'page' }))
   })
 
@@ -282,6 +282,20 @@ describe('Sidebar theme button (M7)', () => {
     expect(gear).toHaveAttribute('title', 'Settings')
     await userEvent.click(gear)
     expect(useSettingsModal.getState().isOpen).toBe(true)
+    resetSettingsModal()
+  })
+
+  it('test sidebar footer has a Shortcuts icon and no dead Profile or Share buttons', async () => {
+    resetSettingsModal()
+    render(<Sidebar types={TYPES} />)
+    expect(screen.queryByRole('button', { name: 'Profile' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Share' })).toBeNull()
+    const shortcuts = screen.getByRole('button', { name: 'Shortcuts' })
+    expect(shortcuts).toBeEnabled()
+    expect(shortcuts).toHaveAttribute('title', 'Shortcuts')
+    await userEvent.click(shortcuts)
+    expect(useSettingsModal.getState().shortcutsOpen).toBe(true)
+    expect(useSettingsModal.getState().isOpen).toBe(false)
     resetSettingsModal()
   })
 })

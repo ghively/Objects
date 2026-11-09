@@ -53,6 +53,11 @@ describe('SettingsModal', () => {
     ])
     expect(within(nav).getByRole('button', { name: 'Shortcuts' })).toBeInTheDocument()
     expect(within(nav).getByPlaceholderText('Search settings')).toBeInTheDocument()
+    // Catalog section 1: the nav's footer shows the version, under the Shortcuts row.
+    const version = await within(nav).findByText('Object 0.1.0')
+    expect(version).toHaveAttribute('data-app-version', '0.1.0')
+    // ... and a Reload row (the catalog's footer: version, Diagnostics, Reload).
+    expect(within(nav).getByRole('button', { name: 'Reload' })).toBeInTheDocument()
 
     // Each row shows its section's heading.
     for (const s of SETTINGS_SECTIONS) {

@@ -141,7 +141,13 @@ def test_empty_or_long_name_422(blocks_space_dir: Path, patch):
     with _client(blocks_space_dir) as c:
         r = c.put("/api/space", json={"patch": patch, "baseRevision": ""})
         assert r.status_code == 422, r.text
-        assert r.json()["detail"]
+        key = next(iter(patch))
+        if key not in spaceconfig.PATCH_KEYS:  # an unknown key is told apart from a bad value
+            assert r.json()["detail"] == f'There is no setting named "{key}".'
+        elif key != "name":
+            assert r.json()["detail"] == f"The setting \"{key}\" can't be saved."
+        else:
+            assert r.json()["detail"]
     assert _tree(blocks_space_dir) == before
     # Exactly 120 characters is fine.
     spaceconfig.patch(blocks_space_dir, {"name": "y" * 120}, "")

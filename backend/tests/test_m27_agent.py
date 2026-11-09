@@ -316,6 +316,17 @@ def test_mcp_tools(client, tmp_path):
     with pytest.raises(Exception, match="no approved schema proposal"):
         # the mapping would create a Runbooks type no approved proposal creates (the open space is the target)
         call("start_import", preview_id=pv["previewId"], target={"kind": "currentSpace"}, batch=batch)
+    # Gene's decision (2026-11-08): an import into a NEW space is checked the same way.
+    dest = tmp_path / "dest"
+    dest.mkdir()
+    with pytest.raises(Exception, match="no approved schema proposal"):
+        call("start_import", preview_id=pv["previewId"],
+             target={"kind": "newSpace", "name": "Imported", "location": str(dest)}, batch=batch)
+    assert list(dest.iterdir()) == []  # nothing was made
+    # a mapping that creates no type (every page becomes a Page) needs no proposal
+    started = call("start_import", preview_id=pv["previewId"], mapping={"typeSource": "none"},
+                   target={"kind": "newSpace", "name": "Imported", "location": str(dest)})
+    assert started["jobId"]
     names = {t.name for t in asyncio.run(server.list_tools())}
     assert {"import_scan", "import_proposal", "import_report", "save_import_proposal", "save_import_decisions"} <= names
     ro = {t.name for t in asyncio.run(build_server(http, write=False).list_tools())}

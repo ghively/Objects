@@ -35,7 +35,7 @@ describe('AppearanceSection', () => {
     // The light and dark themes, with their descriptions.
     const light = screen.getByRole('radiogroup', { name: 'Light theme' })
     expect(within(light).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Light', 'Light Dimmed'])
-    expect(within(light).getByText('Light, with softer contrast')).toBeInTheDocument()
+    expect(within(light).getByText('Light, with softer contrast.')).toBeInTheDocument()
     await user.click(within(light).getByRole('radio', { name: 'Light Dimmed' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ lightTheme: 'lightDimmed' }, expect.anything())
 
@@ -90,4 +90,15 @@ describe('AppearanceSection', () => {
     expect(within(group).getByRole('button', { name: 'Zoom in' })).toBeDisabled()
     expect(within(group).getByRole('button', { name: 'Zoom out' })).toBeEnabled()
   })
+
+  test('test the four theme descriptions read as one style', () => {
+    render(<AppearanceSection />)
+    const light = screen.getByRole('radiogroup', { name: 'Light theme' })
+    const dark = screen.getByRole('radiogroup', { name: 'Dark theme' })
+    expect(within(light).getByText('The standard light theme.')).toBeInTheDocument()
+    expect(within(light).getByText('Light, with softer contrast.')).toBeInTheDocument()
+    expect(within(dark).getByText('The standard dark theme.')).toBeInTheDocument()
+    expect(within(dark).getByText('Dark, with softer contrast.')).toBeInTheDocument()
+  })
+
 })

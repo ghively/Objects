@@ -1,7 +1,10 @@
 /**
  * M20: a remote agent's Profile tab. Name and icon each save on change with the agent's revision
  * (`saveRemoteAgent`); on a 409 the tab reloads the agent, as M17's Profile does. "Agent Card"
- * shows the card URL (read-only) with "Refresh card", where messages go and the A2A version.
+ * shows the card URL (read-only) with "Refresh card", where messages go and the A2A version. A
+ * refreshed card whose endpoint moved to another host or scheme is not switched to (Gene,
+ * 2026-11-08): the section says where it moved, with "Switch to the new address" and "Keep the old
+ * one"; after a switch an agent that had a token is asked for it again, as when adding.
  * "Authentication" shows the auth as "set" (never its value) or "Token: needed"; "Replace token…"
  * opens the auth fields in place. "Context sent" says when context was first sent. "Folder" has
  * "Open folder" and "Remove from list". A remote agent has no soul, memory, skills, model or tool
@@ -121,6 +124,48 @@ export function RemoteProfileTab({ agent }: { agent: Agent }) {
     }
   }
 
+  /** "Switch to the new address": the pending endpoint becomes the one messages go to; an agent
+   * that had a token is asked for it again (the move dropped it), the way adding asks. */
+  const switchAddress = async () => {
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const next = await api.confirmRemoteEndpoint(agent.id)
+      latest.current = next
+      putAgent(next)
+      const kind = next.remote?.auth.kind ?? 'none'
+      if (kind !== 'none') {
+        setAuth({ kind, headerName: next.remote?.auth.headerName ?? '', value: '' })
+        setReplacing(true)
+        setNotice(T.switchedNeedsToken)
+      } else {
+        setNotice(T.switched)
+      }
+    } catch (e) {
+      setError(message(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** "Keep the old one": forgets the pending endpoint; messages keep going where they did. */
+  const keepAddress = async () => {
+    setBusy(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const next = await api.dismissRemoteEndpoint(agent.id)
+      latest.current = next
+      putAgent(next)
+      setNotice(T.keptAddress)
+    } catch (e) {
+      setError(message(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const reveal = async () => {
     setError(null)
     try {
@@ -201,6 +246,21 @@ export function RemoteProfileTab({ agent }: { agent: Agent }) {
         </div>
         <p className="text-[14px]">{T.sendsTo(remote.endpointHost)}</p>
         <p className="text-[14px] text-fg-muted">{T.protocol(remote.protocolVersion)}</p>
+        {remote.pendingEndpoint && (
+          <div className="mt-1 flex flex-col gap-2 rounded-md border border-line px-3 py-2">
+            <p className="text-[14px]" title={remote.pendingEndpoint.url}>
+              {T.moved(remote.pendingEndpoint.host)}
+            </p>
+            <div className="flex gap-2">
+              <Button type="button" disabled={busy} onClick={() => void switchAddress()}>
+                {T.switchAddress}
+              </Button>
+              <Button type="button" variant="outline" disabled={busy} onClick={() => void keepAddress()}>
+                {T.keepAddress}
+              </Button>
+            </div>
+          </div>
+        )}
       </Section>
 
       <Section label={T.authentication}>

@@ -389,7 +389,7 @@ def test_automations_and_import(env: Env, tmp_path: Path) -> None:
     dest = tmp_path / "dest"
     dest.mkdir()
     started = env.call(
-        "start_import", preview_id=preview["previewId"],
+        "start_import", preview_id=preview["previewId"], mapping={"typeSource": "none"},  # no new types: no proposal needed
         target={"kind": "newSpace", "name": "Imported", "location": str(dest)},
     )
     deadline = time.monotonic() + 20

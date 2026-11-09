@@ -462,7 +462,7 @@ describe('actions in the list', () => {
     for (const row of document.querySelectorAll('[data-action]')) expect(row.lastElementChild?.textContent).toBe('Action')
     await user.clear(input)
     await user.type(input, 'toggle')
-    await waitFor(() => expect(actionLabels()).toEqual(['Toggle focus mode', 'Toggle left sidebar', 'Toggle right sidepanel']))
+    await waitFor(() => expect(actionLabels()).toEqual(['Toggle focus mode', 'Toggle left sidebar', 'Toggle right side panel']))
   })
 
   test('a matching action keeps "No results" away; no match at all shows it', async () => {
@@ -505,7 +505,7 @@ describe('actions in the list', () => {
     await user.click(await findAction(user, 'left sidebar', 'toggleLeftSidebar'))
     expect(p.onToggleSidebar).toHaveBeenCalledTimes(1)
 
-    await user.click(await findAction(user, 'right sidepanel', 'toggleSidepanel'))
+    await user.click(await findAction(user, 'right side panel', 'toggleSidepanel'))
     expect(p.onToggleRightPanel).toHaveBeenCalledTimes(1)
 
     useFocusMode.setState({ on: false })

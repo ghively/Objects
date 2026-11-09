@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 import types
 from dataclasses import dataclass
@@ -358,6 +359,73 @@ def test_rerun_changed_in_both_take_source_and_keep_mine(client, tmp_path):
     reconciles(again)
 
 
+def test_rerun_after_the_source_folder_moved_updates_the_same_objects(client, tmp_path):
+    # Gene's decision (2026-11-08): a re-run from a moved source folder matches the objects an earlier
+    # run made by their source ids instead of creating them again; the report says the source moved.
+    vault = copy_fixture("import-obsidian", tmp_path / "Vault")
+    root = client.space_root
+    first = run(client, vault)["result"]
+    before = blocks(root)
+    attachments = sorted(p.name for p in (root / "Attachments").iterdir())
+    moved = tmp_path / "Elsewhere" / "Vault"
+    moved.parent.mkdir()
+    shutil.move(str(vault), str(moved))
+    second = run(client, moved)["result"]
+    assert second["objects"] == 0 and second["removed"] == 0
+    assert second["updated"] + second["unchanged"] == first["objects"]
+    reconciles(second)
+    assert set(blocks(root)) == set(before)  # the same objects, nothing new
+    assert sorted(p.name for p in (root / "Attachments").iterdir()) == attachments
+    report = (root / second["reportPath"]).read_text(encoding="utf-8")
+    assert report.lower().count("source moved") == 1 and str(vault) in report
+    # a changed file at the new place updates its object in place
+    (moved / "Books" / "Emma.md").write_text(
+        (moved / "Books" / "Emma.md").read_text(encoding="utf-8") + "\nAfter the move.\n", encoding="utf-8")
+    third = run(client, moved)["result"]
+    assert third["objects"] == 0 and third["updated"] == 1 and third["changedInBoth"] == 0
+    emma = next(r for r, b in blocks(root).items() if b["id"] == "Books/Emma.md")
+    assert "After the move." in (root / emma).read_text(encoding="utf-8")
+    assert blocks(root)[emma]["source"] == str(moved)
+    # the two vaults rule stands: a second copy of the source somewhere else is its own source
+    other = copy_fixture("import-obsidian", tmp_path / "Other")
+    fourth = run(client, other)["result"]
+    assert fourth["objects"] == first["objects"]
+
+
+def test_a_moved_source_is_matched_only_within_its_own_system(client, tmp_path):
+    # The same file names from a source of another system (no .obsidian: plain Markdown) are new
+    # objects, even when the folder the first import came from is gone.
+    vault = copy_fixture("import-obsidian", tmp_path / "Vault")
+    root = client.space_root
+    first = run(client, vault)["result"]
+    plain = copy_fixture("import-obsidian", tmp_path / "Plain")
+    shutil.rmtree(plain / ".obsidian")
+    shutil.rmtree(vault)
+    other = run(client, plain)["result"]
+    assert other["objects"] > 0 and other["updated"] == 0
+    assert "source moved" not in (root / other["reportPath"]).read_text(encoding="utf-8").lower()
+    assert first["objects"] > 0
+
+
+def test_move_batch_to_trash_after_a_moved_rerun(client, tmp_path):
+    vault = copy_fixture("import-obsidian", tmp_path / "Vault")
+    r = client.post("/api/import/preview", json={"source": {"path": str(vault)}, "target": "currentSpace"})
+    assert r.json()["mapping"]["typeSource"] == "folder"
+    r = client.post("/api/import/start", json={"previewId": r.json()["previewId"], "mapping": {"typeSource": "none"},
+                                               "target": {"kind": "currentSpace"}})
+    first = wait_job(client, r.json()["jobId"])["result"]
+    moved = tmp_path / "Moved"
+    shutil.move(str(vault), str(moved))
+    # a fresh preview from the new place starts from the mapping the first import used
+    r = client.post("/api/import/preview", json={"source": {"path": str(moved)}, "target": "currentSpace"})
+    assert r.json()["mapping"]["typeSource"] == "none"
+    second = run(client, moved)["result"]
+    assert second["objects"] == 0
+    # the first batch made the objects, so it still trashes every one of them
+    out = client.post(f"/api/import/batches/{first['batch']}/trash").json()
+    assert out["trashed"] == first["objects"] and out["missing"] == 0
+
+
 def test_rerun_reuses_attachments_and_mapping(client, tmp_path):
     vault = copy_fixture("import-obsidian", tmp_path / "Vault")
     root = client.space_root
@@ -397,6 +465,22 @@ def test_batch_records_and_move_to_trash(client, tmp_path):
     trash = client.get("/api/trash").json()
     assert len(trash) >= res["objects"]  # restorable
     assert client.post("/api/import/batches/nope/trash").status_code == 404
+
+
+def test_report_is_stamped_in_the_spaces_time_zone(space_dir, tmp_path):
+    """Sweep 2026-11-08 (work-import 9): the "Imported:" line used the server's local zone; every
+    other stamp in Object uses the space's time zone."""
+    from datetime import UTC, datetime, timedelta, timezone
+
+    sp = Space(space_dir)
+    sp.tz = timezone(timedelta(hours=5, minutes=45))  # a zone no server runs in
+    sp.clock = lambda: datetime(2026, 11, 8, 3, 30, tzinfo=UTC)
+    vault = copy_fixture("import-obsidian", tmp_path / "Vault")
+    with TestClient(create_app(sp, watch=False)) as c:
+        c.space_root = space_dir  # type: ignore[attr-defined]
+        res = run(c, vault)["result"]
+    report = (space_dir / res["reportPath"]).read_text(encoding="utf-8")
+    assert "- Imported: 2026-11-08 09:15\n" in report
 
 
 def test_batch_trash_leaves_updated_objects(client, tmp_path):

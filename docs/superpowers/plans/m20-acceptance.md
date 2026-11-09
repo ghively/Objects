@@ -77,3 +77,7 @@ On a copy of his export. Run a fake remote agent first with `uv run python backe
 - [ ] Deleting Fake Planner and restoring it from "Deleted agents…" brings it back, still working.
 - [ ] `%LOCALAPPDATA%\object\agents\Fake Planner\` holds `.object-agent\agent.json`, `card.json` and `sessions\`, and no token anywhere (search the folder for `test-token`).
 - [ ] Unlinked mentions still show on the object page.
+
+## Review item 5 closed (2026-11-09, sweep, Gene's decision)
+Refresh on a card whose endpoint moved to another host (or scheme) keeps the old endpoint, drops the stored token and records the new address as pending; the agent's Profile shows "The agent's address moved to <host>. Confirm the move to use it." with **Switch to the new address** (then asks for the token again) and **Keep the old one**. Chat keeps the old endpoint until switched. Routes: `POST /api/remote-agents/{id}/confirm-endpoint`, `DELETE /api/remote-agents/{id}/pending-endpoint`.
+

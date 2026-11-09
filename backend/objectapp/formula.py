@@ -57,7 +57,7 @@ MAX_LIST = 1000
 MAX_TEXT = 100_000
 """The longest text a formula may build (`replace`, ``+``, `concat`, `join`, `format`)."""
 MAX_NUMBER_BITS = 1023
-"""An integer of more bits is refused ("Number too large"): it would not fit a float or JSON."""
+"""An integer of more bits is refused ("The number is too large."): it would not fit a float or JSON."""
 
 
 class FormulaError(Exception):
@@ -151,7 +151,7 @@ def tokenize(src: str) -> list[Token]:
             buf: list[str] = []
             while True:
                 if j >= n:
-                    raise FormulaError(f"Unterminated text starting at position {i + 1}")
+                    raise FormulaError(f"Unterminated text starting at position {i + 1}.")
                 ch = src[j]
                 if ch == "\\" and j + 1 < n and src[j + 1] in '"\\':
                     buf.append(src[j + 1])
@@ -181,7 +181,7 @@ def tokenize(src: str) -> list[Token]:
                 i += len(op)
                 break
         else:
-            raise FormulaError(f"Unexpected character {c!r} at position {i + 1}")
+            raise FormulaError(f'Unexpected character "{c}" at position {i + 1}.')
     out.append(Token("end", None, n, n))
     return out
 
@@ -257,7 +257,7 @@ class _Parser:
     def expect_op(self, op: str) -> Token:
         tok = self.next()
         if tok.kind != "op" or tok.value != op:
-            raise FormulaError(f"Expected {op!r} {self._where(tok)}")
+            raise FormulaError(f'Expected "{op}" {self._where(tok)}.')
         return tok
 
     def _where(self, tok: Token) -> str:
@@ -268,7 +268,7 @@ class _Parser:
     def enter(self) -> None:
         self.depth += 1
         if self.depth > MAX_DEPTH:
-            raise FormulaError(f"The formula is nested too deeply (at most {MAX_DEPTH} levels)")
+            raise FormulaError(f"The formula is nested too deeply (at most {MAX_DEPTH} levels).")
 
     def leave(self) -> None:
         self.depth -= 1
@@ -276,11 +276,11 @@ class _Parser:
     # grammar
     def parse(self) -> tuple:
         if self.peek().kind == "end":
-            raise FormulaError("The formula is empty")
+            raise FormulaError("The formula is empty.")
         node = self.expr()
         tok = self.peek()
         if tok.kind != "end":
-            raise FormulaError(f"Unexpected {self._show(tok)} {self._where(tok)}")
+            raise FormulaError(f"Unexpected {self._show(tok)} {self._where(tok)}.")
         return node
 
     def _show(self, tok: Token) -> str:
@@ -347,10 +347,10 @@ class _Parser:
             self.next()
             tok = self.next()
             if tok.kind != "ident" or tok.value in _KEYWORDS:
-                raise FormulaError(f"Expected a function name after '.' {self._where(tok)}")
+                raise FormulaError(f'Expected a function name after "." {self._where(tok)}.')
             name = tok.value
             if name == "prop":
-                raise FormulaError("prop can't be used in method form")
+                raise FormulaError("The function prop can't be used in method form.")
             self.enter()
             added += 1
             args = self.args()
@@ -374,14 +374,14 @@ class _Parser:
             tok = self.next()
             if tok.kind == "op" and tok.value == ")":
                 break
-            raise FormulaError(f"Expected ',' or ')' {self._where(tok)}")
+            raise FormulaError(f'Expected "," or ")" {self._where(tok)}.')
         self.leave()
         return out
 
     def _call(self, name: str, args: list[tuple], tok: Token) -> tuple:
         arity = ARITY.get(name)
         if arity is None:
-            raise FormulaError(f"Unknown function {name!r}")
+            raise FormulaError(f'Unknown function "{name}".')
         lo, hi = arity
         if not lo <= len(args) <= hi:
             if lo == hi:
@@ -390,7 +390,7 @@ class _Parser:
                 want = f"at least {lo} argument{'s' if lo != 1 else ''}"
             else:
                 want = f"{lo} to {hi} arguments"
-            raise FormulaError(f"{name} takes {want}")
+            raise FormulaError(f"The function {name} takes {want}.")
         return ("call", name, args)
 
     def primary(self) -> tuple:
@@ -412,28 +412,28 @@ class _Parser:
             if name == "false":
                 return ("lit", False)
             if name in _KEYWORDS:
-                raise FormulaError(f"Unexpected {name!r} {self._where(tok)}")
+                raise FormulaError(f'Unexpected "{name}" {self._where(tok)}.')
             if not self.at_op("("):
-                raise FormulaError(f'Unknown name {name!r} (a property is written prop("{name}"))')
+                raise FormulaError(f'Unknown name "{name}" (a property is written prop("{name}")).')
             if name == "prop":
                 self.expect_op("(")
                 arg = self.next()
                 if arg.kind != "str":
-                    raise FormulaError('prop takes a property name in quotes: prop("Name")')
+                    raise FormulaError('The function prop takes a property name in quotes: prop("Name").')
                 self.expect_op(")")
                 return ("prop", arg.value)
             return self._call(name, self.args(), tok)
         if tok.kind == "end":
-            raise FormulaError("A value is missing at the end of the formula")
-        raise FormulaError(f"Unexpected {self._show(tok)} {self._where(tok)}")
+            raise FormulaError("A value is missing at the end of the formula.")
+        raise FormulaError(f"Unexpected {self._show(tok)} {self._where(tok)}.")
 
 
 def parse(src: str) -> tuple:
     """The AST of ``src``. Raises `FormulaError` (empty, too long, a syntax error, too deep)."""
     if not isinstance(src, str):
-        raise FormulaError("The formula must be text")
+        raise FormulaError("The formula must be text.")
     if len(src) > MAX_EXPRESSION:
-        raise FormulaError(f"The formula is longer than {MAX_EXPRESSION} characters")
+        raise FormulaError(f"The formula is longer than {MAX_EXPRESSION} characters.")
     return _Parser(src).parse()
 
 
@@ -583,18 +583,18 @@ def _is_empty(v: Any) -> bool:
 
 def _check_text(t: str) -> str:
     if len(t) > MAX_TEXT:
-        raise FormulaError("Text too long")
+        raise FormulaError("The text is too long.")
     return t
 
 
 def _check_list(items: list) -> list:
     if len(items) > MAX_LIST:
-        raise FormulaError(f"A list holds at most {MAX_LIST} items")
+        raise FormulaError(f"A list holds at most {MAX_LIST} items.")
     return items
 
 
 def _want(name: str, v: Any, *kinds: str) -> None:
-    raise FormulaError(f"{name} takes {' or '.join(kinds)}, not {_kind(v)}")
+    raise FormulaError(f"The function {name} takes {' or '.join(kinds)}, not {_kind(v)}.")
 
 
 def _text_arg(name: str, v: Any) -> str | None:
@@ -623,14 +623,14 @@ def _bool_cond(name: str, v: Any) -> bool:
         return False
     if isinstance(v, bool):
         return v
-    raise FormulaError(f"{name} needs a true/false condition, not {_kind(v)}")
+    raise FormulaError(f"The function {name} needs a true/false condition, not {_kind(v)}.")
 
 
 def _finite(n: float) -> int | float:
     if isinstance(n, float) and not math.isfinite(n):
-        raise FormulaError("The result is not a finite number")
+        raise FormulaError("The result is not a finite number.")
     if isinstance(n, int) and n.bit_length() > MAX_NUMBER_BITS:
-        raise FormulaError("Number too large")
+        raise FormulaError("The number is too large.")
     return n
 
 
@@ -646,19 +646,19 @@ def _compare(op: str, a: Any, b: Any, tz: tzinfo) -> Any:
             same = _is_empty(a) and _is_empty(b)
         elif isinstance(a, list) or isinstance(b, list):
             if not (isinstance(a, list) and isinstance(b, list)):
-                raise FormulaError(f"Can't compare {_kind(a)} and {_kind(b)}")
+                raise FormulaError(f"Can't compare {_kind(a)} and {_kind(b)}.")
             same = [value_text(x) for x in a] == [value_text(x) for x in b]
         else:
             ka, kb = _kind(a), _kind(b)
             if ka != kb:
-                raise FormulaError(f"Can't compare {ka} and {kb}")
+                raise FormulaError(f"Can't compare {ka} and {kb}.")
             same = _sort_key(a, tz) == _sort_key(b, tz)
         return same if op == "==" else not same
     if a is None or b is None:
         return None
     ka, kb = _kind(a), _kind(b)
     if ka != kb or ka in ("list", "value"):
-        raise FormulaError(f"Can't compare {ka} and {kb}")
+        raise FormulaError(f"Can't compare {ka} and {kb}.")
     x, y = _sort_key(a, tz), _sort_key(b, tz)
     if op == "<":
         return x < y
@@ -674,7 +674,7 @@ def _arith(op: str, a: Any, b: Any) -> Any:
         if isinstance(a, str) or isinstance(b, str):
             ta, tb = value_text(a), value_text(b)
             if len(ta) + len(tb) > MAX_TEXT:
-                raise FormulaError("Text too long")
+                raise FormulaError("The text is too long.")
             return ta + tb
         if a is None or b is None:
             if (a is None or _is_num(a)) and (b is None or _is_num(b)):
@@ -682,11 +682,11 @@ def _arith(op: str, a: Any, b: Any) -> Any:
         elif _is_num(a) and _is_num(b):
             return _finite(a + b)
         if isinstance(a, FDate) or isinstance(b, FDate):
-            raise FormulaError("Use dateAdd to add to a date")
-        raise FormulaError(f"Can't add {_kind(a)} and {_kind(b)}")
+            raise FormulaError("Use dateAdd to add to a date.")
+        raise FormulaError(f"Can't add {_kind(a)} and {_kind(b)}.")
     if (a is not None and not _is_num(a)) or (b is not None and not _is_num(b)):
         word = {"-": "subtract", "*": "multiply", "/": "divide", "%": "take the remainder of"}[op]
-        raise FormulaError(f"Can't {word} {_kind(a)} and {_kind(b)}")
+        raise FormulaError(f"Can't {word} {_kind(a)} and {_kind(b)}.")
     if a is None or b is None:
         return None
     if op == "-":
@@ -694,7 +694,7 @@ def _arith(op: str, a: Any, b: Any) -> Any:
     if op == "*":
         return _finite(a * b)
     if b == 0:
-        raise FormulaError("Division by zero")
+        raise FormulaError("Division by zero.")
     if op == "/":
         return _finite(a / b)
     r = math.fmod(a, b)
@@ -713,14 +713,14 @@ def _add_months(v: date | datetime, months: int) -> date | datetime:
     year, month = divmod(total, 12)
     month += 1
     if not 1 <= year <= 9999:
-        raise FormulaError("The date is out of range")
+        raise FormulaError("The date is out of range.")
     day = min(v.day, calendar.monthrange(year, month)[1])
     return v.replace(year=year, month=month, day=day)
 
 
 def _date_add(d: FDate, n: float, unit: str, tz: tzinfo) -> FDate:
     if unit not in UNITS:
-        raise FormulaError(f"Unknown unit {unit!r} (use {', '.join(UNITS)})")
+        raise FormulaError(f'Unknown unit "{unit}" (use {", ".join(UNITS)}).')
     try:
         if unit in ("years", "quarters", "months"):
             months = int(n) * {"years": 12, "quarters": 3, "months": 1}[unit]
@@ -741,7 +741,7 @@ def _date_add(d: FDate, n: float, unit: str, tz: tzinfo) -> FDate:
         delta = timedelta(hours=n) if unit == "hours" else timedelta(minutes=n)
         return FDate(d.instant(tz) + delta)
     except (OverflowError, ValueError) as exc:
-        raise FormulaError("The date is out of range") from exc
+        raise FormulaError("The date is out of range.") from exc
 
 
 def _trunc(x: float) -> int:
@@ -750,7 +750,7 @@ def _trunc(x: float) -> int:
 
 def _date_between(a: FDate, b: FDate, unit: str, tz: tzinfo) -> int:
     if unit not in UNITS:
-        raise FormulaError(f"Unknown unit {unit!r} (use {', '.join(UNITS)})")
+        raise FormulaError(f'Unknown unit "{unit}" (use {", ".join(UNITS)}).')
     if unit in ("years", "quarters", "months"):
         la, lb = _local(a, tz), _local(b, tz)
         if isinstance(la, datetime) != isinstance(lb, datetime):
@@ -833,7 +833,7 @@ def _to_number(v: Any) -> Any:
     if isinstance(v, FDate):
         # Milliseconds since 1970 (as JavaScript dates count).
         return int(v.instant(UTC).timestamp() * 1000)
-    raise FormulaError(f"toNumber takes text, a number, a date or true/false, not {_kind(v)}")
+    raise FormulaError(f"The function toNumber takes text, a number, a date or true/false, not {_kind(v)}.")
 
 
 class _Evaluator:
@@ -854,7 +854,7 @@ class _Evaluator:
             if v is None:
                 return None
             if not _is_num(v):
-                raise FormulaError(f"Can't negate {_kind(v)}")
+                raise FormulaError(f"Can't negate {_kind(v)}.")
             return -v
         if tag == "not":
             return not _bool_cond("not", self.ev(n[1]))
@@ -877,7 +877,7 @@ class _Evaluator:
                 else:
                     acc = _arith(op, acc, rhs)
             return acc
-        raise FormulaError(f"Unknown node {tag!r}")  # pragma: no cover
+        raise FormulaError(f'Unknown node "{tag}".')  # pragma: no cover
 
     def call(self, name: str, args: list[tuple]) -> Any:
         # The lazy ones first: only the branch taken is evaluated.
@@ -931,7 +931,7 @@ class _Evaluator:
             if not isinstance(x, str):
                 _want("concat", x, "text", "lists")
         if sum(len(x) for x in present) > MAX_TEXT:
-            raise FormulaError("Text too long")
+            raise FormulaError("The text is too long.")
         return "".join(present) if present else None
 
     def f_join(self, xs: Any, sep: Any) -> Any:
@@ -942,7 +942,7 @@ class _Evaluator:
             _want("join", xs, "a list")
         parts = [t for t in (value_text(x) for x in xs) if t]
         if sum(len(t) for t in parts) + len(sep) * max(len(parts) - 1, 0) > MAX_TEXT:
-            raise FormulaError("Text too long")
+            raise FormulaError("The text is too long.")
         return sep.join(parts)
 
     def f_lower(self, x: Any) -> Any:
@@ -967,7 +967,7 @@ class _Evaluator:
             return t
         # Predict the size before building: nested replaces would otherwise grow without bound.
         if len(t) + t.count(f) * (len(r) - len(f)) > MAX_TEXT:
-            raise FormulaError("Text too long")
+            raise FormulaError("The text is too long.")
         return t.replace(f, r)
 
     # -- numbers ----------------------------------------------------------------------
@@ -978,7 +978,7 @@ class _Evaluator:
             return None
         d = int(d or 0)
         if not -15 <= d <= 15:
-            raise FormulaError("round takes 0 to 15 digits")
+            raise FormulaError("The function round takes 0 to 15 digits.")
         return _round(n, d)
 
     def f_floor(self, x: Any) -> Any:
@@ -998,7 +998,7 @@ class _Evaluator:
         if n is None:
             return None
         if n < 0:
-            raise FormulaError("sqrt of a negative number")
+            raise FormulaError("The function sqrt can't take a negative number.")
         r = math.sqrt(n)
         return int(r) if r.is_integer() else r
 
@@ -1008,7 +1008,7 @@ class _Evaluator:
             return None
         kinds = {_kind(i) for i in items}
         if len(kinds) > 1:
-            raise FormulaError(f"{name} can't mix numbers and dates")
+            raise FormulaError(f"The function {name} can't mix numbers and dates.")
         return pick(items, key=lambda v: _sort_key(v, self.tz))
 
     def f_min(self, *xs: Any) -> Any:
@@ -1020,7 +1020,7 @@ class _Evaluator:
     def f_sum(self, *xs: Any) -> Any:
         items = _numbers("sum", list(xs))
         if any(isinstance(i, FDate) for i in items):
-            raise FormulaError("sum takes numbers, not date")
+            raise FormulaError("The function sum takes numbers, not dates.")
         if not items:
             return None
         return _finite(math.fsum(items) if any(isinstance(i, float) for i in items) else sum(items))
@@ -1040,7 +1040,7 @@ class _Evaluator:
 
     def _unit(self, name: str, u: Any) -> str:
         if not isinstance(u, str):
-            raise FormulaError(f"{name} takes a unit in quotes ({', '.join(UNITS)})")
+            raise FormulaError(f"The function {name} takes a unit in quotes ({', '.join(UNITS)}).")
         return u
 
     def f_dateAdd(self, d: Any, n: Any, unit: Any) -> Any:
@@ -1101,10 +1101,10 @@ def evaluate(node: tuple, env: Env) -> Any:
     try:
         return _Evaluator(env).ev(node)
     except RecursionError as exc:
-        raise FormulaError("The formula is nested too deeply") from exc
+        raise FormulaError("The formula is nested too deeply.") from exc
     except (OverflowError, ArithmeticError, ValueError) as exc:
         # ValueError: `floor(NaN)`, or an integer over Python's 4,300-digit text limit.
-        raise FormulaError("The result is out of range") from exc
+        raise FormulaError("The result is out of range.") from exc
 
 
 def error_value(message: str) -> dict[str, Any]:
@@ -1117,7 +1117,7 @@ def to_computed(v: Any) -> dict[str, Any]:
         return _to_computed(v)
     except (OverflowError, ValueError, ArithmeticError):
         # An integer too long to write as text (Python refuses over 4,300 digits).
-        return error_value("Number too large")
+        return error_value("The number is too large.")
 
 
 def _to_computed(v: Any) -> dict[str, Any]:
@@ -1129,7 +1129,7 @@ def _to_computed(v: Any) -> dict[str, Any]:
         if isinstance(v, float) and not math.isfinite(v):
             return error_value("The result is not a finite number")
         if isinstance(v, int) and v.bit_length() > MAX_NUMBER_BITS:
-            return error_value("Number too large")
+            return error_value("The number is too large.")
         return {"type": "number", "value": v}
     if isinstance(v, str):
         return {"type": "text", "value": v}
@@ -1137,7 +1137,7 @@ def _to_computed(v: Any) -> dict[str, Any]:
         return {"type": "date", "value": v.iso()}
     if isinstance(v, list):
         if len(v) > MAX_LIST:
-            return error_value(f"A list holds at most {MAX_LIST} items")
+            return error_value(f"A list holds at most {MAX_LIST} items.")
         return {"type": "list", "value": [t for t in (value_text(x) for x in v) if t]}
     return error_value(f"Unsupported value {type(v).__name__}")
 

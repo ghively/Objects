@@ -9,10 +9,10 @@ with nothing effective left passes.
 Everything works on the API's JSON shapes: a row is ``{summary, values, links}`` as
 ``GET /api/rows`` serves it, a type is ``{id, propertyDefinitions: [{id, key, type,
 options}]}``, a collection ``{id, name, formerNames}``. Relative dates ("today", "this
-week"...) resolve against ``ctx.now`` in ``ctx.tz``; a week runs Monday to Sunday whatever the
-space's week start, as ``views/dates.ts`` resolves it (our choice: a rule's "this week" is the
-one the views show). Tag
-references are Tag object ids (``ctx.tag_titles``), entity references object ids
+week"...) resolve against ``ctx.now`` in ``ctx.tz``; a week starts on the space's "Start of the
+week" setting (``ctx.week_start``, ``ui.json`` ``calendar.weekStart``, Monday by default), as
+``views/dates.ts`` resolves it, so a rule's "this week" is the one the views and the calendar
+show. Tag references are Tag object ids (``ctx.tag_titles``), entity references object ids
 (``ctx.paths_by_id``).
 
 Parity with ``filter.ts`` is tested: ``frontend/src/views/__fixtures__/filter-cases.json``
@@ -130,6 +130,8 @@ class FilterCtx:
     """Object id -> path, for entity filters' object ids."""
     view_type_ids: list[str] | None = None
     """The types first searched for a key two types share (the view's; here the scope's)."""
+    week_start: str = "monday"
+    """'monday' or 'sunday': the "Start of the week" setting (``recurrence.week_start_of``)."""
 
 
 def type_json(t: Any) -> dict[str, Any]:
@@ -301,13 +303,19 @@ def _match_number(value: Any, f: Mapping[str, Any]) -> bool:
     return True
 
 
-def _match_set(have: list[Any], want: list[Any], f: Mapping[str, Any]) -> bool:
+def _match_set(have: list[Any], want: list[Any], f: Mapping[str, Any], configured: int | None = None) -> bool:
+    """Includes (any of ``want``) / does not include (none).
+
+    A filter with no configured values (``configured`` 0) is inactive and passes; one whose
+    values all resolve to nothing (an option, tag or object that no longer exists) matches
+    nothing for includes and everything for does not include, as its values are gone.
+    """
     option = f.get("option")
     if option == "isEmpty":
         return not have
     if option == "isNotEmpty":
         return bool(have)
-    if not want:
+    if (len(want) if configured is None else configured) == 0:
         return True
     hit = any(w in have for w in want)
     return not hit if option == "notContains" else hit
@@ -375,10 +383,16 @@ def _add_months(d: date, n: int) -> date:
     return date(y, m, min(d.day, calendar.monthrange(y, m)[1]))
 
 
-def _relative_range(rel: str, now: datetime, tz: tzinfo) -> tuple[str, str] | None:
+def week_start_day(d: date, week_start: str = "monday") -> date:
+    """The first day of ``d``'s week: the Sunday or Monday on or before it (``dates.ts`` ``weekStartOf``)."""
+    back = (d.weekday() + 1) % 7 if week_start == "sunday" else d.weekday()
+    return d - timedelta(days=back)
+
+
+def _relative_range(rel: str, now: datetime, tz: tzinfo, week_start: str = "monday") -> tuple[str, str] | None:
     """``resolveRelative`` as an inclusive range of ``YYYY-MM-DD`` days (``''``: no start).
 
-    Weeks run Monday to Sunday, as ``views/dates.ts`` has them (not the space's week start)."""
+    Weeks start on ``week_start`` ('monday' or 'sunday'), as ``views/dates.ts`` has them."""
     today = now.astimezone(tz).date()
 
     def day(d: date) -> tuple[str, str]:
@@ -394,7 +408,7 @@ def _relative_range(rel: str, now: datetime, tz: tzinfo) -> tuple[str, str] | No
         case "tomorrow":
             return day(today + timedelta(days=1))
         case "thisWeek":
-            start = today - timedelta(days=today.weekday())
+            start = week_start_day(today, week_start)
             return start.isoformat(), (start + timedelta(days=6)).isoformat()
         case "thisMonth":
             last = calendar.monthrange(today.year, today.month)[1]
@@ -418,7 +432,7 @@ def _reference_range(f: Mapping[str, Any], ctx: FilterCtx) -> tuple[str, str] | 
         return None
     rel = ref.get("relative")
     if rel:
-        return _relative_range(str(rel), ctx.now, ctx.tz)
+        return _relative_range(str(rel), ctx.now, ctx.tz, ctx.week_start)
     exact = ref.get("exactDate")
     if exact:
         m = _DAY_RE.match(str(exact))
@@ -565,8 +579,9 @@ def _match_kind(
             for o in label_set:
                 if isinstance(o, Mapping):
                     by_id.setdefault(o.get("id"), o.get("text"))  # the first wins, as `find`
-            want = [t for t in (by_id.get(i) for i in _ref_ids(f)) if t]
-            return _match_set(have, want, f)
+            ids = _ref_ids(f)
+            want = [t for t in (by_id.get(i) for i in ids) if t]
+            return _match_set(have, want, f, len(ids))
         case "entity" | "entity_backlinks":
             option = f.get("option")
             if option == "isEmpty":
@@ -574,11 +589,13 @@ def _match_kind(
             if option == "isNotEmpty":
                 return has and _entity_count(row, pid) > 0
             paths = _entity_paths(row, pid) if has else []
-            want = [p for p in (ctx.paths_by_id.get(i) for i in _ref_ids(f)) if p]
-            return _match_set(paths, want, f)
+            ids = _ref_ids(f)
+            want = [p for p in (ctx.paths_by_id.get(i) for i in ids) if p]
+            return _match_set(paths, want, f, len(ids))
         case "entity_tags":
-            want = [t for t in (ctx.tag_titles.get(i) for i in _ref_ids(f)) if t]
-            return _match_set(list(s.get("tags") or []), want, f)
+            ids = _ref_ids(f)
+            want = [t for t in (ctx.tag_titles.get(i) for i in ids) if t]
+            return _match_set(list(s.get("tags") or []), want, f, len(ids))
         case "entity_collections":
             return _match_set(_collection_ids(row, ctx.collections), _ref_ids(f), f)
         case "entity_type":

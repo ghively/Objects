@@ -1,5 +1,5 @@
 // A type row's context menu in the sidebar: Open ›, Create <Type>,
-// New from Template ›, New Collection, Object Type Settings, Import, Delete object type.
+// New from template ›, New collection, Object type settings, Import, Delete object type.
 import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import type { ObjectSummary, TypeDef } from '@/api/types'
@@ -26,10 +26,10 @@ export const TYPE_MENU_TEXT = {
   openInNewTab: 'Open in new tab',
   openInSidePanel: 'Open in side panel',
   create: (name: string) => `Create ${name}`,
-  fromTemplate: 'New from Template',
+  fromTemplate: 'New from template',
   noTemplates: 'No templates',
-  newCollection: 'New Collection',
-  settings: 'Object Type Settings',
+  newCollection: 'New collection',
+  settings: 'Object type settings',
   deleteType: 'Delete object type',
 }
 
@@ -77,7 +77,7 @@ export interface TypeContextMenuProps {
   onImport?: (type: TypeDef) => void
 }
 
-/** "Pin to Sidebar" / "Unpin from space" for the type itself (the live menu has it after New Collection). */
+/** "Pin to sidebar" / "Unpin from space" for the type itself (the live menu has it after New collection). */
 export function PinTypeItem({ type }: { type: TypeDef }) {
   const { isPinned, pin, unpin } = usePinned()
   const ref = { kind: 'type' as const, id: type.id }

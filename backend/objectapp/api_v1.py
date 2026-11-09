@@ -59,14 +59,15 @@ from .apictx import ApiContext
 from .apiquery import (
     Matcher,
     append_to_section,
-    is_excluded,
     outline,
     parse_since,
     read_section,
     replace_section,
+    resolve_saved_filters,
     sort_rows,
 )
 from .propvalues import InvalidValue
+from .recurrence import week_start_of
 from .space import Conflict, ReadOnly
 from .tokens import ActivityLog, TokenStore
 from .v1guard import V1Guard, guarded
@@ -304,15 +305,17 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
     ):
         auth(request)
         if mode not in ("auto", "title", "fullText"):
-            return _error(422, "mode must be auto, title or fullText.")
+            return _error(422, 'The field "mode" must be auto, title or fullText.')
         if len(q) > 200:
-            return _error(422, "q must be at most 200 characters.")
+            return _error(422, 'The field "q" must be at most 200 characters.')
         limit = max(1, min(int(limit), 100))
         known = {t.id for t in space.types}
         types = [resolve_type(t).id for t in type if resolve_type(t) is not None]
         types = [t for t in types if t in known]
         hidden = hidden_paths()
-        found = ctx.search.search(q, types=types, limit=min(200, limit + len(hidden)), mode=mode)
+        # Hidden objects are left out before ranking, so `limit` visible results come back
+        # however many hidden ones match (sweep 2026-11-08).
+        found = ctx.search.search(q, types=types, limit=limit, mode=mode, exclude_paths=hidden)
         results = [x for x in found.get("results", []) if x.get("path") not in hidden][:limit]
         if hidden and results:
             # A properties snippet shows a relation's target by its title: leave it out for an
@@ -344,7 +347,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             for name in type_ids:
                 t = resolve_type(name)
                 if t is None:
-                    raise InvalidValue(f"No object type {name!r}")
+                    raise InvalidValue(f'There is no object type "{name}".')
                 ids.append(t.id)
         rows = space.rows(ids, collection_ids or None, None, None, False)
         hidden = hidden_paths()
@@ -352,7 +355,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         if tags:
             want = {t.casefold() for t in tags}
             rows = [x for x in rows if want & {t.casefold() for t in x.summary.tags}]
-        matcher = Matcher(group, space.clock().astimezone(space.tz).date())
+        matcher = Matcher(group, space.clock().astimezone(space.tz).date(), week_start_of(space.root))
         rows = [x for x in rows if matcher.matches(x.values)]
         if sort and isinstance(sort.get("propertyId"), str):
             rows = sort_rows(rows, sort["propertyId"], bool(sort.get("descending")))
@@ -388,7 +391,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         req = req or RunQueryRequest()
         q = next((x for x in space.list_queries() if x.id == query_id), None)
         if q is None:
-            return _error(404, f"No query {query_id!r}")
+            return _error(404, f'There is no query "{query_id}".')
         d = q.definition or {}
         type_entries = [s for s in d.get("types") or [] if isinstance(s, dict)]
         type_ids = [s["id"] for s in type_entries if isinstance(s.get("id"), str)] or None
@@ -401,10 +404,21 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
              "descending": str(sorts[0].get("option", "")).startswith("descending")}
             if sorts else None
         )
+        # The app stores a label filter's option id, a tag filter's Tag object id and a
+        # relation filter's object id; the rows carry texts, so resolve them first as the
+        # app's engine does (sweep 2026-11-08).
+        types = [t for t in (space.type_by_id(i) for i in type_ids or []) if t is not None] or list(
+            space.types
+        )
+        summaries = space.list()
+        group, unresolved = resolve_saved_filters(
+            d.get("filterGroup"),
+            types,
+            {s.id: s.title for s in summaries if s.id and s.type == "tag"},
+            {s.id: s.path for s in summaries if s.id},
+        )
         try:
-            out = run_query(
-                type_ids, collection_ids, None, d.get("filterGroup"), sort, req.limit, req.offset
-            )
+            out = run_query(type_ids, collection_ids, None, group, sort, req.limit, req.offset)
         except InvalidValue as exc:
             return _error(422, str(exc))
         # Parts of a saved query this engine doesn't apply yet; the app's own view does.
@@ -421,7 +435,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             )
             if present
         ]
-        out["unsupported"] = sorted({*out["unsupported"], *skipped})
+        out["unsupported"] = sorted({*out["unsupported"], *skipped, *unresolved})
         out["query"] = {"id": q.id, "name": q.name}
         return SafeJSONResponse(json.loads(json.dumps(out, default=str)))
 
@@ -441,7 +455,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         hidden = hidden_paths()
         links = space.links_of(rel, fm)
         links = {k: [p for p in v if p not in hidden] for k, v in links.items()}
@@ -471,12 +485,12 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         body = of.body
         if section is not None:
             found = read_section(body, section)
             if found is None:
-                return _error(404, f"No heading {section!r} in {rel!r}")
+                return _error(404, f'There is no heading "{section}" in "{rel}".')
             body = found
         return SafeJSONResponse(
             json.loads(
@@ -497,7 +511,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except KeyError:
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         hidden = hidden_paths()
         items = [b for b in space.backlinks(rel) if b.get("path") not in hidden]
         return SafeJSONResponse(json.loads(json.dumps({"backlinks": items}, default=str)))
@@ -509,7 +523,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         notes, _dupes = space.daily_notes()
         path = notes.get(date)
         if path is None or path in hidden_paths():
-            return _error(404, f"No daily note for {date}")
+            return _error(404, f"There is no daily note for {date}.")
         return {"path": path}
 
     @r.get("/v1/changes")
@@ -518,7 +532,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         auth(request)
         at = parse_since(since)
         if since and at is None:
-            return _error(422, "since must be an ISO date or date-time.")
+            return _error(422, 'The field "since" must be an ISO date or date-time.')
         limit = max(1, min(int(limit), 500))
         hidden = hidden_paths()
         objs = [s for s in space.list() if s.path not in hidden and s.lastUpdated]
@@ -548,9 +562,9 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         token = auth(request, write=True)
         t = resolve_type(req.type)
         if t is None:
-            return _error(404, f"No object type {req.type!r}")
+            return _error(404, f'There is no object type "{req.type}".')
         if req.body is not None and len(req.body) > MAX_BODY:
-            return _error(422, "body is too long.")
+            return _error(422, "The body is too long.")
         values = dict(req.values or {})
         try:
             path, version = space.create_object(
@@ -559,7 +573,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         except InvalidValue as exc:
             return _error(422, str(exc))
         except KeyError:
-            return _error(404, f"No object type {req.type!r}")
+            return _error(404, f'There is no object type "{req.type}".')
         announce("created", path, version, token)
         if req.body:
             try:
@@ -612,7 +626,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         if result.version != req.version:
             announce("changed", rel, result.version, token)
             guard.log(token, "properties", rel, keys=sorted({*updates, *req.remove}))
@@ -635,11 +649,11 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
     def section(req: SectionRequest, request: Request):
         token = auth(request, write=True)
         if req.mode not in ("append", "replace"):
-            return _error(422, "mode must be append or replace.")
+            return _error(422, 'The field "mode" must be append or replace.')
         if req.mode == "replace" and not req.heading:
-            return _error(422, "replace needs a heading.")
+            return _error(422, "Replacing needs a heading.")
         if len(req.text) > MAX_BODY:
-            return _error(422, "text is too long.")
+            return _error(422, "The text is too long.")
         try:
             rel = visible_rel(req.path)
             of, _fm, current = space.read(rel)
@@ -651,7 +665,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             else:
                 new = replace_section(body, req.heading or "", req.text)
             if new is None:
-                return _error(404, f"No heading {req.heading!r} in {rel!r}")
+                return _error(404, f'There is no heading "{req.heading}" in "{rel}".')
             version = space.save_body(rel, new, req.version)
         except Conflict as exc:
             return conflict(exc)
@@ -660,7 +674,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         if version != req.version:
             announce("changed", rel, version, token)
             guard.log(token, f"section-{req.mode}", rel, heading=req.heading)
@@ -682,7 +696,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         if result.path != rel:
             announce("renamed", result.path, result.version, token, oldPath=rel)
         elif result.version != req.version:
@@ -704,7 +718,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
-            return _error(404, f"No object at {req.path!r}")
+            return _error(404, f'There is no object at "{req.path}".')
         announce("deleted", item.originalPath, None, token)
         guard.log(token, "trash", item.originalPath)
         return {"trashId": item.id}

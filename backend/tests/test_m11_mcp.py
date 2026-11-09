@@ -109,7 +109,7 @@ def test_write_tools_and_conflict(http: TestClient, space_dir: Path) -> None:
 
 def test_unreachable_app_is_a_clear_error() -> None:
     client = ObjectClient("http://127.0.0.1:9", "obj_x")
-    with pytest.raises(ApiError, match="is the app running"):
+    with pytest.raises(ApiError, match="Is the app running"):
         client.get("/schema")
 
 

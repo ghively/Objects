@@ -45,8 +45,10 @@ __all__ = [
     "duplicates",
     "find",
     "index_space",
+    "moved_sources",
     "scope",
     "read_block",
+    "source_moved",
     "system_of",
 ]
 
@@ -217,12 +219,29 @@ class Existing:
     block: dict[str, Any]
 
 
+class _Index(dict):
+    """`index_space`'s answer: also the (source path, system) of every batch not in the Trash."""
+
+    sources: set[tuple[str, str]]
+
+
+def _norm(path: str) -> str:
+    return os.path.normcase(os.path.normpath(path))
+
+
 def index_space(space: Space) -> dict[tuple[str, str], list[Existing]]:
     """Every object of ``space`` that carries an ``importSource`` block, by (system, id).
 
     Several sources can share an id (two vaults with ``Notes/Meeting.md``), so each key keeps all of
     them; `find` picks the one from the right source. Read from the space's in-memory raw objects."""
-    out: dict[tuple[str, str], list[Existing]] = {}
+    from . import batches
+
+    out: _Index = _Index()
+    out.sources = set()
+    for b in batches.list_batches(space.root):
+        src = b.get("source")
+        if not b.get("trashedAt") and isinstance(src, dict) and src.get("path") and src.get("system"):
+            out.sources.add((_norm(str(src["path"])), str(src["system"])))
     with space._lock:
         raws = sorted(space._raw.values(), key=lambda r: r.path)
     for raw in raws:
@@ -232,12 +251,66 @@ def index_space(space: Space) -> dict[tuple[str, str], list[Existing]]:
     return out
 
 
+def _same_source(a: str, b: str) -> bool:
+    return a == b or os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
+
+
+def _is_path(source: str) -> bool:
+    """A recorded source that is a folder or zip path (not a site's origin)."""
+    return urlsplit(source).scheme not in ("http", "https")
+
+
+def source_moved(recorded: str, here: str | None) -> bool:
+    """Whether an object's recorded source is a folder or zip that is no longer there while the run's
+    source is another path: the source moved (Gene, 2026-11-08), so its ids still name the same
+    items. A recorded source that still exists is its own (two vaults with ``Notes/Meeting.md``)."""
+    if here is None or not _is_path(recorded) or not _is_path(here) or _same_source(recorded, here):
+        return False
+    return not os.path.exists(recorded)
+
+
+def moved_sources(index: dict[tuple[str, str], list[Existing]], read: ReadResult) -> set[str]:
+    """The recorded sources ``read``'s source moved there from: folders or zips no longer there
+    (`source_moved`), imported by a batch (not in the Trash) of the same system as this run, whose
+    objects carry the ids of at least half of the run's items. Fewer shared ids mean another source
+    happens to use the same names (two vaults with ``Home.md``): it stays its own. Cached on the
+    index for each read."""
+    known = getattr(index, "sources", None)
+    if not known:
+        return set()
+    cache = index.__dict__.setdefault("_moved", {})
+    if id(read) in cache:
+        return cache[id(read)]
+    here = _norm(str(read.sourcePath))
+    system = system_of(read)
+    counts: dict[str, int] = {}
+    for o in read.objects:
+        mine: set[str] = set()
+        for hit in index.get(ident(read, o), []):
+            there = hit.block.get("source")
+            if (isinstance(there, str) and there not in mine and (_norm(there), system) in known
+                    and source_moved(there, here)):
+                mine.add(there)
+                counts[there] = counts.get(there, 0) + 1
+    out = {p for p, n in counts.items() if read.objects and n * 2 >= len(read.objects)}
+    cache[id(read)] = out
+    return out
+
+
 def find(index: dict[tuple[str, str], list[Existing]], read: ReadResult, o: ReadObject) -> Existing | None:
     """The earlier object made from ``o``: same system and id, and the same source (a block with no
-    source, written before sources were recorded, or a global id, matches any)."""
+    source, written before sources were recorded, or a global id, matches any). When no object of
+    the same source has the id, one from a source this one moved from (`moved_sources`) is it."""
     here = scope(read, o)
-    for hit in index.get(ident(read, o), []):
+    hits = index.get(ident(read, o), [])
+    for hit in hits:
         there = hit.block.get("source")
-        if here is None or there is None or os.path.normcase(os.path.normpath(str(there))) == here or there == here:
+        if here is None or there is None or _same_source(str(there), here):
             return hit
+    if here is not None and hits:
+        moved = moved_sources(index, read)
+        for hit in hits:
+            there = hit.block.get("source")
+            if isinstance(there, str) and there in moved:
+                return hit
     return None

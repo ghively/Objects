@@ -472,7 +472,8 @@ class Filing:
         from ..space import version_of
 
         data, items = batches.load_batch(self.space.root, batch)
-        recorded = batches.load_prior(self.space.root, str(data.get("source", {}).get("path", ""))).versions
+        moved = [str(m) for m in data.get("movedFrom") or []]  # the paths the source had before it moved
+        recorded = batches.load_prior(self.space.root, str(data.get("source", {}).get("path", "")), also=moved).versions
         out: list[str] = []
         for it in items:
             if it.get("action") not in ("created", "updated", "unchanged", "resolvedTake", "resolvedKeep"):

@@ -2,6 +2,8 @@
 
 Status (2026-11-07): built, reviewed, fixed and gated; on `master`. Gene's 53 hand-checks below are unticked.
 
+Values (2026-11-08): PR #13 moved the board's sizes to whole grid cells and Gene kept them, so the checks below run against the current model: a new text block is 390 × 60 (auto-sizing up to 600 × 480, resize floor 60 × 30), a new frame 600 × 360, the zoom menu lists 5, 10, 20, 33, 50, 75, 100, 125, 160, 200 and 300 %, and the gates menu reads AND, OR, NOT, NAND, NOR, XOR, XNOR, then HIGH, LOW. The M6 plan carries the same numbers; `model.test.ts` pins them.
+
 Plan: `2026-10-26-m6-whiteboards-pen.md`, Task 13. Date: 2026-10-27. Built on a Linux cloud container, not Gene's Windows PC, so the Wacom checks below have not been run on real hardware.
 
 ## Automated results

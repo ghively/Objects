@@ -115,11 +115,55 @@ def test_matcher_dates_and_unsupported() -> None:
     assert m.matches(row) and m.unsupported == {"frobnicate"}
 
 
+def test_matcher_relative_names_match_the_apps() -> None:
+    # `views/dates.ts`: inOneWeek (oneWeekFromNow is still read), oneMonthAgo, inOneMonth.
+    today = date(2026, 3, 31)
+    row = {"due": {"start": "2026-04-07", "resolution": "day"}}
+    for rel in ("inOneWeek", "oneWeekFromNow"):
+        m = Matcher(_g(_f("due", "is", {"relative": rel})), today)
+        assert m.matches(row) and m.unsupported == set(), rel
+    m = Matcher(_g(_f("due", "isAfter", {"relative": "oneMonthAgo"})), today)  # 2026-02-28 (clamped)
+    assert m.matches({"due": {"start": "2026-03-01"}}) and not m.matches({"due": {"start": "2026-02-28"}})
+    assert m.unsupported == set()
+    m = Matcher(_g(_f("due", "is", {"relative": "inOneMonth"})), today)  # 2026-04-30 (clamped)
+    assert m.matches({"due": {"start": "2026-04-30"}}) and not m.matches({"due": {"start": "2026-05-01"}})
+    assert m.unsupported == set()
+
+
+def test_matcher_this_week_follows_the_week_start() -> None:
+    # Sunday 8 Nov 2026: Monday weeks run 2-8 Nov, Sunday weeks 8-14 Nov.
+    sunday = date(2026, 11, 8)
+    wed = {"due": {"start": "2026-11-04", "resolution": "day"}}
+    tue = {"due": {"start": "2026-11-10", "resolution": "day"}}
+    this_week = _g(_f("due", "is", {"relative": "thisWeek"}))
+    assert Matcher(this_week, sunday).matches(wed)  # Monday by default
+    assert not Matcher(this_week, sunday).matches(tue)
+    assert Matcher(this_week, sunday, week_start="monday").matches(wed)
+    assert not Matcher(this_week, sunday, week_start="sunday").matches(wed)
+    assert Matcher(this_week, sunday, week_start="sunday").matches(tue)
+
+
 def test_parse_since() -> None:
     assert parse_since("2026-11-05") == "2026-11-05"
     assert parse_since("2026-11-05T10:00:00Z") == "2026-11-05T10:00:00"
     assert parse_since("nope") is None
     assert parse_since(None) is None
+    # An offset is an offset: the instant is compared in UTC, like the stored stamps.
+    assert parse_since("2026-11-05T15:17:00+05:00") == "2026-11-05T10:17:00"
+    assert parse_since("2026-11-05T05:00:00-05:00") == "2026-11-05T10:00:00"
+    assert parse_since("2026-11-05T10:00:00") == "2026-11-05T10:00:00"  # naive means UTC
+
+
+def test_changes_since_with_an_offset_is_the_same_instant(api) -> None:
+    _space, client, _ = api
+    hdr = _token(client, "read")
+    # Fix printer: lastUpdated 2026-03-05T09:30:00Z. 08:00Z, spelt in +05:00, is 13:00+05:00.
+    as_utc = client.get("/api/v1/changes", headers=hdr, params={"since": "2026-03-05T08:00:00Z"}).json()
+    with_offset = client.get(
+        "/api/v1/changes", headers=hdr, params={"since": "2026-03-05T13:00:00+05:00"}
+    ).json()
+    assert "Tasks/Fix printer.md" in [o["path"] for o in as_utc["objects"]]
+    assert with_offset["objects"] == as_utc["objects"]
 
 
 BODY = "Intro\n\n## Plan\n\nStep one\n\n### Detail\n\nMore\n\n## Notes\n\n```\n## not a heading\n```\n"
@@ -259,7 +303,9 @@ def test_query_filters_and_sorts(api) -> None:
     assert res["total"] == 1 and res["unsupported"] == []
     every = client.post("/api/v1/query", headers=hdr, json={"typeIds": ["Task"], "limit": 1}).json()
     assert len(every["rows"]) == 1 and every["total"] >= 2
-    assert client.post("/api/v1/query", headers=hdr, json={"typeIds": ["Nope"]}).status_code == 422
+    nope = client.post("/api/v1/query", headers=hdr, json={"typeIds": ["Nope"]})
+    assert nope.status_code == 422
+    assert nope.json()["detail"] == 'There is no object type "Nope".'
 
 
 def test_excluded_objects_are_invisible(api, space_dir: Path) -> None:

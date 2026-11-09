@@ -230,3 +230,31 @@ def test_list_captures_writes_nothing(env: Env) -> None:
     allc = env.c.get("/api/work/captures").json()["captures"]
     assert {c["path"] for c in allc} == {a["path"], b["path"]}
     assert env.status() == snapshot and env.state_files() == state
+
+
+def test_file_capture_writes_the_capture_atomically(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sweep 2026-11-09: filing writes the brain dump through a temp file beside it and one replace
+    (`Space._write`), so a crash at the replace leaves the old file whole and no temp file behind."""
+    import os
+
+    c = dump(env, "Check the printer")
+    target = env.root / c["path"]
+    before = target.read_bytes()
+    entries = set(os.listdir(target.parent))
+    real = os.replace
+
+    def crash(src, dst, *a, **k):
+        if Path(dst) == target:
+            raise OSError("crash at the replace")
+        return real(src, dst, *a, **k)
+
+    monkeypatch.setattr(os, "replace", crash)
+    res = file_(env, c, "needsYou", question="Which?")
+    assert res.status_code == 503 and "crash at the replace" in res.json()["detail"]
+    assert target.read_bytes() == before
+    assert set(os.listdir(target.parent)) == entries  # no temp file left
+    monkeypatch.setattr(os, "replace", real)
+    res = file_(env, c, "needsYou", question="Which?")
+    assert res.status_code == 200, res.text
+    assert target.read_bytes() != before and b"Which?" in target.read_bytes()
+    assert set(os.listdir(target.parent)) == entries

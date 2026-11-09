@@ -14,7 +14,10 @@
 ``message``, ``goal`` and ``context`` are 1..200,000, 1..20,000 and 0..200,000 characters (422).
 A delegated run's token gets 403 "A delegated agent can't delegate further." on ``remote-call``
 and ``delegate``; a ``read`` token (a proposal turn's) gets 403 "This token can only read." there,
-since the other agent would act with write tools. Each route calls `v1guard.agent_tool_allowed` for its tool.
+since the other agent would act with write tools, and the purpose-based `v1guard.WRITE_GUARDS`
+run there too (a read-only work run's or an import-filing run's token gets its 403 "This run is
+read-only."), since handing work on is a write. Each route calls `v1guard.agent_tool_allowed`
+for its tool.
 
 Imports no network client: a remote call goes through ``remotechat`` (and its ``a2a``).
 """
@@ -33,7 +36,7 @@ from .apictx import ApiContext
 from .appstate import space_key
 from .remotemodel import REMOTE_CALL_TIMEOUT, REMOTE_CALL_TIMEOUT_MAX, REMOTE_KIND, REMOTE_TEXT_CAP
 from .tokens import TokenRecord, TokenStore
-from .v1guard import Denied, V1Guard, agent_auth, agent_tool_allowed, error
+from .v1guard import WRITE_GUARDS, Denied, V1Guard, agent_auth, agent_tool_allowed, error
 from .watcher import ChangeEvent
 
 __all__ = ["CONTEXT_MAX", "GOAL_MAX", "MESSAGE_MAX", "NOT_REMOTE", "router"]
@@ -80,7 +83,7 @@ def _name(record: Any) -> str:
 
 def _length(value: str, field: str, low: int, high: int) -> None:
     if not low <= len(value) <= high:
-        raise Denied(422, f"{field} must be {low:,} to {high:,} characters.")  # our string
+        raise Denied(422, f'"{field}" must be {low:,} to {high:,} characters.')  # our string
 
 
 def _timeout(value: float | None) -> float:
@@ -103,11 +106,15 @@ def router(ctx: ApiContext) -> APIRouter:
         agent_tool_allowed(token, tool)
         return token, agent, registry
 
-    def flat(token: TokenRecord) -> None:
+    def flat(token: TokenRecord, request: Request) -> None:
         if token.purpose == "delegate" or delegation.is_delegated_chat(token.chat):
             raise Denied(403, delegation.FLAT)
         if token.scope != "read-write":  # handing work on would lift a read-only turn to writes
             raise Denied(403, READ_ONLY)
+        for check in list(WRITE_GUARDS):  # as `V1Guard.auth(write=True)`: a read-only purpose
+            message = check(token, request)
+            if message:
+                raise Denied(403, message)
 
     def find(registry: AgentRegistry, name: str) -> AgentRecord:
         try:
@@ -148,7 +155,7 @@ def router(ctx: ApiContext) -> APIRouter:
     @_aguarded
     async def remote_call(req: RemoteCallRequest, request: Request):
         token, caller, registry = await asyncio.to_thread(auth, request, "remote_agent_call")
-        flat(token)
+        flat(token, request)
         _length(req.message, "message", 1, MESSAGE_MAX)
         target = await asyncio.to_thread(find, registry, req.agent)
         if target.kind != REMOTE_KIND:
@@ -193,7 +200,7 @@ def router(ctx: ApiContext) -> APIRouter:
     @_aguarded
     async def delegate(req: DelegateRequest, request: Request):
         token, caller, registry = await asyncio.to_thread(auth, request, "delegate")
-        flat(token)
+        flat(token, request)
         _length(req.goal, "goal", 1, GOAL_MAX)
         context = req.context or ""
         _length(context, "context", 0, CONTEXT_MAX)

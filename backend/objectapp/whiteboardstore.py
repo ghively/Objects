@@ -76,7 +76,7 @@ WHITEBOARD_UI_KEYS = (
 )
 
 # Our string.
-_UI_PROBLEM = "whiteboard must be an object of true/false settings."
+_UI_PROBLEM = 'The key "whiteboard" must be an object of true/false settings.'
 
 
 class NotAWhiteboard(Exception):
@@ -220,7 +220,7 @@ def _board_md(space: Space, path: str) -> str:
         raise KeyError(rel)
     t = whiteboard_type(space)
     if t is None or summary.type != t.id:
-        raise NotAWhiteboard(f"{rel} isn't a whiteboard.")
+        raise NotAWhiteboard(f'"{rel}" isn\'t a whiteboard.')
     return rel
 
 

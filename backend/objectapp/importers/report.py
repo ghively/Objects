@@ -159,6 +159,11 @@ def _extra_sections(extra: dict, obj: Callable[[str], str]) -> list[str]:
     out: list[str] = []
     if extra.get("batch"):
         out += [f"Batch: {code(extra['batch'])}", ""]
+    moved = extra.get("movedFrom") or []
+    if moved:
+        was = " and ".join(code(p) for p in moved)
+        out += [(f"Source moved: it was imported before from {was}; the objects made then were found by their "
+                 "source ids, so none was made twice."), ""]
     kept = extra.get("originals", 0)
     large = extra.get("originalsLarge") or []
     if kept or large:

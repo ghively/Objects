@@ -5,10 +5,17 @@
  * binds them with `useTabShortcuts()` and `usePanelShortcuts()`. Back/forward (Ctrl+←/→, Ctrl+[/])
  * and the panel keys (Ctrl+Shift+←/→) stay out of text fields and editors, where those keys move
  * and select by word.
+ *
+ * The General keys of the 2026-11-08 sweep (`useGeneralShortcuts()`: Create new task) ride along
+ * with the tab shortcuts, so `App` binds them with the same call.
  */
 import { toggleCalendarSidebar } from '@/calendar/calendarUi'
+import { useCalendar } from '@/calendar/useCalendar'
+import { createAndOpen } from '@/create/createAndOpen'
+import { showToast } from '@/editor/media/upload'
+import { useLinkIndex } from '@/links/linkIndex'
 import { M7_SHORTCUTS, registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'
-import { useTabs } from '@/nav/tabs'
+import { currentTarget, useTabs } from '@/nav/tabs'
 import { useTabMenu } from '@/shell/TabMenu'
 
 export const TAB_SHORTCUT_IDS = ['closeTab', 'openNewTab', 'navigateTabs', 'openTabList', 'navigateBack', 'navigateForward'] as const
@@ -33,7 +40,45 @@ export function cycleTabs(): void {
   s.activate(s.tabs[(i + 1) % s.tabs.length].id)
 }
 
+/** The basic Task type of this space (by flag and name, as the server infers it), or none. */
+export function taskTypeId(): string | undefined {
+  const types = useLinkIndex.getState().types
+  return (types.find((t) => t.basic && t.name.toLowerCase() === 'task') ?? types.find((t) => t.id === 'task'))?.id
+}
+
+export const CREATE_TASK_FAILED = 'Could not create the task.'
+
+/**
+ * "Create new task" (Ctrl+Shift+T): the New menu's flow for the Task type, outside editable
+ * targets. A failure shows its message as a toast, as the New menu shows it.
+ */
+export function createNewTask(): void {
+  const id = taskTypeId()
+  if (!id) return
+  void createAndOpen(id).catch((err: unknown) => showToast(err instanceof Error && err.message ? err.message : CREATE_TASK_FAILED))
+}
+
+/**
+ * "Go to Calendar" (Ctrl+Alt+H): open the Calendar in the current tab; pressed again while it is
+ * open, jump to today (the catalog: "press twice to jump to today").
+ */
+export function goToCalendar(): void {
+  const tabs = useTabs.getState()
+  if (currentTarget(tabs)?.kind === 'calendar') useCalendar.getState().today()
+  else tabs.open({ kind: 'calendar' })
+}
+
+/**
+ * The General keys of the 2026-11-08 sweep. Inside the editor Ctrl+Shift+T stays "Make this block
+ * a task"; Ctrl+Alt+H types nothing, so it works there too.
+ */
+export function useGeneralShortcuts(): void {
+  useGlobalShortcut('createNewTask', createNewTask)
+  useGlobalShortcut('goToCalendar', goToCalendar, { allowInEditable: true })
+}
+
 export function useTabShortcuts(): void {
+  useGeneralShortcuts()
   useGlobalShortcut('closeTab', closeActiveTab)
   useGlobalShortcut('openNewTab', () => useTabs.getState().newTab())
   useGlobalShortcut('navigateTabs', cycleTabs, { allowInEditable: true })

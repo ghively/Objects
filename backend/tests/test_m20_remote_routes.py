@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 from fake_a2a import FakeA2A
 from fastapi.testclient import TestClient
-from objectapp import api_remote_agents, server, transcripts
+from objectapp import a2a, api_remote_agents, server, transcripts
 from objectapp.appstate import state_dir
 from objectapp.curator import Curator, IdleClock
 from objectapp.reviews import ReviewRunner
@@ -125,6 +125,11 @@ def test_preview_errors(api, fake: FakeA2A) -> None:
 
     res = client.post("/api/remote-agents/preview", json={"url": "ftp://x", "auth": {"kind": "none"}})
     assert (res.status_code, res.json()["detail"]) == (422, "That isn't an http or https address.")
+    # Sweep 2026-11-08 (3): a control character in the address (urlsplit drops a tab; httpx refuses
+    # it) is our 422, not a 500, both as a card path and as a bare host.
+    for bad in ("http://a\tb.example/card.json", "http://a\tb.example", "http://x.example/c\x00ard.json"):
+        res = client.post("/api/remote-agents/preview", json={"url": bad, "auth": {"kind": "none"}})
+        assert (res.status_code, res.json()["detail"]) == (422, "That isn't an http or https address."), bad
 
     # a bad header rule, and a body that doesn't fit, answer our 422 without echoing a value
     res = client.post("/api/remote-agents/preview",
@@ -134,6 +139,24 @@ def test_preview_errors(api, fake: FakeA2A) -> None:
                                                            "auth": {"kind": "magic", "value": LONG_TOKEN}})
     assert res.status_code == 422
     assert LONG_TOKEN not in res.text
+
+
+def test_control_character_in_a_url_is_refused_not_a_crash() -> None:
+    """Sweep 2026-11-08 (3): `a2a._open` turns httpx's refusal of a control character (an
+    ``InvalidURL``, not an ``HTTPError``) into the 422 the other bad-URL case gives, so a stored
+    card whose interface URL holds one fails the same way at chat time."""
+
+    async def go() -> None:
+        async with a2a._new_client(1.0) as client:
+            for bad in ("http://a\tb.example/a2a", "http://x.example/a\x00"):
+                with pytest.raises(a2a.A2AError) as info:
+                    await a2a._open(client, "POST", bad, {}, b"{}", asyncio.get_running_loop().time() + 5)
+                assert (info.value.status, info.value.message) == (422, "That isn't an http or https address.")
+        with pytest.raises(a2a.A2AError) as info:
+            await a2a.fetch_card("http://a\tb.example/card.json", a2a.Auth(kind="none"))
+        assert info.value.status == 422
+
+    asyncio.run(go())
 
 
 def test_preview_other_status(api, fake: FakeA2A) -> None:
@@ -292,9 +315,12 @@ def test_put_remote(api, fake: FakeA2A) -> None:
     assert res.json()["remote"]["auth"] == {"kind": "none", "headerName": None, "set": False}
 
 
-def test_url_change_drops_the_secret(api, fake: FakeA2A) -> None:
-    client = api["client"]
+def test_url_change_drops_the_secret_and_waits_for_the_move(api, fake: FakeA2A) -> None:
+    """Gene, 2026-11-08: on a host change the stored endpoint stays and the token goes; the new
+    address is answered as pending with a notice, and used only once it is confirmed."""
+    client, published = api["client"], api["published"]
     agent = _add(client, fake.base_url)
+    old_endpoint = fake.base_url + "/a2a"
     other = FakeA2A()
     other.start()
     try:
@@ -303,12 +329,57 @@ def test_url_change_drops_the_secret(api, fake: FakeA2A) -> None:
         res = client.post(f"/api/remote-agents/{agent['id']}/refresh", json={"clientId": "win-3"})
         assert res.status_code == 200, res.text
         body = res.json()
-        assert body["remote"]["endpointUrl"] == f"http://localhost:{port}/a2a"
+        assert body["remote"]["endpointUrl"] == old_endpoint  # kept until the move is confirmed
         assert body["remote"]["auth"]["set"] is False
         assert body["name"] == "Fake Planner"
+        assert body["remote"]["pendingEndpoint"] == {"url": f"http://localhost:{port}/a2a",
+                                                     "host": f"localhost:{port}"}
+        assert body["notice"] == f"The agent's address moved to localhost:{port}. Confirm the move to use it."
+        assert client.get(f"/api/agents/{agent['id']}").json()["remote"]["endpointUrl"] == old_endpoint
+
+        # Confirming switches and clears the pending address.
+        count = len(published)
+        res = client.post(f"/api/remote-agents/{agent['id']}/confirm-endpoint", json={"clientId": "win-3"})
+        assert res.status_code == 200, res.text
+        assert res.json()["remote"]["endpointUrl"] == f"http://localhost:{port}/a2a"
+        assert res.json()["remote"]["pendingEndpoint"] is None
+        assert res.json()["remote"]["auth"]["set"] is False
+        revision = res.json()["revision"]
+        _wait(published, count + 1)
+        assert any(e.kind == "agents" and e.path == agent["id"] and e.origin == "win-3" for e in published[count:])
+        res = client.post(f"/api/remote-agents/{agent['id']}/confirm-endpoint", json={})
+        assert res.status_code == 422  # nothing pending
+
+        # The token is given again (the card fetch needs it); a same-host refresh (a new path on
+        # the confirmed host) records no move, switches at once and keeps the token.
+        res = client.put(f"/api/remote-agents/{agent['id']}", json={
+            "name": "Fake Planner", "auth": _bearer(), "baseRevision": revision})
+        assert res.status_code == 200, res.text
+        fake.card_override = _moved_card(fake, f"http://localhost:{port}/a2a/v2")
+        res = client.post(f"/api/remote-agents/{agent['id']}/refresh", json={})
+        assert res.status_code == 200, res.text
+        assert res.json()["remote"]["pendingEndpoint"] is None and res.json()["notice"] is None
+        assert res.json()["remote"]["endpointUrl"] == f"http://localhost:{port}/a2a/v2"
+        assert res.json()["remote"]["auth"]["set"] is True
+
+        # Dismissing keeps the stored address and clears the pending one.
+        fake.card_override = _moved_card(fake, old_endpoint)  # back to 127.0.0.1: a move again
+        res = client.post(f"/api/remote-agents/{agent['id']}/refresh", json={})
+        assert res.status_code == 200, res.text
+        assert res.json()["remote"]["pendingEndpoint"]["host"] == fake.base_url.removeprefix("http://")
+        assert res.json()["remote"]["auth"]["set"] is False
+        res = client.delete(f"/api/remote-agents/{agent['id']}/pending-endpoint?clientId=win-3")
+        assert res.status_code == 200, res.text
+        assert res.json()["remote"]["endpointUrl"] == f"http://localhost:{port}/a2a/v2"
+        assert res.json()["remote"]["pendingEndpoint"] is None
     finally:
         other.stop()
     assert all(r["headers"].get("Authorization") is None for r in other.requests)
+    assert client.post("/api/remote-agents/01JC7ZK3T9Q4M2X8B5N6R1V0WE/confirm-endpoint", json={}).status_code == 404
+    assert client.delete("/api/remote-agents/01JC7ZK3T9Q4M2X8B5N6R1V0WE/pending-endpoint").status_code == 404
+    local = client.get("/api/agents").json()["agents"][0]  # the default agent
+    res = client.post(f"/api/remote-agents/{local['id']}/confirm-endpoint", json={})
+    assert (res.status_code, res.json()["detail"]) == (422, "That isn't a remote agent.")
 
 
 def test_endpoint_refusal_rules() -> None:
@@ -396,6 +467,11 @@ def test_refresh_drops_the_secret_when_the_endpoint_loses_https(api, fake: FakeA
     assert res.status_code == 200, res.text
     assert res.json()["remote"]["auth"]["set"] is False
     assert not remotesecrets.is_set(agent["id"])
+    assert res.json()["remote"]["endpointUrl"].startswith("https://")  # kept until confirmed
+    assert res.json()["remote"]["pendingEndpoint"]["url"] == fake.base_url + "/a2a"
+    res = client.post(f"/api/remote-agents/{agent['id']}/confirm-endpoint", json={})
+    assert res.status_code == 200, res.text
+    assert res.json()["remote"]["endpointUrl"] == fake.base_url + "/a2a"
     # http -> http (no change) keeps a secret set again.
     res = client.put(f"/api/remote-agents/{agent['id']}", json={
         "name": "Fake Planner", "auth": _bearer(), "baseRevision": res.json()["revision"]})

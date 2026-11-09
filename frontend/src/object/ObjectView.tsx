@@ -45,6 +45,7 @@ import { invalidateLinkIndex, typeOf, useLinkIndex, ensureLinkIndex } from '@/li
 import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
 import { formatKeys, isEditableTarget, keysFor, matches } from '@/lib/shortcuts'
 import { cn } from '@/lib/utils'
+import { revealMenuLabel } from '@/lib/platformText'
 import { canGoBack, usePeek, useTabs, type Target } from '@/nav/tabs'
 import { ReferencesSection } from '@/references/ReferencesSection'
 import { byPluralName, TypeChip } from '@/shell/Sidebar'
@@ -105,6 +106,11 @@ export interface ObjectViewProps {
   /** Called with each version this view adopts (load, saves, reloads). */
   onVersion?: (version: string) => void
   /**
+   * Called with the object's detail each time this view's copy changes (load, property writes,
+   * reloads), so an owner (the peek's daily-note header) reads nothing of its own.
+   */
+  onDetail?: (detail: ObjectDetail) => void
+  /**
    * Inline only: an element the owner provides for the object's `…` menu (the same menu as the
    * page's), drawn into it. The Calendar's Daily note header holds it beside Reviewed.
    */
@@ -150,20 +156,20 @@ export const FIND_IN_PAGE_MENU_ITEM = 'Find in page'
 
 /** M8 menu items and the focus-mode button. */
 export const OBJECT_M8_TEXT = {
-  versionHistory: 'Version History',
+  versionHistory: 'Version history',
   mergeObject: 'Merge into object',
   mergeTag: 'Merge into tag',
   present: 'Present',
   addToWhiteboard: 'Add to whiteboard',
-  enterFocusMode: 'Enter Focus Mode',
-  leaveFocusMode: 'Leave Focus Mode',
+  enterFocusMode: 'Enter focus mode',
+  leaveFocusMode: 'Leave focus mode',
 } as const
 
 /** M9 menu items. */
 export const OBJECT_M9_TEXT = {
   wideLayout: 'Wide layout',
   normalLayout: 'Normal layout',
-  textStats: 'Text Stats',
+  textStats: 'Text stats',
   export: 'Export',
   duplicate: 'Duplicate',
 } as const
@@ -270,6 +276,7 @@ export function ObjectView({
   autoFocus,
   initialText,
   onVersion,
+  onDetail,
   menuSlot,
   onDeleted,
   workHeader,
@@ -326,6 +333,11 @@ export function ObjectView({
   const versionRef = useRef('')
   const onVersionRef = useRef(onVersion)
   onVersionRef.current = onVersion
+  const onDetailRef = useRef(onDetail)
+  onDetailRef.current = onDetail
+  useEffect(() => {
+    if (detail && detail.summary.path === path) onDetailRef.current?.(detail)
+  }, [detail, path])
   const adoptVersion = useCallback((v: string) => {
     versionRef.current = v
     setVersion(v)
@@ -384,6 +396,16 @@ export function ObjectView({
         return
       }
       const mine = h?.getBody() ?? null
+      if (h && mine !== null && !h.isDirty() && theirs.body === h.savedBody()) {
+        // Only the frontmatter changed (a property write outside this view's own write path: the
+        // peek's Reviewed, another window): adopt the version and keep the editor's document
+        // (a reload would drop its selection, scroll and undo history for nothing).
+        setDetail(theirs)
+        adoptVersion(theirs.version)
+        void h.resume(theirs.version)
+        unblockRef.current()
+        return
+      }
       if (!h || mine === null || !h.isDirty()) {
         h?.reload(theirs.body, theirs.version)
         setDetail(theirs)
@@ -1037,14 +1059,51 @@ export function ObjectView({
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void api.reveal(path).catch(() => undefined)}>
               <Icon name="ph-folder-open" size={14} />
-              Reveal in Explorer
+              {revealMenuLabel()}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => useFind.getState().open(path)}>
               <Icon name="ph-magnifying-glass" size={14} />
               {FIND_IN_PAGE_MENU_ITEM}
               <MenuKeys id="findInPage" />
             </DropdownMenuItem>
+            {canTemplate && type && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger disabled={propsReadOnly}>
+                  <Icon name="ph-file-dashed" size={14} />
+                  {USE_TEMPLATE_TEXT.menu}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="border-line bg-raised">
+                  <UseTemplateMenu
+                    type={type}
+                    editor={typeEditor}
+                    onApply={(id) => void applyTemplate(id)}
+                    onEdit={(p) => openTarget({ kind: 'object', path: p })}
+                    onCreated={(p) => openTarget({ kind: 'object', path: p })}
+                  />
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
             <PinMenuItems pin={{ kind: 'object', path, id: summary?.id }} shortcut={<MenuKeys id="toggleFavorite" />} />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger disabled={propsReadOnly || !summary || isTemplate}>
+                <Icon name="ph-swap" size={14} />
+                Change type
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="max-h-[360px] overflow-auto border-line bg-raised">
+                {otherTypes.map((t) => (
+                  <DropdownMenuItem key={t.id} onSelect={() => setChangeTo(t)}>
+                    <TypeChip type={t} size={18} />
+                    {t.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            {type && (
+              <DropdownMenuItem data-type-setting="" onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
+                <Icon name="ph-gear-six" size={14} />
+                Object type settings
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               disabled={!summary}
               onSelect={() => {
@@ -1128,43 +1187,12 @@ export function ObjectView({
               </>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger disabled={propsReadOnly || !summary || isTemplate}>
-                <Icon name="ph-swap" size={14} />
-                Change type
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="max-h-[360px] overflow-auto border-line bg-raised">
-                {otherTypes.map((t) => (
-                  <DropdownMenuItem key={t.id} onSelect={() => setChangeTo(t)}>
-                    <TypeChip type={t} size={18} />
-                    {t.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            {canTemplate && type && (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger disabled={propsReadOnly}>
-                  <Icon name="ph-file-dashed" size={14} />
-                  {USE_TEMPLATE_TEXT.menu}
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="border-line bg-raised">
-                  <UseTemplateMenu
-                    type={type}
-                    editor={typeEditor}
-                    onApply={(id) => void applyTemplate(id)}
-                    onEdit={(p) => openTarget({ kind: 'object', path: p })}
-                    onCreated={(p) => openTarget({ kind: 'object', path: p })}
-                  />
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            )}
             <DropdownMenuItem
               disabled={propsReadOnly || !summary || isTemplate}
               onSelect={() => setCollectionsOpen(true)}
             >
               <Icon name={COLLECTION_ICON} size={14} />
-              Edit Collections
+              Edit collections
             </DropdownMenuItem>
             {canDuplicate && (
               <DropdownMenuItem disabled={propsReadOnly} onSelect={() => void duplicate()}>
@@ -1179,12 +1207,6 @@ export function ObjectView({
               <Icon name="ph-git-merge" size={14} />
               {isTag ? OBJECT_M8_TEXT.mergeTag : OBJECT_M8_TEXT.mergeObject}
             </DropdownMenuItem>
-            {type && (
-              <DropdownMenuItem data-type-setting="" onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
-                <Icon name="ph-gear-six" size={14} />
-                Object Type Settings
-              </DropdownMenuItem>
-            )}
             <DropdownMenuSeparator />
             {canWide && (
               <DropdownMenuItem
@@ -1319,7 +1341,7 @@ export function ObjectView({
       {summary && (
         <Dialog open={collectionsOpen} onOpenChange={setCollectionsOpen}>
           <DialogContent className="w-auto border-line bg-raised p-0 text-fg sm:max-w-none">
-            <DialogTitle className="sr-only">Edit Collections</DialogTitle>
+            <DialogTitle className="sr-only">Edit collections</DialogTitle>
             <DialogDescription className="sr-only">Choose the collections this object belongs to.</DialogDescription>
             <CollectionPicker
               value={summary.collections ?? []}

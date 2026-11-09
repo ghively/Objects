@@ -54,7 +54,9 @@ export function useViewState<S extends ViewState = ViewState>(
       }
       try {
         const fresh = await refetchRef.current()
-        const next = patches.reduce<S>((s, p) => apply(s, p) as S, fresh)
+        // Patches queued while this save was in flight are part of the state too; they stay in
+        // `pending` so their own flush still saves them.
+        const next = [...patches, ...pending.current].reduce<S>((s, p) => apply(s, p) as S, fresh)
         stateRef.current = next
         setState(next)
         await saveRef.current(next)

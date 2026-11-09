@@ -99,9 +99,9 @@ def router(ctx: ApiContext, jobs: Jobs, announce_resync) -> APIRouter:
         try:
             full = attachment_path(ctx.space.root, req.path)
         except (FileNotFoundError, OSError, ValueError):
-            return _error(404, f"No file at {req.path!r}")
+            return _error(404, f'There is no file at "{req.path}".')
         except Exception:  # noqa: BLE001 - NotServed for a .md
-            return _error(404, f"No file at {req.path!r}")
+            return _error(404, f'There is no file at "{req.path}".')
         server.reveal_in_file_manager(full)
         return {"ok": True}
 

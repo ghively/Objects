@@ -148,7 +148,7 @@ def join_entries(entries: list[str]) -> str:
 
 def _target_path(folder: Path, target: str) -> Path:
     if target not in _FILES:
-        raise MemoryError("The target is memory or user.")
+        raise MemoryError("The target must be memory or user.")
     return Path(folder) / _FILES[target]
 
 

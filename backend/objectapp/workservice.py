@@ -81,14 +81,23 @@ __all__ = [
     "WorkNotice",
     "WorkService",
     "add_work_listener",
+    "in_work_write",
 ]
 
 log = logging.getLogger(__name__)
 
+_writing = threading.local()
+
+
+def in_work_write() -> bool:
+    """True while this thread is inside a `WorkService` write (a `Space.add_listener` listener
+    can tell the service's writes, which a `WorkNotice` follows, from any other write)."""
+    return bool(getattr(_writing, "depth", 0))
+
 NOTE_NEEDS_TEXT = "A note needs text."
 ALREADY_DONE = "This item is already done."
 NO_DONE_STATUS = "This type has no done status."
-NOT_A_FIELD = "{key} isn't a work field."
+NOT_A_FIELD = 'The field "{key}" isn'"'"'t a work field.'
 NOTE_TOO_LONG = f"Keep it to {MAX_NOTE} characters."
 FLOOR_NEEDS = "A floor item needs a place or what to collect."  # as `workvalues.floor_from_api`
 _FIELD_WRITE_KEYS = FIELD_KEYS - {"steps", "floorItems"}
@@ -221,12 +230,12 @@ def _floor_text(value: Any, what: str) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
-        raise InvalidValue(f"Expected text for {what}")
+        raise InvalidValue(f"Expected text for {what}.")
     text = value.strip()
     if "\n" in text or "\r" in text:
         raise InvalidValue(f"Keep {what} to one line.")
     if len(text) > MAX_LIST_TEXT:
-        raise InvalidValue(f"{what.capitalize()} is at most {MAX_LIST_TEXT} characters.")
+        raise InvalidValue(f"Keep {what} to at most {MAX_LIST_TEXT} characters.")
     return text or None
 
 
@@ -292,14 +301,18 @@ class WorkService:
             return text if out is None else out
 
         attempts = _RETRIES if base_version is None else 1
-        for attempt in range(attempts):
-            try:
-                return self.space.write_work(
-                    rel, base_version, updates=updates, remove=remove, raw=raw, body=body_fn
-                )
-            except Conflict:
-                if attempt + 1 >= attempts:
-                    raise
+        _writing.depth = getattr(_writing, "depth", 0) + 1
+        try:
+            for attempt in range(attempts):
+                try:
+                    return self.space.write_work(
+                        rel, base_version, updates=updates, remove=remove, raw=raw, body=body_fn
+                    )
+                except Conflict:
+                    if attempt + 1 >= attempts:
+                        raise
+        finally:
+            _writing.depth -= 1
         raise AssertionError("unreachable")
 
     def _append(self, text: str, lines: _Lines, event: WorkEvent, now: datetime,
@@ -411,6 +424,49 @@ class WorkService:
             after=seen["after"], text=text, not_before=seen["not_before"],
         )])
         return result
+
+    def withdraw_approval(self, path: str, step_id: str, result: str, why: str | None = None) -> dict | None:
+        """Object's own move of an approved step back to Open once the run it started ended failed
+        (M24; Gene, 2026-11-08): the approval is spent, so the user approves again before a retry.
+        ``result`` is shown on the step (its ``result``); ``why`` (the run's failure reason) goes
+        into the Activity line. Answers a ``WorkWriteResult``, or None when the step isn't approved
+        any more (nothing is written). Raises `KeyError`, `NotWorkItem`, `ReadOnly`."""
+        rel = self._check(path)
+        now = self.space.clock()
+        actor = Actor("app", "Object")
+        lines = _Lines()
+        seen: dict[str, Any] = {}
+
+        def raw(fm: dict) -> dict[str, Any]:
+            steps = read_steps_strict(fm.get("steps"))
+            i = _find(steps, step_id)
+            if i is None or steps[i].state != "approved":
+                raise _Stale(step_id)
+            new = [copy.copy(s) for s in steps]
+            step = new[i]
+            step.state = "open"
+            step.approvedAt = step.notBefore = None
+            step.result = one_line(result, MAX_NOTE) or None
+            seen.update(n=i + 1, kind=step.kind, step_text=step.text, id=step.id)
+            return {"steps": encode_steps(new) or []}
+
+        def body(text_: str, _fm: dict) -> str:
+            event = WorkEvent(kind="reopen", who=actor.name, n=seen["n"], step_text=seen["step_text"],
+                              step_kind=seen["kind"], text=None, not_before_local=None, date=self._day(now))
+            detail = one_line(why or "", 300).rstrip(".")
+            detail = f" ({detail})" if detail else ""
+            return self._append(text_, lines, event, now, activity=activity_text(event) + detail)
+
+        try:
+            outcome = self._write(rel, None, lines, raw=raw, body=body)
+        except _Stale:
+            return None
+        out = self._result(rel, outcome, lines)
+        _notify(self.space, [self._notice(
+            rel, "reopen", actor, now, outcome.version, step_id=seen["id"], n=seen["n"], kind=seen["kind"],
+            step_text=seen["step_text"], before="approved", after="open",
+        )])
+        return out
 
     def edit_steps(self, path: str, ops: list[dict], actor: Actor) -> dict:
         """Apply step ops (``add``, ``edit``, ``move``, ``remove``) in order, in one write."""
@@ -682,7 +738,7 @@ class WorkService:
             raise InvalidValue("Unknown floor item change.")
         place_t, what_t = _floor_text(place, "the place"), _floor_text(what, "what to collect")
         if found is not None and not isinstance(found, str):
-            raise InvalidValue("Expected text for found")
+            raise InvalidValue('Expected text for "found".')
         found_t = found.strip() if isinstance(found, str) and found.strip() else None
         if found_t is not None and len(found_t) > MAX_NOTE:
             raise InvalidValue(NOTE_TOO_LONG)

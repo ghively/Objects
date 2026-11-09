@@ -22,6 +22,19 @@ describe('whiteboard model', () => {
     expect(M.CONTENT_Z_MIN).toBe(1)
   })
 
+  test('test the pixel values the M6 plan states', () => {
+    // The literal numbers the M6 plan and m6-acceptance.md quote (whole grid cells since PR #13).
+    // A refactor that moves one of them must change the plan and this test together.
+    expect([M.DEFAULT_NODE_WIDTH, M.DEFAULT_NODE_HEIGHT]).toEqual([390, 60])
+    expect([M.AUTO_MAX_WIDTH, M.AUTO_MAX_HEIGHT]).toEqual([600, 480])
+    expect([M.MIN_BLOCK_WIDTH, M.MIN_BLOCK_HEIGHT]).toEqual([60, 30])
+    expect([M.MIN_SHAPE_WIDTH, M.MIN_SHAPE_HEIGHT]).toEqual([90, 90])
+    expect(M.LINK_BLOCK_MIN_WIDTH).toBe(360)
+    expect([M.DEFAULT_FRAME_WIDTH, M.DEFAULT_FRAME_HEIGHT]).toEqual([600, 360])
+    expect(M.ZOOM_PRESETS).toEqual([0.05, 0.1, 0.2, 0.33, 0.5, 0.75, 1, 1.25, 1.6, 2, 3])
+    expect(M.CIRCUIT_LABELS).toEqual(['and', 'or', 'not', 'nand', 'nor', 'xor', 'xnor', 'high', 'low'])
+  })
+
   test('test zoom stops climb from the minimum to the maximum', () => {
     const stops = [M.ZOOM_MIN, ...M.ZOOM_PRESETS, M.ZOOM_MAX]
     for (let i = 1; i < stops.length; i++) expect(stops[i]).toBeGreaterThan(stops[i - 1])

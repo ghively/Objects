@@ -1,5 +1,5 @@
 /**
- * The app's own Trash (in `.object/trash/`, not the Windows Recycle Bin): deleted objects and
+ * The app's own Trash (in `.object/trash/`, separate from the computer's): deleted objects and
  * types (a type shows its object count), "Restore", "Delete permanently", and "Empty Trash", which
  * asks the user to type "Delete". Entries are removed after 30 days.
  * M14: deleted automations are listed too ("Automation"), restored under their id.
@@ -24,16 +24,21 @@ import { invalidateLinkIndex } from '@/links/linkIndex'
 
 export const TRASH_TEXT = {
   heading: 'Trash',
-  info: 'Objects and object types are kept in the Trash for 30 days and are then removed completely. This is the app\'s Trash, not the Windows Recycle Bin.',
+  info: 'Objects and object types are kept in the Trash for 30 days and are then removed completely. Object types and collections cannot be restored completely. This is Object\'s own Trash, separate from your computer\'s.',
   empty: 'Trash is empty',
   restore: 'Restore',
   deletePermanently: 'Delete permanently',
   emptyTrash: 'Empty Trash',
   emptyConfirmDescription: (count: number) =>
-    `Delete all ${count} object(s) in the trash for good? You won't be able to get them back.`,
-  purgeConfirmTitle: 'Permanently delete',
-  purgeConfirmDescription: (count: number) =>
-    `Delete ${count} object(s) for good? You won't be able to get them back.`,
+    `${count === 1 ? 'Delete the one entry' : `Delete all ${count} entries`} in the Trash for good? You won't be able to get ${count === 1 ? 'it' : 'them'} back.`,
+  purgeConfirmTitle: 'Delete permanently?',
+  /** Names what goes: an object, an object type or collection with its objects, a query or an automation. */
+  purgeConfirmDescription: (item: Pick<TrashItem, 'kind' | 'objectCount'> | null) => {
+    const what = item ? purgeSubject(item) : TRASH_TEXT.objects(1)
+    const many = item !== null && item.kind !== 'object' && (item.objectCount ?? 0) > 0
+    return `Delete ${what} for good? You won't be able to get ${many ? 'them' : 'it'} back.`
+  },
+  cancel: 'Cancel',
   typeToConfirm: 'Enter "Delete" to go ahead',
   confirmWord: 'Delete',
   objectType: 'Object type',
@@ -54,6 +59,14 @@ const ENTRY_ICON: Partial<Record<TrashItem['kind'], string>> = {
 /** How many entries go with this one: a type or collection takes its objects with it. */
 function entryCount(i: TrashItem): number {
   return i.kind === 'type' || i.kind === 'collection' ? 1 + (i.objectCount ?? 0) : 1
+}
+
+/** The thing a "Delete permanently" asks about: "1 object", "this object type and its 3 objects", "this query". */
+function purgeSubject(i: Pick<TrashItem, 'kind' | 'objectCount'>): string {
+  if (i.kind === 'object') return TRASH_TEXT.objects(1)
+  const noun = i.kind === 'type' ? 'object type' : i.kind
+  const n = i.objectCount ?? 0
+  return n > 0 ? `this ${noun} and its ${TRASH_TEXT.objects(n)}` : `this ${noun}`
 }
 
 function formatDeletedAt(iso: string): string {
@@ -179,11 +192,11 @@ export function TrashView() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[17px]">{TRASH_TEXT.purgeConfirmTitle}</AlertDialogTitle>
             <AlertDialogDescription className="text-[14px] text-fg-muted">
-              {TRASH_TEXT.purgeConfirmDescription(purging ? entryCount(purging) : 1)}
+              {TRASH_TEXT.purgeConfirmDescription(purging)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{TRASH_TEXT.cancel}</AlertDialogCancel>
             <Button
               variant="destructive"
               disabled={busy !== null}
@@ -216,7 +229,7 @@ export function TrashView() {
             />
           </label>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{TRASH_TEXT.cancel}</AlertDialogCancel>
             <Button
               variant="destructive"
               disabled={typed !== TRASH_TEXT.confirmWord || busy !== null}

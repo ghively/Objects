@@ -144,7 +144,11 @@ def test_settings_bad_shape_422(state: Path, blocks_space_dir: Path, patch):
     with TestClient(create_app(Space(blocks_space_dir), None, watch=False)) as c:
         r = c.put("/api/settings", json={"patch": patch, "baseRevision": ""})
         assert r.status_code == 422, r.text
-        assert r.json()["detail"] == f"Cannot patch: {key}"
+        # An unknown key and a bad value are told apart (sweep 2026-11-08 review, NIT 7).
+        if key in settings.DEFAULTS:
+            assert r.json()["detail"] == f"The setting \"{key}\" can't be saved."
+        else:
+            assert r.json()["detail"] == f'There is no setting named "{key}".'
     assert not (state / "settings.json").exists()
 
 

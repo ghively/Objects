@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import shutil
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -127,12 +128,17 @@ class Prior:
     """The last finished batch's mapping (the effective one)."""
 
 
-def load_prior(space_root: Path | str, source_path: str, *, exclude: str | None = None) -> Prior:
+def load_prior(space_root: Path | str, source_path: str, *, exclude: str | None = None,
+               also: Iterable[str] = ()) -> Prior:
+    """What earlier batches of ``source_path`` left behind; ``also`` names the paths the same source
+    had before it moved (the writer finds them on the objects it matched), whose batches count too."""
     prior = Prior()
+    paths = [source_path, *also]
     for b in reversed(list_batches(space_root)):  # oldest first, so the newest wins
         if b.get("id") == exclude or b.get("trashedAt"):
             continue
-        if not same_source(str(b.get("source", {}).get("path", "")), source_path):
+        recorded = str(b.get("source", {}).get("path", ""))
+        if not any(same_source(recorded, p) for p in paths):
             continue
         d = imports_root(space_root) / str(b["id"])
         items = _read_json(d / "items.json") or []
@@ -141,8 +147,8 @@ def load_prior(space_root: Path | str, source_path: str, *, exclude: str | None 
                 continue
             if it.get("action") in ("created", "updated", "unchanged", "conflict", "resolvedTake", "resolvedKeep"):
                 prior.items[(str(it.get("system")), str(it.get("id")))] = it
-            if it.get("version") and it.get("action") in ("created", "updated", "resolvedTake", "resolvedKeep"):
-                prior.versions[str(it["path"])] = str(it["version"])
+            if it.get("version") and it.get("action") in ("created", "updated", "unchanged", "resolvedTake", "resolvedKeep"):
+                prior.versions[str(it["path"])] = str(it["version"])  # unchanged: only when its block was restamped
         atts = _read_json(d / "attachments.json")
         if isinstance(atts, dict):
             prior.attachments.update({k: v for k, v in atts.items() if isinstance(v, dict)})

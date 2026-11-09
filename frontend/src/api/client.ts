@@ -2,12 +2,14 @@ import type {
   AddRemoteAgentRequest,
   Agent,
   AgentChatSummary,
+  AppInfo,
   AgentInput,
   AgentTranscript,
   AgentTrashItem,
   CreateAgentRequest,
   RemoteAuthInput,
   RemotePreview,
+  RemoteRefreshResult,
   SaveRemoteAgentRequest,
   ToolGroup,
   ChatSearchHit,
@@ -607,6 +609,11 @@ function ensureSource(resyncOnOpen = false) {
 }
 
 export const api = {
+  /** The app's version, for the Settings nav's footer. */
+  appInfo(): Promise<AppInfo> {
+    return request<AppInfo>('/app')
+  },
+
   space(): Promise<SpaceInfo> {
     return request<SpaceInfo>('/space')
   },
@@ -1704,9 +1711,22 @@ export const api = {
     return request<Agent>(`/remote-agents/${seg(id)}`, json('PUT', { ...req, clientId: req.clientId ?? CLIENT_ID }))
   },
 
-  /** Fetch a remote agent's card again. 404, 422, 502. */
-  refreshRemoteAgent(id: string): Promise<Agent> {
-    return request<Agent>(`/remote-agents/${seg(id)}/refresh`, json('POST', { clientId: CLIENT_ID }))
+  /** Fetch a remote agent's card again. An endpoint that moved to another host or scheme is not
+   * switched to: it comes back as `remote.pendingEndpoint` with a `notice`. 404, 422, 502. */
+  refreshRemoteAgent(id: string): Promise<RemoteRefreshResult> {
+    return request<RemoteRefreshResult>(`/remote-agents/${seg(id)}/refresh`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** Switch a remote agent to its pending (moved) endpoint. 404, 422 (nothing pending). */
+  confirmRemoteEndpoint(id: string): Promise<Agent> {
+    return request<Agent>(`/remote-agents/${seg(id)}/confirm-endpoint`, json('POST', { clientId: CLIENT_ID }))
+  },
+
+  /** Forget a remote agent's pending (moved) endpoint; the stored one stays. 404, 422. */
+  dismissRemoteEndpoint(id: string): Promise<Agent> {
+    return request<Agent>(`/remote-agents/${seg(id)}/pending-endpoint${qs({ clientId: CLIENT_ID })}`, {
+      method: 'DELETE',
+    })
   },
 
   /** Record that Gene confirmed context leaves this computer for this remote agent (once per agent). */

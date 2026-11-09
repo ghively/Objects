@@ -60,6 +60,34 @@ describe('M8 shortcuts', () => {
     expect(PRESENTATION_ONLY_IDS).toEqual(['exitPresentationMode', 'nextPresentationSlide', 'previousPresentationSlide'])
   })
 
+  test('sweep 2026-11-08 #3: Underline is unbound (Ctrl+U is "Add new content"); toggles open on Ctrl+Up/Down', () => {
+    expect(keysFor('underline')).toEqual([])
+    expect(allShortcuts().find((d) => d.id === 'underline')?.name).toBe('Underline')
+    const holders = (key: string) => allShortcuts().filter((d) => d.keys.includes(key)).map((d) => d.id)
+    expect(holders('Mod-u')).toEqual(['openAddEntityMenu'])
+    expect(keysFor('toggleToggleInBlockWithCursor')).toEqual(['Mod-Enter', 'Mod-Shift-Enter', 'Mod-ArrowUp', 'Mod-ArrowDown'])
+  })
+
+  test('sweep 2026-11-08 #3: no two registered ids in one scope share a key, on either platform', () => {
+    const scopeOf = (id: string, scope: string) => (PRESENTATION_ONLY_IDS.includes(id) ? 'presentation' : scope)
+    for (const platform of ['Win32', 'MacIntel']) {
+      const mac = platform === 'MacIntel'
+      const seen = new Map<string, string>()
+      for (const d of allShortcuts()) {
+        for (const k of d.keys) {
+          const c = parseKeys(k, mac)
+          const sig = k.includes(' ')
+            ? `${scopeOf(d.id, d.scope)}|seq|${k.toLowerCase()}`
+            : `${scopeOf(d.id, d.scope)}|${c.ctrl}|${c.meta}|${c.alt}|${c.shift}|${c.key.toLowerCase()}`
+          const other = seen.get(sig)
+          if (other && sharesKeyByDesign(other, d.id)) continue
+          expect(other, `${d.id} (${k}) collides with ${other} in scope ${d.scope} on ${platform}`).toBeUndefined()
+          seen.set(sig, d.id)
+        }
+      }
+    }
+  })
+
   test('test provisional keys do not collide with existing bindings in the same scope', () => {
     // The presentation-only keys are bound only while presenting: their own scope.
     const scopeOf = (id: string, scope: string) => (PRESENTATION_ONLY_IDS.includes(id) ? 'presentation' : scope)

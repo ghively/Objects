@@ -63,13 +63,13 @@ is the expected behaviour.
     the title, a "Tags" row under it, then the body. Properties live in a side pane (Contact, Category,
     "Add Property", each "Empty" when unset); the outline is a dash ladder at the right edge.
 15. **Settings > Editor** (all missing from Object): Disable spellcheck; Spellcheck language
-    (Experimental); Always open as full page; Always create inline links; backlink display (Only block with
-    backlink / Full path above); Hide object type settings outside of settings; Hide outliner lines; Toggle
+    (Experimental); Open objects as a full page; Insert links inline by default; backlink display (Just the
+    linking block / Full path above); Keep type settings inside Settings only; Hide outliner lines; Toggle
     style (Toggle | Bullet); Hide App Menu; When the app starts (space on this device: Last opened | Specific;
     per space: Where I left off | Calendar | Calendar today | Specific object); Highlight Style (Default |
-    Minimal); Default state for backlink sections.
+    Minimal); Backlink sections start as.
 16. **Other Settings pages**: Language; Date & Time (time zone list, date formatting); Offline & Sync
-    (sync status, content downloaded, Recalculate content index, local storage size, media loading Everything |
+    (sync status, content downloaded, Rebuild search index, local storage size, media loading Everything |
     Required only, Clear media cache, cloud media usage); Import Content (migration guides per app); Space
     Settings; Object Types; Task management; Integrations (Calendar, Task actions, API, Web Extension, Email,
     Telegram, WhatsApp, Readwise, Kindle, Raycast). Cloud-only ones (Account, Billing, sync, integrations)
@@ -198,9 +198,9 @@ debugger, which makes list shortcuts unreliable to judge, so treat "did not conv
 41. **Slash menu** ("Create a block", a scrolling list with the same footer hints), in order:
     Create a block: Standard, Small, Heading 1-4, Bullet list, Alphabetical list, Numbered list, Roman list,
     Quote block, To-do, Toggle, Icon, Group, Math, Code, Horizontal line, Two Columns, Table.
-    Create an object: New <each type in the space>, New Date, New Tag, New Tweet.
-    Link to a date: Time, Now, Today, Tomorrow, Yesterday, In a week, A week ago.
-    Use the AI Assistant: Ask AI about this block, Add tags to block using AI (both Pro).
+    Create an object: Create <each type in the space> (with text after the slash: Create <type> with title "...").
+    Link to a date: Now - timestamp, Today - date link, Today, Tomorrow, Yesterday, In a week, A week ago.
+    Use the AI Assistant: Ask AI about this block, Let AI suggest tags for this block (both Pro).
 42. **`@` picker** (not `[[`; `[[` stayed literal text): lists recent objects with their type icon and a
     "Collection" badge on collections, then one row per type with a `>` to browse its objects; typing
     filters; same footer hints.
@@ -224,7 +224,7 @@ unless marked (as of 2026-11-07 the backlog is built, see "2026-11-04: the last 
 
 **Keep (Gene's explicit requirements)**
 - **Unlinked mentions stay.** Object already has them (M5: `backend/objectapp/references.py`,
-  `frontend/src/references/`, setting "Default state for backlink sections" with Open | Closed | Hidden).
+  `frontend/src/references/`, setting "Backlink sections start as" with Open | Closed | Hidden).
   The catalog marks them Pro; Object keeps them free. Any change to references, the object page or
   search must not remove or hide them. Add a regression test per change that touches that code.
 
@@ -249,8 +249,8 @@ unless marked (as of 2026-11-07 the backlog is built, see "2026-11-04: the last 
 10. Markdown shortcuts incl. `|` quote, `>` toggle, `a)` and `i)` lists, `()` icon block, combinable (catalog
     section 2); confirm each with real key events.
 11. Inline date chip; inline tag chip; inline code token style; Icon block; emoji-heavy pasted content.
-12. Focus mode while typing (chrome fades) and "Always open as full page" / "Always create inline links" /
-    "Disable automatic detection of numbered lists" / spellcheck settings (item 15).
+12. Focus mode while typing (chrome fades) and "Open objects as a full page" / "Insert links inline by default" /
+    "Turn off automatic numbered lists" / spellcheck settings (item 15).
 13. Rem-based editor sizing from a 15.5px root and a text-size setting (item 13).
 
 **C. Shell, menus, palettes** (backlog 1-12 above; catalog sections 4, 8, 9)
@@ -264,7 +264,7 @@ unless marked (as of 2026-11-07 the backlog is built, see "2026-11-04: the last 
 19. Shortcuts panel (the arrow icon at the sidebar footer) with the full grouped list (catalog section 2);
     Object's registry is `frontend/src/lib/shortcuts.ts`.
 20. Help & Resources sidebar section; Graph settings list (Show tags network, Filter / Exclude object types,
-    Show completed tasks, Hide objects with many links, Hide dates, Hide indirect links) and zoom presets.
+    Show completed tasks, Hide heavily linked objects, Hide dates, Hide indirect links) and zoom presets.
 
 **D. Views and pages** (items 23-26; catalog sections 5, 8, 9)
 21. Masonry cards; Wall cards with property rows and "Empty" placeholders; Tags type page chips with counts.
@@ -330,7 +330,7 @@ Remaining tasks 2-25 (less 9's Help & Resources and 24, which link to external w
 |---|---|---|---|
 | Block menus | 2, 3 | `d4fcfe4`, `23c5c3a` | Block menu in the catalog's order plus Object's Alignment, Standout, Indent; Ctrl+G binds Group with blocks selected; "Turn into..." is the object picker (reference check 2e). Bottom block-selection bar replaces the "N blocks" pill; Move to Today, Tomorrow or a new page. Tag dropdown skipped (no block tags in Markdown). |
 | Editor typing | 4, 5 | `21479a6`, `9404905` | `>` is now toggle and `|` quote; `a)`, `i)`, `()`, `[]` added; marks combine before the Space. `()` uses `ph-star` (the catalog uses the last block icon). Chrome fades while typing with the catalog's fade timing. |
-| Settings | 6, 7, 25 | `21c9941`, `578a914`, `f94f166` | 15.5px root (96.875%); text size is the desktop zoom factor, stored as device `zoom`, scales the note body only. Spellcheck language, Always create inline links (off: `@` in an empty block makes an object block), Hide object type settings, Highlight Style (stored, nothing to style yet). Offline & Sync page holds Recalculate content index. |
+| Settings | 6, 7, 25 | `21c9941`, `578a914`, `f94f166` | 15.5px root (96.875%); text size is the desktop zoom factor, stored as device `zoom`, scales the note body only. Spellcheck language, Insert links inline by default (off: `@` in an empty block makes an object block), Keep type settings inside Settings only, Highlight Style (stored, nothing to style yet). Offline & Sync page holds Rebuild search index. |
 | Shell | 8, 9 (Add Section), 11, 13 | `c278e5c`, `3054c33`, `3db82fa`, `831f596` | Manual type order in `ui.json` (`objectsSectionSortOption`, `workspace.objects.ids`); alphabetical when unset. Object menu key hints, Import, Copy > submenu; no Share. Item 12 skipped: collections are not linkable in Object. |
 | Palette | 10 | `b81d26b`, `44692ff` | One list; recents Today/Earlier (the recent store keeps `openedAt`); actions after content when typing; Ctrl+Enter, Shift+Enter. |
 | Views | 14-17 | `f976c5e`, `3af4753`, `e5e0a6d`, `2f0efa5`, `679d3d7` | Table "N words" chip and row numbers (backend word count, regex approximation); Overview gear with hidden sections; tag chips with counts; `hideProperties` frontmatter key; backlink hover actions Expand, new tab, side panel. |
@@ -351,7 +351,7 @@ Everything not done, with the behaviour to match (catalog section in brackets) a
 4. Markdown shortcuts: confirm each with real key events (`|` quote, `>` toggle, `a)` and `i)` lists, `()` icon block, combinable); the debugger-typed test was inconclusive. S each.
 5. Focus mode while typing (chrome fades until the pointer moves). S.
 6. Rem-based editor sizing from a 15.5px root and a text-size setting. M.
-7. Settings > Editor options Object lacks: spellcheck language, Always create inline links, Hide object type settings outside of settings, Highlight Style, startup per-space choice. M.
+7. Settings > Editor options Object lacks: spellcheck language, Insert links inline by default, Keep type settings inside Settings only, Highlight Style, startup per-space choice. M.
 
 **Shell and menus** (catalog 4, 8, 9)
 8. Sidebar Object Types header `...`: Sort Manually | Sort Alphabetically, with drag reordering for manual. M.

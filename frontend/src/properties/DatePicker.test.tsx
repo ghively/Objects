@@ -9,12 +9,13 @@ import { formatDate } from './format'
 const NOW = new Date(2026, 9, 21, 10, 30)
 
 describe('DatePicker', () => {
-  it('test DatePicker hides "Range" when endTimeSettings notAllowed and forces time when resolutionConstraint time', async () => {
+  it('test DatePicker hides "End Date" when endTimeSettings notAllowed and forces time when resolutionConstraint time', async () => {
     const onChange = vi.fn()
     const { unmount } = render(
       <DatePicker value={null} constraints={{ endTimeSettings: 'notAllowed' }} onChange={onChange} now={NOW} />,
     )
     expect(screen.queryByText('Range')).toBeNull()
+    expect(screen.queryByRole('switch', { name: 'End Date' })).toBeNull()
     expect(screen.getByText('Include Time')).toBeInTheDocument()
     unmount()
 
@@ -47,7 +48,7 @@ describe('DatePicker', () => {
     expect(screen.getByRole('textbox', { name: 'Starts' })).toHaveValue('Oct 30, 2026')
   })
 
-  it('typing a phrase and Enter sets the date; Range adds an end', async () => {
+  it('typing a phrase and Enter sets the date; End Date adds an end', async () => {
     const onChange = vi.fn()
     const { rerender } = render(
       <DatePicker value={{ start: '2026-10-30', resolution: 'day' }} onChange={onChange} now={NOW} />,
@@ -58,13 +59,16 @@ describe('DatePicker', () => {
     expect(onChange).toHaveBeenLastCalledWith({ start: '2026-10-24', resolution: 'day' })
 
     rerender(<DatePicker value={{ start: '2026-10-24', resolution: 'day' }} onChange={onChange} now={NOW} />)
-    await userEvent.click(screen.getByRole('switch', { name: 'Range' }))
+    // Catalog: the toggles are "Include Time" and "End Date".
+    expect(screen.queryByRole('switch', { name: 'Range' })).toBeNull()
+    await userEvent.click(screen.getByRole('switch', { name: 'End Date' }))
     expect(onChange).toHaveBeenLastCalledWith({ start: '2026-10-24', end: '2026-10-24', resolution: 'day' })
 
     rerender(
       <DatePicker value={{ start: '2026-10-24', end: '2026-10-24', resolution: 'day' }} onChange={onChange} now={NOW} />,
     )
-    expect(screen.getByText('Ends')).toBeInTheDocument()
+    expect(screen.queryByText('Ends')).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'End Date' })).toHaveAttribute('placeholder', 'End Date')
     await userEvent.click(screen.getByRole('button', { name: '1 week' }))
     expect(onChange).toHaveBeenLastCalledWith({ start: '2026-10-24', end: '2026-10-31', resolution: 'day' })
   })

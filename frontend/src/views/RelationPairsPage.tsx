@@ -21,7 +21,7 @@ export const RELATION_PAIRS_TEXT = {
   dependencies: { title: 'Dependencies', hint: 'Mark items as blocked by other items.', on: 'Turn on dependencies' },
   isOn: 'On',
   off: 'Turn off',
-  basic: 'Not available for basic object types.',
+  basic: 'The properties of basic types are fixed.', // the sentence the backend and AddPropertyMenu use
   readOnly: "This type can't be changed.",
   conflict: 'The type changed elsewhere. Try again.',
   failed: 'Could not turn it on.',

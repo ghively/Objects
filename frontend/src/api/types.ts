@@ -348,6 +348,11 @@ export interface ObjectSummary {
   collections?: string[]
 }
 
+/** GET /api/app: the app's version (`"dev"` when the package is not installed). */
+export interface AppInfo {
+  version: string
+}
+
 /** GET /api/space */
 export interface SpaceInfo {
   /** `.object/space.json`'s `name`, else the folder name. */
@@ -460,7 +465,7 @@ export interface DeviceSettings {
   workAgentId: string | null
   /** "Agent acts on my approvals". */
   workAgentActs: boolean
-  /** "Auto-run read-only steps". */
+  /** "Agent runs by itself". */
   workAutoRun: boolean
   /** MCP tools (`mcp__<server>__<tool>`) a read-only run may use (at most 500). */
   workReadTools: string[]
@@ -2050,9 +2055,17 @@ export interface RemoteInfo {
   protocolVersion: string
   streaming: boolean
   auth: { kind: 'none' | 'bearer' | 'header'; headerName: string | null; set: boolean }
+  /** A refreshed card's endpoint on another host or scheme, waiting for the move to be confirmed. */
+  pendingEndpoint: { url: string; host: string } | null
   card: RemoteCard
   cardFetchedAt: string
   contextNoticeAt: string | null
+}
+
+/** POST /api/remote-agents/{id}/refresh: the agent, the preview warnings and the moved-address notice. */
+export interface RemoteRefreshResult extends Agent {
+  warnings: string[]
+  notice: string | null
 }
 
 /** A remote agent's auth as entered (the value is sent once and never shown again). */

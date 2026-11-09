@@ -26,7 +26,7 @@ __all__ = [
     "resolve_date_variable",
 ]
 
-TEMPLATE_FAILED = "The template couldn't be applied"
+TEMPLATE_FAILED = "The template couldn't be applied."
 
 _MONTHS = [
     "January", "February", "March", "April", "May", "June",
@@ -74,7 +74,7 @@ def _token(tok: str, dt: datetime) -> str:
             return f"{dt.hour:02d}"
         case "mm":
             return f"{dt.minute:02d}"
-    raise TemplateError(f"Unknown date token {tok!r}")
+    raise TemplateError(f'Unknown date token "{tok}".')
 
 
 def format_date(fmt: str, dt: datetime) -> str:
@@ -92,7 +92,7 @@ def format_date(fmt: str, dt: datetime) -> str:
             continue
         ch = fmt[i]
         if ch.isalpha():
-            raise TemplateError(f"Unknown date format letter {ch!r} in {fmt!r}")
+            raise TemplateError(f'Unknown date format letter "{ch}" in "{fmt}".')
         out.append(ch)
         i += 1
     return "".join(out)
@@ -119,7 +119,7 @@ def resolve_date_variable(var: str, created: datetime | date) -> str:
             start = day.replace(month=1, day=1)
             end = day.replace(month=12, day=31)
         case _:
-            raise TemplateError(f"Unknown date variable {var!r}")
+            raise TemplateError(f'Unknown date variable "{var}".')
     return f"{start.isoformat()} -> {end.isoformat()}"
 
 

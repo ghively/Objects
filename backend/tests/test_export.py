@@ -105,6 +105,29 @@ def test_export_skips_missing_and_outside_paths(space_root: Path):
     assert all(not n.startswith(("/", "..")) for n in names)
 
 
+@pytest.mark.parametrize(
+    "form",
+    [
+        "![a](Attachments/shot%20(2).png)",
+        "![a](Attachments/shot (2).png)",
+        "[a](Attachments/shot%20(2).png)",
+        '![a](Attachments/shot%20(2).png "A title")',
+    ],
+)
+def test_export_media_with_parentheses_in_the_path(space_root: Path, form: str):
+    # Sweep 2026-11-08: the destination was cut at the first `)`, so the file was not found.
+    from objectapp.export import referenced_media
+
+    (space_root / "Attachments" / "shot (2).png").write_bytes(b"\x89PNG two")
+    rel = "Pages/Parens.md"
+    (space_root / rel).write_bytes(f"---\ntype: 'Page'\ntitle: Parens\n---\n\n{form}\n".encode())
+    assert referenced_media(space_root, rel, {}, f"\n{form}\n") == ["Attachments/shot (2).png"]
+    c = _client(space_root)
+    with c:
+        names = zipfile.ZipFile(io.BytesIO(_export(c, rel, 1).content)).namelist()
+    assert "Attachments/shot (2).png" in names
+
+
 def test_export_writes_nothing(space_root: Path):
     state = Path(os.environ["OBJECT_STATE_DIR"])
     c = _client(space_root)

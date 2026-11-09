@@ -137,11 +137,19 @@ _PRESENTATION_TEXTS = ("footerLeft", "footerRight")
 _lock = threading.RLock()
 
 
+UNKNOWN_SETTING = 'There is no setting named "{key}".'
+BAD_SETTING_VALUE = "The setting \"{key}\" can't be saved."
+
+
 class SettingsProblem(ValueError):
-    """A ``PUT /api/settings`` patch has an unknown key or a value of the wrong shape (422)."""
+    """A ``PUT /api/settings`` patch has an unknown key or a value of the wrong shape (422).
+
+    The default text is the bad-value sentence; `patch` passes `UNKNOWN_SETTING` for a key
+    that is not a setting at all (review 2026-11-08, NIT 7).
+    """
 
     def __init__(self, key: str, message: str | None = None) -> None:
-        text = message if message is not None else f"Cannot patch: {key}"
+        text = message if message is not None else BAD_SETTING_VALUE.format(key=key)
         super().__init__(text)
         self.key = key
         self.message = text
@@ -313,9 +321,11 @@ def patch(patch: dict[str, Any], base_revision: str | None) -> tuple[dict[str, A
     from .space import ReadOnly
 
     if not isinstance(patch, dict):
-        raise SettingsProblem("patch")
+        raise SettingsProblem("patch", "The patch must be an object.")
     for key, value in patch.items():
-        if key not in DEFAULTS or not _valid(key, value):
+        if key not in DEFAULTS:
+            raise SettingsProblem(key, UNKNOWN_SETTING.format(key=key))
+        if not _valid(key, value):
             raise SettingsProblem(key, _PROBLEM_MESSAGES.get(key))
     path = settings_path()
     with _lock:

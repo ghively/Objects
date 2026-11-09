@@ -80,6 +80,7 @@ __all__ = [
     "AgentRegistry",
     "effective_model",
     "endpoint_host",
+    "endpoint_moved",
     "remote_auth",
     "remote_card",
 ]
@@ -94,6 +95,7 @@ SETTINGS_UNREADABLE = "This agent's .claude/settings.json can't be read. Fix it,
 FOLDER_IN_USE = "This agent's folder is in use. Wait for its turn to finish, then try again."  # our string
 REMOTE_HAS_NO = "This is a remote agent; it has no {what} in Object."  # M20 Contract
 NOT_REMOTE = "That isn't a remote agent."  # M20 Contract (the agent tools' string)
+NO_PENDING_ENDPOINT = "This agent's address hasn't moved."  # our string
 CARD_FILE = ".object-agent/card.json"
 
 _ULID = re.compile(r"^[0-9A-HJKMNP-TV-Z]{26}$")
@@ -246,6 +248,17 @@ def _endpoint(data: dict[str, Any]) -> dict[str, Any]:
     return ep if isinstance(ep, dict) else {}
 
 
+def _pending_endpoint(data: dict[str, Any]) -> dict[str, Any]:
+    ep = data.get("pendingEndpoint")
+    return ep if isinstance(ep, dict) else {}
+
+
+def endpoint_moved(old_url: str, new_url: str) -> bool:
+    """Whether `new_url` is on another host (``host[:port]``) or scheme than `old_url`: a move
+    Gene confirms before Object uses it, and one that drops the stored secret."""
+    return endpoint_host(new_url) != endpoint_host(old_url) or _scheme(new_url) != _scheme(old_url)
+
+
 def _read_card(folder: Path) -> dict[str, Any]:
     """``card.json`` as a dict; ValueError when it can't be read. Never writes."""
     try:
@@ -311,6 +324,7 @@ def _remote_info(record: AgentRecord) -> dict[str, Any]:
     ep = _endpoint(d)
     url = _str(ep.get("url")) or ""
     kind, header_name = _auth_fields(d)
+    pending_url = _str(_pending_endpoint(d).get("url"))
     return {
         "cardUrl": _str(d.get("cardUrl")) or "",
         "endpointUrl": url,
@@ -319,6 +333,9 @@ def _remote_info(record: AgentRecord) -> dict[str, Any]:
         "streaming": d.get("streaming") is True,
         "auth": {"kind": kind, "headerName": header_name,
                  "set": kind != "none" and remotesecrets.is_set(record.id)},
+        "pendingEndpoint": (
+            {"url": pending_url, "host": endpoint_host(pending_url)} if pending_url else None
+        ),
         "card": _card_api(record),
         "cardFetchedAt": _str(d.get("cardFetchedAt")) or "",
         "contextNoticeAt": _str(d.get("contextNoticeAt")),
@@ -587,9 +604,9 @@ class AgentRegistry:
         try:
             parent = _resolve(location)
             if not parent.is_dir():
-                raise AgentNotFound(f"Not a folder: {parent}")  # our string, as Create space
+                raise AgentNotFound(f'"{parent}" isn\'t a folder.')  # our string, as Create space
         except (OSError, ValueError):
-            raise AgentNotFound(f"Not a folder: {str(location)[:60]!r}") from None
+            raise AgentNotFound(f'"{str(location)[:60]}" isn\'t a folder.') from None
         target = parent / stem
         self._check_nesting(target)
         try:
@@ -654,7 +671,7 @@ class AgentRegistry:
         inp = clean_input(inp)
         source = self.get(source_id)
         if source.missing:
-            raise AgentNotFound(f"This agent's folder is missing: {source.folder}")
+            raise AgentNotFound(f'This agent\'s folder "{source.folder}" is missing.')
         with _lock:
             src_off = source.data.get("toolsOff")
             src_off = [t for t in src_off if isinstance(t, str)] if isinstance(src_off, list) else default_off()
@@ -685,9 +702,9 @@ class AgentRegistry:
             folder = _resolve(path)
             is_dir = folder.is_dir()
         except (OSError, ValueError):
-            raise AgentNotFound(f"Not a folder: {str(path)[:60]!r}") from None
+            raise AgentNotFound(f'"{str(path)[:60]}" isn\'t a folder.') from None
         if not is_dir:
-            raise AgentNotFound(f"Not a folder: {folder}")
+            raise AgentNotFound(f'"{folder}" isn\'t a folder.')
         try:
             data, _ = agentfiles.read_agent_file(folder)
         except ValueError:
@@ -787,24 +804,56 @@ class AgentRegistry:
 
     def refresh_remote(self, agent_id: str, card: a2a.Card, card_raw: dict[str, Any], card_url: str) -> AgentRecord:
         """A card fetched again: ``card.json``, the endpoint, streaming and ``cardFetchedAt``. Gene's
-        name is kept. An endpoint whose host changed, or that went from https to http, removes the
-        secret, so a token never follows a card to a new host or onto an unencrypted line."""
+        name is kept. An endpoint on another host or scheme (`endpoint_moved`) is not switched to:
+        the stored endpoint stays, the secret is removed (so a token never follows a card to a new
+        host or onto an unencrypted line) and the new one waits in ``pendingEndpoint`` for
+        `confirm_endpoint` or `dismiss_endpoint` (Gene, 2026-11-08). A card back on the stored
+        host clears a pending move."""
         with _lock:
             rec = self._writable_remote(agent_id)
             data = dict(rec.data)
             old_url = _str(_endpoint(data).get("url")) or ""
-            old_host = endpoint_host(old_url)
             now = _now()
+            new_endpoint = {"url": card.endpoint_url, "protocolVersion": card.protocol_version,
+                            "binding": A2A_BINDING}
             data["cardUrl"] = card_url
-            data["endpoint"] = {"url": card.endpoint_url, "protocolVersion": card.protocol_version,
-                                "binding": A2A_BINDING}
+            if endpoint_moved(old_url, card.endpoint_url):
+                data["pendingEndpoint"] = new_endpoint
+                remotesecrets.remove(agent_id)
+            else:
+                data["endpoint"] = new_endpoint
+                data.pop("pendingEndpoint", None)
             data["streaming"] = card.streaming is True
             data["cardFetchedAt"] = now
             data["updatedAt"] = now
-            lost_tls = _scheme(old_url) == "https" and _scheme(card.endpoint_url) != "https"
-            if endpoint_host(card.endpoint_url) != old_host or lost_tls:
-                remotesecrets.remove(agent_id)
             atomic_write(rec.folder / CARD_FILE, dump_json(card_raw))
+            agentfiles.write_agent_file(rec.folder, data)
+            return self.get(agent_id)
+
+    def confirm_endpoint(self, agent_id: str) -> AgentRecord:
+        """Switch to the pending endpoint and clear it. `AgentInvalid` when nothing is pending."""
+        with _lock:
+            rec = self._writable_remote(agent_id)
+            pending = _pending_endpoint(rec.data)
+            if not _str(pending.get("url")):
+                raise AgentInvalid(NO_PENDING_ENDPOINT)
+            data = dict(rec.data)
+            data["endpoint"] = {"url": pending["url"], "protocolVersion": _str(pending.get("protocolVersion")) or "",
+                                "binding": A2A_BINDING}
+            data.pop("pendingEndpoint", None)
+            data["updatedAt"] = _now()
+            agentfiles.write_agent_file(rec.folder, data)
+            return self.get(agent_id)
+
+    def dismiss_endpoint(self, agent_id: str) -> AgentRecord:
+        """Forget the pending endpoint; the stored one stays. Nothing pending is left untouched."""
+        with _lock:
+            rec = self._writable_remote(agent_id)
+            if "pendingEndpoint" not in rec.data:
+                return rec
+            data = dict(rec.data)
+            data.pop("pendingEndpoint", None)
+            data["updatedAt"] = _now()
             agentfiles.write_agent_file(rec.folder, data)
             return self.get(agent_id)
 
@@ -826,7 +875,7 @@ class AgentRegistry:
     def _writable(self, agent_id: str) -> AgentRecord:
         rec = self.get(agent_id)
         if rec.missing:
-            raise AgentNotFound(f"This agent's folder is missing: {rec.folder}")
+            raise AgentNotFound(f'This agent\'s folder "{rec.folder}" is missing.')
         if rec.read_only_reason:
             raise AgentReadOnly(rec.read_only_reason)
         return rec

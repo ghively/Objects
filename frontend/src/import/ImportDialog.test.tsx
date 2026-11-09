@@ -749,6 +749,21 @@ describe('ImportDialog: target, progress and finish', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Disk full')
   })
 
+  test('test a failed import into a new space that was never made offers no Switch space', async () => {
+    mocked.importJob.mockResolvedValue(
+      job({ phase: 'failed', error: 'The location is not writable.', targetPath: '/home/gene/Spaces/Vault', result: null }),
+    )
+    const user = await previewVault()
+    await user.click(screen.getByRole('button', { name: T.import }))
+    expect(await screen.findByRole('heading', { name: T.failed })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('The location is not writable.')
+    expect(screen.queryByRole('button', { name: T.switchNow })).toBeNull()
+    expect(screen.queryByRole('button', { name: T.later })).toBeNull()
+    expect(screen.queryByText('/home/gene/Spaces/Vault')).toBeNull()
+    await user.click(screen.getAllByRole('button', { name: T.close })[0])
+    expect(useImportDialog.getState().isOpen).toBe(false)
+  })
+
   test('test a job the server forgot ends the wait', async () => {
     mocked.importJob.mockRejectedValue(new ApiError(404, 'unknown job'))
     const user = await previewVault()

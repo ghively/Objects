@@ -3,9 +3,11 @@ import {
   DEFAULT_REFERENCES_UI,
   loadReferencesUi,
   referencesKey,
+  referencesSettings,
   saveReferencesUi,
   splitAt,
   tabCount,
+  visibleTabs,
 } from './referencesUi'
 
 afterEach(() => {
@@ -58,6 +60,20 @@ describe('referencesUi', () => {
     expect(tabCount('relatedTags', d)).toBe(4)
     // relatedTags is not offered, so All leaves it out.
     expect(tabCount('all', d)).toBe(6)
+  })
+
+  // Settings > Editor offers Open | Closed for Backlinks and Related Content (the catalog); a
+  // device that stored "hidden" for them before that keeps its section, closed.
+  test('a stored "hidden" for Backlinks or Related Content reads as "closed"; Unlinked Mentions keeps Hidden', () => {
+    const s = referencesSettings({ backlinkSectionsDefault: { backlinks: 'hidden', relatedContent: 'hidden', unlinkedMentions: 'hidden' } })
+    expect(s.backlinkSectionsDefault).toEqual({ backlinks: 'closed', relatedContent: 'closed', unlinkedMentions: 'hidden' })
+    expect(visibleTabs(['all', 'backlinks', 'related', 'mentions'], s, 'page')).toEqual(['all', 'backlinks', 'related'])
+    // The two kept values still read as themselves.
+    expect(referencesSettings({ backlinkSectionsDefault: { backlinks: 'closed', relatedContent: 'open' } }).backlinkSectionsDefault).toEqual({
+      backlinks: 'closed',
+      relatedContent: 'open',
+      unlinkedMentions: 'open',
+    })
   })
 
   test('splitAt clamps the span', () => {

@@ -12,7 +12,7 @@ export const TASK_MANAGEMENT_TEXT = {
   description: 'Plan and track tasks right next to your notes.',
   hide: 'Hide Task Management',
   hideDescription:
-    "If you don't want to use tasks in Object, you can simply hide it. You are changing this setting for your active space, not for all spaces.", // our string
+    "If you don't want to use tasks in Object, you can hide them. You are changing this setting for your active space, not for all spaces.", // our string
   hideInfo:
     'Tasks you already made stay put. To remove them too, delete the Task type from this space.',
   customization: 'Task type settings',

@@ -14,6 +14,7 @@ vi.mock('@/references/ReferencesSection', () => ({ ReferencesSection: () => null
 import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { activeTab, currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { revealMenuLabel } from '@/lib/platformText'
 import { ObjectView } from './ObjectView'
 
 const mocked = vi.mocked(api)
@@ -40,6 +41,53 @@ beforeEach(() => {
 })
 
 describe('ObjectView … menu', () => {
+  test('the rows are in the catalog order and in sentence case', async () => {
+    const user = userEvent.setup()
+    render(<ObjectView path={PATH} mode="page" />)
+    await screen.findByText('Hello.')
+    await user.click(screen.getByRole('button', { name: 'More' }))
+    const menu = await screen.findByRole('menu')
+    // Every row, submenu trigger and checkbox row, without its key hint.
+    const labels = [...menu.querySelectorAll<HTMLElement>('[role^="menuitem"]')].map((el) => {
+      const copy = el.cloneNode(true) as HTMLElement
+      copy.querySelectorAll('[data-slot="dropdown-menu-shortcut"]').forEach((k) => k.remove())
+      return copy.textContent?.trim() ?? ''
+    })
+    expect(labels).toEqual([
+      'Open in new tab',
+      'Open in side panel',
+      revealMenuLabel(),
+      'Find in page',
+      'Use template',
+      'Pin to sidebar',
+      'Pin to...',
+      'Change type',
+      'Object type settings',
+      'Present',
+      'Export',
+      'Import',
+      'Version history',
+      'Text stats',
+      'Copy',
+      'Add to whiteboard',
+      'Add tags using AI',
+      'Fill empty properties using AI',
+      'Edit collections',
+      'Duplicate',
+      'Merge into object',
+      'Wide layout',
+      'Raw Markdown',
+      'Delete object',
+    ])
+    // The separators split the menu into its groups.
+    const groups: string[][] = [[]]
+    for (const el of menu.children) {
+      if (el.getAttribute('role') === 'separator') groups.push([])
+      else if (/^menuitem/.test(el.getAttribute('role') ?? '')) groups[groups.length - 1].push(el.textContent ?? '')
+    }
+    expect(groups.map((g) => g.length)).toEqual([12, 6, 3, 2, 1])
+  })
+
   test('test object menu offers Open in side panel', async () => {
     const user = userEvent.setup()
     useTabs.getState().open({ kind: 'object', path: 'Pages/Main.md' })

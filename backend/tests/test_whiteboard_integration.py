@@ -256,10 +256,10 @@ def test_change_type_refused_for_whiteboards(wb_dir: Path):
     _space, c, _events = _client(wb_dir)
     r = c.get("/api/object/change-type", params={"path": NETWORK, "typeId": "page"})
     assert r.status_code == 422
-    assert r.json()["detail"] == "The type of a Whiteboard object can't be changed"
+    assert r.json()["detail"] == "The type of a Whiteboard object can't be changed."
     r = c.get("/api/object/change-type", params={"path": ROUTER_A, "typeId": "whiteboard"})
     assert r.status_code == 422
-    assert r.json()["detail"] == "An object can't be changed to a Whiteboard"
+    assert r.json()["detail"] == "An object can't be changed to a Whiteboard."
 
 
 def test_watcher_announces_external_sidecar_change(wb_dir: Path):

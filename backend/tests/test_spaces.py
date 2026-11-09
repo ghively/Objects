@@ -164,6 +164,44 @@ def test_create_space_bad_location_404_bad_name_422(tmp_path: Path, state: Path)
     assert not (tmp_path / "nowhere").exists()
 
 
+def test_space_name_with_a_nul_is_refused(tmp_path: Path, state: Path):
+    """Sweep 2026-11-08: a NUL in the name was silently cut (``a\\x00b`` made the folder ``a``)."""
+    loc = _folder(tmp_path, "loc")
+    client = _client(_folder(tmp_path, "cur"))
+    resp = client.post("/api/spaces", json={"name": "a\x00b", "location": str(loc)})
+    assert resp.status_code == 422, resp.text
+    with pytest.raises(SpaceNameProblem):
+        create_space("a\x00b", loc)
+    assert list(loc.iterdir()) == []
+
+
+def test_relative_locations_and_paths_are_refused(tmp_path: Path, state: Path, monkeypatch):
+    """Sweep 2026-11-08: a relative location or path resolved against the server's working
+    folder (`location: "."` made a space inside the checkout; `open {"path": "."}` registered it)."""
+    cwd = tmp_path / "cwd"
+    (cwd / "inner" / ".object").mkdir(parents=True)
+    monkeypatch.chdir(cwd)
+    calls: list[Path] = []
+    client = _client(_folder(tmp_path, "cur"), on_switch=calls.append)
+    for rel in (".", "..", "./", "inner", "inner/", "cwd"):
+        resp = client.post("/api/spaces", json={"name": "N", "location": rel})
+        assert resp.status_code == 404, (rel, resp.text)
+        assert resp.json()["detail"] == "Choose a folder for the new space."
+        resp = client.post("/api/spaces/open", json={"path": rel})
+        assert resp.status_code == 404, (rel, resp.text)
+        assert resp.json()["detail"] == "Choose a folder by its full path."
+        resp = client.post("/api/spaces/switch", json={"path": rel})
+        assert resp.status_code == 404, (rel, resp.text)
+    assert calls == []
+    assert sorted(p.name for p in cwd.iterdir()) == ["inner"]
+    assert not (tmp_path / "N").exists() and not (cwd / "inner" / "N").exists()
+    registered = [i["path"] for i in Registry(state)._load()["spaces"]]
+    assert registered == []
+    # The same folders by their full paths are fine.
+    assert client.post("/api/spaces/open", json={"path": str(cwd / "inner")}).status_code == 200
+    assert client.post("/api/spaces", json={"name": "N", "location": str(cwd)}).status_code == 201
+
+
 # -- removing, opening, switching -------------------------------------------------
 
 
@@ -309,7 +347,7 @@ def test_startup_space_choice(tmp_path: Path, state: Path):
 def test_startup_main_refuses_missing_space(tmp_path: Path, state: Path, capsys):
     with pytest.raises(SystemExit):
         launcher.main(["--space", str(tmp_path / "nope")])
-    assert "Not a folder" in capsys.readouterr().err
+    assert "is not a folder." in capsys.readouterr().err
 
 
 def test_startup_parser_error_message(state: Path, capsys):

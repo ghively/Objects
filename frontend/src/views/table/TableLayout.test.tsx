@@ -110,6 +110,20 @@ describe('TableLayout', () => {
     expect(note?.colWidth).toBe(17)
   })
 
+  test('the live width while dragging stays within the 2 to 50 rem bounds', () => {
+    const onState = vi.fn()
+    render(<Harness onState={onState} />)
+    const header = screen.getByText('Note').closest('[role="columnheader"]')
+    fireEvent.mouseDown(screen.getByLabelText('Resize Note'), { clientX: 2100 })
+    fireEvent.mouseMove(document, { clientX: 100 })
+    expect(header).toHaveStyle({ width: '32px' })
+    fireEvent.mouseMove(document, { clientX: 6000 })
+    expect(header).toHaveStyle({ width: '800px' })
+    fireEvent.mouseUp(document)
+    const saved = onState.mock.calls[0][0] as ViewState
+    expect(saved.viewDefinition.tableConfigs?.page.properties.find((c) => c.id === 'note')?.colWidth).toBe(50)
+  })
+
   // Audit 2026-11-07 #45: a table unmounted mid-drag drops its document listeners.
   test('a resize under way when the table goes away leaves no listener behind', () => {
     const onState = vi.fn()

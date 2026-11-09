@@ -85,7 +85,7 @@ def test_ticket_fields_only(env: Env) -> None:
     assert "Work set Desk status to Resolved" in text
     version = env.space.read(PRINTER)[2]
     bad = call(good, path=PRINTER, version=version, values={"rank": 3})
-    assert bad.status_code == 422 and bad.json()["detail"] == "rank isn't a ticket field."
+    assert bad.status_code == 422 and bad.json()["detail"] == 'The field "rank" isn\'t a ticket field.'
     for purpose in ("work-read", "chat"):
         res = call(token(env, purpose), path=PRINTER, version=version, values={"deskStatus": "x"})
         assert res.status_code == 403

@@ -12,6 +12,12 @@ import { M7_SHORTCUTS, M8_SHORTCUTS, allShortcuts, isMacPlatform, keysFor, regis
 import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
 import { showToast } from './media/upload'
 import { blockSelectionKey } from './extensions/blockSelection'
+import { mergeTextBlocks } from './extensions/mergeTextBlocks'
+import { openBlockStyling } from './extensions/openBlockStyling'
+import { PasteAsPlainText, armPlainPaste } from './extensions/pasteAsPlainText'
+import { removeBlockStyles } from './extensions/removeBlockStyles'
+import { stepHierarchy } from './extensions/textHierarchy'
+import { toggleAllToggles } from './extensions/toggleAll'
 import { copyBlockReference } from './nodes/blockRef'
 import { runHighlightText } from './nodes/textStyle'
 import { turnIntoObject, turnIntoTask, turnTodoIntoTask } from './turnInto'
@@ -47,6 +53,16 @@ export function proseMirrorKey(spec: string, mac = isMacPlatform()): string {
 }
 
 /**
+ * The ProseMirror keys of one registry key: `AltCtrl` resolved, and a `=` key answers `+` too
+ * (the catalog's Ctrl+Plus is Ctrl+Shift+= on most layouts, where the key reads "+", or the
+ * numpad's own +).
+ */
+export function proseMirrorKeys(spec: string, mac = isMacPlatform()): string[] {
+  const key = proseMirrorKey(spec, mac)
+  return key.endsWith('-=') ? [key, `${key.slice(0, -1)}+`] : [key]
+}
+
+/**
  * A ProseMirror key map from shortcut ids to handlers, read from the registry
  * now. Two ids on one key run in order until one returns true.
  */
@@ -54,9 +70,10 @@ export function keymapFor(handlers: Record<string, () => boolean>): Record<strin
   const map: Record<string, () => boolean> = {}
   for (const [id, run] of Object.entries(handlers)) {
     for (const spec of keysFor(id)) {
-      const key = proseMirrorKey(spec)
-      const before = map[key]
-      map[key] = before ? () => before() || run() : run
+      for (const key of proseMirrorKeys(spec)) {
+        const before = map[key]
+        map[key] = before ? () => before() || run() : run
+      }
     }
   }
   return map
@@ -96,11 +113,20 @@ export function indentAtCursor(editor: Editor, dir: 1 | -1): boolean {
   return true
 }
 
-/** The editor's M8 key bindings, from the registry's keys. */
+/**
+ * The editor's M8 key bindings, from the registry's keys; and the 2026-11-08 sweep's editor
+ * keys (`pasteAsPlainText`, `toggleAllToggles`, `increaseTextHierarchy`, `decreaseTextHierarchy`,
+ * `mergeTextBlocks`, `removeBlockStyles`, `openBlockStyling`), whose extensions it brings along so
+ * the editor needs no other wiring.
+ */
 export const M8Keys = Extension.create({
   name: 'm8Keys',
   // After `BlockSelection` (900), before the built-in keymaps and the tables'.
   priority: 850,
+
+  addExtensions() {
+    return [PasteAsPlainText]
+  },
 
   addKeyboardShortcuts() {
     const editor = this.editor
@@ -113,6 +139,17 @@ export const M8Keys = Extension.create({
       turnIntoTask: () => runAction(() => turnIntoTask(editor)),
       turnBlockIntoTaskObject: () => runAction(() => turnTodoIntoTask(editor)),
       highlightText: () => runHighlightText(editor),
+      // Arms the next paste and lets the browser fire it (the key is not consumed).
+      pasteAsPlainText: () => {
+        armPlainPaste()
+        return false
+      },
+      toggleAllToggles: () => toggleAllToggles(editor),
+      increaseTextHierarchy: () => stepHierarchy(editor, 1),
+      decreaseTextHierarchy: () => stepHierarchy(editor, -1),
+      mergeTextBlocks: () => mergeTextBlocks(editor),
+      removeBlockStyles: () => removeBlockStyles(editor),
+      openBlockStyling: () => openBlockStyling(editor),
     })
   },
 })

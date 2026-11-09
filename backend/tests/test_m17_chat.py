@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -310,6 +311,42 @@ def test_stopped_turn_is_marked(space_dir: Path, fake) -> None:
     assert last["stopped"] is True and last["text"] == ""
 
 
+def test_second_turn_on_a_running_chat_is_refused(api, fake) -> None:
+    """Sweep 2026-11-08 (4): the same chat open in two tabs, both sending: the second turn gets
+    one ``error`` frame before any CLI starts, so the transcript keeps one question and one
+    answer in order instead of ``user, user, assistant, assistant``."""
+    _space, client, _published = api
+    chat_id = "01KAAAAAAAAAAAAAAAAAAAAAAA"
+    go = Path(str(fake["log"]) + ".go")
+    first: list = []
+
+    def turn_one() -> None:
+        first.extend(_chat(client, "First question FAKE:wait", chatId=chat_id))
+
+    t = threading.Thread(target=turn_one, daemon=True)
+    t.start()
+    try:
+        deadline = time.monotonic() + 20
+        while not _runs(fake["log"]) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert len(_runs(fake["log"])) == 1
+        second = _chat(client, "Second question", chatId=chat_id)
+    finally:
+        go.touch()
+        t.join(60)
+    assert second == [{"type": "error", "message": "This chat is still answering."}]
+    assert first[0] == {"type": "chat", "chatId": chat_id, "agentId": "assistant"}
+    assert first[-1]["type"] == "done"
+    assert len(_runs(fake["log"])) == 1  # no CLI started for the refused turn
+    t_items = transcripts.read(state_dir() / "agents" / "Assistant", chat_id)["items"]
+    assert [i["type"] for i in t_items] == ["user", "assistant"]
+    assert t_items[0]["text"] == "First question FAKE:wait"
+    # The chat is free again once the first turn ended.
+    third = _chat(client, "Third question", chatId=chat_id)
+    assert third[-1]["type"] == "done"
+    assert len(_runs(fake["log"])) == 2
+
+
 def test_unknown_or_missing_agent(api, fake, tmp_path: Path) -> None:
     _space, client, _ = api
     assert _chat(client, "Hi", agentId="01JC7ZK3T9Q4M2X8B5N6R1V0WE") == [
@@ -322,7 +359,7 @@ def test_unknown_or_missing_agent(api, fake, tmp_path: Path) -> None:
 
     shutil.rmtree(folder)
     assert _chat(client, "Hi", agentId=made["id"]) == [
-        {"type": "error", "message": f"This agent's folder is missing: {folder}"}]
+        {"type": "error", "message": f'This agent\'s folder "{folder}" is missing.'}]
     locked = _create(client, "Locked")
     (Path(locked["folder"]) / ".object-agent" / "agent.json").write_text("{", encoding="utf-8")
     assert _chat(client, "Hi", agentId=locked["id"]) == [

@@ -123,6 +123,9 @@ class RemoteAgentFile(BaseModel):
     endpoint: RemoteEndpoint
     streaming: bool
     auth: RemoteAuth
+    # A refreshed card's endpoint on another host (or scheme), kept here until Gene confirms the
+    # move (then it becomes `endpoint`) or dismisses it (Gene, 2026-11-08).
+    pendingEndpoint: RemoteEndpoint | None = None
     contextNoticeAt: str | None = None
     cardFetchedAt: str
     createdAt: str
@@ -164,6 +167,8 @@ def card_url_for(url: str) -> str:
     """The Agent Card URL for what Gene typed: a ``.json`` path is the card as is; anything else
     gets `CARD_PATH` at its host's root. Only http and https; raises `AgentInvalid`."""
     text = (url or "").strip()
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in text):  # urlsplit drops a tab; httpx refuses it
+        raise AgentInvalid("That isn't an http or https address.")
     try:
         parts = urlsplit(text)
         host = parts.hostname

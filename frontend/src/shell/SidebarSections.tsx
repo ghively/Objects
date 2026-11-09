@@ -1,5 +1,5 @@
 // Custom sidebar sections (such as "In Progress"): rendered above Pinned, each with its icon and
-// name as heading, the same items as Pinned, "Edit Section" / "Delete Section" on the heading and
+// name as heading, the same items as Pinned, "Edit section" / "Delete section" on the heading and
 // an "Add Section" control. M9: the top-level blocks (these sections, Pinned, the object types)
 // follow `ui.workspaceOrder` and are reordered by dragging.
 import { useEffect, useState, type ReactNode } from 'react'
@@ -29,10 +29,10 @@ import { showToast } from '@/editor/media/upload'
 import { enqueueUiSave, pendingUiSaves, reloadUi, SIDEBAR_SAVE_FAILED, usePinned, useUiStore } from './usePinned'
 
 export const SECTION_TEXT = {
-  add: 'Add Section',
+  add: 'Add section',
   addHint: 'Put pages and collections under a heading of your own in the sidebar.',
-  edit: 'Edit Section',
-  delete: 'Delete Section',
+  edit: 'Edit section',
+  delete: 'Delete section',
   name: 'Section Name',
   save: 'Save',
   cancel: 'Cancel',

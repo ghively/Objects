@@ -109,7 +109,7 @@ def router(ctx: ApiContext, engine: AutomationEngine) -> APIRouter:
     def get_rule(rule_id: str):
         lr = find(rule_id)
         if lr is None:
-            return _error(404, f"No automation {rule_id[:60]!r}")
+            return _error(404, f'There is no automation "{rule_id[:60]}".')
         return api_form(lr)
 
     @r.post("/automations", status_code=201)
@@ -124,11 +124,11 @@ def router(ctx: ApiContext, engine: AutomationEngine) -> APIRouter:
     @r.put("/automations/{rule_id}")
     def save_rule(rule_id: str, req: SaveRuleRequest):
         if find(rule_id) is None:
-            return _error(404, f"No automation {rule_id[:60]!r}")
+            return _error(404, f'There is no automation "{rule_id[:60]}".')
         try:
             lr = engine.save(rule_id, req.rule, req.baseRevision)
         except KeyError:
-            return _error(404, f"No automation {rule_id[:60]!r}")
+            return _error(404, f'There is no automation "{rule_id[:60]}".')
         except ReadOnly as exc:
             return _locked(exc.reason)
         except RevisionConflict as exc:
@@ -141,11 +141,11 @@ def router(ctx: ApiContext, engine: AutomationEngine) -> APIRouter:
     @r.delete("/automations/{rule_id}")
     def delete_rule(rule_id: str, clientId: str | None = Query(default=None)):
         if find(rule_id) is None:
-            return _error(404, f"No automation {rule_id[:60]!r}")
+            return _error(404, f'There is no automation "{rule_id[:60]}".')
         try:
             trash_id = engine.delete(rule_id)
         except KeyError:
-            return _error(404, f"No automation {rule_id[:60]!r}")
+            return _error(404, f'There is no automation "{rule_id[:60]}".')
         except ReadOnly as exc:
             return _locked(exc.reason)
         announce(ChangeEvent("automations", rule_id, None, origin=clientId))
@@ -154,7 +154,7 @@ def router(ctx: ApiContext, engine: AutomationEngine) -> APIRouter:
     @r.post("/automations/{rule_id}/run")
     def run_rule(rule_id: str, req: RunRequest):
         if find(rule_id) is None:
-            return _error(404, f"No automation {rule_id[:60]!r}")
+            return _error(404, f'There is no automation "{rule_id[:60]}".')
         try:
             return engine.run_button(rule_id, req.path)
         except RuleRefused as exc:
@@ -165,7 +165,7 @@ def router(ctx: ApiContext, engine: AutomationEngine) -> APIRouter:
     @r.get("/automations/{rule_id}/runs")
     def get_runs(rule_id: str, limit: int = Query(default=200, ge=1, le=200)):
         if find(rule_id) is None:
-            return _error(404, f"No automation {rule_id[:60]!r}")
+            return _error(404, f'There is no automation "{rule_id[:60]}".')
         return {"runs": engine.runs(rule_id, limit)}
 
     return r

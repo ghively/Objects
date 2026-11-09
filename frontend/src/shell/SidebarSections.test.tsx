@@ -90,11 +90,11 @@ describe('SidebarSections', () => {
     expect(within(later).getByText('No pinned content')).toBeInTheDocument()
   })
 
-  test('test Add Section then Pin to... adds the item to that section; Unpin from {section} removes it only there', async () => {
+  test('test Add section then Pin to... adds the item to that section; Unpin from {section} removes it only there', async () => {
     const user = userEvent.setup()
     stored.sections = []
     render(<Harness />)
-    await user.click(await screen.findByRole('button', { name: 'Add Section' }))
+    await user.click(await screen.findByRole('button', { name: 'Add section' }))
     await user.type(screen.getByRole('textbox', { name: 'Section Name' }), 'Hot')
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(stored.sections.map((s) => s.name)).toEqual(['Hot']))
@@ -114,12 +114,12 @@ describe('SidebarSections', () => {
     expect(stored.pinned).toEqual([{ kind: 'collection', id: 'tooling' }])
   })
 
-  test('test Edit Section renames and Delete Section keeps the items pinned elsewhere', async () => {
+  test('test Edit section renames and Delete section keeps the items pinned elsewhere', async () => {
     const user = userEvent.setup()
     stored.pinned.push({ kind: 'query', id: 'open' })
     render(<Sidebar types={[SERVER]} />)
     fireEvent.contextMenu(await screen.findByRole('heading', { name: 'In Progress' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Edit Section' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit section' }))
     const input = await screen.findByRole('textbox', { name: 'Section Name' })
     await user.clear(input)
     await user.type(input, 'Doing')
@@ -127,7 +127,7 @@ describe('SidebarSections', () => {
     await waitFor(() => expect(stored.sections[0].name).toBe('Doing'))
 
     fireEvent.contextMenu(await screen.findByRole('heading', { name: 'Doing' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete Section' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete section' }))
     await waitFor(() => expect(stored.sections).toEqual([]))
     expect(stored.pinned).toContainEqual({ kind: 'query', id: 'open' })
     expect(await screen.findAllByText('Open servers')).toHaveLength(1)
@@ -144,7 +144,7 @@ describe('SidebarSections', () => {
       </DropdownMenu>,
     )
     await user.click(screen.getByText('menu'))
-    await user.click(await screen.findByRole('menuitem', { name: 'Pin to Sidebar' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Pin to sidebar' }))
     await waitFor(() => expect(mocked.patchUi).toHaveBeenCalled())
     expect(mocked.ensureId).toHaveBeenCalledWith('Servers/Atlas.md')
     expect(mocked.ensureId.mock.invocationCallOrder[0]).toBeLessThan(mocked.patchUi.mock.invocationCallOrder[0])
@@ -168,7 +168,7 @@ describe('SidebarSections', () => {
     expect(screen.getByRole('button', { name: 'Trash' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create object type' })).toBeInTheDocument()
     fireEvent.contextMenu(screen.getByText('Servers'))
-    await user.click(await screen.findByRole('menuitem', { name: 'Object Type Settings' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Object type settings' }))
     expect(onOpenTypeSettings).toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Queries' }))
     expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'queries' }, { newTab: false })

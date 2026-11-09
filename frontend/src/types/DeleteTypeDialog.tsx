@@ -1,5 +1,5 @@
 /**
- * "Move this type to the trash?": moves the type, its objects, its templates and the saved queries of
+ * "Move this object type to the Trash?": moves the type, its objects, its templates and the saved queries of
  * only this type to the app's Trash (restorable for 30 days; other queries drop the type until
  * it is restored), so "This can't be undone." is not shown.
  */
@@ -19,10 +19,10 @@ import { Button } from '@/components/ui/button'
 import { invalidateLinkIndex } from '@/links/linkIndex'
 
 export const DELETE_TYPE_TEXT = {
-  title: 'Move this type to the trash?',
+  title: 'Move this object type to the Trash?',
   // The saved-queries part is our string (what a type delete does to queries is our choice).
   description:
-    'Moves the type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
+    'Moves the object type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
   action: 'Delete object type',
 }
 

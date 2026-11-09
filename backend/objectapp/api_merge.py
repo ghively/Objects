@@ -46,7 +46,7 @@ def router(ctx: ApiContext) -> APIRouter:
     @r.post("/object/merge")
     def post_merge(req: MergeRequest):
         if not req.confirm:
-            return _error(428, "Merging needs to be confirmed")
+            return _error(428, "Merging needs to be confirmed.")
         try:
             result = merge_objects(
                 space, req.source, req.target, req.sourceVersion, req.targetVersion, space.clock()
@@ -62,7 +62,7 @@ def router(ctx: ApiContext) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError) as exc:
-            return _error(404, f"No object at {exc.args[0] if exc.args else ''!r}")
+            return _error(404, f'There is no object at "{exc.args[0] if exc.args else ""}".')
         origin = req.clientId
         ctx.announce(ChangeEvent("changed", result.target, result.version, origin=origin))
         for path in result.relinked:

@@ -231,6 +231,42 @@ def test_rename_leaves_a_heading_inside_a_code_block_alone(space_dir: Path):
     assert body.endswith("\n# Beta\n\nText\n")
 
 
+def test_rename_leaves_links_inside_an_indented_code_block_alone(space_dir: Path):
+    # Sweep 2026-11-08: a four-space (or tab) indented block after a blank line is code, as the
+    # editor shows it; a line indented inside a list item or continuing a paragraph is not.
+    ref = space_dir / "Pages" / "Ref.md"
+    ref.write_bytes(
+        b"---\ntype: 'Page'\ntitle: Ref\n---\n\n"
+        b"Syntax:\n\n    [[Ada Lovelace]] stays\n    second line [[Ada Lovelace]]\n\n"
+        b"\t[[Ada Lovelace]] tab stays\n\n"
+        b"- item\n\n    [[Ada Lovelace]] in the item\n\n"
+        b"Paragraph\n    [[Ada Lovelace]] continues it\n\n"
+        b"Done [[Ada Lovelace]].\n"
+    )
+    space = Space(space_dir)
+    before = ref.read_bytes()
+    result = _rename_ada(space)
+    assert "Pages/Ref.md" in result.relinked
+
+    body = ref.read_text(encoding="utf-8").split("---\n", 2)[2]
+    assert "    [[Ada Lovelace]] stays\n    second line [[Ada Lovelace]]\n" in body
+    assert "\t[[Ada Lovelace]] tab stays\n" in body
+    assert "    [[Ada King]] in the item\n" in body
+    assert "    [[Ada King]] continues it\n" in body
+    assert body.endswith("Done [[Ada King]].\n")
+    removed, _added = _changed_lines(before, ref.read_bytes())
+    assert len(removed) == 3
+
+
+def test_wikilink_helpers_skip_indented_code():
+    text = "Intro\n\n    [[Code]]\n\nText [[Plain]]\n"
+    assert wikilink_targets(text) == {"Plain"}
+    rewritten = replace_wikilinks(text, lambda _t: True, "New")
+    assert rewritten == "Intro\n\n    [[Code]]\n\nText [[New]]\n"
+    # The first line of a text can open an indented block too.
+    assert wikilink_targets("    [[Code]]\n[[Plain]]\n") == {"Plain"}
+
+
 @pytest.mark.parametrize(
     ("title", "stem"),
     [("Ada [x]", "Ada x"), ("Ada #1", "Ada 1"), ("Ada|B", "Ada"), ("Ada: K's #1", "Ada")],

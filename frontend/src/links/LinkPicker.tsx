@@ -169,6 +169,13 @@ export function LinkPicker() {
     // No recents and no types to browse: the first few objects, as before.
     return head.length ? head : fuzzyMatch('', objects).map((o) => ({ kind: 'object' as const, o }))
   }, [query, objects, types, typeFilter, recentPaths])
+
+  // The list shows about eight rows: keep the active one in view as the arrow keys move it.
+  const listRef = useRef<HTMLUListElement | null>(null)
+  useEffect(() => {
+    const row = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (row && typeof row.scrollIntoView === 'function') row.scrollIntoView({ block: 'nearest' })
+  }, [active, open])
   // Under the caret (the picker's range start); centred when the editor can't say.
   const anchor = useRef({
     getBoundingClientRect: () => new DOMRect(0, 0, 0, 0),
@@ -281,7 +288,7 @@ export function LinkPicker() {
             className="h-11 min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-fg-muted"
           />
         </div>
-        <ul role="listbox" aria-label="Objects" className="max-h-[320px] overflow-auto p-1.5">
+        <ul ref={listRef} role="listbox" aria-label="Objects" className="max-h-[320px] overflow-auto p-1.5">
           {rows.length === 0 && <li className="px-3 py-2 text-fg-muted italic">No matching objects</li>}
           {rows.map((row, i) => {
             const type = row.kind === 'object' ? typeOf(row.o.type) : row.t

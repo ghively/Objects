@@ -1,4 +1,4 @@
-// Polish item 8: the Object Types header `...` menu (Sort Manually | Sort Alphabetically) and drag
+// Polish item 8: the Object Types header `...` menu (Sort manually | Sort alphabetically) and drag
 // reordering of the types in manual mode, saved to `ui.objectsSectionSortOption` and
 // `ui.workspace.objects.ids`.
 import { act, render, screen, waitFor } from '@testing-library/react'
@@ -86,12 +86,13 @@ describe('Object Types sort', () => {
     await waitFor(() => expect(rows()).toEqual(['a', 'b', 'queries', 'z']))
     await user.click(screen.getByRole('button', { name: TYPES_MENU_LABEL }))
     const manual = await screen.findByRole('menuitemcheckbox', { name: SORT_MANUALLY })
+    expect([SORT_MANUALLY, SORT_ALPHABETICALLY]).toEqual(['Sort manually', 'Sort alphabetically'])
     const alpha = screen.getByRole('menuitemcheckbox', { name: SORT_ALPHABETICALLY })
     expect(manual).toHaveAttribute('aria-checked', 'false')
     expect(alpha).toHaveAttribute('aria-checked', 'true')
   })
 
-  test('Sort Manually keeps the shown order and saves it', async () => {
+  test('Sort manually keeps the shown order and saves it', async () => {
     const user = userEvent.setup()
     render(<Sidebar types={[Z, A, B]} />)
     await waitFor(() => expect(rows()).toEqual(['a', 'b', 'queries', 'z']))

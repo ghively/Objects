@@ -10,7 +10,10 @@ operator, elements}`` with ``{type: 'filter', propertyId, option, referenceValue
 over a row's decoded values. It covers the text, number, checkbox, list (labels,
 relations, tags) and plain date operators of ``frontend/src/views/filter.ts``. An
 operator it doesn't know is reported in ``unsupported`` and the filter is skipped
-(the app's own rule for an invalid filter: it passes).
+(the app's own rule for an invalid filter: it passes). A saved query's label, tag and
+relation filters hold ids (an option id, a Tag object's id, an object id) where the rows
+carry texts: `resolve_saved_filters` turns them into the texts first, as the app's
+engine does, and names the ids that resolve to nothing.
 
 **Sections.** A section is a heading line and everything after it up to the next
 heading of the same or a higher level. Fenced code is not scanned for headings.
@@ -20,8 +23,11 @@ body's line endings.
 
 from __future__ import annotations
 
+import calendar
+import copy
 import re
-from datetime import date, datetime, timedelta
+from collections.abc import Mapping
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 __all__ = [
@@ -30,8 +36,11 @@ __all__ = [
     "append_to_section",
     "is_excluded",
     "outline",
+    "parse_since",
     "read_section",
     "replace_section",
+    "resolve_saved_filters",
+    "sort_rows",
 ]
 
 EXCLUDE_TAG = "exclude from ai"
@@ -62,6 +71,9 @@ def is_excluded(fm: dict | None, tags: list[str] | None) -> bool:
 # -- filters -------------------------------------------------------------------------
 
 
+_WIKI_RE = re.compile(r"^\[\[([^\[\]|]*)(?:\|[^\[\]]*)?\]\]$")
+
+
 def _text_of(value: Any) -> str:
     if value is None:
         return ""
@@ -73,15 +85,26 @@ def _text_of(value: Any) -> str:
         return ""
     if isinstance(value, list):
         return ", ".join(_text_of(v) for v in value)
-    return str(value)
+    text = str(value)
+    # A tag or relation stored as a wiki link (``[[Urgent]]``) is the title it names.
+    m = _WIKI_RE.match(text.strip())
+    return m.group(1).strip() if m else text
 
 
 def _items(value: Any) -> list[str]:
+    """The texts a list value can be matched by: a relation's target title and its path both."""
     if value is None or value == "":
         return []
-    if isinstance(value, list):
-        return [_text_of(v).casefold() for v in value if _text_of(v) != ""]
-    return [_text_of(value).casefold()]
+    if not isinstance(value, list):
+        return [_text_of(value).casefold()]
+    out: list[str] = []
+    for v in value:
+        text = _text_of(v)
+        if text != "":
+            out.append(text.casefold())
+        if isinstance(v, dict) and isinstance(v.get("path"), str) and v["path"]:
+            out.append(v["path"].casefold())
+    return out
 
 
 def _ref_items(ref: Any) -> list[str]:
@@ -122,12 +145,26 @@ def _day(text: str | None) -> date | None:
         return None
 
 
-class Matcher:
-    """Matches rows against one filter group, relative to `today`."""
+def _add_months(d: date, n: int) -> date:
+    """Calendar-month arithmetic that clamps the day (Mar 31 minus one month is Feb 28),
+    as ``views/dates.ts`` ``addMonths`` does."""
+    month0 = d.year * 12 + (d.month - 1) + n
+    year, month = divmod(month0, 12)
+    month += 1
+    return date(year, month, min(d.day, calendar.monthrange(year, month)[1]))
 
-    def __init__(self, group: dict | None, today: date) -> None:
+
+class Matcher:
+    """Matches rows against one filter group, relative to `today`.
+
+    ``week_start`` ('monday' or 'sunday') is the space's "Start of the week" setting
+    (``ui.json`` ``calendar.weekStart``, `recurrence.week_start_of`): "this week" starts on it.
+    """
+
+    def __init__(self, group: dict | None, today: date, week_start: str = "monday") -> None:
         self.group = group if isinstance(group, dict) else None
         self.today = today
+        self.week_start = week_start
         self.unsupported: set[str] = set()
 
     def matches(self, values: dict[str, Any]) -> bool:
@@ -161,10 +198,15 @@ class Matcher:
                 return t + timedelta(days=1), t + timedelta(days=1)
             if rel == "oneWeekAgo":
                 return t - timedelta(days=7), t - timedelta(days=7)
-            if rel == "oneWeekFromNow":
+            if rel in ("inOneWeek", "oneWeekFromNow"):  # the app's name, and this API's older one
                 return t + timedelta(days=7), t + timedelta(days=7)
+            if rel == "oneMonthAgo":
+                return _add_months(t, -1), _add_months(t, -1)
+            if rel == "inOneMonth":
+                return _add_months(t, 1), _add_months(t, 1)
             if rel == "thisWeek":
-                start = t - timedelta(days=t.weekday())
+                back = (t.weekday() + 1) % 7 if self.week_start == "sunday" else t.weekday()
+                start = t - timedelta(days=back)
                 return start, start + timedelta(days=6)
             if rel == "thisMonth":
                 start = t.replace(day=1)
@@ -246,6 +288,76 @@ class Matcher:
         return True
 
 
+_ID_KINDS = frozenset({"label", "entity", "entity_backlinks", "entity_tags"})
+
+
+def _property_of(types: list[Any], key: str) -> Any | None:
+    """The first definition (over the query's types) whose id, then key, is `key`."""
+    for by_key in (False, True):
+        for t in types:
+            for p in getattr(t, "propertyDefinitions", None) or []:
+                if (p.key if by_key else p.id) == key:
+                    return p
+    return None
+
+
+def resolve_saved_filters(
+    group: dict | None,
+    types: list[Any],
+    tag_titles: Mapping[str, str],
+    paths_by_id: Mapping[str, str],
+) -> tuple[dict | None, list[str]]:
+    """A saved query's filter group with its reference ids turned into the texts the rows
+    carry: a label option id into the option's text, a Tag object's id into the tag's
+    title, an object id into its path (``views/filter.ts`` does the same with
+    ``options.set``, ``ctx.tagIdsToTitles`` and ``ctx.pathsById``).
+
+    Returns the resolved copy and the filters whose ids name nothing (``"status is o9"``):
+    those keep their ids, so they match no row, and the caller lists them as unsupported.
+    """
+    if not isinstance(group, dict):
+        return group, []
+    out = copy.deepcopy(group)
+    unresolved: list[str] = []
+
+    def lookup(p: Any) -> Mapping[str, str]:
+        if p.type == "label":
+            options = p.options.get("set") if isinstance(p.options, dict) else None
+            return {
+                str(o["id"]): str(o.get("text") or "")
+                for o in (options or [])
+                if isinstance(o, dict) and o.get("id") is not None
+            }
+        if p.type == "entity_tags":
+            return tag_titles
+        return paths_by_id
+
+    def walk(g: dict) -> None:
+        for e in g.get("elements") or []:
+            if not isinstance(e, dict):
+                continue
+            if e.get("type") == "filterGroup":
+                walk(e)
+                continue
+            key, ref = e.get("propertyId"), e.get("referenceValue")
+            if not isinstance(key, str) or ref is None or isinstance(ref, (dict, bool)):
+                continue
+            p = _property_of(types, key)
+            if p is None or p.type not in _ID_KINDS:
+                continue
+            table = lookup(p)
+            ids = ref if isinstance(ref, list) else [ref]
+            found = [table[str(i)] for i in ids if str(i) in table]
+            if not found:
+                if ids:
+                    unresolved.append(f"{key} {e.get('option')} {', '.join(str(i) for i in ids)}")
+                continue
+            e["referenceValue"] = found if isinstance(ref, list) else found[0]
+
+    walk(out)
+    return out, unresolved
+
+
 def sort_rows(rows: list[Any], key: str | None, descending: bool) -> list[Any]:
     """Rows sorted by one value (empty values last), then by title."""
     if not key:
@@ -264,15 +376,22 @@ def sort_rows(rows: list[Any], key: str | None, descending: bool) -> list[Any]:
 
 
 def parse_since(text: str | None) -> str | None:
-    """An ISO instant or day as a comparable ``YYYY-MM-DDTHH:MM:SS`` prefix, else None."""
+    """An ISO instant or day as a comparable UTC ``YYYY-MM-DDTHH:MM:SS`` prefix, else None.
+
+    The stored stamps are UTC, so an instant with an offset is moved to UTC first; a naive
+    one is read as UTC.
+    """
     if not text:
         return None
     try:
         if len(text) == 10:
             return date.fromisoformat(text).isoformat()
-        return datetime.fromisoformat(text.replace("Z", "+00:00")).strftime("%Y-%m-%dT%H:%M:%S")
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
         return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(UTC)
+    return dt.strftime("%Y-%m-%dT%H:%M:%S")
 
 
 # -- sections ------------------------------------------------------------------------

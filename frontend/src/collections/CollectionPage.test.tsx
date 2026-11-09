@@ -157,6 +157,10 @@ describe('CollectionPage', () => {
   test('shows the empty state for an empty collection', async () => {
     setup(TOOLING(), [])
     render(<CollectionPage id="tooling" />)
-    expect(await screen.findByText('Nothing in this collection yet. Add a new record or existing content.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing in this collection yet. Add a new object or an existing one.')).toBeInTheDocument()
+    // Catalog: a "+ New object" row (sentence case, Gene 2026-11-08); "object" is the one word for what a collection holds.
+    expect(screen.getByRole('button', { name: 'New object' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Add existing' }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: 'Create entry' })).toBeNull()
   })
 })

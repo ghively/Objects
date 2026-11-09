@@ -82,14 +82,14 @@ describe('ObjectView AI entries (M10)', () => {
     const user = userEvent.setup()
     const view = render(<ObjectView path={PATH} mode="peek" />)
     await screen.findByText('Hello.')
-    expect(screen.queryByRole('button', { name: 'Enter Focus Mode' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Enter focus mode' })).toBeNull()
     await user.click(screen.getByRole('button', { name: OBJECT_AI_TEXT.peek }))
     expect(useAi.getState().pending?.seed).toEqual({ mode: 'chat', contextPaths: [PATH] })
     view.unmount()
 
     render(<ObjectView path={PATH} mode="page" />)
     await screen.findByText('Hello.')
-    expect(screen.getByRole('button', { name: 'Enter Focus Mode' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Enter focus mode' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: OBJECT_AI_TEXT.peek })).toBeNull()
   })
 

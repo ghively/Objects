@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import type { Filter } from '@/api/types'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
-import { DATE_RELATIVE_OPTIONS, dateSpan, resolveRelative } from './dates'
+import { DATE_RELATIVE_OPTIONS, dateSpan, resolveRelative, type WeekStart } from './dates'
 import { matchFilter } from './filter'
 import { groupRows } from './group'
 
@@ -71,9 +71,19 @@ describe('dates', () => {
     expect(resolveRelative('overdue', now).end.getDate()).toBe(22)
   })
 
-  test('week starts on Monday even when now is a Sunday', () => {
+  test('this week follows the week start: Monday by default, Sunday when the setting says so', () => {
     const sunday = new Date(2026, 9, 25, 9)
-    expect(ymd(resolveRelative('thisWeek', sunday).start)).toBe('2026-10-19')
+    const span = (ws?: WeekStart) => {
+      const { start, end } = resolveRelative('thisWeek', sunday, ws)
+      return `${ymd(start)}..${ymd(end)}`
+    }
+    expect(span()).toBe('2026-10-19..2026-10-25')
+    expect(span('monday')).toBe('2026-10-19..2026-10-25')
+    expect(span('sunday')).toBe('2026-10-25..2026-10-31')
+    // A Sunday-start week seen from its Saturday starts on the Sunday before.
+    const saturday = new Date(2026, 9, 31, 9)
+    expect(ymd(resolveRelative('thisWeek', saturday, 'sunday').start)).toBe('2026-10-25')
+    expect(ymd(resolveRelative('thisWeek', saturday, 'monday').start)).toBe('2026-10-26')
   })
 
   test('month arithmetic clamps the day', () => {

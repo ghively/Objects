@@ -3,6 +3,7 @@ import { TextSelection } from '@tiptap/pm/state'
 import { afterEach, describe, expect, test } from 'vitest'
 import { allShortcuts, keysFor, registerShortcuts } from '@/lib/shortcuts'
 import { editorExtensions, loadBody, serializeBody } from './document'
+import { OPEN_BLOCK_MENU_EVENT, type OpenBlockMenuDetail } from './extensions/openBlockStyling'
 import { EDITOR_SHORTCUT_IDS, EDITOR_SHORTCUTS, keymapFor, proseMirrorKey } from './shortcuts'
 
 const editors: TiptapEditor[] = []
@@ -61,7 +62,8 @@ describe('editor shortcuts', () => {
       moveDownBlockWithCursor: ['Alt-ArrowDown'],
       moveUpBlockWithCursorOnSameLevel: ['Alt-Shift-ArrowUp'],
       moveDownBlockWithCursorOnSameLevel: ['Alt-Shift-ArrowDown'],
-      toggleToggleInBlockWithCursor: ['Mod-Enter', 'Mod-Shift-Enter'],
+      toggleToggleInBlockWithCursor: ['Mod-Enter', 'Mod-Shift-Enter', 'Mod-ArrowUp', 'Mod-ArrowDown'],
+      underline: [],
     }
     for (const [id, keys] of Object.entries(EXPECTED)) expect(keysFor(id), id).toEqual(keys)
     const registered = new Map(allShortcuts().map((d) => [d.id, d]))
@@ -74,7 +76,7 @@ describe('editor shortcuts', () => {
     }
     // the catalogued names
     expect(registered.get('heading1')!.name).toBe('Make the selected blocks heading 1')
-    expect(registered.get('mathToken')!.name).toBe('Format as TeX-formula')
+    expect(registered.get('mathToken')!.name).toBe('Format as TeX formula')
     expect(registered.get('insertBlockBelow')!.name).toBe('New block below, with the cursor in it')
     expect(registered.get('moveUpBlockWithCursor')!.name).toBe('Move active block up')
     expect(registered.get('moveSelectedBlocksUpOnSameLevel')!.name).toBe('Shift the selected blocks up among their siblings')
@@ -83,9 +85,9 @@ describe('editor shortcuts', () => {
   test('editor shortcuts come from the registry and a changed key takes effect', () => {
     const original = allShortcuts().find((d) => d.id === 'textAlignCenter')!
     try {
-      // Text alignment has no key.
+      // Text alignment has no key (Ctrl+Shift+R is bound to nothing; Ctrl+Shift+E is now "Open block styling").
       let editor = headless('Hello\n\nWorld\n')
-      expect(press(editor, 'e', { ctrl: true, shift: true })).toBe(false)
+      expect(press(editor, 'r', { ctrl: true, shift: true })).toBe(false)
       expect(serializeBody(editor)).toBe('Hello\n\nWorld\n')
 
       // A key added in the registry: a new editor uses it.
@@ -161,6 +163,19 @@ describe('editor shortcuts', () => {
     expect(proseMirrorKey('Mod-AltCtrl-l', false)).toBe('Mod-Alt-l')
     expect(proseMirrorKey('Mod-AltCtrl-l', true)).toBe('Mod-Ctrl-l')
     expect(proseMirrorKey('Alt-ArrowUp', true)).toBe('Alt-ArrowUp')
+  })
+
+  test('Ctrl+Shift+E (Open block styling) asks the handles overlay for the block menu of the cursor block', () => {
+    const editor = headless('Hello\n\nWorld\n')
+    const asked: number[] = []
+    editor.view.dom.addEventListener(OPEN_BLOCK_MENU_EVENT, (e) => asked.push((e as CustomEvent<OpenBlockMenuDetail>).detail.pos))
+    expect(press(editor, 'e', { ctrl: true, shift: true })).toBe(true)
+    expect(asked).toEqual([0])
+    expect(serializeBody(editor)).toBe('Hello\n\nWorld\n')
+    // Not in a read-only editor.
+    editor.setEditable(false)
+    expect(press(editor, 'e', { ctrl: true, shift: true })).toBe(false)
+    expect(asked).toEqual([0])
   })
 
   test('Mod-Shift-b is the shortcuts menu, not a quote', () => {

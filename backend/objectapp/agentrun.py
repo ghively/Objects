@@ -44,6 +44,7 @@ import re
 import shutil
 import sys
 import tempfile
+import threading
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -82,8 +83,11 @@ __all__ = [
     "fence_rules",
     "fill_refs",
     "nesting_problem",
+    "register_run_pid",
     "rule_path",
     "run_base_env",
+    "running_run_pids",
+    "unregister_run_pid",
 ]
 
 CLI_FLAGS = (
@@ -347,11 +351,21 @@ def fence_rules(folders: list[Path], own: Path, state: Path, home: Path) -> list
         rules += [f"Read({s}/{sub}/**)", f"Edit({s}/{sub}/**)"]
     h = rule_path(Path(home).resolve())
     rules += [f"Read({h}/.claude/.credentials.json)", f"Edit({h}/.claude/**)", f"Edit({h}/.claude.json)"]
+    rules += _cli_file_reads(f"{h}/.claude", f"{h}/.claude.json")
     out: list[str] = []
     for r in rules:
         if r not in out:
             out.append(r)
     return out
+
+
+def _cli_file_reads(config: str, claude_json: str) -> list[str]:
+    """The ``Read`` denies for the CLI's own files under a config folder (rule form): every run's
+    session (the prompt, each tool input and result: the space text that agent read) and the
+    user's own coding sessions under ``projects/``, and the config files (an ``env`` block or a
+    user-level MCP server may hold a key). The CLI reads these itself, not through the Read tool."""
+    return [f"Read({config}/projects/**)", f"Read({config}/settings.json)",
+            f"Read({config}/settings.local.json)", f"Read({claude_json})"]
 
 
 def nesting_problem(own: Path, folders: list[Path], message: str = NESTED_MESSAGE) -> str | None:
@@ -509,7 +523,7 @@ def _fence(scope: RunScope, parts: RunParts) -> None:
     if config is not None:  # as ~/.claude's: the login and the user's Claude Code files
         for form in _both_forms(config):
             c = rule_path(form)
-            rules += [f"Read({c}/.credentials.json)", f"Edit({c}/**)"]
+            rules += [f"Read({c}/.credentials.json)", f"Edit({c}/**)", *_cli_file_reads(c, f"{c}/.claude.json")]
     for rule in rules:
         if rule not in parts.deny_rules:
             parts.deny_rules.append(rule)
@@ -668,3 +682,26 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
         run_settings=settings,
         append=append,
     )
+
+
+# -- the running runs (the run fence, `runfence`) -----------------------------------------------
+
+_RUN_PIDS: set[int] = set()
+_RUN_PIDS_LOCK = threading.Lock()
+
+
+def register_run_pid(pid: int) -> None:
+    """Note a started run's root process (the CLI) until `unregister_run_pid`."""
+    with _RUN_PIDS_LOCK:
+        _RUN_PIDS.add(pid)
+
+
+def unregister_run_pid(pid: int) -> None:
+    with _RUN_PIDS_LOCK:
+        _RUN_PIDS.discard(pid)
+
+
+def running_run_pids() -> frozenset[int]:
+    """The root process ids of the runs going on right now."""
+    with _RUN_PIDS_LOCK:
+        return frozenset(_RUN_PIDS)

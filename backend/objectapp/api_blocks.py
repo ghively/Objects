@@ -112,7 +112,7 @@ def router(ctx: ApiContext) -> APIRouter:
         except ValueError as exc:
             return _error(400, str(exc))
         if not (space.root / rel).is_file():
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         return rel
 
     @r.get("/block")
@@ -123,10 +123,10 @@ def router(ctx: ApiContext) -> APIRouter:
         try:
             of, _fm, version = space.read(rel)
         except (KeyError, OSError):
-            return _error(404, f"No object at {path!r}")
+            return _error(404, f'There is no object at "{path}".')
         markdown = block_markdown(of.body, id)
         if markdown is None:
-            return _error(404, f"No block {id!r} in {path!r}")
+            return _error(404, f'There is no block "{id}" in "{path}".')
         from .searchtext import display_safe
 
         return {"path": rel, "id": id, "markdown": display_safe(markdown), "version": version}

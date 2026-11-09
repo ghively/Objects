@@ -230,7 +230,7 @@ def _test_route_shapes(env: Env) -> None:
     bad = e.c.post("/api/work/fields", json={
         "path": BADGE, "baseVersion": res.json()["version"], "set": {"status": "Done"},
     })
-    assert bad.status_code == 422 and bad.json()["detail"] == "status isn't a work field."
+    assert bad.status_code == 422 and bad.json()["detail"] == 'The field "status" isn\'t a work field.'
 
     # Notes.
     e.published.clear()

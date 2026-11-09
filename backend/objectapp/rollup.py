@@ -127,7 +127,7 @@ def calculate(calc: str, values: list[Any], tz: tzinfo) -> Any:
         if a.is_day and b.is_day:
             return (b.start - a.start).days  # type: ignore[operator]
         return _r10((b.instant(tz) - a.instant(tz)).total_seconds() / 86400)
-    raise FormulaError(f"Unknown calculation {calc!r}")
+    raise FormulaError(f'Unknown calculation "{calc}".')
 
 
 def rollup_value(c: Computer, obj: Obj, p: PropertyDefinition) -> Any:
@@ -139,7 +139,7 @@ def rollup_value(c: Computer, obj: Obj, p: PropertyDefinition) -> Any:
     if not isinstance(rel_id, str) or not rel_id or not isinstance(target_id, str) or not target_id:
         return None
     if calc not in ROLLUP_CALCS:
-        raise FormulaError(f"Unknown calculation {calc!r}")
+        raise FormulaError(f'Unknown calculation "{calc}".')
     rel = c.prop_by_id(obj.t, rel_id)
     if rel is None or rel.type != "entity":
         # Only a type file stored that way gets here (saving refuses it): empty, like no relation.

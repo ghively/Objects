@@ -29,7 +29,7 @@ export const ROW_MENU_TEXT = {
   copyReference: 'Copy object reference',
   copied: 'Link to object copied',
   duplicate: 'Duplicate',
-  delete: 'Delete Object',
+  delete: 'Delete object',
 }
 
 /** What a row's menu needs from its view. */

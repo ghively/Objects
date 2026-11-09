@@ -48,6 +48,7 @@ __all__ = [
     "create_space",
     "delete_space",
     "folder_token",
+    "is_full_path",
     "normalize",
 ]
 
@@ -103,6 +104,14 @@ def normalize(path: Path | str) -> Path:
     if any(_component_too_long(part) for part in text.replace("\\", "/").split("/")):
         raise ValueError(f"path component too long: {text[:60]!r}")
     return Path(text).resolve()
+
+
+def is_full_path(path: Path | str) -> bool:
+    """Whether `path` (``~`` expanded) is absolute. The spaces routes take only full paths:
+    a relative one would be read against the server's working folder, which is nothing
+    the user chose (sweep 2026-11-08)."""
+    text = str(path).strip()
+    return bool(text) and Path(os.path.expanduser(text)).is_absolute()
 
 
 def _key(path: Path | str) -> str:
@@ -268,6 +277,8 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     name = name.strip()
     if len(name) > MAX_NAME_LENGTH:
         raise SpaceNameProblem(f"A space name can have at most {MAX_NAME_LENGTH} characters.")
+    if "\x00" in name:  # `safe_filename` would cut the name there, silently
+        raise SpaceNameProblem("A space name can't contain a NUL character.")
     try:
         parent = normalize(location)
         if not parent.is_dir():
@@ -350,7 +361,7 @@ def _move_to_trash(path: Path) -> None:
     fake = os.environ.get(FAKE_TRASH_ENV)
     if fake:
         if fake == "unavailable":
-            raise TrashUnavailable("The trash is not available.")
+            raise TrashUnavailable("The Trash is not available.")
         bin_dir = state_dir() / "fake-trash"
         bin_dir.mkdir(parents=True, exist_ok=True)
         dest, n = bin_dir / path.name, 2
@@ -366,13 +377,19 @@ def _move_to_trash(path: Path) -> None:
     try:
         send2trash(str(path))
     except TrashPermissionError as exc:
-        raise TrashUnavailable(str(exc) or "The trash is not available.") from exc
+        raise TrashUnavailable(_trash_unavailable(exc)) from exc
     except FileNotFoundError:
         raise
     except OSError as exc:
         if path.exists():  # nothing (or only part) was moved: the trash can't take it
-            raise TrashUnavailable(str(exc) or "The trash is not available.") from exc
+            raise TrashUnavailable(_trash_unavailable(exc)) from exc
         raise
+
+
+def _trash_unavailable(exc: OSError) -> str:
+    """The 428's one sentence: ``The Trash is not available.`` plus the OS reason when it has one."""
+    reason = (exc.strerror or str(exc) or "").strip().rstrip(".")
+    return f"The Trash is not available: {reason}." if reason else "The Trash is not available."
 
 
 def _before_permanent_delete(path: Path) -> None:
@@ -407,14 +424,14 @@ def delete_space(
     try:
         target = normalize(path)
     except ValueError as exc:
-        raise SpaceNotFound(f"Not a space folder: {str(path)[:60]!r}") from exc
+        raise SpaceNotFound(f'"{str(path)[:60]}" is not a space folder.') from exc
     if current is not None:
         cur = normalize(current)
         if _within(cur, target) or _within(target, cur):
             raise SpaceIsCurrent("This space is open. Switch to another space first.")
     registered = {_key(i["path"]) for i in reg._load()["spaces"]}
     if _key(target) not in registered or not _is_space_folder(target):
-        raise SpaceNotFound(f"Not a space folder: {target}")
+        raise SpaceNotFound(f'"{target}" is not a space folder.')
     if not permanent:
         try:
             _move_to_trash(target)
@@ -429,7 +446,7 @@ def delete_space(
     before = _identity(target)
     if folder is not None and folder != f"{before[0]}:{before[1]}":
         raise SpaceFolderChanged(
-            f"The folder was replaced since the trash failed; nothing was deleted: {target}"
+            f'The folder "{target}" was replaced after the Trash failed, so nothing was deleted.'
         )
     _before_permanent_delete(target)
     try:
@@ -437,7 +454,7 @@ def delete_space(
     except OSError:
         same = False
     if not same:
-        raise SpaceNotFound(f"The folder changed; nothing was deleted: {target}")
+        raise SpaceNotFound(f'The folder "{target}" changed, so nothing was deleted.')
     shutil.rmtree(target)
     reg.remove(target)
     return False

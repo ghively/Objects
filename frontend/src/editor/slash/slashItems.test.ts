@@ -71,7 +71,7 @@ describe('slash items', () => {
       ['Group', 'Keep several blocks together in one box'],
       ['Ask AI about this block', null], // M10: the AI items, after the (search-only) colour items
       ['Let AI suggest tags for this block', null],
-      ['Record audio', 'Record from the microphone and drop the clip here.'],
+      ['Record audio', 'Record from the microphone and drop the clip here'],
       ['Math', 'An equation on its own line'],
       ['Code', 'A code block'],
       ['Horizontal line', 'A divider line between parts of the page'],
@@ -97,15 +97,18 @@ describe('slash items', () => {
       'Create Page with title "Q3 plan"',
       'Create Person with title "Q3 plan"',
     ])
+    // Catalog item 41: Time, Now, Today, Tomorrow, Yesterday, In a week, A week ago.
     expect(sections[2].items.map((i) => [i.name, i.description])).toEqual([
+      ['Now - timestamp', 'Insert the time right now'],
+      ['Today - date link', "Insert today's date as a link"],
       ['Today', "Link today's daily note here"],
       ['Tomorrow', "Link tomorrow's daily note here"],
       ['Yesterday', "Link yesterday's daily note here"],
       ['In a week', 'Add a link to the daily note a week from today'],
       ['A week ago', 'Add a link to the daily note of a week ago'],
-      ['Today - date link', "Insert today's date as a link."],
-      ['Now – timestamp', 'Insert the time right now'],
     ])
+    // No description ends with a full stop (they are labels, not sentences).
+    for (const s of sections) for (const i of s.items) expect(i.description ?? '', i.id).not.toMatch(/\.$/)
     expect(sections[3].items.map((i) => i.name)).toEqual(['Reuse any content'])
   })
 
@@ -164,6 +167,25 @@ describe('each block item runs its command', () => {
     else expected(editor, view)
   })
 
+  test('sweep 2026-11-08 #6: Table inserts the catalog default, 2 columns by 3 rows with a header row', () => {
+    const editor = headless('Hello\n\nWorld\n')
+    BLOCK_ITEMS.find((i) => i.id === 'table')!.run(editor)
+    const table = editor.state.doc.child(1)
+    expect(table.type.name).toBe('table')
+    expect(table.childCount).toBe(3)
+    const rows: string[][] = []
+    table.forEach((row) => {
+      const cells: string[] = []
+      row.forEach((cell) => cells.push(cell.type.name))
+      rows.push(cells)
+    })
+    expect(rows).toEqual([
+      ['tableHeader', 'tableHeader'],
+      ['tableCell', 'tableCell'],
+      ['tableCell', 'tableCell'],
+    ])
+  })
+
   test('reuse any content opens the embed picker', () => {
     const picker = vi.fn()
     setObjectEmbedPicker(picker)
@@ -190,6 +212,13 @@ describe('object and date items', () => {
     await empty.run(editor)
     expect(createObject).toHaveBeenLastCalledWith('page', {})
     expect(serializeBody(editor)).toBe('Hello[[Q3 plan]][[Untitled]]\n')
+  })
+
+  test('sweep 2026-11-08 #7: the "Link to a date" section leads with the time items, in one dash style', () => {
+    const items = slashSections(ctx())[2].items
+    expect(items.slice(0, 2).map((i) => i.id)).toEqual(['timestamp', 'dateLink'])
+    expect(items.map((i) => i.id)).toEqual(['timestamp', 'dateLink', 'today', 'tomorrow', 'yesterday', 'inAWeek', 'aWeekAgo'])
+    for (const i of items) expect(i.name, i.id).not.toMatch(/[–—]/)
   })
 
   test('date items insert daily-note links and the timestamp in the chosen time format', () => {
@@ -224,8 +253,14 @@ describe('m8 typed dates and reuse items', () => {
     const dates = sections.find((s) => s.id === 'dates')!
     expect(dates.items.slice(0, 2).map((i) => [i.name, i.description])).toEqual([
       ['Fri, Oct 30, 2026', 'Add a link to this daily note'],
-      ['Fri, Oct 30, 2026 - date link', 'Add a link to this date.'],
+      ['Fri, Oct 30, 2026 - date link', 'Add a link to this date'],
     ])
+    // Sweep 2026-11-08 #7: before filtering, the typed date stays first and the time items lead the fixed ones.
+    expect(
+      slashSections(ctx(q, { now }))[2]
+        .items.slice(0, 4)
+        .map((i) => i.id),
+    ).toEqual(['date:2026-10-30', 'dateToken:2026-10-30', 'timestamp', 'dateLink'])
     const run = (index: number) => {
       const editor = headless('Hello\n')
       editor.commands.setTextSelection(6)
@@ -238,7 +273,7 @@ describe('m8 typed dates and reuse items', () => {
     expect(slashSections(ctx('2026-12-24', { now }))[2].items[0].name).toBe(dayLabel('2026-12-24'))
     expect(slashSections(ctx('in 2 weeks', { now }))[2].items[0].id).toBe('date:2026-11-10')
     expect(slashSections(ctx('march 15', { now }))[2].items[0].id).toBe('date:2026-03-15')
-    expect(slashSections(ctx('hello', { now }))[2].items[0].id).toBe('today')
+    expect(slashSections(ctx('hello', { now }))[2].items[0].id).toBe('timestamp')
     // A phrase being typed keeps the menu open on a space.
     expect(hasRealMatch(slashSections(ctx('next ', { now })), 'next ', now)).toBe(true)
   })
@@ -285,7 +320,8 @@ describe('search-only items', () => {
     COLOR_ITEMS.find((i) => i.id === 'color:bg-blue')!.run(editor)
     expect(serializeBody(editor)).toBe('<!-- block: color=bg-blue -->\nHello\n\nWorld\n')
     const mermaid = slashSections(ctx('mmd'))[0].items.find((i) => i.id === 'mermaid')!
-    expect(mermaid).toMatchObject({ name: 'Mermaid Diagram', description: 'A code block', alias: 'mmd' })
+    // Sweep 2026-11-08 #7: its own description, not Code's.
+    expect(mermaid).toMatchObject({ name: 'Mermaid Diagram', description: 'A Mermaid diagram in a code block', alias: 'mmd' })
     const other = headless('graph TD\n')
     mermaid.run(other)
     expect(serializeBody(other)).toBe('```mermaid\ngraph TD\n```\n')

@@ -230,6 +230,27 @@ describe('picker rows', () => {
     expect(names().some((n) => n?.includes('People'))).toBe(true)
   })
 
+  test('sweep 2026-11-08 #2: arrowing down scrolls the active row into view', async () => {
+    const scroll = vi.fn()
+    const had = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView')
+    Object.defineProperty(Element.prototype, 'scrollIntoView', { value: scroll, configurable: true, writable: true })
+    try {
+      render(<LinkPicker />)
+      const input = await screen.findByRole('textbox', { name: 'Search objects' })
+      await screen.findByRole('option', { name: /People/ })
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+      await waitFor(() => expect(screen.getAllByRole('option')[2]).toHaveAttribute('aria-selected', 'true'))
+      expect(scroll).toHaveBeenCalled()
+      const last = scroll.mock.contexts[scroll.mock.contexts.length - 1] as HTMLElement
+      expect(last).toBe(screen.getAllByRole('option')[2])
+      expect(scroll.mock.lastCall).toEqual([{ block: 'nearest' }])
+    } finally {
+      if (had) Object.defineProperty(Element.prototype, 'scrollIntoView', had)
+      else delete (Element.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView
+    }
+  })
+
   test('the picker opens as a popover at the caret, not a centred dialog', async () => {
     render(<LinkPicker />)
     const pop = await screen.findByRole('dialog', { name: 'Link to an object' })

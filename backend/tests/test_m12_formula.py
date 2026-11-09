@@ -28,7 +28,7 @@ class Env:
     def prop(self, name):
         if name in self.props:
             return self.props[name]
-        raise FormulaError(f'Unknown property "{name}"')
+        raise FormulaError(f'Unknown property "{name}".')
 
 
 def ev(expr, tz=UTC, **props):
@@ -73,10 +73,10 @@ def test_tokenize_positions():
     "expr, message",
     [
         ("1 +", "end of the formula"),
-        ("(1", "Expected ')'"),
+        ("(1", 'Expected ")"'),
         ('"open', "Unterminated text"),
         ("1 $ 2", "Unexpected character"),
-        ("foo(1)", "Unknown function 'foo'"),
+        ("foo(1)", 'Unknown function "foo"'),
         ("Budget", "prop(\"Budget\")"),
         ("prop(Budget)", "prop takes a property name in quotes"),
         ("if(true, 1)", "if takes 3 arguments"),
@@ -85,7 +85,7 @@ def test_tokenize_positions():
         ("1 2", "Unexpected"),
         ("x.prop()", "Unknown name"),
         ("1.prop()", "prop can't be used in method form"),
-        ("(1).foo()", "Unknown function 'foo'"),
+        ("(1).foo()", 'Unknown function "foo"'),
     ],
 )
 def test_parse_errors(expr, message):
@@ -121,8 +121,8 @@ def test_depth_limit():
 
 def test_value_errors_are_formula_errors():
     """Bug audit 2026-11-07, 28: `floor(NaN)` and a 4,300+-digit number are errors, not crashes."""
-    assert err('floor(prop("x"))', x=float("nan")) == "The result is out of range"
-    assert err('format(prop("x"))', x=10**5000) == "The result is out of range"
+    assert err('floor(prop("x"))', x=float("nan")) == "The result is out of range."
+    assert err('format(prop("x"))', x=10**5000) == "The result is out of range."
 
 
 # -- operators and precedence ------------------------------------------------------------------
@@ -206,7 +206,7 @@ def test_empty_propagates_quietly():
 
 def test_prop_and_unknown_prop():
     assert val('prop("Budget") * 2', Budget=21) == 42
-    assert err('prop("Nope")') == 'Unknown property "Nope"'
+    assert err('prop("Nope")') == 'Unknown property "Nope".'
 
 
 def test_method_form():
@@ -397,18 +397,18 @@ def _nested_replace(levels: int) -> str:
 def test_text_growth_is_bounded():
     assert len(val(_nested_replace(3))) == 10_000
     # Each level multiplies the text by ten: refused before it is built.
-    assert err(_nested_replace(5)) == "Text too long"
+    assert err(_nested_replace(5)) == "The text is too long."
     big = "x" * 60_000
-    assert err('prop("A") + prop("A")', A=big) == "Text too long"
-    assert err('concat(prop("A"), prop("A"))', A=big) == "Text too long"
-    assert err('join(prop("L"), "")', L=[big, big]) == "Text too long"
-    assert err('format(prop("L"))', L=[big, big]) == "Text too long"
+    assert err('prop("A") + prop("A")', A=big) == "The text is too long."
+    assert err('concat(prop("A"), prop("A"))', A=big) == "The text is too long."
+    assert err('join(prop("L"), "")', L=[big, big]) == "The text is too long."
+    assert err('format(prop("L"))', L=[big, big]) == "The text is too long."
     assert len(val('prop("A") + "!"', A=big)) == 60_001  # under the limit is fine
     assert val('replace("abc", "b", "")') == "ac"  # shrinking needs no room
 
 
 def test_huge_numbers_are_errors():
-    assert err('prop("N") * prop("N")', N=10**200) == "Number too large"
-    assert ev('prop("N")', N=10**320) == {"type": "error", "value": None, "error": "Number too large"}
-    assert ev('prop("N")', N=10**5000)["error"] == "Number too large"
+    assert err('prop("N") * prop("N")', N=10**200) == "The number is too large."
+    assert ev('prop("N")', N=10**320) == {"type": "error", "value": None, "error": "The number is too large."}
+    assert ev('prop("N")', N=10**5000)["error"] == "The number is too large."
     assert val('prop("N") + 1', N=10**300) == 10**300 + 1

@@ -4,7 +4,7 @@
  */
 import type { TypeDef } from '@/api/types'
 
-/** The palette's strings (the typo in `onlyPartialResults` kept on purpose). */
+/** The palette's strings. */
 export const PALETTE_TEXT = {
   /** The palette's one input (content and actions). */
   placeholder: 'Find objects and commands, or paste',

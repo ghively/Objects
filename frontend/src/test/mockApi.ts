@@ -387,6 +387,7 @@ export function remoteAgent(partial: Partial<Agent> & Pick<Agent, 'id'>): Agent 
       protocolVersion: '1.0',
       streaming: true,
       auth: { kind: 'bearer', headerName: null, set: true },
+      pendingEndpoint: null,
       card: remotePreview().card,
       cardFetchedAt: '2026-11-05T09:00:00.000Z',
       contextNoticeAt: null,
@@ -769,6 +770,7 @@ type Fn =(...args: never[]) => unknown
 
 function defaults(): Api {
   return {
+    appInfo: async () => ({ version: '0.1.0' }),
     space: async () => ({
       name: 'space',
       root: '/space',
@@ -1075,7 +1077,9 @@ function defaults(): Api {
       remoteAgent({ id: '01JNEWREMOTE00000000000000', name: req.name ?? 'Fake Planner', revision: 'r1' }),
     saveRemoteAgent: async (id: string, req: SaveRemoteAgentRequest) =>
       remoteAgent({ id, name: req.name, revision: `${req.baseRevision}+1` }),
-    refreshRemoteAgent: async (id: string) => remoteAgent({ id }),
+    refreshRemoteAgent: async (id: string) => ({ ...remoteAgent({ id }), warnings: [], notice: null }),
+    confirmRemoteEndpoint: async (id: string) => remoteAgent({ id }),
+    dismissRemoteEndpoint: async (id: string) => remoteAgent({ id }),
     ackRemoteContext: async () => ({ contextNoticeAt: '2026-11-05T09:00:00.000Z' }),
     revealAgentFile: async () => ({ ok: true as const }),
     // M18

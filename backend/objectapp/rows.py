@@ -227,12 +227,12 @@ def cached_preview(path: str, version: str, body: str) -> str:
 def check_search(terms: list[str], mode: str) -> list[str]:
     """The cleaned terms, or `InvalidValue` (the API answers 422)."""
     if mode not in SEARCH_MODES:
-        raise InvalidValue(f"Unknown search mode {mode!r}")
+        raise InvalidValue(f'Unknown search mode "{mode}".')
     cleaned = [t.strip() for t in terms]
     if len(cleaned) > MAX_TERMS:
-        raise InvalidValue(f"At most {MAX_TERMS} search terms")
+        raise InvalidValue(f"At most {MAX_TERMS} search terms.")
     if any(len(t) < MIN_TERM for t in cleaned):
-        raise InvalidValue(f"A search term needs at least {MIN_TERM} characters")
+        raise InvalidValue(f"A search term needs at least {MIN_TERM} characters.")
     return cleaned
 
 

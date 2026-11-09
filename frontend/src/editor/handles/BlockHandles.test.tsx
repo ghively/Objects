@@ -155,6 +155,39 @@ describe('<BlockHandles>', () => {
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
   })
 
+  // The 2026-11-08 sweep: "Open block styling" (Ctrl+Shift+E, the catalog's Block editing group)
+  // opens the block menu for the block with the cursor, as a click on its drag handle does.
+  test('Ctrl+Shift+E opens the block menu for the block with the cursor; with blocks selected, for them', async () => {
+    const editor = mounted('Hello\n\nWorld\n\nLast\n')
+    render(<BlockHandles editor={editor} />)
+    const world = blockPos(editor, 1)
+    editor.commands.setTextSelection(world + 1)
+    const press = () => {
+      const event = new KeyboardEvent('keydown', { key: 'E', code: 'KeyE', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'keyCode', { value: 69 })
+      let prevented = false
+      act(() => {
+        prevented = !editor.view.dom.dispatchEvent(event)
+      })
+      return prevented
+    }
+    expect(press()).toBe(true)
+    const menu = await screen.findByRole('menu')
+    expect(blockSelectionRange(editor.state)?.blocks.map((b) => b.node.textContent)).toEqual(['World'])
+    expect(within(menu).getByRole('menuitem', { name: /^Duplicate/ })).toBeInTheDocument()
+    // The handles sit beside the block the menu is for.
+    expect(document.querySelector('[data-block-handles]')?.getAttribute('data-pos')).toBe(String(world))
+    fireEvent.keyDown(menu, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+
+    // A block selection is kept: the menu acts on all of it.
+    selectBlocks(editor, blockPos(editor, 1), blockPos(editor, 2))
+    expect(press()).toBe(true)
+    const again = await screen.findByRole('menu')
+    expect(within(again).getByText('2 selected')).toBeInTheDocument()
+    expect(blockSelectionRange(editor.state)?.blocks.map((b) => b.node.textContent)).toEqual(['World', 'Last'])
+  })
+
   test('move via handle keeps the moved block\'s bytes', () => {
     const editor = mounted(BODY)
     // Drop B below the toggle: the blocks reordered, each byte-identical.

@@ -277,6 +277,36 @@ def test_missing_secret(api, fake) -> None:
     assert not _rpc(fake, "SendMessage", "SendStreamingMessage")
 
 
+def test_chat_keeps_the_stored_endpoint_until_the_move_is_confirmed(api) -> None:
+    """Gene, 2026-11-08: a refreshed card whose endpoint moved to another host doesn't change
+    where a chat goes until the move is confirmed on the agent's page."""
+    _space, client, _ = api
+    old = FakeA2A()  # no token, so the chat can go on after a move drops the secret
+    new = FakeA2A()
+    old.start()
+    new.start()
+    try:
+        reg = AgentRegistry()
+        rec = reg.create_remote(a2a.parse_card(old.card()), old.card(),
+                                old.base_url + "/.well-known/agent-card.json", AuthInput(kind="none"))
+        moved = old.card()
+        moved["supportedInterfaces"] = [{"url": new.base_url + "/a2a", "protocolBinding": "JSONRPC",
+                                         "protocolVersion": "1.0"}]
+        rec = reg.refresh_remote(rec.id, a2a.parse_card(moved), moved, old.base_url + "/.well-known/agent-card.json")
+        assert rec.to_api({})["remote"]["pendingEndpoint"]["url"] == new.base_url + "/a2a"
+        events = _chat(client, "hi", rec.id)
+        assert events[-1]["type"] == "done", events
+        assert len(_sent_messages(old)) == 1 and not _sent_messages(new)
+
+        reg.confirm_endpoint(rec.id)
+        events = _chat(client, "again", rec.id)
+        assert events[-1]["type"] == "done", events
+        assert len(_sent_messages(old)) == 1 and len(_sent_messages(new)) == 1
+    finally:
+        old.stop()
+        new.stop()
+
+
 def test_hidden_ai_still_403(api, fake) -> None:
     _space, client, _ = api
     rec = _add_remote(fake)

@@ -29,7 +29,7 @@ the first day the repeat reaches from today).
 
 def _need(value: Any, field: str, action: str) -> None:
     if value is None or (isinstance(value, str) and not value.strip() and field != "prompt"):
-        raise ApiError(f"{action} needs {field}.")  # our string
+        raise ApiError(f'"{action}" needs {field}.')  # our string
 
 
 def register(server: MCPServer, client: ObjectClient) -> None:
@@ -71,4 +71,4 @@ def register(server: MCPServer, client: ObjectClient) -> None:
             return client.put(route, body)
         if action == "delete":
             return client.delete(route)
-        raise ApiError(f"Unknown action {action!r}.")
+        raise ApiError(f'Unknown action "{action}".')

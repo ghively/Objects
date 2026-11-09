@@ -25,8 +25,7 @@ export async function scanSource(path: string, leaveOut: string[]): Promise<Scan
     let msg = `Scan failed (${res.status})`
     try {
       const d = await res.json()
-      if (typeof d?.error === 'string') msg = d.error
-      else if (typeof d?.detail === 'string') msg = d.detail
+      if (typeof d?.detail === 'string') msg = d.detail
     } catch {
       /* keep the status message */
     }

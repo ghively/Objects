@@ -456,7 +456,7 @@ def test_ui_accepts_calendar_tasks_reminders_keys(calendar_space_dir: Path):
             assert bad_r.status_code == 422, (bad, bad_r.text)
         unknown = c.put("/api/ui", json={"patch": {"calendarz": {}}, "baseRevision": rev})
         assert unknown.status_code == 422
-        assert "Cannot patch" in unknown.json()["detail"]
+        assert unknown.json()["detail"] == "The UI state has no key named calendarz."
         stale = c.put("/api/ui", json={"patch": {"reminders": {"enabled": True}}, "baseRevision": base})
         assert stale.status_code == 409
         assert c.get("/api/ui").json()["ui"]["reminders"] == {"enabled": False}

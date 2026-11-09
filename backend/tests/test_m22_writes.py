@@ -516,9 +516,9 @@ def test_fields_write_and_activity(space: Space, svc: WorkService):
     assert "blockedOn" not in space.read(BADGE)[1] or space.read(BADGE)[1]["blockedOn"] is None
     assert res["activity"].endswith("Gene cleared Blocked on")
 
-    with pytest.raises(InvalidValue, match="status isn't a work field."):
+    with pytest.raises(InvalidValue, match='The field "status" isn\'t a work field.'):
         svc.fields(BADGE, res["version"], {"status": "Done"}, [], GENE)
-    with pytest.raises(InvalidValue, match="steps isn't a work field."):
+    with pytest.raises(InvalidValue, match='The field "steps" isn\'t a work field.'):
         svc.fields(BADGE, res["version"], {"steps": []}, [], GENE)
     with pytest.raises(Conflict):
         svc.fields(BADGE, v, {"rank": 3}, [], GENE)

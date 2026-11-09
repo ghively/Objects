@@ -61,8 +61,8 @@ describe('EditorSection', () => {
     const group = screen.getByRole('radiogroup', { name: 'When this space opens' })
     expect(within(group).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
       'Where I left off',
-      'Calendar today',
       'Calendar',
+      'Calendar today',
       'Specific object',
     ])
     await waitFor(() => expect(useSpaceInfo.getState().space?.root).toBe('/space'))
@@ -97,6 +97,28 @@ describe('EditorSection', () => {
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ startupSpacePath: '/other/Work' }, expect.anything())
   })
 
+  test('a Backlinks or Related Content section stored as "hidden" shows "Closed" checked (no Hidden there any more)', async () => {
+    const user = userEvent.setup()
+    useSettings.setState({
+      settings: { ...settingsDefaults, backlinkSectionsDefault: { backlinks: 'hidden', relatedContent: 'hidden', unlinkedMentions: 'hidden' } },
+      revision: 'r0',
+      loaded: true,
+    })
+    render(<EditorSection />)
+    for (const name of ['Backlinks', 'Related Content']) {
+      const g = screen.getByRole('radiogroup', { name })
+      expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Open', 'Closed'])
+      expect(within(g).getByRole('radio', { name: 'Closed' })).toHaveAttribute('aria-checked', 'true')
+    }
+    expect(within(screen.getByRole('radiogroup', { name: 'Unlinked Mentions' })).getByRole('radio', { name: 'Hidden' })).toHaveAttribute('aria-checked', 'true')
+    // The next change writes the read values, so the stored "hidden" is gone for those two.
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Backlinks' })).getByRole('radio', { name: 'Open' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith(
+      { backlinkSectionsDefault: { backlinks: 'open', relatedContent: 'closed', unlinkedMentions: 'hidden' } },
+      expect.anything(),
+    )
+  })
+
   test('test backlink defaults save each section', async () => {
     const user = userEvent.setup()
     useLinkIndex.setState({
@@ -108,11 +130,15 @@ describe('EditorSection', () => {
     expect(
       screen.getByText('Whether each section is expanded or collapsed when an object page opens. Each object can still override it.'),
     ).toBeInTheDocument()
-    for (const name of ['Backlinks', 'Related Content', 'Unlinked Mentions']) {
+    // Only Unlinked Mentions can be hidden from here (catalog: Backlinks Open | Closed; Unlinked Mentions Open | Closed | Hidden).
+    for (const name of ['Backlinks', 'Related Content']) {
       const g = screen.getByRole('radiogroup', { name })
-      expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Open', 'Closed', 'Hidden'])
+      expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Open', 'Closed'])
       expect(within(g).getByRole('radio', { name: 'Open' })).toHaveAttribute('aria-checked', 'true')
     }
+    const unlinked = screen.getByRole('radiogroup', { name: 'Unlinked Mentions' })
+    expect(within(unlinked).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Open', 'Closed', 'Hidden'])
+    expect(within(unlinked).getByRole('radio', { name: 'Open' })).toHaveAttribute('aria-checked', 'true')
     await user.click(within(screen.getByRole('radiogroup', { name: 'Related Content' })).getByRole('radio', { name: 'Closed' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith(
       { backlinkSectionsDefault: { backlinks: 'open', relatedContent: 'closed', unlinkedMentions: 'open' } },

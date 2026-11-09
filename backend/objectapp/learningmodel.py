@@ -153,7 +153,7 @@ def clean_learning(value: dict[str, Any]) -> dict[str, Any]:
     """A ``PUT /agents/{id}/learning`` body's ``learning``: unknown keys kept, known keys
     checked (`LearningInvalid`); ``reviewModel`` goes through `aimodels.clean_model`."""
     if not isinstance(value, dict):
-        raise LearningInvalid("learning must be an object.")
+        raise LearningInvalid('"learning" must be an object.')
     out: dict[str, Any] = {}
     for key, item in value.items():
         if key in LEARNING_RANGES:

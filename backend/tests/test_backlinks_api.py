@@ -77,13 +77,13 @@ def test_ui_graph_key(links_space_dir: Path):
             "/api/ui", json={"patch": {"graph": {"zoom": 2}}, "baseRevision": rev}
         )
         assert bad.status_code == 422
-        assert bad.json()["detail"] == "Cannot patch: graph.zoom"
+        assert bad.json()["detail"] == "The UI state has no key named graph.zoom."
         bad = c.put(
             "/api/ui",
             json={"patch": {"graph": {"hideDates": "yes"}}, "baseRevision": rev},
         )
         assert bad.status_code == 422
-        assert bad.json()["detail"] == "graph.hideDates must be true or false."
+        assert bad.json()["detail"] == 'The key "graph.hideDates" must be true or false.'
         bad = c.put(
             "/api/ui",
             json={"patch": {"graph": {"filterTypeIds": [1]}}, "baseRevision": rev},
