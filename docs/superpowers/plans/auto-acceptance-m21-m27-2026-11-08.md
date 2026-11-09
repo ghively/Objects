@@ -20,6 +20,11 @@ against a scratch server. **No box in Gene's `mN-acceptance.md` files was ticked
 - **Acceptance scripts** (fake CLI, re-run in this worktree, logs in `<scratch>/logs/`): m21 (space-sample)
   36 `[ok]` RESULT: PASS; m22 44 ok PASS; m23 40 ok PASS; m24 72 ok PASS; m25 37 ok "All checks passed"; m26 13 ok
   PASS; m27 21 ok PASS. Zero `[FAIL]` lines.
+- **Lane C2c (M27, M27-UI):** same worktree and port, scratch `~/.hermes/cache/scratch/lane-c2c` (fresh
+  `space-sample` copy, own state dir, session `lane-c2c`). Source: a synthetic Files folder (60 runbooks with
+  `Environment: Prod/prod/Production`, two flagged secrets files, a `Credentials` folder left out). Proposal saved by
+  a scripted MCP stdio client (`objectapp-mcp`, read-write token); filing by the repo's fake claude through a
+  wrapper that reads `FAKE_CLAUDE_FILING` from a scratch file. Everything else through the wizard in the browser.
 
 **Result:** 83 boxes: PASS 66, PARTIAL 9, MANUAL 3, DEFERRED-live-CLI 2, FAIL 2, SUPERSEDED 1.
 
