@@ -2055,9 +2055,17 @@ export interface RemoteInfo {
   protocolVersion: string
   streaming: boolean
   auth: { kind: 'none' | 'bearer' | 'header'; headerName: string | null; set: boolean }
+  /** A refreshed card's endpoint on another host or scheme, waiting for the move to be confirmed. */
+  pendingEndpoint: { url: string; host: string } | null
   card: RemoteCard
   cardFetchedAt: string
   contextNoticeAt: string | null
+}
+
+/** POST /api/remote-agents/{id}/refresh: the agent, the preview warnings and the moved-address notice. */
+export interface RemoteRefreshResult extends Agent {
+  warnings: string[]
+  notice: string | null
 }
 
 /** A remote agent's auth as entered (the value is sent once and never shown again). */

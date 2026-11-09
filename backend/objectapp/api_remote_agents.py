@@ -9,8 +9,14 @@
   is already listed as {name}." (same ``cardUrl`` and endpoint).
 - ``PUT  /remote-agents/{id}`` ``SaveRemoteAgentRequest`` -> ``Agent``. 404; 409
   ``{currentRevision}``; 422 (name, header rule; not a remote agent).
-- ``POST /remote-agents/{id}/refresh`` ``{clientId?}`` -> ``Agent`` plus ``warnings`` (the card
-  fetched again; an endpoint on another host drops the secret). 404; 422 (as preview); 502.
+- ``POST /remote-agents/{id}/refresh`` ``{clientId?}`` -> ``Agent`` plus ``warnings`` and
+  ``notice`` (the card fetched again). An endpoint on another host or scheme drops the secret but
+  isn't switched to: it waits as ``remote.pendingEndpoint`` with the notice "The agent's address
+  moved to {host}. Confirm the move to use it." (Gene, 2026-11-08). 404; 422 (as preview); 502.
+- ``POST /remote-agents/{id}/confirm-endpoint`` ``{clientId?}`` -> ``Agent``: switches to the
+  pending endpoint and clears it. 404; 422 (nothing pending; not a remote agent).
+- ``DELETE /remote-agents/{id}/pending-endpoint?clientId=`` -> ``Agent``: forgets the pending
+  endpoint, the stored one stays. 404; 422 (not a remote agent).
 
 `endpoint_refusal` (audit 6): an endpoint on this computer (loopback) is accepted only from a card
 fetched from this computer, and an endpoint that is Object's own address never; otherwise a chat
@@ -69,6 +75,7 @@ LOOPBACK_ENDPOINT = (
     "isn't on this computer."
 )  # our string
 OWN_ENDPOINT = "This agent's card sends messages to {endpoint}, which is Object itself."  # our string
+ADDRESS_MOVED = "The agent's address moved to {host}. Confirm the move to use it."  # our string
 _REASON_MAX = 200
 _ANSWERED_RE = re.compile(r" answered (\d{3})\.$")
 
@@ -353,7 +360,33 @@ def router(ctx: ApiContext) -> APIRouter:
             return _fail(exc)
         announce(rec.id, rec.revision, req.clientId)
         has_token = await asyncio.to_thread(remotesecrets.is_set, rec.id)
-        return {**out(rec), "warnings": preview_warnings(card_url, card.endpoint_url, has_token)}
+        answer = out(rec)
+        pending = answer["remote"]["pendingEndpoint"]
+        notice = ADDRESS_MOVED.format(host=pending["host"]) if pending else None
+        return {**answer, "warnings": preview_warnings(card_url, card.endpoint_url, has_token), "notice": notice}
+
+    @r.post("/remote-agents/{agent_id}/confirm-endpoint")
+    def confirm_endpoint(agent_id: str, body: Any = Body(None)):
+        req = _parse(ClientRequest, body)
+        if req is None:
+            return _error(422, BAD_REQUEST)
+        try:
+            remote_of(agent_id)
+            rec = registry().confirm_endpoint(agent_id)
+        except AgentError as exc:
+            return _fail(exc)
+        announce(rec.id, rec.revision, req.clientId)
+        return out(rec)
+
+    @r.delete("/remote-agents/{agent_id}/pending-endpoint")
+    def dismiss_endpoint(agent_id: str, clientId: str | None = None):  # noqa: N803 - the query name
+        try:
+            remote_of(agent_id)
+            rec = registry().dismiss_endpoint(agent_id)
+        except AgentError as exc:
+            return _fail(exc)
+        announce(rec.id, rec.revision, clientId)
+        return out(rec)
 
     @r.post("/remote-agents/{agent_id}/context-notice")
     def context_notice(agent_id: str, body: Any = Body(None)):
