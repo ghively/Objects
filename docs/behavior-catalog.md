@@ -400,7 +400,7 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   "Imported from <system> (author, modified <date>, version <v>)", **Open original** (the web url, else the kept
   file) and **Show file** (shows the kept original in the file manager). Every imported object carries the system
   frontmatter block `importSource` (system, url, id, version, author, created, modified, original, contentHash, batch,
-  importedAt).
+  importedAt); it is a system field, so the property panel never lists it under External properties.
 - **Links between imported pages**: a source link names a page by path or by name; when several pages share the name
   (Books/Dune and Movies/Dune) the one nearest the linking page wins (its own folder, then the deepest shared folder,
   then the shortest path), and the written link is the title only when the space resolves it to that object, else its
@@ -416,7 +416,8 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   in its body (the design's call, approved by Gene as AC-2 on 2026-11-08; not a Page holding the image). Only images
   the Page row would take: a mapping that puts them in a folder or key type, or the Page row into another type, wins.
   The report's Originals section says "1 image became an Image object."; File objects mode makes no second object for
-  an image. An image an earlier import made into a Page stays that Page on a re-run (matched by source id, updated in
+  an image; the File, PDF, Audio and Video objects it makes belong to the basic media types (made when the space has
+  none, like Image), so their MIME type, file size and source are read-only system fields, not External properties. An image an earlier import made into a Page stays that Page on a re-run (matched by source id, updated in
   place, never duplicated or migrated) and the report notes "Kept as a Page: an earlier import made it before images
   became Image objects".
 - **Scanned PDF pages (OCR)**: a page with no text layer (or one under 32 characters) that holds an image is read with
