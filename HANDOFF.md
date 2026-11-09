@@ -4,7 +4,7 @@ Updated 2026-11-08, evening (M1-M27 are built, gated and on `master`; everything
 
 ## Where things stand
 
-- **M1-M27 are all built and on `master`** (2026-11-07). `master` is the default branch (no `main`). The 2026-11-08 work is on `integrate/2026-11-08` (every lane merged `--no-ff`); base new work on it until it reaches `master`. Last full gate recorded (Linux, sweep round 3 on `master`): back end 3287 passed, front end 3984 passed, `tsc`, lint and build clean, acceptance 52/52 PASS; the integrate branch's gate numbers go into `remaining-work.md` when it merges.
+- **M1-M27 are all built and on `master`** (2026-11-07). `master` is the default branch (no `main`). The 2026-11-08 work is on `integrate/2026-11-08` (every lane merged `--no-ff`); base new work on it until it reaches `master`. Last full gate recorded (Linux, sweep round 3 on `master`): back end 3287 passed, front end 3984 passed, `tsc`, lint and build clean, acceptance 52/52 PASS; gate on `integrate/2026-11-08` (2026-11-09): back end 3391 passed, front end 4074 passed, lint and build clean (details in `remaining-work.md`).
 - **2026-11-08, what changed** (details in `remaining-work.md`, "What remains", and the catalog sections named):
   - **Sidebar redesign** (catalog §4): Calendar, Tasks, Graph and Assistant on top; Agents as its own section with a header `+`; Trash at the bottom; All notes off the sidebar (the palette's "Open all notes"). The Assistant's hover `…` menu opens its own page.
   - **Tasks dashboard** (catalog §4): the Work page and the task lists are one page; views grouped as a Drive row and More views (Plan, Manage, Review); the old Tasks page is retired; Tasks › Today shows the Calendar Day view's task list (decision T1).
