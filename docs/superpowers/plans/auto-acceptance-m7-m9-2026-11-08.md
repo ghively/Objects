@@ -2,7 +2,7 @@
 
 Generated from `results.json` (lane C1b scratch). Gene's `mN-acceptance.md` boxes are NOT ticked; this file records what an agent could verify.
 
-**Counts:** MANUAL 59, NOT-RUN 5, PARTIAL 19, PASS 31, SUPERSEDED 1 (total 115)
+**Counts:** MANUAL 59, NOT-RUN 2, PARTIAL 22, PASS 31, SUPERSEDED 1 (total 115)
 
 ## How this was run
 
@@ -12,6 +12,17 @@ Generated from `results.json` (lane C1b scratch). Gene's `mN-acceptance.md` boxe
 - Scripted acceptance re-run in this worktree (all PASS, logs in the lane scratch `acc/`): `m7_acceptance.py space-blocks` (23 checks), `m8_acceptance.py space-m8`, `m9_acceptance.py space-m8` and `space-sample`.
 - Every edit adds a `lastUpdated` line change. The evidence below lists it as "+lastUpdated" and does not count it as an extra change.
 - Headless pitfall: a background tab reports `document.visibilityState = hidden`, so Radix exit animations never finish and closed dialogs leave a click-blocking overlay. `Page.bringToFront` fixes it. This is a harness artefact, not an app bug.
+
+## Findings for Gene / the fix pass
+
+1. **Shift+click on an inline wikilink opens the peek, not the side panel** (M7#32). `links/wikilinkPresenter.ts` `onClick` handles Ctrl/Cmd (new tab) and otherwise peeks; it has no `shiftKey` branch, while the catalog's Navigation row says "Open in side panel (Shift+Click)" and embed cards / rows already do it through `openObject`. Not fixed here (would need a regression test in the presenter's tests).
+2. **Block colour from the block-selection bar did not apply under automation** (M7#5): Color > Text color > Red text was clicked three ways (CDP click, JS click) and the file stayed unchanged. Could be a harness artefact (Radix submenu under CDP) or a real bug; needs one hand-check. Alignment and Remove block styles work.
+3. **Wide layout showed no width change with the inspector pinned** (M9#6): the editor column stayed 594 px for both Wide and Normal (the key is written correctly). Look check for Gene.
+4. **`+` handle then Escape leaves a "/" in the note** (M7#20). Probably intended (Notion does the same); listed so Gene can decide.
+5. **Shift+click to extend a block selection** became a text selection under CDP (M7#21); not confirmed either way.
+6. The drop path for files (M7#7, M7#29), native block drag (M7#20) and pointer drag of sidebar sections (M9#15; keyboard works) could not be driven: synthetic HTML5 drag events are not handled by ProseMirror/dnd in this harness.
+
+No code was changed in this lane.
 
 
 ## M7 (`docs/superpowers/plans/m7-acceptance.md`)
@@ -130,14 +141,14 @@ Generated from `results.json` (lane C1b scratch). Gene's `mN-acceptance.md` boxe
 | M9#4 | Text Stats in the `…` menu and the inspector's Stats tab give the expected counts on the same note (words, sentences, paragraphs, charact... | AUTO | **PASS** | Blocks M8: More > Text stats = 56 words / 16 sentences / 16 paragraphs / 324 characters / Created at / Last updated; Inspector > Stats tab shows the same four numbers |
 | M9#5 | The page inspector: the Outline jumps to headings, and Pin/Unpin is remembered. | AUTO | **PARTIAL** | Inspector toggle shows Outline \| Stats \| Pin; Pin -> localStorage object.page.inspectorPinned = "1". Outline jump not driven: no space-m8 page has headings ("This page has no headings") |
 | M9#6 | Wide layout / Normal layout per object overrides the type. Toggling the wide cover and repositioning the cover (drag, Save, Cancel) look ... | AUTO | **PARTIAL** | More > Wide layout -> `wideLayoutMode: true`; menu then offers "Normal layout" -> `wideLayoutMode: false` (per-object override, one line each). Editor column stayed 594px both ways with the inspector pinned (walkthrough measured 724<->936 without it) - look for Gene. Cover wide toggle / reposition Save-Cancel / reset on new image: API-verified only (m9_acceptance check 4: offset kept for the same image, dropped for a new one); UI not driven |
-| M9#7 | Content property: the full block editor works in the property panel. A note edited there reloads identically. | ? | **NOT-RUN** | not reached |
-| M9#8 | Text property: `[[` opens the picker, links show as chips, and renaming the target updates the link. | ? | **NOT-RUN** | not reached |
-| M9#9 | Template date variables: "Day/Week/Month/Year of creation" on a template's date property; a new object from it gets the right date or range. | ? | **NOT-RUN** | not reached |
-| M9#10 | An embedded collection and an embedded query: change the layout, filter, sort and group, close and reopen, and they are kept. The note's ... | ? | **NOT-RUN** | not reached |
+| M9#7 | Content property: the full block editor works in the property panel. A note edited there reloads identically. | AUTO | **NOT-RUN** | Needs a custom type with a Content property (basic types' properties are fixed: 422); not set up in this lane for lack of budget |
+| M9#8 | Text property: `[[` opens the picker, links show as chips, and renaming the target updates the link. | AUTO | **NOT-RUN** | Needs a custom type with a Text property; not set up in this lane for lack of budget |
+| M9#9 | Template date variables: "Day/Week/Month/Year of creation" on a template's date property; a new object from it gets the right date or range. | AUTO | **PARTIAL** | API only: m9_acceptance check 5 (space-m8, space-sample) - `{creation:week}` accepted on a template, 422 on a plain object; a new object from the template gets `2026-10-26 -> 2026-11-01`. UI: a template (POST /api/types/page/templates) opens inside Object type settings > Templates; the date popover with the variable picker was not reached |
+| M9#10 | An embedded collection and an embedded query: change the layout, filter, sort and group, close and reopen, and they are kept. The note's ... | AUTO | **PARTIAL** | Round trip only: m9_acceptance check 9 - roundtrip.space.test.ts keeps the two `localDataViewInfo` embed annotations byte for byte. Changing layout/filter/sort/group in an embedded collection and query and reopening was not driven (space-m8 has no data-view embed) |
 | M9#11 | Alignment in the block menu and in the table bar. | AUTO | **PASS** | Table bar (Blocks M8): cell > Alignment = Align text left \| Text align center \| Text align right; center -> `\| --- \| --- \|` -> `\| :---: \| --- \|` (one line). Block menu > Alignment > Text align center -> `<!-- block: align=center ... -->` (M7#5) |
 | M9#12 | The row menu on a type page, a type dashboard section and a query page; Select multiple; bulk change type, open in side panel and delete. | AUTO | **PARTIAL** | Pages type page: row right-click = Select multiple \| Open in side panel \| Open in new tab \| Change type \| Copy object reference \| Duplicate \| Delete object; Select multiple + Shift-click -> "6 selected" bar. Not driven: type dashboard section and query page rows, bulk change type / side panel / delete |
 | M9#13 | Import CSV into a type (with and without a header row, and a new collection); the warning shows. | AUTO | **PARTIAL** | Pages > More > Import CSV: "Bulk import from CSV", "Has a header row" (on), warning "Use this with caution / Each row becomes its own object...", file set -> "Add 2 new Pages to / Pages / New collection \"people\"" (blank line skipped) + Property Mappings; Import created 2 files. The harness mis-mapped the columns (title went to Description -> "Untitled.md" with description "CSV one"), so title mapping is unconfirmed; no-header and new-collection runs not driven |
-| M9#14 | A single-type query tab: the type is locked and the release button works. | ? | **NOT-RUN** | not reached |
+| M9#14 | A single-type query tab: the type is locked and the release button works. | AUTO | **PARTIAL** | Pages > More > Save as query -> new `.object/queries/new-query-2.json` and a query page with "Edit query"; the editor shows Types: Page (+ Add object type, Exclude object types). No "Release type constraint" button was found on this query or among the type page tabs (Overview \| All \| Reading list) - the single-type lock/release was not located; hand-check |
 | M9#15 | Sidebar sections: drag to reorder, restart, and the order is kept. | AUTO | **PASS** | Sidebar grips "Reorder Pinned", "Reorder Object Types": keyboard Space, ArrowDown, Space -> order Object Types, Pinned; `.object/ui.json` workspaceOrder ["objects","pinned"]; page reload keeps it (m9_acceptance check 7 round-trips workspaceOrder). Pointer drag under CDP did not move it |
 | M9#16 | "Rebuild search index" (Settings > Offline & Sync) runs and the indexing state shows. | AUTO | **PASS** | Settings > Offline & Sync > "Rebuild search index": button disabled while running, "Rebuilding the index" state shown; requests POST /api/search/reindex then polling /api/search?q=&limit=1; space unchanged |
 | M9#17 | Draw on a whiteboard: its "Last updated" moves, at most once a minute. The board's Notes still save. | AUTO | **PASS** | Media board, Pen stroke: `.ink.svg` changed and the `.md` changed only its lastUpdated line; a second stroke ~20 s later changed only the `.ink.svg` (throttle); then the Notes bar edit saved (`Notes for the media board.` + text, lastUpdated) with no error. m9_acceptance check 6 likewise |
