@@ -15,6 +15,7 @@ import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/compon
 import { useTabs } from '@/nav/tabs'
 import { AliasesCell } from '@/properties/cells/AliasesCell'
 import { DescriptionCell } from '@/properties/cells/DescriptionCell'
+import { takeFresh } from '@/create/freshObjects'
 import { TagsCell } from '@/properties/cells/TagsCell'
 import { TagPicker } from '@/properties/TagPicker'
 import { chipStyle, lineColor } from '@/theme/palette'
@@ -115,6 +116,25 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesCh
   useEffect(() => {
     if (!focusedRef.current && hash === null) setDraft(summary.title)
   }, [summary.title, hash])
+
+  // A freshly created object ("+ New" and friends) starts with its title focused and selected, so
+  // typing names it at once (acceptance M2#3). The mark is taken once, by the first header to show it.
+  const path = summary.path
+  useEffect(() => {
+    if (!takeFresh(path) || !titleEditable) return
+    requestAnimationFrame(() => {
+      const el = titleRef.current
+      if (!el) return
+      el.focus()
+      el.select()
+    })
+  }, [path, titleEditable])
+
+  // "Add description" reveals the field and puts the caret in it.
+  const descriptionRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (addingDescription) descriptionRef.current?.querySelector<HTMLTextAreaElement>('textarea')?.focus()
+  }, [addingDescription])
 
   const write = (updates: Record<string, unknown>) => onPropertiesChange?.(updates)
 
@@ -319,7 +339,7 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesCh
       </div>
 
       {showDescription && (
-        <div className="mt-2 text-fg-muted">
+        <div ref={descriptionRef} className="mt-2 text-fg-muted">
           <DescriptionCell
             def={DESCRIPTION_DEF}
             value={summary.description}

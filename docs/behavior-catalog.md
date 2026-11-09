@@ -215,7 +215,9 @@ Each starter template pre-fills the new type's properties.
 - **Header**, top to bottom: type pill (icon + name; click to change type), a relation button, then any
   property surfaced in the header (a Status chip such as "In Progress"), a "Collections" chip; the title in
   large bold; the Description property as a paragraph under the title; a "Tags" row of colored tag chips with a
-  small list icon; a divider; the body.
+  small list icon; a divider; the body. A freshly created object (the New menu, a type's `+`, Ctrl+U and the
+  other create buttons) opens with its title focused and selected, in the peek and on the full page, so typing
+  names it; "Add description" puts the caret in the description it reveals.
 - **Property value editors**:
   - Date: a chip; click opens a picker: an input with an info icon, presets (Yesterday, Today, Tomorrow, In 1
     week, In 2 weeks), month and year dropdowns, a month grid with the chosen day as a pill, toggles
