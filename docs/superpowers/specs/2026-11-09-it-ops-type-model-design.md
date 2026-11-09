@@ -153,7 +153,7 @@ The import keeps the source data and distils what is relevant into the right obj
   - **Distilled into** (the counterpart of the entities' "Sources" relation).
 
   The provenance fields (link, author, dates, batch) show on its Source line, as for any imported object.
-- **An option on every import** (Gene, 2026-11-09): "Keep pages as Sources" in the import wizard. On: every page becomes a Source, and with the AI filing pass entities are distilled from them. Off: pages are filed into their mapped types, as imports do today. Default (ours): on when the import runs the AI filing pass, off for a plain mapped import.
+- **An option on every import** (Gene, 2026-11-09): "Keep pages as Sources" in the import wizard. On: every page becomes a Source, and with the AI filing pass entities are distilled from them. Off: pages are filed into their mapped types, as imports do today. Default: **on for every import** (Gene, 2026-11-09); untick it to file pages into their mapped types.
 - **Entities are distilled from all their sources.** A Host mentioned by 12 pages gets the relevant facts from all 12, not just from its own page. Each entity has:
   - its **properties**, each value carrying the Source (or Sources) and the quote it came from;
   - a **distilled section** at the top of its body ("From sources"; our string): a short summary written by the filing pass, every line citing its Sources as links. The import owns this section: a re-run rewrites it when a cited Source changed, and nothing else in the body;
