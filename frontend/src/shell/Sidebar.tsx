@@ -435,7 +435,8 @@ export function Sidebar({
         </button>
       </div>
 
-      {/* The main navigation, always visible at the top: Calendar, Tasks, Graph. */}
+      {/* The main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant. Tasks
+          opens the Tasks dashboard (Gene's redesign: M23's Work page and the task lists as one page). */}
       <nav aria-label="Main" className="flex flex-col gap-0.5">
         <MainNavButton
           icon="ph-calendar-blank"
@@ -447,8 +448,8 @@ export function Sidebar({
           <MainNavButton
             icon="ph-check-circle"
             label="Tasks"
-            active={tasksActive}
-            onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
+            active={tasksActive || workActive}
+            onClick={(e) => onOpenTarget?.({ kind: 'work' }, { newTab: e.ctrlKey || e.metaKey })}
           />
         )}
         <MainNavButton
@@ -461,17 +462,8 @@ export function Sidebar({
         <AssistantNavButton />
       </nav>
 
-      {/* M17: the agents, a section of their own; M23: Work, the agent loop's dashboard, right
-          below them (Work shows while AI features are hidden too). */}
+      {/* M17: the agents, a section of their own, below the main navigation. */}
       <AgentsSection onOpenTarget={onOpenTarget} />
-      <nav aria-label="Work" className="flex flex-col gap-0.5 pb-2">
-        <MainNavButton
-          icon="ph-briefcase"
-          label={WORK_LABEL}
-          active={workActive}
-          onClick={(e) => onOpenTarget?.({ kind: 'work' }, { newTab: e.ctrlKey || e.metaKey })}
-        />
-      </nav>
 
       <ScrollArea className="min-h-0 flex-1">
         {/* The custom sections, Pinned and the object types, in `ui.workspaceOrder` (M9). */}

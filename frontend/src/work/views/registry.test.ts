@@ -45,7 +45,7 @@ describe('work view registry', () => {
       'Now',
       'Flow',
       'Projects map',
-      'Today',
+      'Timeline',
       'On the floor',
       'Your queues',
       'Agent queue',
@@ -106,7 +106,7 @@ describe('work view registry', () => {
     expect(workViews()).toHaveLength(13)
   })
 
-  test('test a view registered before the page renders shows in the switcher after Tickets', async () => {
+  test('test a view registered before the page renders shows in the switcher, in its group', async () => {
     mocked.workBoard.mockResolvedValue(board)
     registerWorkView({
       id: 'captures',
@@ -121,7 +121,8 @@ describe('work view registry', () => {
     const labels = within(nav)
       .getAllByRole('button')
       .map((b) => b.getAttribute('data-work-view'))
-    expect(labels.slice(-2)).toEqual(['tickets', 'captures'])
+    // Captures is a Drive view (Gene's redesign): last on the Drive row, before More views.
+    expect(labels.slice(-2)).toEqual(['captures', null])
     await act(async () => {
       within(nav).getByRole('button', { name: /Captures/ }).click()
     })

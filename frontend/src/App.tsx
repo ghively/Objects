@@ -47,7 +47,6 @@ import { prefetchOnIdle } from '@/nav/prefetch'
 import { useSettings } from '@/settings/useSettings'
 import { fetchSpace } from '@/settings/useSpaceInfo'
 import { TopBar } from '@/shell/TopBar'
-import { TasksPage } from '@/tasks/TasksPage'
 import { TrashView } from '@/trash/TrashView'
 import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
@@ -151,7 +150,8 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
         </Suspense>
       )
     case 'tasks':
-      return <TasksPage />
+      // Gene's redesign: the task lists and M23's dashboard are one page, the Tasks dashboard.
+      return <WorkPage />
     case 'graph':
       return (
         <Suspense fallback={null}>
@@ -165,7 +165,7 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
       // M17: the agent page (Profile, Instructions, Tools, Chats).
       return <AgentPage key={target.id} id={target.id} tab={target.tab} />
     case 'work':
-      // M23: the Work section's page, on its view.
+      // M23's Work page, now the Tasks dashboard (Gene's redesign), on its view.
       return <WorkPage view={target.view} />
   }
 }

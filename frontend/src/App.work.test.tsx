@@ -63,15 +63,18 @@ beforeEach(() => {
 })
 
 describe('M23 Work wiring', () => {
-  test('test a work target renders the Work page with tab title Work', async () => {
+  test('test a work target renders the Tasks dashboard with tab title Tasks', async () => {
     act(() => useTabs.getState().open({ kind: 'work' }))
     render(<App />)
     expect(await screen.findByTestId('work-page')).toHaveTextContent('work page default')
     const strip = screen.getByRole('tablist', { name: 'Tabs' })
-    await waitFor(() => expect(within(strip).getByText('Work')).toBeInTheDocument())
-    expect(within(strip).getByRole('tab').querySelector('[data-icon="ph-briefcase"]')).not.toBeNull()
-    // The sidebar's Work entry is the active one.
-    expect(screen.getByRole('button', { name: 'Work' })).toHaveAttribute('aria-current', 'page')
+    await waitFor(() => expect(within(strip).getByText('Tasks')).toBeInTheDocument())
+    expect(within(strip).getByRole('tab').querySelector('[data-icon="ph-check-circle"]')).not.toBeNull()
+    // The sidebar's Tasks entry is the active one (Gene's redesign: the dashboard is Tasks).
+    expect(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('button', { name: 'Tasks' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
 
     act(() => useTabs.getState().open({ kind: 'work', view: 'flow' }))
     expect(await screen.findByText('work page flow')).toBeInTheDocument()

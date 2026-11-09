@@ -182,6 +182,41 @@ function SectionView({
   )
 }
 
+// ---- one section on its own (the Tasks dashboard's list views) ------------------------------
+
+/**
+ * One task section without the page's header and tabs: the Tasks dashboard (`work/`) shows each
+ * section as one of its views (Inbox, Today's list, Scheduled, ...), so the lists and the
+ * dashboard are one page over the same Task objects.
+ */
+export function TaskSectionPanel({ sectionKey }: { sectionKey: TaskSectionKey }) {
+  usePinned() // loads `ui.json`
+  const types = useLinkIndex((s) => s.types)
+  const taskType = useMemo(() => findTaskType(types), [types])
+  const [toast, setToast] = useState<string | null>(null)
+  const scope = useMemo(() => ({ typeIds: [taskType?.id ?? 'task'] }), [taskType])
+  const { rows, loading, patchRow } = useRows(scope)
+  return (
+    <div data-task-section={sectionKey} className="flex flex-col">
+      {toast && (
+        <p role="status" className="pb-2 text-[13px] text-fg-muted">
+          {toast}
+        </p>
+      )}
+      <SectionView
+        key={sectionKey}
+        sectionKey={sectionKey}
+        rows={rows}
+        loading={loading}
+        types={types.length > 0 ? types : taskType ? [taskType] : []}
+        taskType={taskType}
+        patchRow={patchRow}
+        onToast={setToast}
+      />
+    </div>
+  )
+}
+
 // ---- the page ------------------------------------------------------------------------------
 
 export function TasksPage() {
