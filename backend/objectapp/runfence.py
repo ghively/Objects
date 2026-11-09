@@ -19,6 +19,21 @@ table for about two seconds (`CACHE_SECONDS`): a connection the table hasn't see
 once, a known connection (a browser's keep-alive socket) is answered from the table. On this
 machine (Linux) a scan takes a few milliseconds; a table hit is microseconds. The lookup runs
 in a worker thread, off the event loop. `is_run_process` walks ``psutil.Process(pid).parents()``.
+
+What this does not stop (for the acceptance notes):
+
+- A process that leaves the run's process tree: a run with the shell on can start something
+  detached (``setsid``, ``nohup``, a scheduled task, a service), and the fence then sees an
+  ordinary process with no run among its parents. The fence covers the run's own tree only.
+- Platforms where psutil can't list connections with their owners (macOS without root raises
+  ``AccessDenied``; a sandbox may hide ``/proc``): the first failure is logged once
+  (`UNAVAILABLE_MESSAGE`) and every ``/api`` request is let through from then on, as before.
+- A connection whose owner psutil can see but can't name (``pid`` None: another user's
+  process on Linux): let through, since it can't be a run of this user's Object.
+- Requests that don't come over TCP at all (none today: the server listens on 127.0.0.1 only).
+
+It is a fence for the app's own routes, not the token-protected API: a run can still call
+``/api/v1`` with its own token, by design, and that token's scope and budget are the limit there.
 """
 
 from __future__ import annotations
