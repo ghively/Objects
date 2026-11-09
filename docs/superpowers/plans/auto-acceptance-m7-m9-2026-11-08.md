@@ -2,7 +2,7 @@
 
 Generated from `results.json` (lane C1b scratch). Gene's `mN-acceptance.md` boxes are NOT ticked; this file records what an agent could verify.
 
-**Counts:** MANUAL 59, NOT-RUN 17, PARTIAL 13, PASS 25, SUPERSEDED 1 (total 115)
+**Counts:** MANUAL 59, NOT-RUN 8, PARTIAL 18, PASS 29, SUPERSEDED 1 (total 115)
 
 ## How this was run
 
@@ -124,22 +124,22 @@ Generated from `results.json` (lane C1b scratch). Gene's `mN-acceptance.md` boxe
 
 | Box | Check | Class | Result | Evidence |
 |---|---|---|---|---|
-| M9#1 | Opening the space, exporting and reading stats change nothing (`git status` clean). | ? | **NOT-RUN** | not reached |
-| M9#2 | Duplicate a page, a task and a tag: the copies are named "<Title> (Copy)" and the source is untouched. Duplicating an object with a two-w... | ? | **NOT-RUN** | not reached |
-| M9#3 | Export a page as Markdown, then with "Include media": the zip opens, and images and attachments are inside (including `![[name.png]]` sho... | ? | **NOT-RUN** | not reached |
-| M9#4 | Text Stats in the `…` menu and the inspector's Stats tab give the expected counts on the same note (words, sentences, paragraphs, charact... | ? | **NOT-RUN** | not reached |
-| M9#5 | The page inspector: the Outline jumps to headings, and Pin/Unpin is remembered. | ? | **NOT-RUN** | not reached |
-| M9#6 | Wide layout / Normal layout per object overrides the type. Toggling the wide cover and repositioning the cover (drag, Save, Cancel) look ... | ? | **NOT-RUN** | not reached |
+| M9#1 | Opening the space, exporting and reading stats change nothing (`git status` clean). | AUTO | **PASS** | space-m8: Text stats, Inspector (Outline + Stats), Export dialog -> git status empty; m9_acceptance check 1 on space-m8 and space-sample: two starts + every read incl. export with/without media, search, ui -> 0 files changed, nothing new in the state dir |
+| M9#2 | Duplicate a page, a task and a tag: the copies are named "<Title> (Copy)" and the source is untouched. Duplicating an object with a two-w... | AUTO | **PARTIAL** | Lane C1 (same code): Duplicate on a page/task/tag -> "<Title> (Copy)", sources untouched, two-way relation target links the copy; daily note menu has no Duplicate. This lane: whiteboard (Media board) menu = Export as PNG \| Version History \| Clear Whiteboard \| Delete (no Duplicate); daily note 2026-10-27 More has no Duplicate. Template menu: template opens inside Object type settings (no More menu reached) - not shown; m9_acceptance check 2: duplicating a template -> 422 |
+| M9#3 | Export a page as Markdown, then with "Include media": the zip opens, and images and attachments are inside (including `![[name.png]]` sho... | AUTO | **PARTIAL** | UI: More > Export dialog = Format PDF/Markdown/Microsoft Word/Latex, Include subpages, Include media, title heading; Export clicked with Markdown + Include media (browser download, not captured headless). m9_acceptance check 3 (space-m8, space-sample): media=0 -> text/markdown, bytes identical; media=1 -> application/zip [M9 export.md, Attachments/m9 pixel.png]; short-name embed handling per fix 90a0bd1. Opening the zip on Windows is MANUAL |
+| M9#4 | Text Stats in the `…` menu and the inspector's Stats tab give the expected counts on the same note (words, sentences, paragraphs, charact... | AUTO | **PASS** | Blocks M8: More > Text stats = 56 words / 16 sentences / 16 paragraphs / 324 characters / Created at / Last updated; Inspector > Stats tab shows the same four numbers |
+| M9#5 | The page inspector: the Outline jumps to headings, and Pin/Unpin is remembered. | AUTO | **PARTIAL** | Inspector toggle shows Outline \| Stats \| Pin; Pin -> localStorage object.page.inspectorPinned = "1". Outline jump not driven: no space-m8 page has headings ("This page has no headings") |
+| M9#6 | Wide layout / Normal layout per object overrides the type. Toggling the wide cover and repositioning the cover (drag, Save, Cancel) look ... | AUTO | **PARTIAL** | More > Wide layout -> `wideLayoutMode: true`; menu then offers "Normal layout" -> `wideLayoutMode: false` (per-object override, one line each). Editor column stayed 594px both ways with the inspector pinned (walkthrough measured 724<->936 without it) - look for Gene. Cover wide toggle / reposition Save-Cancel / reset on new image: API-verified only (m9_acceptance check 4: offset kept for the same image, dropped for a new one); UI not driven |
 | M9#7 | Content property: the full block editor works in the property panel. A note edited there reloads identically. | ? | **NOT-RUN** | not reached |
 | M9#8 | Text property: `[[` opens the picker, links show as chips, and renaming the target updates the link. | ? | **NOT-RUN** | not reached |
 | M9#9 | Template date variables: "Day/Week/Month/Year of creation" on a template's date property; a new object from it gets the right date or range. | ? | **NOT-RUN** | not reached |
 | M9#10 | An embedded collection and an embedded query: change the layout, filter, sort and group, close and reopen, and they are kept. The note's ... | ? | **NOT-RUN** | not reached |
 | M9#11 | Alignment in the block menu and in the table bar. | ? | **NOT-RUN** | not reached |
-| M9#12 | The row menu on a type page, a type dashboard section and a query page; Select multiple; bulk change type, open in side panel and delete. | ? | **NOT-RUN** | not reached |
+| M9#12 | The row menu on a type page, a type dashboard section and a query page; Select multiple; bulk change type, open in side panel and delete. | AUTO | **PARTIAL** | Pages type page: row right-click = Select multiple \| Open in side panel \| Open in new tab \| Change type \| Copy object reference \| Duplicate \| Delete object; Select multiple + Shift-click -> "6 selected" bar. Not driven: type dashboard section and query page rows, bulk change type / side panel / delete |
 | M9#13 | Import CSV into a type (with and without a header row, and a new collection); the warning shows. | ? | **NOT-RUN** | not reached |
 | M9#14 | A single-type query tab: the type is locked and the release button works. | ? | **NOT-RUN** | not reached |
-| M9#15 | Sidebar sections: drag to reorder, restart, and the order is kept. | ? | **NOT-RUN** | not reached |
-| M9#16 | "Rebuild search index" (Settings > Offline & Sync) runs and the indexing state shows. | ? | **NOT-RUN** | not reached |
+| M9#15 | Sidebar sections: drag to reorder, restart, and the order is kept. | AUTO | **PASS** | Sidebar grips "Reorder Pinned", "Reorder Object Types": keyboard Space, ArrowDown, Space -> order Object Types, Pinned; `.object/ui.json` workspaceOrder ["objects","pinned"]; page reload keeps it (m9_acceptance check 7 round-trips workspaceOrder). Pointer drag under CDP did not move it |
+| M9#16 | "Rebuild search index" (Settings > Offline & Sync) runs and the indexing state shows. | AUTO | **PASS** | Settings > Offline & Sync > "Rebuild search index": button disabled while running, "Rebuilding the index" state shown; requests POST /api/search/reindex then polling /api/search?q=&limit=1; space unchanged |
 | M9#17 | Draw on a whiteboard: its "Last updated" moves, at most once a minute. The board's Notes still save. | ? | **NOT-RUN** | not reached |
 | M9#18 | Every rule in "Rules the build chose", against the behaviour catalog. | MANUAL | **MANUAL** | Rules for Gene to confirm against the catalog |
 | M9#19 | The look of every M9 screen against the spec and catalog, in Light and Dark. | MANUAL | **MANUAL** | Visual look in Light/Dark |
