@@ -9,9 +9,9 @@ from fastapi.testclient import TestClient
 from objectapp.frontmatter import parse_fm
 from objectapp.propvalues import InvalidValue
 from objectapp.server import create_app
-from objectapp.space import SYNC_MULTI_ONLY, SYNC_NOT_ALLOWED, Space
-from objectapp.typemodel import RevisionConflict, type_revision
-from test_types_api import _changed_lines, _type_file, _write
+from objectapp.space import BASIC_LOCKED, SYNC_MULTI_ONLY, SYNC_NOT_ALLOWED, Space
+from objectapp.typemodel import PropertyDefinition, RevisionConflict, type_revision
+from test_types_api import _changed_lines, _edit, _save, _type_file, _write
 
 STAMP = "lastUpdated: 2026-10-01T08:00:00.000Z\n"
 
@@ -173,6 +173,52 @@ def test_refusals(space_dir: Path):
     with pytest.raises(InvalidValue, match=SYNC_NOT_ALLOWED):
         space.create_relation_pair("page", "subItems", _rev(space, "page"))
     assert _type_file(space_dir, "story").read_bytes() == type_bytes
+
+
+def test_ac1_the_basic_task_type_takes_sub_items_and_dependencies(space_dir: Path):
+    """Decision AC-1: the basic Task type may take both pairs; its other properties stay fixed."""
+    space = Space(space_dir)
+    sub = space.create_relation_pair("task", "subItems", _rev(space, "task"))
+    dep = space.create_relation_pair("task", "dependencies", _rev(space, "task"))
+    assert sub.created is True and dep.created is True
+    t = dep.type
+    by_key = {p.key: p for p in t.propertyDefinitions}
+    for key, is_list in (("parentItem", False), ("subItems", True), ("blockedBy", True), ("blocking", True)):
+        assert _entity(by_key[key]) == ("entity", is_list, ["task"], False)
+        assert space.sync_problem(t, by_key[key]) is None
+    # The Task fields a load tops up stay on the type in memory and in the answer.
+    for key in ("priority", "date", "deadline", "repeat"):
+        assert t.prop(key) is not None and space.type_by_id("task").prop(key) is not None
+    stored = json.loads(_type_file(space_dir, "task").read_text(encoding="utf-8"))
+    assert [p["key"] for p in stored["propertyDefinitions"]][-4:] == ["parentItem", "subItems", "blockedBy", "blocking"]
+
+    def fm(rel: str) -> dict:
+        return parse_fm((space_dir / rel).read_text().replace("\r\n", "\n").split("---\n")[1])
+
+    v = space.cached_version
+    child, parent = "Tasks/Write docs.md", "Tasks/Fix printer.md"
+    space.update_properties(child, {"parentItem": [{"target": "Fix printer", "path": parent}]}, v(child))
+    space.update_properties(child, {"blockedBy": [{"target": "Fix printer", "path": parent}]}, v(child))
+    assert fm(child)["parentItem"] == "[[Fix printer]]"
+    assert fm(child)["blockedBy"] == ["[[Fix printer]]"]
+    assert fm(parent)["subItems"] == ["[[Write docs]]"]
+    assert fm(parent)["blocking"] == ["[[Write docs]]"]
+
+    # A later save of the Task type keeps the pairs; every other fixed-property rule stays.
+    keep = _edit(space, "task")
+    keep.prop("status").options["set"][0]["color"] = "teal"
+    _save(space, keep)
+    added = _edit(space, "task")
+    added.propertyDefinitions.append(PropertyDefinition(id="effort", key="effort", name="Effort", type="number"))
+    removed = _edit(space, "task")
+    removed.propertyDefinitions = [p for p in removed.propertyDefinitions if p.key != "blocking"]
+    for bad in (added, removed):
+        with pytest.raises(InvalidValue, match=BASIC_LOCKED):
+            _save(space, bad)
+    # The other basic types still can't take them.
+    for type_id in ("page", "dailynote", "tag"):
+        with pytest.raises(InvalidValue, match=SYNC_NOT_ALLOWED):
+            space.create_relation_pair(type_id, "subItems", _rev(space, type_id))
 
 
 def test_two_single_sides_never_sync(space_dir: Path):

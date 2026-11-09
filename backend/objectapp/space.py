@@ -135,6 +135,7 @@ from .typemodel import (
     TypeReadOnly,
     UnreadableType,
     load_types,
+    is_task_type,
     system_property_defs,
     topup_task_type,
     type_revision,
@@ -4885,16 +4886,18 @@ class Space:
         one counterpart is a list that syncs back to it.
         """
         lookup = types if types is not None else {x.id: x for x in self.types}
-        if t.basic:
+        allowed = p.options.get("allowedTypes") or []
+        # Decision AC-1: the basic Task type syncs with itself (its sub-items and dependencies pairs).
+        task_self = is_task_type(t) and allowed == [t.id]
+        if t.basic and not task_self:
             return SYNC_NOT_ALLOWED
         ids = _sync_ids(p)
         if p.type != "entity" or p.options.get("hasFixedSet"):
             return SYNC_MULTI_ONLY
         if not _is_multi(p) and len(ids) != 1:
             return SYNC_MULTI_ONLY
-        allowed = p.options.get("allowedTypes") or []
         target = lookup.get(allowed[0]) if len(allowed) == 1 else None
-        if target is None or target.basic:
+        if target is None or (target.basic and not task_self):
             return SYNC_NOT_ALLOWED
         for pid in ids:
             q = next((x for x in target.propertyDefinitions if x.id == pid), None)
@@ -5366,6 +5369,9 @@ class Space:
         self._check_type_free(t.id, base_revision)
         revision = self._write_type_json(t, base_revision)
         self._loaded_revisions[t.id] = revision
+        # In memory the type keeps the fields a load tops up (the Task and work fields), as
+        # `refresh_type` does; the file keeps only what it stored.
+        topup_work_fields(topup_task_type(t), self.types)
         if any(x.id == t.id for x in self.types):
             self.types = [t if x.id == t.id else x for x in self.types]
         else:
@@ -5591,7 +5597,7 @@ class Space:
         backfilled), and nothing at all when the pair is already there.
 
         Raises `KeyError`, `TypeReadOnly`, `RevisionConflict` and `InvalidValue`
-        (unknown kind, basic type, or a same-named property that doesn't match).
+        (unknown kind, a basic type other than Task, or a same-named property that doesn't match).
         """
         spec = RELATION_PAIRS.get(kind)
         if spec is None:
@@ -5600,7 +5606,8 @@ class Space:
             t, current = self._editable_type(type_id)
             if current != (base_revision or ""):
                 raise RevisionConflict(current)
-            if t.basic:
+            # Decision AC-1: of the basic types, only Task may take sub-items and dependencies.
+            if t.basic and not is_task_type(t):
                 raise InvalidValue(SYNC_NOT_ALLOWED)
 
             def named(name: str) -> PropertyDefinition | None:

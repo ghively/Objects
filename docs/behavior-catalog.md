@@ -70,7 +70,9 @@ Object has no accounts.
 - Space Settings: Icon, Name, Description, Delete space.
 - Object Types: "Custom object types" and "Basic object types" tile grids plus Create; per type: Icon, Name,
   Plural, Color, Description, Properties (Add Property), Templates (New Template), Configuration (see the
-  audit doc item 27), Delete object type. Basic types' properties cannot be edited. Field lists per built-in
+  audit doc item 27), Delete object type. Basic types' properties cannot be edited, except that the basic Task type
+  takes the sub-items and dependencies pairs (Parent item / Sub-items, Blocked by / Blocking; a table or
+  timeline view's Customize › Sub-items and dependencies; decision AC-1). Field lists per built-in
   type are in audit item 28.
 - Task management: "Hide Task Management" per space.
 
