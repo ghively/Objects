@@ -38,6 +38,11 @@ export const AGENT_TEXT = {
   applying: 'Applying…',
   applied: (created: number, extended: number) => `${pl(created, 'type', 'types')} created, ${pl(extended, 'type', 'types')} extended.`,
   itemLabel: (name: string) => `Proposal item ${name}`,
+  willSkip: (reason: string) => `Apply will skip this: ${reason}`,
+  droppedHeading: 'Left out',
+  droppedLine: (name: string, reason: string) => `${name}: ${reason}`,
+  skippedSummary: (items: { name: string; reason: string }[]) =>
+    `Skipped: ${items.map((i) => `${i.name} (${i.reason.replace(/\.$/, '')})`).join('; ')}.`,
 
   // Trial.
   trialHeading: 'Trial on the first 50 objects',

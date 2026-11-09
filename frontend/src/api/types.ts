@@ -2831,6 +2831,10 @@ export interface ProposalGroup {
   documentCount: number
   examples: string[]
   properties: ProposalProperty[]
+  /** Why Apply will skip this item (the app's rules, e.g. too few documents); empty when it can be applied. */
+  problems?: string[]
+  /** Properties the app's rules left out of the item, each with the reason. */
+  dropped?: { key: string; name: string; reason: string }[]
 }
 
 export interface SchemaProposal {

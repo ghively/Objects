@@ -434,7 +434,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   existing type** or **Create type**, with document counts, examples, "N% have a value" fill rates, options and merges;
   **Accept**, **Edit** (Name, Plural name, Keep <property>) or **Turn down**; **Apply** stays disabled until every
   item is decided and creates only what was accepted. A new type needs 10 documents; a property needs 30% of its
-  group. Only the app applies a proposal; no MCP tool can.
+  group. An item the rules will skip says so before Apply ("Apply will skip this: <reason>"), properties the rules left
+  out are listed under **Left out** with their reason, and the Apply summary names each skipped item and why
+  ("Skipped: Memo (…)"; items the user turned down are not repeated). Only the app applies a proposal; no MCP tool can.
 - **Trial on the first 50 objects**: **Start trial**; each result shows a confidence (High, Medium, Low), the value
   and its **Quote**, and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
   failed the app's check says **Did not pass the check**. **Continue with the rest** starts the bulk pass (40 objects
