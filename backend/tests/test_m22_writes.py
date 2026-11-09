@@ -437,6 +437,8 @@ def test_agent_completes_and_fails(space: Space, svc: WorkService):
 def test_hand_edited_list(space: Space, svc: WorkService):
     item = svc.item(HAND)
     assert item["problems"] and any("maybe" in p for p in item["problems"])
+    assert item["stepsUnreadable"] is True  # fix pass H: the UI offers no step actions
+    assert all(s["actions"] == [] for s in item["steps"]) and item["current"]["actions"] == []
     before = _bytes(space, HAND)
     s1 = _step(item, 1)
     with pytest.raises(UnreadableList):
@@ -454,7 +456,7 @@ def test_ids_assigned_on_first_write(space: Space, svc: WorkService):
     path.write_text(text, encoding="utf-8", newline="")
     space.rescan_file(HAND)
     item = svc.item(HAND)
-    assert not item["problems"]
+    assert not item["problems"] and item["stepsUnreadable"] is False
     assert [s["id"] for s in item["steps"]] == ["@1", "@2"]
     res = svc.edit_steps(HAND, [{"op": "add", "kind": "do", "text": "Swap the cable"}], GENE)
     ids = [s["id"] for s in res["item"]["steps"]]

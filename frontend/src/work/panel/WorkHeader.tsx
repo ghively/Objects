@@ -160,7 +160,7 @@ export function WorkHeader({ path, work }: { path: string; work: ObjectWrites['w
             <span className="text-fg-muted">{`${WORK_TEXT.stepOf(current.n, item.stepCount)}: `}</span>
             {current.text}
           </p>
-          <StepActions item={item} step={current} run={run} />
+          {!item.stepsUnreadable && <StepActions item={item} step={current} run={run} />}
         </div>
       )}
 
@@ -203,8 +203,17 @@ export function WorkHeader({ path, work }: { path: string; work: ObjectWrites['w
       )}
 
       <div data-work-part="steps">
+        {item.stepsUnreadable && (
+          // Fix pass H: every step write would be refused until the file is fixed: say why, offer none.
+          <ul role="alert" className="mb-2 flex flex-col gap-0.5 text-[13px] text-[var(--danger)]">
+            {item.problems.map((p) => (
+              <li key={p}>{p}</li>
+            ))}
+          </ul>
+        )}
         <StepList
           steps={item.steps}
+          readOnly={item.stepsUnreadable}
           onOps={async (ops) => !!(await run((p) => api.workSteps(p, ops)))}
           onAction={onAction}
         />

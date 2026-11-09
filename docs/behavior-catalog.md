@@ -380,6 +380,9 @@ Each starter template pre-fills the new type's properties.
   row since Gene last acted on it (decision S3): the 4th Agent step stays Open and is listed in Stuck under
   **Waiting for Run now** ("The agent ran 3 steps of this item in a row by itself. Press Run now to let it go on.");
   any action of Gene's on the item (Run now included) starts the count again. The count survives a restart.
+- **A step list that can't be read** (a hand-edited entry with an unknown kind or state): the readable steps show,
+  but no step offers an action (`stepsUnreadable`, every step's `actions` empty), and the work header lists the
+  problems ("Step 3 has an unknown kind "maybe".") until the file is fixed — the server refuses every step write.
 - **Settings > Work**: **Create the Work agent** (shell warning; offers to copy your `change-reviewer`),
   **Read tools** (mark a server's read-only tools; no more than 500), **Set up Desk sync** (an off schedule at
   07:00 every weekday that updates ticket fields only; never writes to Jira or ServiceNow).

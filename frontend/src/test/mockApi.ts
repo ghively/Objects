@@ -625,6 +625,7 @@ export function workItem(partial: Partial<WorkItem> = {}): WorkItem {
     lastActivity: null,
     lastTouched: '2026-11-05T10:00:00.000Z',
     problems: [],
+    stepsUnreadable: false,
     fields: {},
     steps,
     verified: [],

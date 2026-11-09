@@ -209,6 +209,17 @@ function approvedResult(body: string, version: string) {
 }
 
 describe('the work header', () => {
+  // Fix pass H: a step list with an entry that can't be read refuses every step write (422), so the
+  // header offers no step actions and says why.
+  test('an unreadable step list offers no step actions and shows the problem', async () => {
+    item = printer({ stepsUnreadable: true, problems: ['Step 3 has an unknown kind "maybe".'] })
+    render(<ObjectPage path={PATH} workHeader />)
+    const header = await screen.findByRole('region', { name: 'Work' })
+    expect(await within(header).findByRole('alert')).toHaveTextContent('Step 3 has an unknown kind "maybe".')
+    await within(header).findByText(Q.text)
+    expect(within(header).queryByRole('button', { name: /Mark done|Answer|Approve|Edit step/ })).toBeNull()
+  })
+
   test('the header shows the work parts in order', async () => {
     const user = userEvent.setup()
     const { header } = await openPage()

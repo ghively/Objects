@@ -2602,6 +2602,8 @@ export interface WorkItemSummary {
   lastTouched: string
   /** Unreadable steps, duplicate ids, a field of the wrong kind… */
   problems: string[]
+  /** Fix pass H: a step entry can't be read, so the server refuses every step write until the file is fixed. */
+  stepsUnreadable?: boolean
 }
 
 export interface WorkItem extends WorkItemSummary {
