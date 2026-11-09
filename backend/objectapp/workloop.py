@@ -307,6 +307,12 @@ class WorkLoop:
             if cur is not None and notice.by.role == "agent" and notice.path == cur.get("path"):
                 self._notices.append(notice)
         plan = plan_for_notice(notice)
+        if plan is not None and plan.create is not None and not plan.create.get("title"):
+            # The item's title, for the Agent queue row and the run's chat title (a step's or a
+            # note's entry had none, so its row was blank and its chat read "Brain dump").
+            item = self._item(notice.path)
+            if item is not None and item.get("title"):
+                plan.create["title"] = item["title"]
         if plan is not None:
             try:
                 withdrawn, created = self.store.apply(plan, now=self.clock())

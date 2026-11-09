@@ -197,6 +197,46 @@ def test_fake_matches_documented_rules(tmp_path: Path) -> None:
     assert "SECRET-A" not in json.dumps(events)
 
 
+def test_fence_holds_on_glob_characters_in_a_folder_name(tmp_path: Path) -> None:
+    """Sweep finding 18 (checked against the live CLI 2.1.319): an unescaped ``[2024]`` in a rule
+    path is a character class, so a space named ``Notes [2024]`` was left unfenced while
+    ``Notes 2`` was closed. `agentrun.rule_path` escapes the brackets; ``*``, ``?`` and braces stay
+    as written (the CLI still matches them on the literal name, and ``\\?`` broke the match)."""
+    from objectapp import agentrun
+
+    agent = tmp_path / "agent"
+    agent.mkdir()
+    pairs = [("Notes [2024]", "Notes 2"), ("Plans {a,b}", "Plans a"), ("Wild*", None), ("Ask?", None)]
+    deny: list[str] = []
+    lines: list[str] = []
+    for name, twin in pairs:
+        space = tmp_path / name
+        space.mkdir()
+        (space / "a.md").write_text(f"SECRET {name}", encoding="utf-8")
+        deny += agentrun.fence_rules([space], agent, tmp_path / "state", tmp_path / "home")[:2]
+        lines.append(f"FAKE:read:{space / 'a.md'}")
+        if twin:
+            (tmp_path / twin).mkdir()
+            (tmp_path / twin / "b.md").write_text(f"open {twin}", encoding="utf-8")
+            lines.append(f"FAKE:read:{tmp_path / twin / 'b.md'}")
+    results = _results(_run_fake(tmp_path, "\n".join(lines), {"permissions": {"deny": deny}}))
+    assert [r.get("is_error") is True for r in results] == [True, False, True, False, True, True], results
+    assert agentrun.rule_path(Path("/x/Notes [2024]")) == "//x/Notes \\[2024\\]"
+    assert agentrun.rule_path(Path("/x/Plans {a,b}/Wild*/Ask?")) == "//x/Plans {a,b}/Wild*/Ask?"
+
+
+def test_claude_md_excludes_stay_literal(tmp_path: Path) -> None:
+    """Sweep finding 18: the CLI (2.1.319, live) matches ``claudeMdExcludes`` on the literal path,
+    and a backslash-escaped entry stopped matching, so the excludes are never escaped."""
+    from objectapp import agentrun
+
+    own = (tmp_path / "Notes [2024]" / "Plans {a,b}" / "agents" / "Helper").resolve()
+    own.mkdir(parents=True)
+    got = agentrun.claude_md_excludes(own, tmp_path / "home")
+    assert str(own.parent.parent / "CLAUDE.md").replace("\\", "/") in got
+    assert not [e for e in got if "\\" in e]
+
+
 def test_fake_bare_names_and_folder_settings(tmp_path: Path) -> None:
     (tmp_path / "agent" / ".claude").mkdir(parents=True)
     (tmp_path / "agent" / ".claude" / "settings.json").write_text(

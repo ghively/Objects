@@ -224,10 +224,22 @@ def _posix(path: str) -> str:
 
 
 def _glob_regex(pattern: str) -> re.Pattern[str]:
+    """A rule path as the CLI matches it (2.1.319, checked live, sweep finding 18): ``*``, ``**`` and
+    ``?`` are wildcards, ``[...]`` is a character class (``[!...]`` / ``[^...]`` negated), ``\\[`` and
+    ``\\]`` are the literal brackets, and braces are literal."""
     out = ""
     i = 0
     while i < len(pattern):
-        if pattern.startswith("/**", i) and i + 3 == len(pattern):
+        if pattern[i] == "\\" and i + 1 < len(pattern) and pattern[i + 1] in "[]":
+            out += re.escape(pattern[i + 1])
+            i += 2
+        elif pattern[i] == "[" and (end := pattern.find("]", i + 2)) > i:
+            body = pattern[i + 1:end]
+            neg = body[:1] in ("!", "^")
+            body = body[1:] if neg else body
+            out += "[" + ("^" if neg else "") + "".join("\\" + c if c in "\\^[]" else c for c in body) + "]"
+            i = end + 1
+        elif pattern.startswith("/**", i) and i + 3 == len(pattern):
             out += "(?:/.*)?"
             i += 3
         elif pattern.startswith("**/", i):
