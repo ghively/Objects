@@ -4,7 +4,7 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
-import { api } from '@/api/client'
+import { api, isResync } from '@/api/client'
 import type { Collection, Query } from '@/api/types'
 
 interface DefsState {
@@ -49,7 +49,8 @@ function acquire(): void {
   if (refs > 1) return
   void reload()
   off = api.onChange((e) => {
-    if (e.kind !== 'collections' && e.kind !== 'queries') return
+    // An import's resync (`types` at '*') may carry collections made server side (M27 UI-9).
+    if (e.kind !== 'collections' && e.kind !== 'queries' && !isResync(e, 'types')) return
     if (timer) clearTimeout(timer)
     timer = setTimeout(() => {
       timer = null

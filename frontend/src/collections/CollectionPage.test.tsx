@@ -58,6 +58,24 @@ beforeEach(() => {
 })
 
 describe('CollectionPage', () => {
+  // Fix pass H (M27 UI-9): a collection made server side (the filing pass's Import inbox) is fetched
+  // when the page opens on an id the window's store doesn't know yet.
+  test('test an id the store does not know yet is fetched again before Unknown collection', async () => {
+    mocked.rows.mockResolvedValue(ROWS)
+    mocked.collections.mockResolvedValueOnce([]).mockResolvedValue([TOOLING()])
+    render(<CollectionPage id="tooling" />)
+    expect(await screen.findByRole('textbox', { name: 'Collection name' })).toHaveValue('Tooling')
+    expect(screen.queryByText('Unknown collection')).toBeNull()
+  })
+
+  test('test an id still unknown after the refetch says Unknown collection', async () => {
+    mocked.rows.mockResolvedValue([])
+    mocked.collections.mockResolvedValue([])
+    render(<CollectionPage id="gone" />)
+    expect(await screen.findByText('Unknown collection')).toBeInTheDocument()
+    expect(mocked.collections).toHaveBeenCalledTimes(2)
+  })
+
   test('test collection page All tab loads rows by collectionIds', async () => {
     setup()
     render(<CollectionPage id="tooling" />)

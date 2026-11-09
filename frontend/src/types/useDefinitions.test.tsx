@@ -9,6 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import type { ChangeEvent } from '@/api/types'
 import { useDefinitions, useDefs } from './useDefinitions'
 
 const mocked = vi.mocked(api)
@@ -72,4 +73,25 @@ test('a state write that changes nothing does not re-render consumers', async ()
   act(() => useDefs.setState((s) => ({ ...s })))
   expect(renders).toBe(before)
   unmount()
+})
+
+// Fix pass H (M27 UI-9): an import's resync (`types` at '*', the server's one event for a whole
+// import or filing pass) can carry a collection made server side, such as the Import inbox.
+test('an import resync reloads the collections', async () => {
+  let listener: (e: ChangeEvent) => void = () => undefined
+  mocked.onChange.mockImplementation((fn: (e: ChangeEvent) => void) => {
+    listener = fn
+    return () => undefined
+  })
+  render(<Label tag="r" />)
+  expect(await screen.findByText('r:Tooling')).toBeTruthy()
+  mocked.collections.mockResolvedValue([collection({ id: 'c1', name: 'Tooling' }), collection({ id: 'import-inbox', name: 'Import inbox' })])
+  act(() => listener({ kind: 'types', path: '*', version: null, origin: null }))
+  expect(await screen.findByText('r:Tooling,Import inbox', {}, { timeout: 2000 })).toBeTruthy()
+  // A single type's change is not a resync.
+  act(() => listener({ kind: 'types', path: 'server', version: null, origin: null }))
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 300))
+  })
+  expect(mocked.collections).toHaveBeenCalledTimes(2)
 })

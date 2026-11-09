@@ -440,7 +440,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **Normalise tags and options**: near-duplicate tags and option values (for example Prod / prod / Production) with
   **Merge into** and **Merge N groups**; "Nothing looks like a duplicate." when there are none.
 - **Import inbox**: low-confidence pages land in a collection named "Import inbox"; the last step says
-  "N objects in the Import inbox for you to look at." with **Open Import inbox**.
+  "N objects in the Import inbox for you to look at." with **Open Import inbox**. The open window learns of the collection
+  the pass made: an import's resync reloads the collections, and a collection page opened on an id the window
+  doesn't know yet fetches the collections once more before it says "Unknown collection".
 - **MCP**: `import_scan`, `import_proposal`, `import_report` (read) and `save_import_proposal`, `save_import_decisions`
   (write), the prompt `migrate_a_source` and the resource `object://skills/migrate-a-source` let an outside agent run the
   same workflow; `start_import` refuses a mapping that creates types outside an approved proposal (for the open space or a trial copy; a brand-new space is not checked).
