@@ -1,6 +1,6 @@
 # Object IT ops type model and entity extraction: design
 
-Date: 2026-11-09. Owner: Gene Hively. Status: **draft for Gene's review**. Plans: none yet (milestones after M27; see "Phases").
+Date: 2026-11-09. Owner: Gene Hively. Status: **approved by Gene, 2026-11-09** (the whole document, our calls included). Plans: none yet (milestones after M27; see "Phases").
 
 Builds on the base object model (types, properties, relations, collections, templates, "Pick a starting point"), the work model (M22: ticket fields on Task and Project), the agents milestones (M17-M21) and import and migration (M25-M27, `specs/2026-11-06-import-migration-design.md`), which this design extends.
 
