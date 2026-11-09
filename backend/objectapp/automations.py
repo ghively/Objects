@@ -134,6 +134,7 @@ NO_COLLECTION = "The collection no longer exists."
 NOT_HELD = "This collection doesn't hold objects of this type."
 NOTIFY_OFF = "Notifications are turned off."
 NOT_A_BUTTON = "This automation doesn't run from a button."
+NOT_A_SCHEDULE = "This automation doesn't run on a schedule."
 OUT_OF_SCOPE = "This automation doesn't apply to this object."
 IN_TEMPLATE = "Buttons run in objects made from this template."
 MISSED_CONDITIONS = "The object doesn't meet the automation's conditions."
@@ -1389,6 +1390,23 @@ class AutomationEngine:
         ]
         self._log(run, flush=True)
         return run
+
+    def run_now(self, rule_id: str) -> dict[str, Any] | None:
+        """Run a schedule rule once now ("Run now", outside its schedule). Raises `RuleRefused`
+        (404, 422 not a schedule or turned off, 423 unreadable). An agent schedule's run goes to the
+        agent jobs (approval, remote refusal and the rule re-read happen there): None. The
+        schedule's own bookkeeping (``lastDone``, what the catch-up owes) is untouched."""
+        lr = self.rules.get(rule_id)
+        if lr is None:
+            raise RuleRefused(404, f'There is no automation "{rule_id}".')
+        if lr.rule is None:
+            raise RuleRefused(423, lr.read_only_reason or CANT_READ)
+        rule = lr.rule
+        if not isinstance(rule.trigger, ScheduleTrigger):
+            raise RuleRefused(422, NOT_A_SCHEDULE)
+        if not rule.enabled:
+            raise RuleRefused(422, TURNED_OFF)
+        return self.run_scheduled(lr, self.space.clock(), catch_up=False)
 
     def run_button(self, rule_id: str, path: str) -> dict[str, Any]:
         """Press a button: run the rule on the object now. Raises `RuleRefused`."""

@@ -375,6 +375,9 @@ Each starter template pre-fills the new type's properties.
 - **Settings > Work**: **Create the Work agent** (shell warning; offers to copy your `change-reviewer`),
   **Read tools** (mark a server's read-only tools; no more than 500), **Set up Desk sync** (an off schedule at
   07:00 every weekday that updates ticket fields only; never writes to Jira or ServiceNow).
+- **Agent page > Schedules**: each row's menu offers **Run now** (turned-on schedules only; one run outside the
+  schedule, same guards as a due occurrence, through `POST /automations/{id}/run-now`), **Edit**, **Run log** and
+  **Delete**. A turned-off schedule's summary reads "Off · Every weekday at 7:00 AM".
 - **Queue entry states**: pending, running, done, failed (reason + **Retry**), withdrawn. A failed run says why
   ("The run didn't finish within 30 minutes.", "The agent finished without marking the step done.", "Object closed
   during this run.") or asks Gene one question (a Question step is inserted before the step).

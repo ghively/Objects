@@ -1047,6 +1047,7 @@ function defaults(): Api {
     deleteAutomation: async () => ({ trashId: 'trash-automation-1' }),
     runAutomation: async (id: string, path: string) =>
       automationRun({ ruleId: id, trigger: { kind: 'button', path, scheduledFor: null, catchUp: false } }),
+    runScheduleNow: async (id: string) => automationRun({ ruleId: id }),
     automationRuns: async () => [],
     automationCatchUp: async () => [],
     confirmAutomationCatchUp: async () => [],

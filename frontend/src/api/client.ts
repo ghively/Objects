@@ -1581,6 +1581,15 @@ export const api = {
     return request<AutomationRun>(`/automations/${seg(id)}/run`, json('POST', { path, clientId: CLIENT_ID }))
   },
 
+  /**
+   * "Run now" for a schedule rule: one run outside its schedule. A plain rule's run comes back;
+   * an agent schedule's is handed to the agent jobs (`{queued: true}`). 404, 422 (not a schedule,
+   * turned off), 423.
+   */
+  runScheduleNow(id: string): Promise<AutomationRun | { queued: true }> {
+    return request<AutomationRun | { queued: true }>(`/automations/${seg(id)}/run-now`, json('POST', {}))
+  },
+
   /** A rule's run log, newest first (at most 200). 404. */
   async automationRuns(id: string, limit?: number): Promise<AutomationRun[]> {
     const res = await request<{ runs: AutomationRun[] }>(
