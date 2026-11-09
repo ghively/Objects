@@ -1,7 +1,7 @@
 /**
  * Object Type Settings, in this order: breadcrumb; icon, name, plural, colour and
  * description; Properties; Templates; Work (M22: "Add work fields"); Configuration › Page, Card view
- * and linking; Delete Object Type.
+ * and linking; Delete object type.
  *
  * Every edit saves at once through `useTypeEditor` (text fields 400 ms after the last keystroke,
  * and on blur). A type whose file can't be read shows why and disables every control. The
@@ -103,7 +103,7 @@ export const TYPE_SETTINGS_TEXT = {
   reviewing: 'Reviewing',
   reviewingExplanation: "You can mark daily notes as reviewed. Hide the option if you don't need it.",
   hideReviewing: 'Hide reviewing',
-  deleteHeading: 'Delete Object Type',
+  deleteHeading: 'Delete object type',
   // The saved-queries part is our string (see DeleteTypeDialog).
   deleteExplanation:
     'Moves the object type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
