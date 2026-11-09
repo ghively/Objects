@@ -318,7 +318,7 @@ def _one_line(text: str, what: str, limit: int, line_message: str) -> str:
 def steps_from_api(value: Any) -> list[Step]:
     """New steps from API values (``[{kind, text, …}]``) for a create; all must be open."""
     if not isinstance(value, list):
-        raise InvalidValue("Expected a list of steps")
+        raise InvalidValue("Expected a list of steps.")
     if len(value) > MAX_STEPS:
         raise InvalidValue(f"At most {MAX_STEPS} steps.")
     steps: list[Step] = []
@@ -326,7 +326,7 @@ def steps_from_api(value: Any) -> list[Step]:
         if isinstance(item, str):
             item = {"kind": "do", "text": item}
         if not isinstance(item, dict):
-            raise InvalidValue("A step is {kind, text}")
+            raise InvalidValue("A step is {kind, text}.")
         state = item.get("state")
         if state is not None and str(state).strip().lower() != "open":
             raise InvalidValue("New steps start open.")
@@ -342,7 +342,7 @@ def steps_from_api(value: Any) -> list[Step]:
             if v is None:
                 continue
             if not isinstance(v, str):
-                raise InvalidValue(f"Expected text for {key}")
+                raise InvalidValue(f'Expected text for "{key}".')
             if key in _MULTILINE_KEYS and len(v) > MAX_NOTE:
                 raise InvalidValue(f"At most {MAX_NOTE} characters.")
             values[key] = v or None
@@ -372,7 +372,7 @@ def encode_text_list(value: Any) -> list[str] | None:
     if isinstance(value, str):
         value = [value]
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-        raise InvalidValue("Expected a list of texts")
+        raise InvalidValue("Expected a list of texts.")
     items: list[str] = []
     for v in value:
         if not v.strip():
@@ -503,7 +503,7 @@ def _opt_text(item: dict[str, Any], key: str) -> str | None:
     if v is None:
         return None
     if not isinstance(v, str):
-        raise InvalidValue(f"Expected text for {key}")
+        raise InvalidValue(f'Expected text for "{key}".')
     return v.strip() or None
 
 
@@ -516,7 +516,7 @@ def floor_from_api(value: Any, existing_raw: Any = None) -> list[FloorItem]:
     if isinstance(value, dict):
         value = [value]
     if not isinstance(value, list):
-        raise InvalidValue("Expected a list of floor items")
+        raise InvalidValue("Expected a list of floor items.")
     if len(value) > MAX_FLOOR:
         raise InvalidValue(f"At most {MAX_FLOOR} floor items.")
     stored_at, problems = read_floor_at(existing_raw)
@@ -526,7 +526,7 @@ def floor_from_api(value: Any, existing_raw: Any = None) -> list[FloorItem]:
     out: list[FloorItem] = []
     for item in value:
         if not isinstance(item, dict):
-            raise InvalidValue("A floor item is {place, what, collected, found}")
+            raise InvalidValue("A floor item is {place, what, collected, found}.")
         place, what = _opt_text(item, "place"), _opt_text(item, "what")
         if place is None and what is None:
             raise InvalidValue("A floor item needs a place or what to collect.")
@@ -535,7 +535,7 @@ def floor_from_api(value: Any, existing_raw: Any = None) -> list[FloorItem]:
             raise InvalidValue("Collected is a day (YYYY-MM-DD).")
         found = item.get("found")
         if found is not None and not isinstance(found, str):
-            raise InvalidValue("Expected text for found")
+            raise InvalidValue('Expected text for "found".')
         if found is not None and len(found) > MAX_NOTE:
             raise InvalidValue(f"At most {MAX_NOTE} characters.")
         ref = item.get("id")
