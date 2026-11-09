@@ -1,6 +1,6 @@
 // M24 Task 10: Captures: brain dumps with their filing state; a Needs you row shows the agent's
 // question with a reply box (Send) and Mark filed. A 409 reloads and toasts; success shows nothing.
-import { useEffect, useState, type JSX } from 'react'
+import { useEffect, useRef, useState, type JSX } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { CaptureItem } from '@/api/types'
 import { Chip } from '../components/Chip'
@@ -25,9 +25,18 @@ function StatusChip({ status }: { status: CaptureItem['status'] }): JSX.Element 
   return <Chip tone="capture">{CAPTURE_TEXT.statusNew}</Chip>
 }
 
-function CaptureRow({ c, onChanged }: { c: CaptureItem; onChanged: () => Promise<void> }): JSX.Element {
+function CaptureRow({ c, onChanged, focusReply }: { c: CaptureItem; onChanged: () => Promise<void>; focusReply?: boolean }): JSX.Element {
   const [reply, setReply] = useState('')
   const [busy, setBusy] = useState(false)
+  const box = useRef<HTMLInputElement>(null)
+
+  // Fix pass H: the row a parked dump on Now asked for: its reply box takes the focus once.
+  useEffect(() => {
+    if (!focusReply || !box.current) return
+    box.current.focus()
+    box.current.scrollIntoView?.({ block: 'nearest' })
+    useCaptures.getState().reply(null)
+  }, [focusReply])
 
   const act = async (call: () => Promise<unknown>) => {
     if (busy) return
@@ -82,6 +91,7 @@ function CaptureRow({ c, onChanged }: { c: CaptureItem; onChanged: () => Promise
           )}
           <div className="flex items-center gap-2">
             <input
+              ref={box}
               type="text"
               aria-label={CAPTURE_TEXT.replyLabel}
               value={reply}
@@ -115,7 +125,8 @@ export function CapturesView(_props: WorkViewProps): JSX.Element {
   const items = useCaptures((s) => s.items)
   const loaded = useCaptures((s) => s.loaded)
   const load = useCaptures((s) => s.load)
-  const [filter, setFilter] = useState<Filter>('all')
+  const replyTo = useCaptures((s) => s.replyTo)
+  const [filter, setFilter] = useState<Filter>(() => (useCaptures.getState().replyTo ? 'needsYou' : 'all'))
 
   useEffect(() => {
     void load()
@@ -143,7 +154,7 @@ export function CapturesView(_props: WorkViewProps): JSX.Element {
       ) : (
         <ul className="flex min-w-0 flex-col">
           {shown.map((c) => (
-            <CaptureRow key={c.path} c={c} onChanged={load} />
+            <CaptureRow key={c.path} c={c} onChanged={load} focusReply={replyTo === c.path} />
           ))}
         </ul>
       )}

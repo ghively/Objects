@@ -373,7 +373,9 @@ Each starter template pre-fills the new type's properties.
   queue a question or a break-down; anything else is filed as typed. The capture is never deleted by filing.
 - **Captures** view (Work switcher, icon lightbulb, no key; count = New + Needs you): filters All, New, Needs you,
   Filed; a row shows Captured, From, Filed to, Linked item and, for Needs you, the question with **Reply to the
-  agent** + **Send**; **Mark filed**; empty text "Nothing waiting to be filed.".
+  agent** + **Send**; **Mark filed**; empty text "Nothing waiting to be filed.". A parked dump picked in Now's
+  "Parked dumps need you" opens Captures on Needs you with that dump's reply box focused (the capture's own page
+  has no reply box).
 - **Agent acts on my approvals** (switch; Agent queue and Settings > Work): off = approvals, answers, notes and
   requests only wait in the Agent queue; on = Object runs due entries one at a time. **Agent runs by itself**
   (Settings > Work): an Agent step that becomes current runs once, read-only. At most 3 auto-runs of one item in a
