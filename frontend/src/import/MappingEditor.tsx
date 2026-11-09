@@ -113,6 +113,9 @@ export function MappingEditor({ preview, mapping, onChange, target, spaceTypes, 
   )
 }
 
+/** The preview row of the images that become Image objects (the server's `key`). */
+const IMAGE_ROW = 'image'
+
 function TypeRow({
   type: t,
   mapping,
@@ -131,6 +134,23 @@ function TypeRow({
   const eff = effectiveType(t, mapping)
   const set = (patch: Parameters<typeof withTypeOverride>[2]) => onChange(withTypeOverride(mapping, t.key, patch))
   const into = target === 'currentSpace' && eff.existingTypeId !== NEW_TYPE
+  if (t.key === IMAGE_ROW) {
+    // AC-2: the images the Page row would take become Image objects; the server refuses a
+    // mapping entry for this row, so it is shown as it is, with nothing to change.
+    return (
+      <li>
+        <div role="group" aria-labelledby={`${id}-label`} className="flex flex-col gap-1 rounded-lg border border-line p-2.5">
+          <div className="flex items-baseline justify-between gap-2 text-[13px]">
+            <span id={`${id}-label`} className="min-w-0 truncate font-semibold" title={t.originLabel}>
+              {t.originLabel}
+            </span>
+            <span className="shrink-0 text-fg-muted">{T.objectCount(t.objectCount)}</span>
+          </div>
+          <p className="text-[12px] text-fg-muted">{T.imageRow}</p>
+        </div>
+      </li>
+    )
+  }
   // The types imported notes can go into, and the one chosen now even if it can't (the server's
   // answer is shown as it is; it refuses that type when the import starts).
   const addTo = spaceTypes.filter((s) => canReceiveImport(s) || (into && s.id === eff.existingTypeId))

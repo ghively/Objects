@@ -929,3 +929,33 @@ describe('ImportDialog: M25 originals, scratch copy and batches', () => {
     expect(mocked.startImport.mock.lastCall?.[0]).toMatchObject({ keepOriginals: 'fileObjects' })
   })
 })
+
+describe('ImportDialog: the Image row', () => {
+  test('test the Image row shows its count and note and cannot be changed', async () => {
+    // AC-2: the preview lists images under Image; the server refuses a mapping entry for that row.
+    await previewWith((req) => {
+      const base = rawVaultPreview(req)
+      const images: ImportPlannedType = {
+        key: 'image',
+        name: 'Image',
+        pluralName: 'Images',
+        origin: 'page',
+        originLabel: 'Image files',
+        objectCount: 2,
+        existingTypeId: null,
+        skip: false,
+        properties: [],
+      }
+      const types = [...base.types, images]
+      return { ...base, types, mapping: served(req, types) }
+    })
+    const row = typeRow('Image files')
+    expect(within(row).getByText(T.objectCount(2))).toBeInTheDocument()
+    expect(within(row).getByText(T.imageRow)).toBeInTheDocument()
+    expect(within(row).queryByRole('checkbox')).toBeNull()
+    expect(within(row).queryByRole('textbox')).toBeNull()
+    expect(within(row).queryByRole('combobox')).toBeNull()
+    // the other rows keep their controls
+    expect(within(typeRow('Folder Books')).getByRole('checkbox', { name: T.skip })).toBeInTheDocument()
+  })
+})

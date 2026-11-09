@@ -74,6 +74,8 @@ export const IMPORT_TEXT = {
   pluralName: 'Plural name',
   objectCount: (n: number) => plural(n, 'object', 'objects'),
   skip: "Don't import",
+  // The preview's Image row (AC-2): the import makes these Image objects; the row can't be mapped.
+  imageRow: 'Images always become Image objects.',
   existingType: 'Add to',
   newType: 'A new type',
   showProperties: (n: number) => `Properties (${n})`,
