@@ -37,9 +37,9 @@ describe('AgentsSection', () => {
     render(<Sidebar types={[]} />)
     const section = await screen.findByRole('region', { name: AGENT_TEXT.heading })
     const nav = screen.getByRole('navigation', { name: 'Main' })
-    // Directly below the main navigation; the next element after the section is the Work entry.
+    // Directly below the main navigation (M23's Work entry is gone: Tasks opens that dashboard).
     expect(nav.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(section.nextElementSibling).toBe(screen.getByRole('navigation', { name: 'Work' }))
+    expect(nav.nextElementSibling).toBe(section)
     // The built-in Assistant is not an agent row: it is in the main navigation, under Graph.
     await waitFor(() => expect(section.querySelectorAll('[data-agent]')).toHaveLength(1))
     const rows = [...section.querySelectorAll('[data-agent]')].map((r) => r.getAttribute('data-agent'))

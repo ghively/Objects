@@ -73,7 +73,7 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null)
         case 'agent':
           return agents.find((a) => a.id === target.id)?.name ?? 'Agent'
         case 'work':
-          return 'Work'
+          return 'Tasks'
       }
     },
     [byPath, types, collections, queries, titleCtx, agents],
@@ -106,7 +106,7 @@ export function TargetLabel({ target, space }: { target: Target | null; space: S
   } else if (target?.kind === 'trash') {
     icon = <Icon name="ph-trash" size={15} />
   } else if (target?.kind === 'work') {
-    icon = <Icon name="ph-briefcase" size={15} />
+    icon = <Icon name="ph-check-circle" size={15} />
   } else if (target?.kind === 'type' || target?.kind === 'typeSettings') {
     const type = types.find((t) => t.id === target.typeId)
     icon = type ? <TypeChip type={type} size={22} /> : null

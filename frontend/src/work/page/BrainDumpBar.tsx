@@ -30,7 +30,7 @@ export function BrainDumpBar({ view }: { view: WorkViewId }): JSX.Element {
 
   return (
     <div>
-      <label className="flex h-9 items-center gap-2 rounded border border-line px-2 focus-within:border-[var(--work-capture)] focus-within:ring-1 focus-within:ring-[var(--work-capture)]">
+      <label className="flex h-9 items-center gap-2 rounded-lg border border-line bg-raised px-2.5 focus-within:border-[var(--work-capture)]">
         <Icon name={WORK_ICONS.capture} size={14} className="text-[var(--work-capture)]" />
         <input
           type="text"
@@ -45,10 +45,10 @@ export function BrainDumpBar({ view }: { view: WorkViewId }): JSX.Element {
               void send()
             }
           }}
-          className="h-full min-w-0 flex-1 bg-transparent text-[13px] text-fg outline-none placeholder:text-fg-muted"
+          className="h-full min-w-0 flex-1 bg-transparent text-[14px] text-fg outline-none placeholder:text-fg-muted"
         />
       </label>
-      {error ? <p className="mt-1 text-[12px] text-fg-muted">{error}</p> : null}
+      {error ? <p className="mt-1 text-[13px] text-fg-muted">{error}</p> : null}
     </div>
   )
 }

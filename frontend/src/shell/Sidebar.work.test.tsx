@@ -1,5 +1,6 @@
-// M23 Task 17: the Work entry in the sidebar, directly below the Agents section.
-import { render, screen } from '@testing-library/react'
+// Gene's redesign: M23's Work entry is gone from the sidebar; the Tasks entry opens the Tasks
+// dashboard (M23's Work page and the task lists as one page) and is active on either target.
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -9,15 +10,15 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
-import { AGENT_TEXT } from '@/agents/agentText'
 import { resetAgents } from '@/agents/useAgents'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { agent } from '@/test/mockApi'
-import { Sidebar, WORK_LABEL } from './Sidebar'
+import { Sidebar } from './Sidebar'
 
 const mocked = vi.mocked(api)
+const tasksButton = () => within(screen.getByRole('navigation', { name: 'Main' })).getByRole('button', { name: 'Tasks' })
 
-describe('Sidebar Work entry', () => {
+describe('Sidebar Tasks entry (the Tasks dashboard)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetAgents()
@@ -25,44 +26,36 @@ describe('Sidebar Work entry', () => {
     mocked.agents.mockResolvedValue([agent({ id: 'assistant', exists: false })])
   })
 
-  test('test Work sits below the Agents section, after the main navigation', async () => {
+  test('test there is no separate Work entry', () => {
     render(<Sidebar types={[]} />)
-    const main = screen.getByRole('navigation', { name: 'Main' })
-    const agents = await screen.findByRole('region', { name: AGENT_TEXT.heading })
-    const work = screen.getByRole('navigation', { name: 'Work' })
-    // Order: the main navigation, then the agents, then Work (the agent loop's dashboard).
-    expect(main.compareDocumentPosition(agents) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(agents.nextElementSibling).toBe(work)
-    const button = screen.getByRole('button', { name: WORK_LABEL })
-    expect(button.querySelector('[data-icon="ph-briefcase"]')).not.toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Work' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Work' })).toBeNull()
   })
 
-  test('test Work opens the work target, Ctrl+click in a new tab', async () => {
+  test('test Tasks opens the dashboard, Ctrl+click in a new tab', async () => {
     const onOpenTarget = vi.fn()
     const user = userEvent.setup()
     render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
-    await user.click(screen.getByRole('button', { name: WORK_LABEL }))
+    await user.click(tasksButton())
     expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'work' }, { newTab: false })
     await user.keyboard('{Control>}')
-    await user.click(screen.getByRole('button', { name: WORK_LABEL }))
+    await user.click(tasksButton())
     await user.keyboard('{/Control}')
     expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'work' }, { newTab: true })
   })
 
-  test('test aria-current marks Work while it is active', () => {
+  test('test aria-current marks Tasks on the dashboard and on the old tasks target', () => {
     const { rerender } = render(<Sidebar types={[]} />)
-    expect(screen.getByRole('button', { name: WORK_LABEL })).not.toHaveAttribute('aria-current')
+    expect(tasksButton()).not.toHaveAttribute('aria-current')
     rerender(<Sidebar types={[]} workActive />)
-    expect(screen.getByRole('button', { name: WORK_LABEL })).toHaveAttribute('aria-current', 'page')
+    expect(tasksButton()).toHaveAttribute('aria-current', 'page')
+    rerender(<Sidebar types={[]} tasksActive />)
+    expect(tasksButton()).toHaveAttribute('aria-current', 'page')
   })
 
-  test('test Work shows while AI features are hidden', () => {
+  test('test Tasks shows while AI features are hidden', () => {
     useSettings.setState({ settings: { ...settingsDefaults, aiHidden: true } })
     render(<Sidebar types={[]} />)
-    expect(screen.queryByRole('region', { name: AGENT_TEXT.heading })).toBeNull()
-    expect(screen.getByRole('button', { name: WORK_LABEL })).toBeInTheDocument()
-    expect(screen.getByRole('navigation', { name: 'Main' }).nextElementSibling).toBe(
-      screen.getByRole('navigation', { name: 'Work' }),
-    )
+    expect(tasksButton()).toBeInTheDocument()
   })
 })

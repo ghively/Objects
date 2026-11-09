@@ -1,9 +1,16 @@
-// M23 Task 9: the Work page: the top bar, the brain-dump bar and the focus rail on every view, then
-// the view switcher and the selected view. Every view is computed from `useWorkData`; the page's
-// own state (energy, Just one thing, view, the focus line) is `useWorkUi`, browser storage only.
+// The Tasks dashboard (Gene's redesign of M23's Work page): one page for every task — the Tasks
+// header (search, Create task), the brain-dump bar, the focus rail (when today has focus lines),
+// then the grouped view switcher with the energy controls, and the selected view. The task lists
+// (Inbox, Today, Scheduled, ...) are views here too (`work/tasklists/registerView.ts`). Every
+// dashboard view is computed from `useWorkData`; the page's own state (energy, Just one thing,
+// view, the focus line) is `useWorkUi`, browser storage only.
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import type { WorkBoard, WorkBoardItem, WorkViewId } from '@/api/types'
+import { Icon } from '@/components/Icon'
+import { createAndOpen } from '@/create/createAndOpen'
 import { zonedParts } from '@/lib/zonedTime'
+import { useLinkIndex } from '@/links/linkIndex'
+import { findTaskType, TASKS_TEXT } from '@/tasks/TasksPage'
 import { useWorkKeys } from '../keys/useWorkKeys'
 import { DEFAULT_PARTS, useWorkData, useWorkEvents, type WorkDataState, type WorkPart } from '../state/useWorkData'
 import { useWorkUi } from '../state/useWorkUi'
@@ -11,7 +18,7 @@ import { workViews } from '../views/registry'
 import { BrainDumpBar, focusBrainDumpField } from './BrainDumpBar'
 import { FocusRail } from './FocusRail'
 import { ViewSwitcher } from './ViewSwitcher'
-import { clearWorkSearch, focusSearchField, useWorkSearch, WorkTopBar } from './WorkTopBar'
+import { clearWorkSearch, focusSearchField, useWorkSearch, WorkControls, WorkSearch } from './WorkTopBar'
 
 // A later milestone's views register themselves (`work/<folder>/registerView.ts`, M24's Captures).
 import.meta.glob('../*/registerView.ts', { eager: true })
@@ -110,14 +117,47 @@ export function WorkPage({ view }: { view?: WorkViewId }): JSX.Element {
   )
 
   const View = current?.Component
+  const types = useLinkIndex((s) => s.types)
+  const taskType = useMemo(() => findTaskType(types), [types])
+  // The focus rail only when today has focus lines (Now's side keeps its Edit for adding them).
+  const hasFocusLines = (data.focus?.lines.length ?? 0) > 0
   return (
-    <div data-work-page="" className="flex h-full min-h-0 flex-col gap-3 overflow-auto px-6 py-4">
-      <WorkTopBar data={data} />
-      <BrainDumpBar view={currentId} />
-      <FocusRail data={data} now={now} />
-      <ViewSwitcher views={shown} selected={currentId} data={data} now={now} />
-      <div data-work-view-body={currentId} className="min-h-0 flex-1">
-        {View ? <View data={viewData} now={now} /> : null}
+    <div data-work-page="" className="h-full min-h-0 overflow-auto">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-6 pt-5 pb-16">
+        <header className="flex items-center gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-hover-2">
+            <Icon name="ph-check-circle" size={20} />
+          </span>
+          <h1 className="dataview-heading min-w-0 shrink-0 text-[20px] font-bold md:text-[22px]">{TASKS_TEXT.heading}</h1>
+          <div className="ml-auto flex min-w-0 shrink items-center">
+            <WorkSearch />
+          </div>
+          <button
+            type="button"
+            disabled={!taskType}
+            onClick={(e) =>
+              taskType &&
+              void createAndOpen(taskType.id, {}, { ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey }).catch(
+                (err: unknown) => console.warn('Could not create a task:', err),
+              )
+            }
+            className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line bg-raised px-2.5 text-[14px] font-medium hover:bg-hover disabled:opacity-50"
+          >
+            <Icon name="ph-plus" size={14} />
+            {TASKS_TEXT.createTask}
+          </button>
+        </header>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-[18rem] flex-1">
+            <BrainDumpBar view={currentId} />
+          </div>
+          <WorkControls data={data} />
+        </div>
+        {hasFocusLines && <FocusRail data={data} now={now} />}
+        <ViewSwitcher views={shown} selected={currentId} data={data} now={now} />
+        <div data-work-view-body={currentId} className="min-h-0 flex-1">
+          {View ? <View data={viewData} now={now} /> : null}
+        </div>
       </div>
     </div>
   )

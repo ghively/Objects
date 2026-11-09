@@ -15,9 +15,9 @@ export function AgentPill({ carrying, alerts }: { carrying: number; alerts: numb
         if (ui.calm) ui.setCalm(false)
         ui.setView('agent')
       }}
-      className="inline-flex h-7 items-center gap-1 rounded-full border border-line px-2 text-[12px] text-[var(--work-agent)] hover:bg-hover"
+      className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-medium text-[var(--work-agent)] hover:bg-hover"
     >
-      <Icon name={WORK_ICONS.agent} size={12} />
+      <Icon name={WORK_ICONS.agent} size={13} />
       {WORK_TEXT.agentPill(carrying, alerts)}
     </button>
   )

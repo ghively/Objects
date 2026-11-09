@@ -150,7 +150,8 @@ describe('Sidebar', () => {
     await user.click(calendar)
     expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'calendar' }, { newTab: false })
     await user.click(tasks)
-    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'tasks' }, { newTab: false })
+    // Tasks opens the Tasks dashboard (Gene's redesign).
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'work' }, { newTab: false })
     fireEvent.click(calendar, { ctrlKey: true })
     expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'calendar' }, { newTab: true })
     await user.hover(calendar)

@@ -1,5 +1,6 @@
-// M23 Task 9: the Work page frame: the bars on every view, Just one thing, energy, the agent pill,
-// the search and a work target's view.
+// M23 Task 9, Gene's redesign: the Tasks dashboard frame: the Tasks header and the bars on every
+// view, the Drive row with More views, the task lists as views, Just one thing, energy, the agent
+// pill, the search and a work target's view.
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -68,19 +69,58 @@ describe('WorkPage', () => {
   test('test the bars stay on every view', async () => {
     const user = userEvent.setup()
     await show()
-    const labels = within(switcher())
-      .getAllByRole('button')
-      .map((b) => b.getAttribute('data-work-view'))
-    expect(labels).toHaveLength(12)
-    for (const id of labels) {
+    const ids = workViews().map((v) => v.id)
+    expect(ids).toHaveLength(12)
+    for (const id of ids) {
+      const more = within(switcher()).queryByRole('button', { name: 'More views' })
+      if (!switcher().querySelector(`[data-work-view="${id}"]`) && more) await user.click(more)
       await user.click(switcher().querySelector(`[data-work-view="${id}"]`) as HTMLElement)
       expect(selectedView()).toBe(id)
+      expect(screen.getByRole('heading', { level: 1, name: 'Tasks' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Create task' })).toBeInTheDocument()
       expect(screen.getByRole('group', { name: 'Energy' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Just one thing/ })).toBeInTheDocument()
       expect(screen.getByRole('searchbox', { name: 'Search work' })).toBeInTheDocument()
       expect(screen.getByRole('textbox', { name: 'Brain dump' })).toBeInTheDocument()
-      expect(screen.getByRole('group', { name: 'Focus lines' })).toBeInTheDocument()
     }
+  })
+
+  test('test the Drive row shows first and More views folds Plan, Manage and Review', async () => {
+    const user = userEvent.setup()
+    await show()
+    const row = () =>
+      within(switcher())
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('data-work-view') ?? b.textContent)
+    // Drive (of the default views): Now, Your queues, Agent queue; the rest is folded.
+    expect(row()).toEqual(['now', 'queues', 'agent', 'More views'])
+    await user.click(within(switcher()).getByRole('button', { name: 'More views' }))
+    expect(within(switcher()).getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(['Plan', 'Review'])
+    expect(
+      within(within(switcher()).getByRole('region', { name: 'Plan' }))
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('data-work-view')),
+    ).toEqual(['today', 'flow', 'projects', 'floor'])
+    expect(
+      within(within(switcher()).getByRole('region', { name: 'Review' }))
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('data-work-view')),
+    ).toEqual(['stuck', 'wins', 'alerts', 'tickets', 'everything'])
+    // Picking a folded view and folding again keeps it on the row.
+    await user.click(switcher().querySelector('[data-work-view="wins"]') as HTMLElement)
+    await user.click(within(switcher()).getByRole('button', { name: 'Fewer views' }))
+    expect(row()).toEqual(['now', 'queues', 'agent', 'wins', 'More views'])
+    expect(selectedView()).toBe('wins')
+  })
+
+  test('test the task lists are views of the dashboard (registered through the glob)', () => {
+    const ids = registeredAtImport.map((v) => v.id)
+    for (const id of ['list-inbox', 'list-today', 'list-scheduled', 'list-status', 'list-completed', 'list-all']) {
+      expect(ids).toContain(id)
+    }
+    expect(registeredAtImport.find((v) => v.id === 'list-inbox')?.label).toBe('Inbox')
+    // The dashboard's day timeline is named Timeline, so "Today" means the task list.
+    expect(registeredAtImport.find((v) => v.id === 'today')?.label).toBe('Timeline')
   })
 
   test('test just one thing shows only Now and dims the app', async () => {
@@ -93,11 +133,12 @@ describe('WorkPage', () => {
     expect(document.documentElement).toHaveAttribute('data-work-calm')
     r.unmount()
     expect(document.documentElement).not.toHaveAttribute('data-work-calm')
-    // Off again: every view is back.
+    // Off again: every view is back (the Drive row and More views).
     await show()
     expect(document.documentElement).toHaveAttribute('data-work-calm')
     await user.click(screen.getByRole('button', { name: /Just one thing/ }))
-    expect(within(switcher()).getAllByRole('button')).toHaveLength(12)
+    expect(within(switcher()).getByRole('button', { name: 'More views' })).toBeInTheDocument()
+    expect(within(switcher()).getAllByRole('button').length).toBeGreaterThan(1)
     expect(document.documentElement).not.toHaveAttribute('data-work-calm')
   })
 

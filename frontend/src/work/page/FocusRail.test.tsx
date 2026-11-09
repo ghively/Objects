@@ -79,6 +79,8 @@ describe('FocusRail', () => {
   test('test clicking selects the line and Now shows only its work', async () => {
     const user = userEvent.setup()
     await show()
+    // Flow is folded under More views (Gene's redesign: the Drive views on one row).
+    await user.click(screen.getByRole('button', { name: 'More views' }))
     await user.click(screen.getByRole('button', { name: /^Flow/ }))
     expect(selectedView()).toBe('flow')
     expect(nowCount()).toBe('7')
@@ -106,11 +108,12 @@ describe('FocusRail', () => {
     expect(nowCount()).toBe('7')
   })
 
-  test('test no lines shows the empty rail with Edit', async () => {
+  test('test no lines hides the rail; Now\u2019s Focus card keeps Edit', async () => {
     mocked.workFocus.mockResolvedValue(focusDay([]))
     await show()
-    expect(within(rail()).getByText('No focus lines today.')).toBeInTheDocument()
-    expect(within(rail()).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    // Gene's redesign: an empty rail is clutter; Now's side still offers Edit to add lines.
+    expect(screen.queryByRole('group', { name: 'Focus lines' })).toBeNull()
+    expect(within(screen.getByRole('region', { name: 'Focus' })).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
   })
 
   test('test edit then save sends the lines with the version', async () => {
