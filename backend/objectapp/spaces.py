@@ -377,13 +377,19 @@ def _move_to_trash(path: Path) -> None:
     try:
         send2trash(str(path))
     except TrashPermissionError as exc:
-        raise TrashUnavailable(str(exc) or "The Trash is not available.") from exc
+        raise TrashUnavailable(_trash_unavailable(exc)) from exc
     except FileNotFoundError:
         raise
     except OSError as exc:
         if path.exists():  # nothing (or only part) was moved: the trash can't take it
-            raise TrashUnavailable(str(exc) or "The Trash is not available.") from exc
+            raise TrashUnavailable(_trash_unavailable(exc)) from exc
         raise
+
+
+def _trash_unavailable(exc: OSError) -> str:
+    """The 428's one sentence: ``The Trash is not available.`` plus the OS reason when it has one."""
+    reason = (exc.strerror or str(exc) or "").strip().rstrip(".")
+    return f"The Trash is not available: {reason}." if reason else "The Trash is not available."
 
 
 def _before_permanent_delete(path: Path) -> None:
@@ -418,14 +424,14 @@ def delete_space(
     try:
         target = normalize(path)
     except ValueError as exc:
-        raise SpaceNotFound(f"Not a space folder: {str(path)[:60]!r}") from exc
+        raise SpaceNotFound(f'"{str(path)[:60]}" is not a space folder.') from exc
     if current is not None:
         cur = normalize(current)
         if _within(cur, target) or _within(target, cur):
             raise SpaceIsCurrent("This space is open. Switch to another space first.")
     registered = {_key(i["path"]) for i in reg._load()["spaces"]}
     if _key(target) not in registered or not _is_space_folder(target):
-        raise SpaceNotFound(f"Not a space folder: {target}")
+        raise SpaceNotFound(f'"{target}" is not a space folder.')
     if not permanent:
         try:
             _move_to_trash(target)
