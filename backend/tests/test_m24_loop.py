@@ -408,6 +408,23 @@ def test_agent_status_for_m23(env: Env) -> None:
     assert withdrawn and withdrawn[0]["error"] == REAPPROVE
 
 
+def test_step_entries_carry_the_item_title(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Found on the live-CLI run (lane A): an entry queued by a step action or a note had no title,
+    so its Agent queue row showed no item name and its headless chat was titled "Brain dump · run"."""
+    actions(monkeypatch, {"approve": [step_call("complete", "Done.")]})
+    title = env.service.item(P)["title"]
+    env.step(P, STEP, "approve")
+    env.service.note(P, "request", "hi", GENE)
+    status = AgentSeam().status(env.service.space, [])
+    assert [r["title"] for r in status["rows"]] == [title, title]
+    env.acts()
+    env.idle()
+    [e] = [x for x in env.entries() if x["kind"] == "approve"]
+    chats = (Path(env.agent.folder) / ".object-agent" / "sessions").glob("*.jsonl")
+    heads = [json.loads(p.read_text(encoding="utf-8").splitlines()[0]) for p in chats]
+    assert any(h.get("id") == e["chatId"] and h.get("title", "").startswith(title) for h in heads), heads
+
+
 def test_auto_run(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
     actions(monkeypatch, {"run": [step_call("fail", "Can't read the log", ask="Which reader?")]})
     env.acts()
