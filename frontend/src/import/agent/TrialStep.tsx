@@ -211,6 +211,23 @@ function TrialRow({
             </blockquote>
           </li>
         ))}
+        {(
+          [
+            ['tags', T.tagsLabel],
+            ['collections', T.collectionsLabel],
+          ] as const
+        ).flatMap(([field, label]) =>
+          (item[field] ?? []).map((t, n) => (
+            <li key={`${field}-${n}`}>
+              <span className="font-medium">{label}</span>: {t.value}
+              {!t.ok && <span className="ml-1 text-danger">({T.valueRejected})</span>}
+              <blockquote className="border-l-2 border-line pl-2 text-[12px] text-fg-muted">
+                <span className="sr-only">{T.quote}: </span>
+                {t.quote}
+              </blockquote>
+            </li>
+          )),
+        )}
       </ul>
     </li>
   )

@@ -53,6 +53,8 @@ export const AGENT_TEXT = {
   failed: 'The agent run failed. Nothing more was applied.',
   confidence: { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' },
   quote: 'Quote',
+  tagsLabel: 'Tags',
+  collectionsLabel: 'Collections',
   valueRejected: 'Did not pass the check',
   right: 'Right',
   wrong: 'Wrong',

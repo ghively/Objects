@@ -460,6 +460,10 @@ class Filing:
                 "path": r["path"], "title": r["title"], "type": r["type"] or "", "confidence": r["confidence"],
                 "values": [{"key": v["key"], "value": v["value"], "quote": v["quote"], "ok": bool(v["ok"])}
                            for v in r["values"]],
+                # what the result adds besides values: the tags and collections, each with its quote
+                "tags": [{"value": t["value"], "quote": t["quote"], "ok": bool(t["ok"])} for t in r.get("tags") or []],
+                "collections": [{"value": c["value"], "quote": c["quote"], "ok": bool(c["ok"])}
+                                for c in r.get("collections") or []],
                 "verdict": d["verdicts"].get(p),
             })
         marked = [v for p, v in d["verdicts"].items() if p in d["trialPaths"]]

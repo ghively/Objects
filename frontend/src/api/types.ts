@@ -2876,12 +2876,21 @@ export interface FilingValue {
   ok: boolean
 }
 
+/** A tag or collection a filing result adds, with the words it was read from. */
+export interface FilingLabel {
+  value: string
+  quote: string
+  ok: boolean
+}
+
 export interface FilingTrialItem {
   path: string
   title: string
   type: string
   confidence: FilingConfidence
   values: FilingValue[]
+  tags?: FilingLabel[]
+  collections?: FilingLabel[]
   verdict: FilingVerdict | null
 }
 

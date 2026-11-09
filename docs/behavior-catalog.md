@@ -438,7 +438,7 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   out are listed under **Left out** with their reason, and the Apply summary names each skipped item and why
   ("Skipped: Memo (…)"; items the user turned down are not repeated). Only the app applies a proposal; no MCP tool can.
 - **Trial on the first 50 objects**: **Start trial**; each result shows a confidence (High, Medium, Low), the value
-  and its **Quote**, and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
+  and its **Quote**, the **Tags** and **Collections** it adds (each with its quote), and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
   failed the app's check says **Did not pass the check**. **Continue with the rest** starts the bulk pass (40 objects
   per agent turn). Flagged files are not in the trial.
 - **Normalise tags and options**: near-duplicate tags and option values (for example Prod / prod / Production) with

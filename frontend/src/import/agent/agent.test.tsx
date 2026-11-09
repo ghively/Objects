@@ -50,6 +50,7 @@ function trialStatus(over: Partial<FilingStatus> = {}): FilingStatus {
           confidence: 'high',
           verdict: null,
           values: [{ key: 'status', value: 'Prod', quote: 'We shipped to prod', ok: true }],
+          tags: [{ value: 'Release', quote: 'release notes', ok: true }],
         },
         {
           path: 'b.md',
@@ -178,6 +179,10 @@ describe('TrialStep', () => {
     const alpha = await screen.findByRole('group', { name: 'Alpha' })
     expect(within(alpha).getByText('We shipped to prod')).toBeInTheDocument()
     expect(within(alpha).getByText(T.confidence.high)).toBeInTheDocument()
+    // the tags a result adds, with their quote (fix pass H)
+    expect(within(alpha).getByText(T.tagsLabel)).toBeInTheDocument()
+    expect(within(alpha).getByText(/Release/)).toBeInTheDocument()
+    expect(within(alpha).getByText('release notes')).toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: 'Beta' })).getByText(`(${T.valueRejected})`)).toBeInTheDocument()
     expect(screen.getByText(T.noMarks)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: T.markLabel(T.right, 'Alpha') }))
