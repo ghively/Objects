@@ -21,7 +21,7 @@ against a scratch server. **No box in Gene's `mN-acceptance.md` files was ticked
   36 `[ok]` RESULT: PASS; m22 44 ok PASS; m23 40 ok PASS; m24 72 ok PASS; m25 37 ok "All checks passed"; m26 13 ok
   PASS; m27 21 ok PASS. Zero `[FAIL]` lines.
 
-**Result:** 83 boxes: PASS 63, NOT-RUN 7, PARTIAL 6, MANUAL 3, DEFERRED-live-CLI 2, SUPERSEDED 1, FAIL 1.
+**Result:** 83 boxes: PASS 66, PARTIAL 9, MANUAL 3, DEFERRED-live-CLI 2, FAIL 2, SUPERSEDED 1.
 
 Result key: PASS / FAIL / PARTIAL / SUPERSEDED (the box assumes the pre-redesign layout; the feature was checked at
 its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) / DEFERRED-live-CLI / NOT-RUN.
@@ -130,26 +130,26 @@ its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) 
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M27-1 | Run the acceptance script, then a real trial on a copy of a work export: mark the trial in the wizard, see the accuracy in the report. | NOT-RUN | (not reached) |
+| M27-1 | Run the acceptance script, then a real trial on a copy of a work export: mark the trial in the wizard, see the accuracy in the report. | **PARTIAL** | scripts/m27_acceptance.py: 21 [ok], RESULT: PASS (logs/m27.log). Trial on a synthetic 60-runbook Files folder (no work export here): marked 3 Right + 1 Wrong in the wizard -> report.md "Trial: 50 objects; marked 4 (3 right, 1 wrong): 75% right", "Filed: 58; in the Import inbox: 3". A real work-export trial stays MANUAL |
 | M27-2 | Apply a proposal in the wizard: the types and properties look right; a group under 10 documents is not made. | **PASS** | Wizard Apply on the MCP-saved proposal (batch 01M6ZBFV…): review g1 edited (Playbook->Runbook, drop owner), g2 Memo accepted, g3 extend turned down, g4 use accepted -> "1 type created, 0 types extended."; GET /api/space: new type runbook "Runbook/Runbooks" with only environment label (options Prod, Dev; Rare <30% dropped); Memo (3 documents) not made: applied.skipped "A new type needs at least 10 documents (3 here)…" |
 | M27-3 | A flagged file is imported excluded from AI and is not in the trial. | **PASS** | Secrets.md (scan-flagged, left on "Import, excluded from AI") written with excludeFromAI: true; trial list 50 rows (Notes, Runbook 00-48) without Secrets; fake claude log has no "Object: …Secrets" line; file untouched by filing (type Page, no values) |
 | M27-4 | Low-confidence pages land in the Import inbox collection. | **PASS** | Trial decisions with confidence low (Runbook 01, 07, Notes) -> front matter collections: [Import inbox], type left Page; high ones moved to Runbooks/ with environment: Prod (scripted half: m27_acceptance.py "low confidence goes to the Import inbox" [ok]) |
 | M27-5 | An outside agent (Claude Desktop) reads the `migrate_a_source` prompt and calls `import_scan`, `save_import_proposal`. | **PARTIAL** | No Claude Desktop here; scripted MCP stdio client (objectapp-mcp, read-write token) on :8809: list_prompts -> ["migrate_a_source"] (5801-char skill text, stages and gates), import_scan -> draft batch + findings by kind/line (no values), save_import_proposal -> revision + checks (Rare dropped <30%, Memo 3 docs problem); a bad kind is refused 422. Real Desktop run stays MANUAL |
-| M27-6 | Normalise merges "Prod / prod / Production" tags. | NOT-RUN | (not reached) |
+| M27-6 | Normalise merges "Prod / prod / Production" tags. | **PASS** | After the bulk pass the Normalise step listed TAG "Prod, Production, prod"; Merge into Production -> all 58 Runbooks have tags: [Production], no Prod/prod tag left in the space (also m27_acceptance.py "normalise merges the tags" [ok]) |
 
 ### M27UI (`m27-ui-acceptance.md`, 9 boxes)
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M27UI-1 | Preview a source: the scan step comes before the mapping step; Back returns to the source. | NOT-RUN | (not reached) |
+| M27UI-1 | Preview a source: the scan step comes before the mapping step; Back returns to the source. | **PASS** | Preview of the Files folder opens "Check for sensitive content" (Scan, Back, Continue disabled until scanned); mapping ("Review mappings") only after Continue; Back returns to the source step with the path kept |
 | M27UI-2 | A flagged file set to "Leave out" is not imported; one left as "Import, excluded from AI" is written with `excludeFromAI`. | **PASS** | Wizard scan step (63 scanned, 2 flagged): "Runbooks/Deploy keys.md" set to Leave out -> not in Pages/, report "left out, not read or imported", 0 sk_live hits; "Runbooks/Secrets.md" left on "Import, excluded from AI" -> Pages/Secrets.md front matter excludeFromAI: true (counts 64 source: 62 imported, 2 left out) |
 | M27UI-3 | Finish an import into this space: "Review proposed schema" shows each group as use / extend / create with counts, examples, fill rates, options and m… | **PASS** | Re-seen on a real wizard import (60 runbooks, MCP-saved proposal): CREATE TYPE Playbook 60 documents / CREATE TYPE Memo 3 / EXTEND EXISTING TYPE Page 12 / USE EXISTING TYPE Page 1, each with Examples, "Environment label · 100% have a value", "Options: Prod, Dev", "Prod, prod, Production merged into Prod". Note: problems (Memo <10 docs) and dropped properties (Rare) are not shown in the step |
-| M27UI-4 | Apply stays disabled until every item is accepted, edited or turned down; reloading the dialog restores the decisions. | NOT-RUN | (not reached) |
+| M27UI-4 | Apply stays disabled until every item is accepted, edited or turned down; reloading the dialog restores the decisions. | **PARTIAL** | Apply disabled with "4 items still to decide" / "2 items still to decide", enabled once all 4 were Accepted/Edited/Turned down; every change saved (GET proposal review: g1 edited, g2 accepted, g3 rejected, g4 accepted). Restore on reopen not drivable: the agent flow is only reachable from the finish step of the import that made the batch (ImportDialog step agent); after Close or a page reload there is no entry to reopen it (Settings > Import Content has none) |
 | M27UI-5 | Edit renames a type and drops a property; Apply creates only what was accepted. | **PASS** | Edit on Playbook: Name Runbook, Plural Runbooks, untick "Keep Owner" -> status Edited, review saved {name:Runbook, plural:Runbooks, dropProperties:[owner]}; Apply -> type runbook "Runbook" with environment only; turned-down extend and <10-doc Memo not made (applied.created ["runbook"], skipped g2, g3) |
 | M27UI-6 | Trial shows 50 objects with each value and its quote; Right/Wrong marks stick and the accuracy line updates. | **PASS** | Start trial -> "Trial on the first 50 objects": 50 rows (Right:/Wrong: buttons), each with type, confidence and "environment: Prod / Quote: Environment: Production"; refused value shown "environment: Dev(Did not pass the check)"; Right x3 + Wrong x1 -> "3 of 4 marked right (75%)", aria-pressed true on the marked buttons, GET filing verdicts right/right/right/wrong, rightShare 0.75 |
-| M27UI-7 | "Continue with the rest" starts the bulk pass only then. | NOT-RUN | (not reached) |
-| M27UI-8 | Normalise lists near-duplicate tags and options; merging changes them everywhere. | NOT-RUN | (not reached) |
-| M27UI-9 | The last step shows the Import inbox count and "Open Import inbox" opens that collection. | NOT-RUN | (not reached) |
+| M27UI-7 | "Continue with the rest" starts the bulk pass only then. | **PASS** | During the trial Runbook 49-59 stayed type Page with no values; "Continue with the rest" -> bulk pass ran, Runbooks/ 47 -> 58 files (all 60 minus the 2 low-confidence), filing state done, Normalise step shown |
+| M27UI-8 | Normalise lists near-duplicate tags and options; merging changes them everywhere. | **PARTIAL** | Tags: Normalise listed TAG "Prod, Production, prod" with a Merge into select; merging into Production changed all 58 objects (tags: [Production]). Options: no option group appeared - the proposal had already folded Prod/prod/Production into option Prod, so the filed values were all environment: Prod; option merge only covered by m27_acceptance.py/pytest |
+| M27UI-9 | The last step shows the Import inbox count and "Open Import inbox" opens that collection. | **FAIL** | Last step showed "3 objects in the Import inbox for you to look at." (correct: Notes, Runbook 01, Runbook 07), but "Open Import inbox" opened a tab "import-inbox" reading "Unknown collection" (GET /api/collections had id import-inbox); after a page reload the same tab showed Import inbox with the 3 objects. The collection made during the filing pass is missing from the open window's collections store |
 
 ## Bugs fixed on this branch (one commit each, regression test seen failing first)
 
@@ -179,3 +179,20 @@ its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) 
 - Parked dumps on Now open the capture's page in the side panel, which has no reply box; Send lives in the Captures
   view ("Reply to the agent").
 - Withdraw writes a "reopened step n" Activity line (no "withdrew" wording).
+
+## Lane C2c findings (M27, M27-UI; not fixed, no code changes in this lane)
+
+- **M27UI-9 FAIL**: after a filing pass, "Open Import inbox" opens `{kind:'collection', id:'import-inbox'}` but the
+  page says "Unknown collection" — the "Import inbox" collection is created by the pass (server side) and the open
+  window's collections store never learns of it; a page reload fixes it. `InboxStep` finds the id through
+  `api.collections()` (fresh), `CollectionPage` reads the stale store (`useCollections.ts:55`).
+- The agent flow (Proposed schema / Trial / Normalise / Import inbox) is only reachable from the finish step of the
+  import that made the batch. After Close or a reload there is no way back to a batch's proposal or trial in the UI,
+  so "reloading the dialog restores the decisions" (M27UI-4) and resuming a trial later can't be done, although the
+  review and marks are saved server-side as they change.
+- The Proposed schema step does not show an item's `problems` (e.g. "A new type needs at least 10 documents") or
+  its `dropped` properties; the under-10 Memo looked acceptable until Apply silently skipped it (the summary says
+  "1 type created, 0 types extended." without naming what was skipped).
+- First import into this space defaults to "Try on a copy of this space" (M25): the finish step then offers
+  "Switch space" and no "Review proposed schema"; untick it to reach the agent flow.
+- Trial rows show values and quotes but not the tags a decision adds.
