@@ -115,6 +115,12 @@ export const REMOTE_TEXT = {
   removed: 'Removed from the list. Its folder was left where it is.',
   conflict: 'This agent was changed elsewhere. Its latest settings are shown: apply your change again.',
   refreshed: 'The card was fetched again.',
+  moved: (host: string) => `The agent's address moved to ${host}. Confirm the move to use it.`,
+  switchAddress: 'Switch to the new address',
+  keepAddress: 'Keep the old one',
+  switched: 'Switched to the new address.',
+  switchedNeedsToken: 'Switched to the new address. Enter its token again.',
+  keptAddress: 'The old address is kept.',
 
   // The Card tab
   description: 'Description',

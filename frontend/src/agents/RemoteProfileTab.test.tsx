@@ -129,14 +129,129 @@ describe('RemoteProfileTab', () => {
   test('test Refresh card calls refreshRemoteAgent', async () => {
     seed(remoteAgent({ id: PLANNER }))
     const base = remoteAgent({ id: PLANNER })
-    mocked.refreshRemoteAgent.mockResolvedValueOnce(
-      remoteAgent({ id: PLANNER, remote: { ...base.remote!, endpointHost: 'agents.example.com' } }),
-    )
+    mocked.refreshRemoteAgent.mockResolvedValueOnce({
+      ...remoteAgent({ id: PLANNER, remote: { ...base.remote!, endpointHost: 'agents.example.com' } }),
+      warnings: [],
+      notice: null,
+    })
     const user = userEvent.setup()
     render(<Live id={PLANNER} />)
     await user.click(screen.getByRole('button', { name: REMOTE_TEXT.refreshCard }))
     expect(mocked.refreshRemoteAgent).toHaveBeenCalledWith(PLANNER)
     expect(await screen.findByText('Sends messages to agents.example.com')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(REMOTE_TEXT.refreshed)
+    expect(screen.queryByRole('button', { name: REMOTE_TEXT.switchAddress })).toBeNull()
+  })
+
+  const MOVED = { url: 'https://agents.example.com/a2a', host: 'agents.example.com' }
+  const MOVED_NOTICE = 'The agent\'s address moved to agents.example.com. Confirm the move to use it.'
+
+  test('test a refresh that moved the address keeps the old one and asks', async () => {
+    seed(remoteAgent({ id: PLANNER }))
+    const base = remoteAgent({ id: PLANNER })
+    mocked.refreshRemoteAgent.mockResolvedValueOnce({
+      ...remoteAgent({
+        id: PLANNER,
+        remote: { ...base.remote!, pendingEndpoint: MOVED, auth: { kind: 'bearer', headerName: null, set: false } },
+      }),
+      warnings: [],
+      notice: MOVED_NOTICE,
+    })
+    const user = userEvent.setup()
+    render(<Live id={PLANNER} />)
+    await user.click(screen.getByRole('button', { name: REMOTE_TEXT.refreshCard }))
+    const card = screen.getByRole('region', { name: REMOTE_TEXT.agentCard })
+    expect(await within(card).findByText(MOVED_NOTICE)).toBeInTheDocument()
+    expect(card).toHaveTextContent('Sends messages to 127.0.0.1') // still the old address
+    expect(within(card).getByRole('button', { name: REMOTE_TEXT.switchAddress })).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: REMOTE_TEXT.keepAddress })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: REMOTE_TEXT.authentication })).toHaveTextContent('Token: needed')
+  })
+
+  test('test Switch to the new address confirms and asks for the token again', async () => {
+    const base = remoteAgent({ id: PLANNER })
+    seed(withAuth({ kind: 'bearer', headerName: null, set: false }, { pendingEndpoint: MOVED }))
+    mocked.confirmRemoteEndpoint.mockResolvedValueOnce(
+      remoteAgent({
+        id: PLANNER,
+        revision: 'r2',
+        remote: {
+          ...base.remote!,
+          endpointUrl: MOVED.url,
+          endpointHost: MOVED.host,
+          pendingEndpoint: null,
+          auth: { kind: 'bearer', headerName: null, set: false },
+        },
+      }),
+    )
+    const user = userEvent.setup()
+    render(<Live id={PLANNER} />)
+    const card = screen.getByRole('region', { name: REMOTE_TEXT.agentCard })
+    expect(within(card).getByText(MOVED_NOTICE)).toBeInTheDocument()
+    await user.click(within(card).getByRole('button', { name: REMOTE_TEXT.switchAddress }))
+    expect(mocked.confirmRemoteEndpoint).toHaveBeenCalledWith(PLANNER)
+    expect(await within(card).findByText('Sends messages to agents.example.com')).toBeInTheDocument()
+    expect(within(card).queryByText(MOVED_NOTICE)).toBeNull()
+    // The agent had a token: the auth fields open, as when adding, with its kind chosen.
+    const auth = screen.getByRole('region', { name: REMOTE_TEXT.authentication })
+    expect(within(auth).getByRole('radio', { name: REMOTE_TEXT.authBearer })).toBeChecked()
+    expect(within(auth).getByLabelText(REMOTE_TEXT.token)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(REMOTE_TEXT.switchedNeedsToken)
+    await user.type(within(auth).getByLabelText(REMOTE_TEXT.token), 'fresh-secret')
+    await user.click(within(auth).getByRole('button', { name: REMOTE_TEXT.save }))
+    expect(mocked.saveRemoteAgent).toHaveBeenCalledWith(PLANNER, {
+      name: 'Fake Planner',
+      icon: 'ph-globe',
+      color: null,
+      auth: { kind: 'bearer', value: 'fresh-secret' },
+      baseRevision: 'r2',
+    })
+  })
+
+  test('test Switch to the new address without a token asks for none', async () => {
+    const base = remoteAgent({ id: PLANNER })
+    seed(withAuth({ kind: 'none', headerName: null, set: false }, { pendingEndpoint: MOVED }))
+    mocked.confirmRemoteEndpoint.mockResolvedValueOnce(
+      remoteAgent({
+        id: PLANNER,
+        remote: {
+          ...base.remote!,
+          endpointUrl: MOVED.url,
+          endpointHost: MOVED.host,
+          pendingEndpoint: null,
+          auth: { kind: 'none', headerName: null, set: false },
+        },
+      }),
+    )
+    const user = userEvent.setup()
+    render(<Live id={PLANNER} />)
+    await user.click(screen.getByRole('button', { name: REMOTE_TEXT.switchAddress }))
+    expect(await screen.findByText('Sends messages to agents.example.com')).toBeInTheDocument()
+    const auth = screen.getByRole('region', { name: REMOTE_TEXT.authentication })
+    expect(within(auth).queryByRole('radio', { name: REMOTE_TEXT.authBearer })).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent(REMOTE_TEXT.switched)
+  })
+
+  test('test Keep the old one dismisses the move', async () => {
+    const base = remoteAgent({ id: PLANNER })
+    seed(withAuth({ kind: 'bearer', headerName: null, set: false }, { pendingEndpoint: MOVED }))
+    mocked.dismissRemoteEndpoint.mockResolvedValueOnce(
+      remoteAgent({
+        id: PLANNER,
+        remote: { ...base.remote!, pendingEndpoint: null, auth: { kind: 'bearer', headerName: null, set: false } },
+      }),
+    )
+    const user = userEvent.setup()
+    render(<Live id={PLANNER} />)
+    const card = screen.getByRole('region', { name: REMOTE_TEXT.agentCard })
+    await user.click(within(card).getByRole('button', { name: REMOTE_TEXT.keepAddress }))
+    expect(mocked.dismissRemoteEndpoint).toHaveBeenCalledWith(PLANNER)
+    await waitFor(() => expect(within(card).queryByText(MOVED_NOTICE)).toBeNull())
+    expect(card).toHaveTextContent('Sends messages to 127.0.0.1')
+    expect(mocked.confirmRemoteEndpoint).not.toHaveBeenCalled()
+    expect(screen.getByRole('status')).toHaveTextContent(REMOTE_TEXT.keptAddress)
+    // The token still needs entering by hand: the fields did not open.
+    expect(screen.queryByLabelText(REMOTE_TEXT.token)).toBeNull()
   })
 
   test('test Open folder and Remove from list', async () => {
