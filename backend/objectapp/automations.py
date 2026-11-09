@@ -273,11 +273,11 @@ def _scope_types(space: Space, scope: Scope | None) -> list[TypeDefinition] | No
     if scope.kind == "type":
         t = space.type_by_id(scope.id)
         if t is None:
-            raise InvalidValue(f"There is no object type {scope.id!r}.")
+            raise InvalidValue(f'There is no object type "{scope.id}".')
         return [t]
     c = space.collections.get(scope.id)
     if c is None or c.readOnlyReason:
-        raise InvalidValue(f"There is no collection {scope.id!r}.")
+        raise InvalidValue(f'There is no collection "{scope.id}".')
     ids = c.typeIds or [t.id for t in space.types]  # a collection naming no type: any type
     return [t for t in (space.type_by_id(i) for i in ids) if t is not None]
 
@@ -345,7 +345,7 @@ def check_rule(
     if isinstance(trigger, ScheduleTrigger):
         parsed = parse_repeat(trigger.repeat)
         if parsed is None:
-            raise InvalidValue(f"“{trigger.repeat}” isn't a repeat this app understands.")
+            raise InvalidValue(f'"{trigger.repeat}" isn\'t a repeat this app understands.')
         if parsed.mode == "completionDate":
             raise InvalidValue("A schedule can't repeat after completion.")
         trigger.repeat = format_repeat(parsed)
@@ -376,14 +376,14 @@ def _check_against_space(space: Space, rule: AutomationRule) -> None:
         pdef = _key_def(space, types, trigger.propertyKey)
         if pdef is None:
             raise InvalidValue(
-                f"“{trigger.propertyKey}” isn't a property of {_type_names(types)}."
+                f'"{trigger.propertyKey}" isn\'t a property of {_type_names(types)}.'
             )
         if pdef.type in _UNWATCHABLE_KINDS or trigger.propertyKey in ("type", "id", "template"):
-            raise InvalidValue(f"“{pdef.name}” can't start an automation.")
+            raise InvalidValue(f'"{pdef.name}" can\'t start an automation.')
         if trigger.to is not None:
             options = filter_options_for({"type": pdef.type, "options": pdef.options or {}})
             if trigger.to.option not in options:
-                raise InvalidValue(f"“{trigger.to.option}” isn't a condition for {pdef.name}.")
+                raise InvalidValue(f'"{trigger.to.option}" isn\'t a condition for {pdef.name}.')
     for n, a in enumerate(rule.actions, start=1):
         where = f"Action {n}"
         if a.kind == "runAgent":
@@ -404,30 +404,30 @@ def _check_against_space(space: Space, rule: AutomationRule) -> None:
             key = a.key  # type: ignore[union-attr]
             pdef = _key_def(space, types, key)
             if pdef is None:
-                raise InvalidValue(f"{where}: “{key}” isn't a property of {_type_names(types)}.")
+                raise InvalidValue(f'{where}: "{key}" isn\'t a property of {_type_names(types)}.')
             # M22: steps change only through the step actions (`GATED_KINDS`).
             if pdef.type in _READ_ONLY_KINDS or pdef.type in GATED_KINDS or key in _LOCKED_KEYS:
-                raise InvalidValue(f"{where}: “{pdef.name}” can't be set by an automation.")
+                raise InvalidValue(f'{where}: "{pdef.name}" can\'t be set by an automation.')
             if a.kind == "setProperty":
                 if a.now:  # type: ignore[union-attr]
                     if pdef.type not in ("datetime", "datetimeSimple"):
-                        raise InvalidValue(f"{where}: “{pdef.name}” isn't a date.")
+                        raise InvalidValue(f'{where}: "{pdef.name}" isn\'t a date.')
                 else:
                     _check_value(pdef, a.value, where)  # type: ignore[union-attr]
         elif a.kind in ("setProperty", "clearProperty"):
             key = a.key  # type: ignore[union-attr]
             if key in _LOCKED_KEYS or key in ("createdAt", "lastUpdated", "backlinks"):
-                raise InvalidValue(f"{where}: “{key}” can't be set by an automation.")
+                raise InvalidValue(f'{where}: "{key}" can\'t be set by an automation.')
         if isinstance(a, CreateFromTemplateAction):
             t = space.type_by_id(a.typeId)
             if t is None:
-                raise InvalidValue(f"{where}: there is no object type {a.typeId!r}.")
+                raise InvalidValue(f'{where}: there is no object type "{a.typeId}".')
             if a.templateId not in (None, "none") and _find_template(space, t.id, a.templateId) is None:
-                raise InvalidValue(f"{where}: {t.name} has no template {a.templateId!r}.")
+                raise InvalidValue(f'{where}: {t.name} has no template "{a.templateId}".')
             if a.relateVia is not None:
                 rel_def = t.prop(a.relateVia)
                 if rel_def is None or rel_def.type != "entity":
-                    raise InvalidValue(f"{where}: “{a.relateVia}” isn't a relation of {t.name}.")
+                    raise InvalidValue(f'{where}: "{a.relateVia}" isn\'t a relation of {t.name}.')
                 allowed = rel_def.options.get("allowedTypes") or []
                 if allowed and types is not None:
                     refused = [x.name for x in types if x.id not in allowed]
