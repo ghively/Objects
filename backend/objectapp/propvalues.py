@@ -245,29 +245,29 @@ def _decode_date(pdef: PropertyDefinition, raw: Any) -> dict[str, Any] | None:
 
 def _encode_date_part(text: Any, resolution: str, side: str) -> str:
     if not isinstance(text, str) or not text.strip():
-        raise InvalidValue(f"The date's {side} is missing")
+        raise InvalidValue(f"The date's {side} is missing.")
     text = text.strip()
     if resolution == "day":
         if not _is_day(text):
-            raise InvalidValue(f"{text!r} is not a day (YYYY-MM-DD)")
+            raise InvalidValue(f'"{text}" is not a day (YYYY-MM-DD).')
         return text
     if _is_day(text):
         return f"{text}T00:00:00.000Z"
     dt = _parse_time(text)
     if dt is None:
-        raise InvalidValue(f"{text!r} is not a date and time")
+        raise InvalidValue(f'"{text}" is not a date and time.')
     return _fmt_time(dt)
 
 
 def _encode_date(pdef: PropertyDefinition, value: Any, existing_raw: Any) -> str:
     if not isinstance(value, dict):
-        raise InvalidValue("A date value is {start, end?, resolution}")
+        raise InvalidValue("A date value is {start, end?, resolution}.")
     start, end = value.get("start"), value.get("end")
     resolution = value.get("resolution")
     if resolution is None:
         resolution = "day" if isinstance(start, str) and _is_day(start.strip()) else "time"
     if resolution not in ("day", "time"):
-        raise InvalidValue(f"Unknown date resolution {resolution!r}")
+        raise InvalidValue(f'Unknown date resolution "{resolution}".')
     c = _constraints(pdef)
     constraint = c.get("resolutionConstraint")
     if constraint in ("day", "time") and constraint != resolution:
@@ -276,15 +276,15 @@ def _encode_date(pdef: PropertyDefinition, value: Any, existing_raw: Any) -> str
         )
     has_end = end not in (None, "")
     if c.get("endTimeSettings") == "required" and not has_end:
-        raise InvalidValue("This property needs an end date")
+        raise InvalidValue("This property needs an end date.")
     if c.get("endTimeSettings") == "notAllowed" and has_end:
-        raise InvalidValue("This property doesn't take an end date")
+        raise InvalidValue("This property doesn't take an end date.")
 
     parts = [_encode_date_part(start, resolution, "start")]
     if has_end:
         parts.append(_encode_date_part(end, resolution, "end"))
         if parts[1] < parts[0]:
-            raise InvalidValue("The end is before the start")
+            raise InvalidValue("The end is before the start.")
     if resolution == "day" and _prefers_day(pdef):
         existing = _scalar_text(existing_raw) or ""
         if "T" in existing.split("->")[0]:
@@ -436,19 +436,19 @@ def _encode_work(kind: str, value: Any, existing_raw: Any) -> Any:
 
 def _encode_string(value: Any) -> str | None:
     if not isinstance(value, str):
-        raise InvalidValue("Expected text")
+        raise InvalidValue("Expected text.")
     return value or None
 
 
 def _encode_string_list(pdef: PropertyDefinition, value: Any) -> FlowList | None:
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-        raise InvalidValue("Expected a list of texts")
+        raise InvalidValue("Expected a list of texts.")
     items = [v.strip() for v in value if v.strip()]
     folded = [v.casefold() for v in items]
     if len(set(folded)) != len(folded):
-        raise InvalidValue(f"{pdef.name} must be unique")
+        raise InvalidValue(f'"{pdef.name}" must be unique.')
     if pdef.type == "entity_aliases" and len(items) > MAX_ALIASES:
-        raise InvalidValue(f"At most {MAX_ALIASES} aliases")
+        raise InvalidValue(f"At most {MAX_ALIASES} aliases.")
     return FlowList(items) if items else None
 
 
@@ -457,11 +457,11 @@ def _encode_collections(pdef: PropertyDefinition, value: Any) -> FlowList:
     if value is None:
         return FlowList()
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-        raise InvalidValue("Expected a list of collection names")
+        raise InvalidValue("Expected a list of collection names.")
     items = [v.strip() for v in value if v.strip()]
     folded = [v.casefold() for v in items]
     if len(set(folded)) != len(folded):
-        raise InvalidValue(f"{pdef.name} must be unique")
+        raise InvalidValue(f'"{pdef.name}" must be unique.')
     return FlowList(items)
 
 
@@ -469,18 +469,18 @@ def _encode_label(pdef: PropertyDefinition, value: Any, existing_raw: Any) -> An
     if isinstance(value, str):
         value = [value]
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-        raise InvalidValue("Expected a list of option texts")
+        raise InvalidValue("Expected a list of option texts.")
     texts: list[str] = []
     for v in value:
         if not v.strip():
             continue
         opt = label_lookup(pdef, v)
         if opt is None:
-            raise InvalidValue(f"{v.strip()!r} is not an option of {pdef.name}")
+            raise InvalidValue(f'"{v.strip()}" is not an option of {pdef.name}.')
         if opt.text not in texts:
             texts.append(opt.text)
     if len(texts) > 1 and not _is_array(pdef):
-        raise InvalidValue(f"{pdef.name} takes one option")
+        raise InvalidValue(f'"{pdef.name}" takes one option.')
     return _single_or_list(pdef, texts, existing_raw)
 
 
@@ -491,60 +491,60 @@ def _encode_entity(
     link_for: Callable[[dict[str, Any]], str] | None,
 ) -> Any:
     if not isinstance(value, list):
-        raise InvalidValue("Expected a list of object references")
+        raise InvalidValue("Expected a list of object references.")
     links: list[str] = []
     for ref in value:
         if isinstance(ref, str):
             ref = {"target": ref, "path": None}
         if not isinstance(ref, dict):
-            raise InvalidValue("An object reference is {target, path}")
+            raise InvalidValue("An object reference is {target, path}.")
         text = link_for(ref) if link_for else _default_link_text(ref)
         if not text:
-            raise InvalidValue("An object reference has no target")
+            raise InvalidValue("An object reference has no target.")
         link = f"[[{text}]]"
         if link not in links:
             links.append(link)
     if len(links) > 1 and not _is_array(pdef):
-        raise InvalidValue(f"{pdef.name} takes one object")
+        raise InvalidValue(f'"{pdef.name}" takes one object.')
     return _single_or_list(pdef, links, existing_raw)
 
 
 def _encode_number(value: Any) -> int | float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise InvalidValue("Expected a number")
+        raise InvalidValue("Expected a number.")
     if isinstance(value, float) and not math.isfinite(value):
-        raise InvalidValue("Expected a finite number")
+        raise InvalidValue("Expected a finite number.")
     return _number(value)
 
 
 def _encode_color(value: Any) -> str:
     if not isinstance(value, str):
-        raise InvalidValue("Expected a colour")
+        raise InvalidValue("Expected a color.")
     name = value.strip().removeprefix("bg-")
     if name not in THEME_COLORS:
-        raise InvalidValue(f"Unknown colour {value!r}")
+        raise InvalidValue(f'Unknown color "{value}".')
     return f"bg-{name}"
 
 
 def _encode_email(value: Any) -> str | None:
     if not isinstance(value, str):
-        raise InvalidValue("Expected an email address")
+        raise InvalidValue("Expected an email address.")
     text = value.strip()
     if not text:
         return None
     if not _EMAIL_RE.match(text):
-        raise InvalidValue(f"{text!r} is not an email address")
+        raise InvalidValue(f'"{text}" is not an email address.')
     return text
 
 
 def _encode_phone(value: Any) -> str | None:
     if not isinstance(value, str):
-        raise InvalidValue("Expected a phone number")
+        raise InvalidValue("Expected a phone number.")
     text = value.strip()
     if not text:
         return None
     if not _PHONE_RE.match(text) or sum(c.isdigit() for c in text) < 3:
-        raise InvalidValue(f"{text!r} is not a phone number")
+        raise InvalidValue(f'"{text}" is not a phone number.')
     return text
 
 
@@ -553,7 +553,7 @@ def _encode_files(value: Any) -> FlowList | None:
     if isinstance(value, str):
         value = [value]
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-        raise InvalidValue("Expected a list of file paths")
+        raise InvalidValue("Expected a list of file paths.")
     links: list[str] = []
     for v in value:
         path = v.strip().replace("\\", "/")
@@ -566,7 +566,7 @@ def _encode_files(value: Any) -> FlowList | None:
             or any(p in ("", ".", "..") for p in parts)
             or any(ch in path for ch in "[]|\n\r")
         ):
-            raise InvalidValue(f"{v!r} is not a file in {ATTACHMENTS[:-1]}")
+            raise InvalidValue(f'"{v}" is not a file in {ATTACHMENTS[:-1]}.')
         link = f"[[{path}]]"
         if link not in links:
             links.append(link)
@@ -591,7 +591,7 @@ def encode_value(
     """
     kind = pdef.type
     if kind in _READ_ONLY_KINDS:
-        raise InvalidValue(f"{pdef.name} can't be edited as a property")
+        raise InvalidValue(f'"{pdef.name}" can\'t be edited as a property.')
     if kind == "entity_collections":
         return _encode_collections(pdef, value)
     if value is None or (value == [] and kind in _LIST_KINDS):
@@ -605,7 +605,7 @@ def encode_value(
         return _encode_number(value)
     if kind == "boolean":
         if not isinstance(value, bool):
-            raise InvalidValue("Expected true or false")
+            raise InvalidValue("Expected true or false.")
         return value
     if kind in _DATE_KINDS:
         return _encode_date(pdef, value, existing_raw)
@@ -618,7 +618,7 @@ def encode_value(
     if kind == "entity_icon":
         icon = Icon.parse(value)
         if icon is None:
-            raise InvalidValue("Expected an icon {type, val, color?}")
+            raise InvalidValue("Expected an icon {type, val, color?}.")
         return icon.val
     if kind == "color":
         return _encode_color(value)
@@ -630,7 +630,7 @@ def encode_value(
         return _encode_files(value)
     if kind in _WORK_KINDS:
         return _encode_work(kind, value, existing_raw)
-    raise InvalidValue(f"Properties of kind {kind!r} can't be edited")
+    raise InvalidValue(f'Properties of kind "{kind}" can\'t be edited.')
 
 
 def encode_updates(
@@ -727,7 +727,7 @@ def convert_value(
     if sk == dk:
         return decode_value(dst, raw), False
     if dk not in KIND_TRANSFORMS.get(sk, ()):
-        raise InvalidValue(f"A {sk} property can't become a {dk} property")
+        raise InvalidValue(f"A {sk} property can't become a {dk} property.")
     if raw is None or raw == [] or raw == "":
         return empty_value(dst), False
 

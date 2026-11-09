@@ -29,7 +29,7 @@ _DATE_KINDS = frozenset({"datetime", "datetimeSimple"})
 def _check_day(day: Any) -> str:
     parsed = parse_day(day) if isinstance(day, str) else None
     if parsed is None or parsed != day.strip():
-        raise InvalidValue(f"Not a day (YYYY-MM-DD): {day!r}")
+        raise InvalidValue(f'"{day}" is not a day (YYYY-MM-DD).')
     return parsed
 
 
