@@ -44,3 +44,10 @@ Result on 2026-11-06 (Linux): `RESULT: PASS`, all checks `[ok]`.
 - [ ] The agent pill reads "Agent is carrying N · M alerts" and opens the Agent queue.
 - [ ] Settings > Work > Read tools: mark your Atlassian server's read tools; **Set up Desk sync**, turn it on, run it once (Run now on the Work agent's Schedules tab): ticket fields update, nothing is written to Jira or ServiceNow, and Object's own status never changes.
 - [ ] Unlinked mentions still show on a work item's page.
+
+## Review items closed (2026-11-09, sweep, Gene's decisions)
+- **Retry after a timed-out Approve step:** a failed, timed-out, stopped or crashed run of an Approve step sends the step back to "needs approval"; its queue entry is withdrawn with "The run didn't finish; approve the step again to retry." (shown under the step; the Agent queue drops the row), and Retry answers 409 with that reason. Other step kinds keep Retry.
+- **A full-tool Work run reaching local app routes:** refused by `runfence.py` (see `m27-acceptance.md`, "Open review items", for the limits).
+- **`file_capture` not atomic:** it already was (every capture write goes through `Space._write`: temp file, fsync, one replace); `test_m24_captures.py` now pins it.
+- **Still open:** no auto-run depth cap; learning and A2A routes rely on the CLI tool lists.
+
