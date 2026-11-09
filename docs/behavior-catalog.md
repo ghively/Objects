@@ -369,7 +369,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   a local `tesseract`, English only, and its text merged in page order, so a PDF mixing text and scanned pages keeps
   every page's text (Gene's call, 2026-11-08). The report names the pages: "Needs OCR: page 2 read with the local OCR
   engine", or "Needs OCR: page 2 has no text layer" without `tesseract`; a PDF with no text layer at all still says
-  "Needs OCR: read with the local OCR engine" (or "Needs OCR").
+  "Needs OCR: read with the local OCR engine" (or "Needs OCR"). Each scanned page is OCR'd once: **Check for
+  sensitive content**, the import's own scan and the import reuse the text, cached in memory by the image's content
+  hash (never written to the space or the state folder; a restart of the app reads it again).
 - **Check for sensitive content** (local, nothing sent anywhere; findings never show the matched text): **Leave out**
   (one folder or pattern per line; left-out files are never read), then **Flagged files** with a kind (Private key, API
   key or token, Password assignment, Connection string, Card number) and line; each defaults to **Import, excluded from AI**

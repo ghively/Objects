@@ -212,3 +212,33 @@ def test_mixed_pdf_import_with_real_tesseract(client, tmp_path):
     report = (client.space_root / res["reportPath"]).read_text(encoding="utf-8")
     assert "`Needs OCR: page 2 read with the local OCR engine`" in report
 
+
+def test_scan_then_import_ocrs_each_page_once(client, tmp_path, fake_ocr):
+    """The wizard's sensitive-content scan reads the PDF (with OCR); the import reuses that OCR text."""
+    src = tmp_path / "Scans"
+    src.mkdir()
+    p1 = _page(["First scanned page"])
+    p2 = _page(["Second scanned page"])
+    p1.save(src / "scan.pdf", save_all=True, append_images=[p2], resolution=200)
+    r = client.post("/api/import/scan", json={"path": str(src), "leaveOut": []})
+    assert r.status_code == 200, r.text
+    assert fake_ocr.calls == 2
+    run(client, src)
+    assert fake_ocr.calls == 2, "the import OCR'd the pages again"
+    page = (client.space_root / "Pages" / "scan.md").read_text(encoding="utf-8")
+    assert "herons" in page
+    # The cache is in memory: nothing about it lands in the space.
+    assert not [p for p in client.space_root.rglob("*") if "ocr" in p.name.lower()]
+
+
+def test_failed_ocr_is_not_cached(tmp_path, fake_ocr, monkeypatch):
+    from objectapp import readers
+    from objectapp.readers import pdf
+
+    p = tmp_path / "scan.pdf"
+    _page(["Only page"]).save(p, resolution=200)
+    monkeypatch.setattr(pdf.subprocess, "run", lambda args, **_kw: subprocess.CompletedProcess(args, 1, "", "boom"))
+    assert readers.read_file(p).notes == ["Needs OCR"]
+    monkeypatch.setattr(pdf.subprocess, "run", fake_ocr)
+    r = readers.read_file(p)
+    assert "herons" in r.markdown and fake_ocr.calls == 1

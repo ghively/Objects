@@ -2,13 +2,20 @@
 image is a scanned page: "Needs OCR", read with a local ``tesseract`` when one is installed and merged
 in page order, so a mixed PDF (text pages and scanned pages) keeps every page's text. English only:
 ``tesseract`` is called without ``-l``.
+
+OCR text is cached in memory by the sha256 of each image's bytes (bounded, never written anywhere), so
+the import wizard's sensitive-content scan, the import's own scan and the import's reader read each
+scanned page once.
 """
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 import subprocess
 import tempfile
+import threading
+from collections import OrderedDict
 from pathlib import Path
 
 from pypdf import PdfReader
@@ -19,6 +26,9 @@ from .util import iso
 # A page whose text layer has fewer non-space characters than this, and holds an image, is scanned
 # (a scanner's stamp such as "Scanned by ..." is no text layer).
 NEGLIGIBLE_TEXT = 32
+OCR_CACHE_MAX = 1024  # images; a page's text is a few kB at most
+_OCR_CACHE: OrderedDict[str, str] = OrderedDict()
+_OCR_LOCK = threading.Lock()
 
 
 def ocr_engine() -> str | None:
@@ -26,8 +36,19 @@ def ocr_engine() -> str | None:
     return shutil.which("tesseract")
 
 
+def clear_ocr_cache() -> None:
+    with _OCR_LOCK:
+        _OCR_CACHE.clear()
+
+
 def _ocr_image(engine: str, name: str, data: bytes, tmp: Path, n: int) -> str | None:
-    """One image's OCR text ("" when it has none), or None when the engine failed."""
+    """One image's OCR text ("" when it has none), or None when the engine failed (not cached)."""
+    key = hashlib.sha256(engine.encode("utf-8") + b"\0" + data).hexdigest()
+    with _OCR_LOCK:
+        hit = _OCR_CACHE.get(key)
+        if hit is not None:
+            _OCR_CACHE.move_to_end(key)
+            return hit
     f = tmp / f"i{n}{Path(name).suffix or '.png'}"
     f.write_bytes(data)
     try:
@@ -36,7 +57,12 @@ def _ocr_image(engine: str, name: str, data: bytes, tmp: Path, n: int) -> str | 
         return None
     if r.returncode != 0:
         return None
-    return (r.stdout or "").strip()
+    text = (r.stdout or "").strip()
+    with _OCR_LOCK:
+        _OCR_CACHE[key] = text
+        while len(_OCR_CACHE) > OCR_CACHE_MAX:
+            _OCR_CACHE.popitem(last=False)
+    return text
 
 
 def _page_images(page) -> list:
