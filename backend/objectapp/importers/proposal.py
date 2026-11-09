@@ -225,7 +225,7 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
             raise ProposalInvalid(f"Item {index + 1} ({name}): a property needs a name.")
         kind = p.get("kind", "text")
         if kind not in IMPORT_KINDS:
-            raise ProposalInvalid(f"{name}.{pname}: kind is one of {', '.join(IMPORT_KINDS)}.")
+            raise ProposalInvalid(f'Item {index + 1} ({name}): the kind of "{pname}" is one of {', '.join(IMPORT_KINDS)}.')
         key = _text(p.get("key"), 100) or slug(pname)
         share = _share(p, documents)
         if key in SYSTEM_KEYS or key in keys:
@@ -287,7 +287,7 @@ def _check(items_in: list[Any], space: Space | None) -> list[dict[str, Any]]:
     seen: set[str] = set()
     for it in items:
         if it["id"] in seen:
-            raise ProposalInvalid(f"Two items have the id {it['id']!r}.")
+            raise ProposalInvalid(f'Two items have the id "{it["id"]}".')
         seen.add(it["id"])
     return items
 
@@ -370,13 +370,13 @@ def save_review(space: Space, batch: str, items: list[dict[str, Any]]) -> dict[s
     review = load_review(root, batch)
     decided = review.setdefault("items", {})
     if not isinstance(items, list):
-        raise ProposalInvalid("items is a list.")
+        raise ProposalInvalid('"items" is a list.')
     for row in items:
         if not isinstance(row, dict) or row.get("id") not in ids:
-            raise ProposalInvalid(f"No proposal item {row.get('id') if isinstance(row, dict) else row!r}.")
+            raise ProposalInvalid(f'There is no proposal item "{row.get("id") if isinstance(row, dict) else row}".')
         status = row.get("status")
         if status not in STATUSES:
-            raise ProposalInvalid("status is accepted, edited or rejected.")
+            raise ProposalInvalid('"status" is accepted, edited or rejected.')
         entry: dict[str, Any] = {"status": status, "at": _now()}
         if status == "edited":
             edited = row.get("edited")
@@ -384,7 +384,7 @@ def save_review(space: Space, batch: str, items: list[dict[str, Any]]) -> dict[s
                 raise ProposalInvalid("An edited item says what the edit is.")
             base = next(i for i in proposal["items"] if i["id"] == row["id"])
             if not isinstance(edited.get("dropProperties", []), list):
-                raise ProposalInvalid("dropProperties is a list of property keys.")
+                raise ProposalInvalid('"dropProperties" is a list of property keys.')
             _check_item({**effective_item(base, {"status": "edited", "edited": edited}, None), "id": row["id"]}, 0, space,
                         {i["name"].casefold() for i in proposal["items"]})
             entry["edited"] = edited

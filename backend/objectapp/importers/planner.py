@@ -341,7 +341,7 @@ def plan(
     for key in list(mapping.types) + list(mapping.properties):
         if key not in known_keys:
             if not lenient:
-                raise MappingProblem(f"The mapping names an unknown type {key!r}.")
+                raise MappingProblem(f'The mapping names an unknown type "{key}".')
             mapping.types.pop(key, None)
             mapping.properties.pop(key, None)
 
@@ -363,7 +363,7 @@ def plan(
         if existing_id is not None:
             ex = by_id.get(existing_id)
             if ex is None:
-                raise MappingProblem(f"No type {existing_id!r} can take these objects.")
+                raise MappingProblem(f'There is no object type "{existing_id}" to take these objects.')
             if ex.readOnlyReason:
                 raise MappingProblem(f"The {ex.name} type can't be changed, so pages can't be imported into it.")
             if not importable_type(ex):
@@ -494,7 +494,7 @@ def plan(
             )
         for pkey in overrides:
             if not any(p.key == pkey for p in pt.properties):
-                raise MappingProblem(f"The mapping names an unknown property {pkey!r} of {pt.key!r}.")
+                raise MappingProblem(f'The mapping names an unknown property "{pkey}" of "{pt.key}".')
         effective_props[pt.key] = {
             p.key: PropertyOverride(kind=p.kind, isArray=p.isArray, name=p.name, skip=p.skip) for p in pt.properties
         }

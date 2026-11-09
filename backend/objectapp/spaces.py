@@ -446,7 +446,7 @@ def delete_space(
     before = _identity(target)
     if folder is not None and folder != f"{before[0]}:{before[1]}":
         raise SpaceFolderChanged(
-            f"The folder was replaced since the trash failed; nothing was deleted: {target}"
+            f'The folder "{target}" was replaced after the Trash failed, so nothing was deleted.'
         )
     _before_permanent_delete(target)
     try:
@@ -454,7 +454,7 @@ def delete_space(
     except OSError:
         same = False
     if not same:
-        raise SpaceNotFound(f"The folder changed; nothing was deleted: {target}")
+        raise SpaceNotFound(f'The folder "{target}" changed, so nothing was deleted.')
     shutil.rmtree(target)
     reg.remove(target)
     return False
