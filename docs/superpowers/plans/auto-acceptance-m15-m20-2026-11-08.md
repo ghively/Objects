@@ -33,7 +33,7 @@ The boxes in those files are **not** ticked; this report is the evidence.
 
 ## Counts
 
-67 boxes: MANUAL 1, NOT-RUN 60, PARTIAL 1, PASS 5
+67 boxes: MANUAL 1, NOT-RUN 35, PARTIAL 2, PASS 28, SUPERSEDED 1
 
 
 ## M15 (m15-acceptance.md)
@@ -52,33 +52,33 @@ The boxes in those files are **not** ticked; this report is the evidence.
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M16.1 | A real reply with headings, a table, a task list, a Python fence and `$e^{i\pi}+1=0$` renders properly in the chat, in light and dark the… | **NOT-RUN** | not reached |
-| M16.2 | A user message with `**bold**` renders bold; Copy on an answer pastes the Markdown source into a plain-text editor. | **NOT-RUN** | not reached |
-| M16.3 | Ask "search my notes for rack": the step line "Searched notes for 'rack'" shows between the texts, collapsed; expanding shows the input a… | **NOT-RUN** | not reached |
-| M16.4 | A `[[Page]]` in an answer is a chip and opens the page in Object. | **NOT-RUN** | not reached |
-| M16.5 | Ask the assistant to reply with `<img src=x onerror=alert(1)>` and a `javascript:` link: nothing runs, the HTML shows as text. | **NOT-RUN** | not reached |
-| M16.6 | The header's model picker lists Default, Fable/Opus/Sonnet/Haiku (latest), Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5, Custom…; picking H… | **NOT-RUN** | not reached |
-| M16.7 | The `haiku` alias works with the installed CLI (one short turn on "Haiku (latest)"). | **NOT-RUN** | not reached |
-| M16.8 | Settings > AI Assistant > Model is a picker; a value set in M10 as text still shows; the chat's Default row names it. | **NOT-RUN** | not reached |
-| M16.9 | New chat resets the chat's model to Default. | **NOT-RUN** | not reached |
+| M16.1 | A real reply with headings, a table, a task list, a Python fence and `$e^{i\pi}+1=0$` renders properly in the chat, in light and dark the… | **PARTIAL** | Fake reply (LC2:md) renders: H1 'Heading one', H2, <table> Col A/Col B, task-list checkboxes (false/true), python fence with hljs spans (hljs-keyword def), KaTeX span.katex for $e^{i\pi}+1=0$. Light vs dark look = MANUAL (visual); a real-model reply covered by lane A live check 1 (text only). |
+| M16.2 | A user message with `**bold**` renders bold; Copy on an answer pastes the Markdown source into a plain-text editor. | **PASS** | User message 'This is **bold**' renders <strong>bold</strong> inside li[data-role=user]; 'Copy message' on the answer wrote the raw Markdown ('# Heading one\n\n## Heading two\n\n\| Col A \|…[click me](javascript:alert(1))') to navigator.clipboard.writeText (stubbed; pasting into a real editor = OS clipboard, not exercised). |
+| M16.3 | Ask "search my notes for rack": the step line "Searched notes for 'rack'" shows between the texts, collapsed; expanding shows the input a… | **PASS** | FAKE:tool turn: collapsed button[aria-expanded=false] "Searched notes for 'alpha'" between 'Let me look.' and 'Hello from the fake claude.'; expanded shows 'Input {"query": "alpha"}' and 'Result []'. (The fake's query is fixed to 'alpha'; label format verified.) |
+| M16.4 | A `[[Page]]` in an answer is a chip and opens the page in Object. | **PASS** | [[Alpha]] in the answer is span.wikilink[data-resolved-path=Servers/Alpha.md] (pink chip); clicking it opened the Alpha Server page (tabs: Alpha/Server, Backlinks 2, Related Content 3). |
+| M16.5 | Ask the assistant to reply with `<img src=x onerror=alert(1)>` and a `javascript:` link: nothing runs, the HTML shows as text. | **PASS** | Raw '<img src=x onerror=alert(1)>' shown as text (no <img> in the panel), '[click me](javascript:alert(1))' rendered as plain <p>click me</p> (no <a>), window.alert stub count 0. |
+| M16.6 | The header's model picker lists Default, Fable/Opus/Sonnet/Haiku (latest), Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5, Custom…; picking H… | **PASS** | Header picker lists exactly: Default, Fable/Opus/Sonnet/Haiku (latest), Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5, Custom…; picking Haiku 5.5 mid-chat -> next run's fake log model=claude-haiku-5-5 with --resume d9ecae0c-… (same session), history kept in panel. Live resume: lane A check 1b PASS (same session id, recall of turn 1). |
+| M16.7 | The `haiku` alias works with the installed CLI (one short turn on "Haiku (latest)"). | **PASS** | Cited: lane A live-cli-check-2026-11-08.md check 1c — real CLI 2.1.319, model 'haiku' replied in 2.6 s, transcript '"model":"haiku"'. Not re-run here (no real CLI spend). |
+| M16.8 | Settings > AI Assistant > Model is a picker; a value set in M10 as text still shows; the chat's Default row names it. | **PASS** | aiModel='claude-sonnet-4-5-20250929' (M10-style text): Settings > AI Assistant > Model is a picker button showing that value, listed checked as its own row before Custom…; chat picker's first row reads 'Default (claude-sonnet-4-5-20250929)'. Note: a settings PUT from elsewhere wasn't reflected until reload. |
+| M16.9 | New chat resets the chat's model to Default. | **PASS** | After picking Haiku 5.5, 'New chat' -> picker trigger reads 'Default'. |
 
 ## M17 (m17-acceptance.md)
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M17.1 | The Agents section sits at the top of the sidebar, with Assistant first and "+ New agent" last. | **NOT-RUN** | not reached |
-| M17.2 | Clicking Assistant opens the chat. Ctrl+Alt+J does too. The header shows the agent picker, the model picker and New chat. | **NOT-RUN** | not reached |
-| M17.3 | Assistant creates a Task, edits a page's body and moves a page to the Trash without an Accept step. Each step shows in the chat. The edit… | **NOT-RUN** | not reached |
-| M17.4 | Add tags, Fill empty properties and Rephrase still ask you to Accept. | **NOT-RUN** | not reached |
-| M17.5 | New agent "Researcher" with its own instructions: its folder is in `%LOCALAPPDATA%\object\agents\Researcher\` and opens with Open folder.… | **NOT-RUN** | not reached |
-| M17.6 | Researcher's Tools tab: the shell is off. Turning it on shows the warning. Switching "Object write" off stops it editing notes. | **NOT-RUN** | not reached |
-| M17.7 | Asking any agent to read an "Exclude from AI" page by path with Read, Grep or Glob is refused, and the reply doesn't contain its text. | **NOT-RUN** | not reached |
-| M17.8 | Your own `~/.claude` CLAUDE.md, hooks, plugins and skills don't show up in an agent chat. (Ask it to list its skills and say what its ins… | **NOT-RUN** | not reached |
-| M17.9 | The Chats tab lists the chats you had, and filtering by title works. Opening one shows its messages and steps. | **NOT-RUN** | not reached |
-| M17.10 | Deleting Researcher and restoring it from "Deleted agents…" brings it back with its chats. Assistant can't be deleted. | **NOT-RUN** | not reached |
-| M17.11 | Copying Researcher's folder elsewhere, changing its id in `agent.json` and using "Add agent folder…" lists it. | **NOT-RUN** | not reached |
-| M17.12 | An AI Chat saved before M17 opens and continues with Assistant. | **NOT-RUN** | not reached |
-| M17.13 | Unlinked mentions still show on the object page. | **NOT-RUN** | not reached |
+| M17.1 | The Agents section sits at the top of the sidebar, with Assistant first and "+ New agent" last. | **SUPERSEDED** | Redesign (catalog §4): sidebar order is New, Calendar, Tasks, Graph, Assistant (main nav), then 'Agents' section (user agents only, empty here) whose header '+' ('Add an agent') menu holds New agent / Add agent folder… / Add remote agent… / Deleted agents… — no trailing '+ New agent' row. Verified at the new location. |
+| M17.2 | Clicking Assistant opens the chat. Ctrl+Alt+J does too. The header shows the agent picker, the model picker and New chat. | **PASS** | Sidebar Assistant opens the side-panel chat; with the panel closed, a synthetic Ctrl+Alt+J (CDP keyDown modifiers=3) opened it; header buttons 'Agent for this chat', 'Model for this chat', 'New chat'. |
+| M17.3 | Assistant creates a Task, edits a page's body and moves a page to the Trash without an Accept step. Each step shows in the chat. The edit… | **PASS** | Fake run calling real objectapp-mcp tools (FAKE:mcp:object:create_task / append_to_section / move_to_trash) from an Assistant chat: steps "Created 'Agent made task'", 'Edited Pages/Notes.md', 'Moved Pages/What if.md to the Trash' shown in the chat, 0 Accept buttons; git: Tasks/Agent made task.md new, Pages/What if.md deleted (in .object/trash/), Pages/Notes.md (CRLF) diff = appended '\r\n+Added by the agent.\r' with CRLF kept. Note: that page had no frontmatter, so the write also stamped `id`/`lastUpdated` frontmatter (the app's normal save stamp). Real-CLI chat: lane A check 1. |
+| M17.4 | Add tags, Fill empty properties and Rephrase still ask you to Accept. | **PASS** | 'Add tags using AI' (object More menu) -> 'Suggested tags Math/history/Ideas' + Accept/Dismiss; 'Fill empty properties using AI' -> 'Suggested properties: Description = A mathematician.' + Accept/Dismiss; git showed only the saved AI Chat files, no page change. Chat 'Rephrase' -> 'Suggested text' proposal, nothing written (with no page in context only Copy is offered). Proposal turns run read-only: m17 script check 6 [ok]. |
+| M17.5 | New agent "Researcher" with its own instructions: its folder is in `%LOCALAPPDATA%\object\agents\Researcher\` and opens with Open folder.… | **PASS** | + > New agent 'Researcher' with instructions -> folder state/agents/Researcher/ (CLAUDE.md holds the instructions, .claude/, .object-agent/); Profile tab shows the folder path and an 'Open folder' button (not clicked: it launches the OS file manager = MANUAL). Its chat runs with cwd=state/agents/Researcher, --setting-sources project,local; following the instructions live = lane A check 2 (RESEARCHER-SOUL-42 answered). BUG FOUND+FIXED ec0dde6: with an Assistant chat open in the side panel, clicking Researcher's sidebar row left the panel on Assistant (sidepanel.openInArea ignored agentId/chatId); after the fix the row switches the panel to Researcher. |
+| M17.6 | Researcher's Tools tab: the shell is off. Turning it on shows the warning. Switching "Object write" off stops it editing notes. | **PASS** | Researcher Tools tab: 'Shell (Bash, PowerShell)' switch off (toolsOff ['Bash']); turning it on asks 'Turn on the shell? With the shell on, this agent can read every file on this computer, including pages excluded from AI.' (Cancel kept it off). 'All of Object write' off -> toolsOff gained 43 mcp__object__* write tools; a Researcher turn's create_task step shows "Created 'Researcher forbidden task' (failed)", run's --disallowedTools has mcp__object__create_task, no file written. |
+| M17.7 | Asking any agent to read an "Exclude from AI" page by path with Read, Grep or Glob is refused, and the reply doesn't contain its text. | **PASS** | Excluded page 'Pages/Vault Secret.md' (excludeFromAI, body ZEBRA-EXCL-91): Researcher turn's Read/Grep/Glob steps all '(failed)' (run deny rules Read(//…/space/**), Edit(//…/space/**) plus every known space), 'ZEBRA' absent from the panel. Live CLI: lane A check 1 turn 2 ('File is in a directory that is denied…', marker absent); m17 script checks 3+5 [ok]. |
+| M17.8 | Your own `~/.claude` CLAUDE.md, hooks, plugins and skills don't show up in an agent chat. (Ask it to list its skills and say what its ins… | **PASS** | Cited lane A check 2: live run loads only the agent's CLAUDE.md, ancestor CLAUDE.md markers kept out by claudeMdExcludes; test_user_setup_never_reaches_a_run PASS (0 user skills, 0 hooks, no plugin outside @builtin). Here the fake log shows --setting-sources project,local and no CLAUDE_CONFIG_DIR. ~/.claude/CLAUDE.md itself does not exist on this box and ~/.claude is off limits, so 'what its instructions mention' for a user file = N/A. |
+| M17.9 | The Chats tab lists the chats you had, and filtering by title works. Opening one shows its messages and steps. | **PASS** | Researcher Chats tab lists 3 chats (title, space, date, '2 messages'); 'Search chats' = 'Make' narrows to that chat with <strong>Make</strong> in the snippet; clicking it shows its messages and the step "Created 'Researcher forbidden task' (failed)" in the side panel (with a chat already open this needed fix ec0dde6). |
+| M17.10 | Deleting Researcher and restoring it from "Deleted agents…" brings it back with its chats. Assistant can't be deleted. | **PASS** | Researcher row … > Delete -> agents API lists only Assistant, folder gone from state/agents; '+ > Deleted agents…' lists 'Researcher …/state/agents/Researcher · 11/8/2026'; Restore -> back with same id and its 3 chats (GET /agents/{id}/chats). Assistant: main-nav entry has no actions menu; DELETE /api/agents/assistant -> 422 "The default agent can't be deleted." |
+| M17.11 | Copying Researcher's folder elsewhere, changing its id in `agent.json` and using "Add agent folder…" lists it. | **PASS** | Copied state/agents/Researcher to agentcopies/Researcher Copy, set .object-agent/agent.json id to a new ULID, '+ > Add agent folder…' with that path -> listed (sidebar Agents: Researcher, Researcher; API inStateDir=false, folder=the copy); folder hashes unchanged. Note: an id that isn't a valid ULID (e.g. with 'O') is refused with the misleading 'This folder isn't an Object agent.' |
+| M17.12 | An AI Chat saved before M17 opens and continues with Assistant. | **PASS** | An M10-style AI Chat file (no agent property, session EXPIRED_SESSION) restored into the side panel after reload shows its messages with agent 'Assistant'; the follow-up ran in state/agents/Assistant, the expired resume fell back to a replay (KUMQUAT from the history in the prompt), and the file gained the new turn plus 'agent: Assistant' and a new session. |
+| M17.13 | Unlinked mentions still show on the object page. | **PASS** | Page 'Mention probe' with plain text 'Yesterday Ada Lovelace reviewed the plan.' -> Ada Lovelace page tab 'Mentions 1' lists it with a 'Link' button (checked once on this build, after M17-M20 are all in). |
 
 ## M18 (m18-acceptance.md)
 
@@ -98,7 +98,7 @@ The boxes in those files are **not** ticked; this report is the evidence.
 | M18.12 | Ask the agent what it remembers about an earlier chat: it uses "Searched past chats". | **NOT-RUN** | not reached |
 | M18.13 | Ask the agent to read an "Exclude from AI" page and to remember what it says: it can't read it, so nothing about it is saved. | **NOT-RUN** | not reached |
 | M18.14 | "Memory & skills" in an agent's `…` menu opens its Memory tab. | **NOT-RUN** | not reached |
-| M18.15 | Unlinked mentions still show on the object page. | **NOT-RUN** | not reached |
+| M18.15 | Unlinked mentions still show on the object page. | **PASS** | Page 'Mention probe' with plain text 'Yesterday Ada Lovelace reviewed the plan.' -> Ada Lovelace page tab 'Mentions 1' lists it with a 'Link' button (checked once on this build, after M17-M20 are all in). |
 
 ## M19 (m19-acceptance.md)
 
@@ -114,7 +114,7 @@ The boxes in those files are **not** ticked; this report is the evidence.
 | M19.8 | Put a `.mcp.json` with a `${VAR}` reference into an agent folder (or "Add agent folder…" for a copy from elsewhere). The Profile tab show… | **NOT-RUN** | not reached |
 | M19.9 | Delete a server: "Confirm delete" first. Its secrets are gone from `secrets.json`. | **NOT-RUN** | not reached |
 | M19.10 | "Hide AI features" hides the MCP servers group. | **NOT-RUN** | not reached |
-| M19.11 | Unlinked mentions still show on the object page. | **NOT-RUN** | not reached |
+| M19.11 | Unlinked mentions still show on the object page. | **PASS** | Page 'Mention probe' with plain text 'Yesterday Ada Lovelace reviewed the plan.' -> Ada Lovelace page tab 'Mentions 1' lists it with a 'Link' button (checked once on this build, after M17-M20 are all in). |
 
 ## M20 (m20-acceptance.md)
 
@@ -131,6 +131,6 @@ The boxes in those files are **not** ticked; this report is the evidence.
 | M20.9 | Researcher's Tools tab lists "Delegate to another agent", "Call a remote agent" and "List remote agents" under Object agent tools. Switch… | **NOT-RUN** | not reached |
 | M20.10 | Deleting Fake Planner and restoring it from "Deleted agents…" brings it back, still working. | **NOT-RUN** | not reached |
 | M20.11 | `%LOCALAPPDATA%\object\agents\Fake Planner\` holds `.object-agent\agent.json`, `card.json` and `sessions\`, and no token anywhere (search… | **NOT-RUN** | not reached |
-| M20.12 | Unlinked mentions still show on the object page. | **NOT-RUN** | not reached |
+| M20.12 | Unlinked mentions still show on the object page. | **PASS** | Page 'Mention probe' with plain text 'Yesterday Ada Lovelace reviewed the plan.' -> Ada Lovelace page tab 'Mentions 1' lists it with a 'Link' button (checked once on this build, after M17-M20 are all in). |
 
 
