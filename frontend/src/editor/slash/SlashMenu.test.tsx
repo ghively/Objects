@@ -114,9 +114,18 @@ describe('<SlashMenu>', () => {
   test('escape closes the menu and leaves the text', async () => {
     const editor = mounted('Hello\n')
     await openMenu(editor)
+    type(editor, 'zz')
     expect(press(editor, 'Escape')).toBe(true)
     await waitFor(() => expect(screen.queryByRole('listbox', { name: '/' })).toBeNull())
-    expect(serializeBody(editor)).toBe('Hello/\n')
+    expect(serializeBody(editor)).toBe('Hello/zz\n')
+  })
+
+  test('escape on a menu opened for the user (the + handle) with nothing typed takes its / away', async () => {
+    const editor = mounted('Hello\n')
+    await openMenu(editor)
+    expect(press(editor, 'Escape')).toBe(true)
+    await waitFor(() => expect(screen.queryByRole('listbox', { name: '/' })).toBeNull())
+    expect(serializeBody(editor)).toBe('Hello\n')
   })
 
   test('colour items are listed while searching and set the block colour', async () => {

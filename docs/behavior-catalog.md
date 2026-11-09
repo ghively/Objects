@@ -256,7 +256,9 @@ Each starter template pre-fills the new type's properties.
 
 - **Selection toolbar** (appears above selected text): Bold, Italic, Strikethrough, Underline, bulleted list,
   numbered/to-do list, Link, Code, TeX formula, color/highlight, `+`, `@` mention, AI sparkle.
-- **Block handle**: hovering a block shows `+` (insert below) and a six-dot grip at its left. Clicking the grip
+- **Block handle**: hovering a block shows `+` (insert below; it opens the slash menu in the new block, and
+  Escape with nothing typed closes it leaving the block empty — no stray `/`; a `/` typed by hand stays) and a
+  six-dot grip at its left. Clicking the grip
   selects the block and opens a menu: Hierarchy (current level, submenu), List >, To-do, Quote, Toggle, Group
   (Ctrl+G), AI assistant..., Turn into..., Copy >, Duplicate (Ctrl+D), Remove (Backspace).
 - **Block selection bar** (bottom of the page while blocks are selected): left "N block(s) . M words" with a
