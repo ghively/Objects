@@ -114,7 +114,8 @@ describe('SearchPage', () => {
     expect(init.name).toBeUndefined()
     expect(init.definition).toMatchObject({
       types: [],
-      search: { searchTerms: [{ text: 'alpha' }], searchMode: 'fullText' },
+      // Text matches only is saved as Auto: a query's Exact (fullText) mode is hidden since Q-1 (fix pass H).
+      search: { searchTerms: [{ text: 'alpha' }], searchMode: 'auto' },
     })
     resolve(query({ id: 'q-new', name: 'New Query' }))
     await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'query', id: 'q-new' }))

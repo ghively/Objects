@@ -297,7 +297,8 @@ Each starter template pre-fills the new type's properties.
   - Tab strip: Overview | All | custom tabs (including Query-backed ones) | `+` to add a tab.
 - **Query builder search mode**: Auto | Title. Exact and Semantic are hidden until real full-text search exists
   (Gene's decision Q-1: they matched exactly like Auto). A saved query that uses one still runs as Auto (the
-  server keeps accepting both) and shows Auto; the next edit of its search saves it as Auto.
+  server keeps accepting both) and shows Auto; the next edit of its search saves it as Auto. The Search page's **Save as
+  Query** saves Auto too, with or without **Text matches only** (that toggle filters the Search page only).
   - Type page header: type icon + plural name; search icon; `...` (New collection, Pin to sidebar, Pin to…,
     Object type settings, Import CSV, Save as query, Delete object type; "New from template" is in the sidebar's
     type menu); a split "New" button.
