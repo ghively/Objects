@@ -267,7 +267,11 @@ Each starter template pre-fills the new type's properties.
 - **Explore** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
   (objects related to the page you are on) with "Find More". Toggled with Ctrl+Shift+Right; the tooltip reads
   "Hide sidepanel".
-- **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback.
+- **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback. Object's own
+  section is local only: Keyboard shortcuts, Getting started, Markdown reference and **How-to guides** (Gene's
+  decision D1). How-to guides opens a read-only list (People, Meetings, Projects, Books — one per basic-setup type —
+  and The Tasks dashboard); a guide shows read-only with "All guides" to go back. The guides ship with the app and
+  are never seeded into a space as objects (they would land in All notes and the counts).
 - **Theme toggle** in the sidebar footer switches dark and light immediately (it persists).
 
 ## 8. Search, New menu, view toolbar
