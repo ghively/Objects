@@ -400,6 +400,22 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **Files source**: every non-Markdown file is one page (text and images where they appeared) with the untouched
   original kept in `Attachments/Originals/` (over 100 MB: not copied, listed in the report). A file that cannot be
   read becomes an "Original only" page. Sheets over 200 rows or 20 columns are not shown ("see the original").
+  An image (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`) is an **Image object** in the Image type's folder
+  (`Images/`; the basic media type Image, made when the space has none): MIME type, file size, width, height and
+  source (the kept original) as its read-only system fields, the image
+  in its body (the design's call, approved by Gene as AC-2 on 2026-11-08; not a Page holding the image). Only images
+  the Page row would take: a mapping that puts them in a folder or key type, or the Page row into another type, wins.
+  The report's Originals section says "1 image became an Image object."; File objects mode makes no second object for
+  an image. An image an earlier import made into a Page stays that Page on a re-run (matched by source id, updated in
+  place, never duplicated or migrated) and the report notes "Kept as a Page: an earlier import made it before images
+  became Image objects".
+- **Scanned PDF pages (OCR)**: a page with no text layer (or one under 32 characters) that holds an image is read with
+  a local `tesseract`, English only, and its text merged in page order, so a PDF mixing text and scanned pages keeps
+  every page's text (Gene's call, 2026-11-08). The report names the pages: "Needs OCR: page 2 read with the local OCR
+  engine", or "Needs OCR: page 2 has no text layer" without `tesseract`; a PDF with no text layer at all still says
+  "Needs OCR: read with the local OCR engine" (or "Needs OCR"). Each scanned page is OCR'd once: **Check for
+  sensitive content**, the import's own scan and the import reuse the text, cached in memory by the image's content
+  hash (never written to the space or the state folder; a restart of the app reads it again).
 - **Check for sensitive content** (local, nothing sent anywhere; findings never show the matched text): **Leave out**
   (one folder or pattern per line; left-out files are never read), then **Flagged files** with a kind (Private key, API
   key or token, Password assignment, Connection string, Card number) and line; each defaults to **Import, excluded from AI**

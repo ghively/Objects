@@ -28,6 +28,7 @@ from .typedefs import slug
 
 __all__ = [
     "BASIC_MEDIA_TYPES",
+    "basic_media_type",
     "BASIC_TYPE_NAMES",
     "BUILTIN_TYPES",
     "DATA_VIEW_LAYOUTS",
@@ -1089,6 +1090,41 @@ def _media_field_defs(name: str) -> list[PropertyDefinition]:
 def is_task_type(t: TypeDefinition | None) -> bool:
     """True for the basic Task type."""
     return t is not None and t.basic and _basic_name(t.name) == "Task"
+
+
+# The en-US names of the basic media fields, and the media types' plural names (our strings).
+_MEDIA_FIELD_NAMES = {
+    "url": "URL", "domain": "Domain", "iframeUrl": "Embed URL", "previewImage": "Preview image",
+    "mimeType": "MIME type", "fileSize": "File size", "width": "Width", "height": "Height", "source": "Source",
+}  # fmt: skip
+_MEDIA_PLURALS = {
+    "Weblink": "Weblinks", "File": "Files", "Image": "Images", "PDF": "PDFs", "Audio": "Audio", "Video": "Videos",
+    "Tweet": "Tweets",
+}  # fmt: skip
+
+
+def basic_media_type(name: str, type_id: str) -> TypeDefinition:
+    """A fresh basic media type (Image, PDF, File, ...): the system properties, its media fields
+    as read-only system definitions (``id == key``) and the extra fields `topup_task_type` gives
+    it, read as a v1 seed like `BUILTIN_TYPES`. Raises ``KeyError`` for a name that is no media type."""
+    basic = _basic_name(name)
+    if basic not in BASIC_MEDIA_TYPES:
+        raise KeyError(name)
+    plural = _MEDIA_PLURALS[basic]
+    seed = {
+        "id": type_id,
+        "name": basic,
+        "pluralName": plural,
+        "folder": plural,
+        "icon": _TYPE_ICONS.get(basic, _DEFAULT_TYPE_ICON),
+        "color": "gray",
+        "basic": True,
+        "propertyDefinitions": [
+            {"id": k, "key": k, "name": _MEDIA_FIELD_NAMES.get(k, k), "type": kind}
+            for k, kind in BASIC_MEDIA_TYPES[basic].items()
+        ],
+    }
+    return topup_task_type(TypeDefinition.from_json(seed))
 
 
 def topup_task_type(t: TypeDefinition) -> TypeDefinition:

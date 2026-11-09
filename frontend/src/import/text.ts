@@ -134,7 +134,7 @@ export const IMPORT_TEXT = {
   keepAttachments: 'Attachments',
   keepFileObjects: 'File objects',
   keepOriginalsNote:
-    'Each file that is not Markdown is kept untouched in Attachments/Originals. File objects also make a File, PDF or Image object for each.',
+    'Each file that is not Markdown is kept untouched in Attachments/Originals; an image becomes an Image object. File objects also make a File, PDF, Audio or Video object for each other file.',
   tryCopy: 'Try on a copy of this space',
   tryCopyNote: 'Imports into a copy of this space, made next to it under the name below, for you to look at before the real run.',
   copyName: 'Name of the copy',

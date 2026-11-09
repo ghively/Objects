@@ -20,6 +20,7 @@ caller announces one resync when the job ends (`WriteState.wrote_anything`).
 from __future__ import annotations
 
 import copy
+import io
 import json
 import logging
 import os
@@ -128,6 +129,8 @@ class WriteState:
     """Source paths written with ``excludeFromAI: true``."""
     left_out_files: list[str] = field(default_factory=list)
     """Source paths left out (by pattern or by choice): never read or imported."""
+    images: int = 0
+    """Image objects this run created (AC-2)."""
 
     @property
     def wrote_anything(self) -> bool:
@@ -448,6 +451,62 @@ def _place_unique(space: Space, rel: str, title: str, data: bytes) -> str | None
     return None
 
 
+def _media_type(space: Space, state: WriteState, type_name: str) -> Any:
+    """The space's media type ``type_name`` (Image, PDF, ...), made when it has none. Image is
+    made as the basic media type (AC-2: its media fields are system fields); the others as
+    before (a custom type of that name)."""
+    t = space.type_by_id(space._type_id(type_name))
+    if t is None:
+        if type_name == "Image":
+            t = space.create_media_type(type_name)
+        else:
+            t = space.create_type(type_name, _MEDIA_PLURALS[type_name])
+        state.types += 1
+    return t
+
+
+KEPT_AS_PAGE = "Kept as a Page: an earlier import made it before images became Image objects"
+
+
+def _is_image_object(space: Space, fm: dict[str, Any]) -> bool:
+    t = space.type_by_id(space._type_id("Image"))
+    name = fm.get("type")
+    return t is not None and isinstance(name, str) and space._type_id(name) == t.id
+
+
+def _image_size(data: bytes) -> tuple[int, int] | None:
+    """(width, height) from the image's header, or None (SVG, or a format Pillow can't open)."""
+    try:
+        from PIL import Image
+
+        with Image.open(io.BytesIO(data)) as im:
+            w, h = im.size
+        return (int(w), int(h)) if w > 0 and h > 0 else None
+    except Exception:  # noqa: BLE001 - any undecodable image: no size
+        return None
+
+
+def _image_fields(name: str, data: bytes | None, size: int, orig_rel: str | None) -> dict[str, Any]:
+    """An Image object's system fields (media type Image: mimeType, fileSize, width, height, source)."""
+    out: dict[str, Any] = {"mimeType": attachment_media_type(name), "fileSize": size}
+    dims = _image_size(data) if data is not None else None
+    if dims is not None:
+        out["width"], out["height"] = dims
+    if orig_rel:
+        out["source"] = orig_rel
+    return out
+
+
+def _image_body(state: WriteState, sp: str, title: str, orig_rel: str | None) -> str:
+    if orig_rel:
+        line = _media_block(orig_rel)
+    elif sp in state.originals_large:
+        line = "The original is larger than 100 MB and was not copied."
+    else:
+        line = "The original could not be kept."
+    return f"# {title}\n\n{line}\n"
+
+
 def _file_object(space: Space, state: WriteState, sp: str, orig_rel: str, size: int, scope: str | None,
                  chash: str) -> str | None:
     """"Keep originals as File objects": a File/PDF/Image object for the original (its ``source`` is
@@ -484,10 +543,7 @@ def _file_object(space: Space, state: WriteState, sp: str, orig_rel: str, size: 
                                 "system": "files", "id": ident_, "contentHash": chash})
             return ex.path
     type_name = _MEDIA_TYPE_NAMES[kind_of(name)]
-    t = space.type_by_id(space._type_id(type_name))
-    if t is None:
-        t = space.create_type(type_name, _MEDIA_PLURALS[type_name])
-        state.types += 1
+    t = _media_type(space, state, type_name)
     folder = (t.folder or "").strip("/") or _MEDIA_PLURALS[type_name]
     stamp = now_stamp()
     fm = set_keys(
@@ -708,6 +764,12 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
         with space._lock:
             ex_raw = space._raw.get(w.existing)
     ex_block = provenance.read_block(ex_raw.fm) if ex_raw is not None else None
+    # AC-2: an image becomes an Image object, but one an earlier import made into a Page stays that
+    # Page (matched by (system, id); never duplicated, never migrated silently).
+    as_image = w.media == "image"
+    if as_image and ex_raw is not None and not _is_image_object(space, ex_raw.fm):
+        as_image = False
+        state.losses.append((sp, KEPT_AS_PAGE))
     if ex_raw is not None and ex_block is not None and ex_block.get("contentHash") == chash:
         state.unchanged += 1
         state.written[sp] = w.existing
@@ -723,7 +785,18 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
     page: FilePage | None = None
     orig_rel: str | None = None
     file_obj: str | None = None
-    if o.native:
+    extra_fm: dict[str, Any] = {}
+    if as_image:
+        name = PurePosixPath(sp).name
+        if data is not None:
+            page = file_page(name, data)  # its EXIF date fills importSource.created
+            orig_rel = _keep_original(space, state, sp, data)
+        else:
+            state.originals_large.append(sp)
+        type_name = _media_type(space, state, "Image").name
+        extra_fm = _image_fields(name, data, entry.size if entry is not None else 0, orig_rel)
+        body = _image_body(state, sp, w.obj.title, orig_rel)
+    elif o.native:
         name = PurePosixPath(sp).name
         if data is not None:
             page = file_page(name, data)
@@ -751,6 +824,8 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
     # A re-run never drops the flag: once an object is excluded from AI it stays so.
     kept_flag = ex_raw is not None and ex_raw.fm.get("excludeFromAI") is True
     fm = _frontmatter(w, type_name, blk, keep_id, created, exclude_ai=sp in state.exclude_ai or kept_flag)
+    if extra_fm:
+        fm = set_keys(fm, extra_fm)
     new_of = ObjectFile(fm, body, True, None)
     out = join_object(new_of).encode("utf-8")
 
@@ -791,6 +866,7 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
         return
     state.written[sp] = rel
     state.objects += 1
+    state.images += 1 if as_image else 0
     _record(state, w, system, ident_, "created", path=rel, contentHash=chash, version=version_of(out), original=orig_rel)
 
 
@@ -969,6 +1045,7 @@ def _report(planned: Planned, space: Space, state: WriteState) -> None:
             "counts": state.counts,
             "originals": state.originals_kept,
             "originalsLarge": state.originals_large,
+            "images": state.images,
             "keep": state.keep_originals,
             "losses": state.losses,
             "conflicts": [(link_for_path(c["path"]), c["path"]) for c in state.conflicts],

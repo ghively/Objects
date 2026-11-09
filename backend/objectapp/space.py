@@ -4842,6 +4842,34 @@ class Space:
                     _log.warning("Could not save the query %r of type %s", query[0], t.id, exc_info=True)
             return t
 
+    def create_media_type(self, name: str) -> TypeDefinition:
+        """Create and save the basic media type ``name`` (Image, PDF, File, ...): its media fields
+        (``mimeType``, ``fileSize``, ``width``, ``height``, ``source`` ...) are read-only system
+        definitions, as for a migrated v1 media type. Used by the importer (AC-2: imported images
+        are Image objects). Raises `InvalidValue` for a name in use or that is no media type."""
+        from .typemodel import basic_media_type
+
+        with self._lock:
+            if self._name_taken(name):
+                raise InvalidValue(f'An object type named "{name}" already exists.')
+            types_dir = self.root / ".object" / "types"
+            taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
+            if types_dir.is_dir():
+                taken |= {f.stem for f in types_dir.glob("*.json")}
+            base = slug(name)
+            type_id, n = base, 2
+            while type_id in taken:
+                type_id, n = f"{base}-{n}", n + 1
+            try:
+                t = basic_media_type(name, type_id)
+            except KeyError:
+                raise InvalidValue(f'"{name}" is not a media type.') from None
+            self._write_type_json(t, "")
+            self.types.append(t)
+            self._sort_types()
+            self._types_changed(t.id)
+            return t
+
     def _template_query(
         self, key: str, t: TypeDefinition
     ) -> tuple[str, dict[str, Any], dict[str, Any]] | None:
