@@ -151,9 +151,11 @@ def status(setting: str | None) -> dict[str, Any]:
         detail = (out.stderr or out.stdout or "").strip()[-500:]
         return {"available": False, "reason": "error", "claudePath": claude, "version": None,
                 "message": f"`claude --version` failed (exit {out.returncode}): {detail}".strip()}
-    version = (out.stdout or "").strip().splitlines()
+    lines = [line.strip() for line in (out.stdout or "").splitlines() if line.strip()]
+    # A version manager's shim (mise, asdf) can print its own line first; take the version line.
+    version = next((line for line in lines if re.match(r"\d+\.\d+", line)), lines[0] if lines else None)
     return {"available": True, "reason": "ok", "claudePath": claude,
-            "version": version[0].strip() if version else None, "message": None}
+            "version": version, "message": None}
 
 
 # -- context and prompt ---------------------------------------------------------------

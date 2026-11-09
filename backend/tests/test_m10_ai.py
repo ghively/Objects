@@ -178,6 +178,19 @@ def test_status_uses_the_turns_environment(api, fake, monkeypatch) -> None:
     assert "CLAUDECODE" not in env and env["CLAUDE_CODE_OAUTH_TOKEN"] == "fake-oauth"
 
 
+def test_status_version_skips_a_wrapper_line(api, monkeypatch) -> None:
+    """A version manager's shim (mise) prints its own line before Claude Code's version line."""
+    _space, client, _ = api
+
+    def shim(*_args, **_kw):
+        return ai.subprocess.CompletedProcess(
+            ["claude", "--version"], 0,
+            stdout="mise ~/.config/mise/config.toml tools: claude@2.1.319\n2.1.319 (Claude Code)\n", stderr="")
+
+    monkeypatch.setattr(ai.subprocess, "run", shim)
+    assert client.get("/api/ai/status").json()["version"] == "2.1.319 (Claude Code)"
+
+
 def test_status_error(api, monkeypatch) -> None:
     _space, client, _ = api
     monkeypatch.setenv("FAKE_CLAUDE_VERSION_FAIL", "1")
