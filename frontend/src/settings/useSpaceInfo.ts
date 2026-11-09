@@ -1,5 +1,5 @@
 // The current space's `GET /api/space` info, shared by the Settings modal (Space Settings, Object
-// Types, Task management), the sidebar ("Tasks" hidden while `hideTaskManagement`) and anything
+// Types, Task management), the Tasks dashboard (task lists left out while `hideTaskManagement`) and anything
 // else that shows the space's name or icon. `patch` writes `space.json` through `PUT /api/space`:
 // applied at once, saved after the patches before it with the latest revision; on a 409 the fresh
 // info is fetched and the same patch re-applied once (never a blind overwrite).

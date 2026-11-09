@@ -185,9 +185,13 @@ Each starter template pre-fills the new type's properties.
   row. The task sections are list views of the dashboard, each with the quick add on top (a new task gets
   the values the section's filter implies). **Today** is one view: the day timeline (meetings, focus lines,
   the now-line, deadline countdowns) with **Today's tasks** (overdue and due today, not done) under it; its
-  badge counts today's tasks, Inbox's counts the inbox. The Task rows load once for the page. The old Tasks
-  page (header and section tabs) is retired. Controls use the app's pill style (14px, `bg-hover-2` when
-  on).
+  badge counts today's tasks, Inbox's counts the inbox. While the space hides task management ("Hide Task
+  Management"), the Tasks entry stays — the dashboard is the work dashboard too — and the dashboard leaves
+  out the task lists (the list views and Today's tasks) instead; the work views and the timeline stay. On
+  Today's timeline a block too short for its label and time (the 24-minute Morning brief) shows the two on
+  one line under the track (the next row down when two would meet; the tooltip stays). The Task rows load
+  once for the page. The old Tasks page (header and section tabs) is retired. Controls use the app's pill style
+  (14px, `bg-hover-2` when on).
 - Object Types header: fold chevron, count, a `...` menu (Sort manually with a check, Sort alphabetically) and
   a `+` (the gallery above) on hover.
 - "Add section" opens a small form (a one-line explanation that a section is a named heading for pages

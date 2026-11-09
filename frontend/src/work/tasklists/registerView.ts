@@ -11,6 +11,9 @@ import { registerWorkView } from '../views/registry'
 /** The dashboard view id of a task section. */
 export const listViewId = (key: TaskSectionKey): string => `list-${key}`
 
+/** Whether a dashboard view is one of the task lists (left out while the space hides task management). */
+export const isTaskListView = (id: string): boolean => id.startsWith('list-')
+
 /** Sections whose button shows a count (the Drive lists; the others stay quiet). */
 const COUNTED: readonly TaskSectionKey[] = ['inbox']
 

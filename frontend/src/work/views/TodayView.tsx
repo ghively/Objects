@@ -2,12 +2,14 @@
 // blocks (Morning brief, meetings, focus lines in the free gaps, Wrap-up: ported), a now-line while
 // now is inside the range (moved every minute), the deadline countdowns (amber under 21 days,
 // ported), and the focus lines with their slot times. A meeting click opens it in the side panel.
-import type { JSX } from 'react'
+// A block too short for its label (the 24-minute brief) shows it as a caption under the track.
+import { useLayoutEffect, useRef, useState, type JSX, type RefObject } from 'react'
 import { useTabs } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
 import { formatInZone, zonedParts } from '@/lib/zonedTime'
 import { Chip, type ChipTone } from '../components/Chip'
 import { dayBlocks, type DayBlock } from '../logic/daySlots'
+import { blockCaptions, CAPTION_GAP_PX, type BlockCaption } from '../logic/timelineCaptions'
 import { deadlines } from '../logic/deadlines'
 import type { WorkDataState } from '../state/useWorkData'
 import { WORK_ICONS } from '../workIcons'
@@ -39,11 +41,27 @@ const BLOCK_CLASS: Record<DayBlock['kind'], string> = {
   wrapUp: 'border-line text-fg-muted',
 }
 
-function Block({ b }: { b: DayBlock }): JSX.Element {
+const CAPTION_LANE_PX = 16
+
+function Block({ b, caption }: { b: DayBlock; caption?: BlockCaption }): JSX.Element {
   const start = clamp(b.start)
   const end = clamp(b.end)
   const time = `${hhmm(b.start)}-${hhmm(b.end)}`
-  const body = (
+  // A short block keeps its colour in the track and hangs its label and time, on one line, under it.
+  const body = caption ? (
+    <span
+      data-block-caption={caption.align}
+      data-lane={caption.lane}
+      className="absolute flex items-baseline gap-1 whitespace-nowrap"
+      style={{
+        top: `calc(100% + ${CAPTION_GAP_PX + caption.lane * CAPTION_LANE_PX}px)`,
+        [caption.align === 'start' ? 'left' : 'right']: -1,
+      }}
+    >
+      <span className="text-[12px] leading-4 font-medium">{b.label}</span>
+      <span className="text-[11px] leading-4 opacity-80">{time}</span>
+    </span>
+  ) : (
     <>
       <span className="truncate text-[12px] font-medium">{b.label}</span>
       <span className="truncate text-[11px] opacity-80">{time}</span>
@@ -51,7 +69,8 @@ function Block({ b }: { b: DayBlock }): JSX.Element {
   )
   const style = { left: pct(start), width: `${((end - start) / SPAN) * 100}%` }
   const cls = cn(
-    'absolute top-0 flex h-full min-w-0 flex-col justify-center overflow-hidden rounded border px-1.5 text-left',
+    'absolute top-0 flex h-full min-w-0 flex-col justify-center rounded border px-1.5 text-left',
+    caption ? 'overflow-visible' : 'overflow-hidden',
     BLOCK_CLASS[b.kind],
   )
   const attrs = {
@@ -59,6 +78,7 @@ function Block({ b }: { b: DayBlock }): JSX.Element {
     'data-start': hhmm(b.start),
     'data-end': hhmm(b.end),
     'data-tone': BLOCK_TONE[b.kind],
+    ...(caption ? { 'data-short': '' } : {}),
     title: `${b.label} ${time}`,
   }
   if (b.kind === 'meeting' && b.path) {
@@ -82,18 +102,38 @@ function Block({ b }: { b: DayBlock }): JSX.Element {
   )
 }
 
+/** The track's width in px, followed as it resizes (0 until measured, as in jsdom). */
+function useTrackWidth(ref: RefObject<HTMLDivElement | null>): number {
+  const [w, setW] = useState(0)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => setW(el.clientWidth)
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return w
+}
+
 export function TodayView({ data, now }: { data: WorkDataState; now: Date }): JSX.Element {
   // The now-line moves every minute: `now` is the page's clock, which ticks once a minute already.
   const zone = data.board?.timeZone ?? undefined
   const parts = zonedParts(now, zone)
   const nowMinutes = parts.hour * 60 + parts.minute
   const day = data.today?.day ?? data.board?.today ?? parts.date
+  const track = useRef<HTMLDivElement>(null)
+  const trackPx = useTrackWidth(track)
 
   const blocks = dayBlocks(data.today?.meetings ?? [], data.focus?.lines ?? [], nowMinutes)
   const focusBlocks = blocks.filter((b) => b.kind === 'focus')
   const due = deadlines(data.board?.items ?? [], day)
   const hours = Array.from({ length: 11 }, (_, k) => 7 + k)
   const inRange = nowMinutes >= DAY_START && nowMinutes <= DAY_END
+  const captions = blockCaptions(blocks, trackPx)
+  const lanes = Math.max(0, ...[...captions.values()].map((c) => c.lane + 1))
 
   return (
     <div data-work-view="today" className="flex min-w-0 flex-col gap-4">
@@ -102,7 +142,11 @@ export function TodayView({ data, now }: { data: WorkDataState; now: Date }): JS
       </h2>
 
       <div className="overflow-x-auto">
-        <div className="relative min-w-[640px] px-2 pb-1">
+        <div
+          data-work-timeline=""
+          className="relative min-w-[640px] px-2 pb-1"
+          style={lanes ? { paddingBottom: CAPTION_GAP_PX * 2 + lanes * CAPTION_LANE_PX } : undefined}
+        >
           <div className="relative h-4 text-[11px] text-fg-muted">
             {hours.map((h) => (
               <span key={h} data-hour-mark={h} className="absolute -translate-x-1/2" style={{ left: pct(h * 60) }}>
@@ -110,7 +154,7 @@ export function TodayView({ data, now }: { data: WorkDataState; now: Date }): JS
               </span>
             ))}
           </div>
-          <div className="relative h-14 rounded border border-line">
+          <div ref={track} className="relative h-14 rounded border border-line">
             {hours.map((h) => (
               <span
                 key={h}
@@ -120,7 +164,7 @@ export function TodayView({ data, now }: { data: WorkDataState; now: Date }): JS
               />
             ))}
             {blocks.map((b) => (
-              <Block key={`${b.kind}-${b.start}-${b.label}`} b={b} />
+              <Block key={`${b.kind}-${b.start}-${b.label}`} b={b} caption={captions.get(b)} />
             ))}
             {inRange && (
               <span

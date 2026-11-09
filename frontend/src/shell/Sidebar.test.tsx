@@ -258,7 +258,7 @@ describe('Sidebar theme button (M7)', () => {
     localStorage.clear()
   })
 
-  it('test hide task management hides the Tasks sidebar item', async () => {
+  it('test hide task management keeps the Tasks sidebar item (the work dashboard)', async () => {
     resetSpaceInfo()
     vi.mocked(api.space).mockResolvedValueOnce({
       name: 'space',
@@ -271,9 +271,10 @@ describe('Sidebar theme button (M7)', () => {
     })
     render(<Sidebar types={TYPES} />)
     const nav = screen.getByRole('navigation', { name: 'Main' })
-    await waitFor(() => expect(within(nav).queryByRole('button', { name: 'Tasks' })).toBeNull())
+    await waitFor(() => expect(useSpaceInfo.getState().space?.hideTaskManagement).toBe(true))
+    // The entry opens the dashboard, which is M23's Work page too; the dashboard drops the task lists.
+    expect(within(nav).getByRole('button', { name: 'Tasks' })).toBeInTheDocument()
     expect(within(nav).getByRole('button', { name: 'Calendar' })).toBeInTheDocument()
-    // Showing it again (the Settings modal's switch) brings the entry back.
     act(() => useSpaceInfo.setState((st) => ({ space: st.space && { ...st.space, hideTaskManagement: false } })))
     expect(within(nav).getByRole('button', { name: 'Tasks' })).toBeInTheDocument()
     resetSpaceInfo()
