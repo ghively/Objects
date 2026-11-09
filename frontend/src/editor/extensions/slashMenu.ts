@@ -133,7 +133,19 @@ export const SlashMenu = Extension.create({
               useSlashMenu.setState({ editor: null, range: null, query: '', rect: null })
             }
           },
-          onKeyDown: ({ event }) => {
+          onKeyDown: ({ event, view, range }) => {
+            // Escape on a menu `openSlashMenu` opened (the `+` handle, say) with nothing typed after
+            // its `/`: that `/` was never the user's, so it goes with the menu (acceptance M7#20).
+            // A `/` typed by hand stays, as the catalog's slash menu has it.
+            if (
+              event.key === 'Escape' &&
+              openedAt.get(editor) === range.from &&
+              view.state.doc.textBetween(range.from, range.to) === '/'
+            ) {
+              view.dispatch(view.state.tr.delete(range.from, range.to))
+              closeSlashMenu(editor)
+              return true
+            }
             if (useSlashMenu.getState().editor !== editor) return false
             return keyHandlers.get(editor)?.(event) ?? false
           },

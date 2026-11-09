@@ -178,6 +178,7 @@ describe('SidebarSections', () => {
     const names = within(main)
       .getAllByRole('button')
       .map((b) => b.getAttribute('aria-label') ?? b.textContent)
-    expect(names).toEqual(['Calendar', 'Tasks', 'Graph', 'Assistant'])
+    // The Assistant row carries its hover `…` menu (the way into its own page).
+    expect(names).toEqual(['Calendar', 'Tasks', 'Graph', 'Assistant', 'Assistant actions'])
   })
 })

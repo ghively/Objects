@@ -4747,6 +4747,30 @@ class Space:
             return None
         return TypeDefinition.from_json(data, fallback_id=type_id) if isinstance(data, dict) else None
 
+    def apply_setup(self, setup: str) -> None:
+        """Fix pass H2: apply M8's "Pick a starting point" to this (new or empty) space.
+
+        ``basic`` writes the Person, Meeting, Project and Book types (`basicsetup`) and loads
+        them; ``blank`` writes nothing else. Either way ``space.json`` records the pick
+        (``setup``), so the space is asked once. Raises `ValueError` for another value.
+        """
+        from . import spaceconfig
+        from .basicsetup import basic_types
+
+        if setup not in ("basic", "blank"):
+            raise ValueError(f"Unknown space setup: {setup!r}")
+        with self._lock:
+            if setup == "basic":
+                taken = {t.id for t in self.types}
+                for t in basic_types():
+                    if t.id in taken:
+                        continue
+                    self._write_type_json(t, "")
+                    self.types.append(t)
+                    self._types_changed(t.id)
+                self._sort_types()
+            spaceconfig.set_internal(self.root, "setup", setup)
+
     def create_type(
         self,
         name: str,

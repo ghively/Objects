@@ -153,7 +153,8 @@ def test_set_internal_keeps_everything_else(tmp_path: Path) -> None:
     after = json.loads(path.read_text(encoding="utf-8"))
     assert after == {**before, "deskSyncRuleId": "01JRULE"}
     assert "deskSyncRuleId" not in spaceconfig.space_fields(root)
-    assert spaceconfig.INTERNAL_KEYS == ("deskSyncRuleId", "spaceId")  # spaceId: version control, 2026-11-08
+    # spaceId: version control, 2026-11-08; setup: "Pick a starting point" asked once (fix pass H2)
+    assert spaceconfig.INTERNAL_KEYS == ("deskSyncRuleId", "spaceId", "setup")
     with pytest.raises(ValueError):
         spaceconfig.set_internal(root, "name", "x")
     with pytest.raises(spaceconfig.SpaceConfigProblem):

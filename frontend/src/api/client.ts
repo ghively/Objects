@@ -1294,6 +1294,14 @@ export const api = {
     return request<{ path: string }>('/spaces', json('POST', body), spaceConflict)
   },
 
+  /**
+   * Fix pass H2: apply "Pick a starting point" to the open (new or empty) space; returns the fresh
+   * space info. 409 when the space already has one.
+   */
+  spaceSetup(setup: SpaceSetup): Promise<SpaceInfo> {
+    return request<SpaceInfo>('/space/setup', json('POST', { setup }))
+  },
+
   /** Register an existing folder as a space. 404 when it is not a folder. */
   openSpace(path: string): Promise<{ path: string }> {
     return request<{ path: string }>('/spaces/open', json('POST', { path }))

@@ -139,7 +139,7 @@ Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down
 page up/down.
 
 **Navigation**: Navigate back Ctrl+Left or Ctrl+[ | Navigate forward Ctrl+Right or Ctrl+] | Open in new tab Ctrl+Click | Open in
-side panel (Shift+Click) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y (not in Object).
+side panel (Shift+Click; inline `[[links]]` too) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y (not in Object).
 
 **Calendar**: Go to monthly view M | Go to weekly view W | Show the day before and after R (decision C9) | Go to daily view D | Jump to today T | Back / forward one day, week or month
 Left/Right | Toggle calendar sidebar Ctrl+Alt+S.
@@ -176,9 +176,15 @@ Each starter template pre-fills the new type's properties.
 
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
+- A space opened as a new or empty folder (`objectapp --space <folder>`: no `setup` in `space.json`, no basic
+  types, no files) asks "Pick a starting point" once — the same "Start with basic setup" / "Empty space" choices
+  as "Create new space" (`POST /api/space/setup`). Nothing is written before a pick; closing asks again next
+  time. The pick is recorded as `space.json` `setup` (Create space records it too).
 - Main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant (Gene's 2026-11-08 redesign;
   Calendar is the space's opening view). The Assistant is the built-in, always-on helper — a program
-  feature, not an "agent" — shown with its own icon; a click opens its chat. "All notes" is gone from the
+  feature, not an "agent" — shown with its own icon; a click opens its chat. Like an agent row it carries a
+  hover `…` menu (Open chat, Settings, Memory & skills — no Duplicate/Delete: it is built in), the way into
+  its own page (Profile, Instructions, Memory, Skills, Learning, Chats…). "All notes" is gone from the
   sidebar — with many note types it was a dumping ground; the view stays reachable through queries and the
   palette.
 - Agents (M17), a section of its own with the standard section header, directly below the main navigation;
@@ -237,6 +243,9 @@ Each starter template pre-fills the new type's properties.
   names it; "Add description" puts the caret in the description it reveals. Renaming an object (its title, a
   table's title cell, a whiteboard's name) rewrites the links to it in other objects and then says so with a short
   notice, "Updated links in 3 objects" ("1 object"); nothing is shown when no other object linked to it.
+- **Whiteboard changed outside** (its `.whiteboard.json` edited in another program while the board is open): the
+  board reloads and says "Changed elsewhere. Reloaded."; another view of the same board in this window (a page
+  and a peek) follows silently.
 - **Property value editors**:
   - Date: a chip; click opens a picker: an input with an info icon, presets (Yesterday, Today, Tomorrow, In 1
     week, In 2 weeks), month and year dropdowns, a month grid with the chosen day as a pill, toggles
@@ -255,7 +264,9 @@ Each starter template pre-fills the new type's properties.
 
 - **Selection toolbar** (appears above selected text): Bold, Italic, Strikethrough, Underline, bulleted list,
   numbered/to-do list, Link, Code, TeX formula, color/highlight, `+`, `@` mention, AI sparkle.
-- **Block handle**: hovering a block shows `+` (insert below) and a six-dot grip at its left. Clicking the grip
+- **Block handle**: hovering a block shows `+` (insert below; it opens the slash menu in the new block, and
+  Escape with nothing typed closes it leaving the block empty — no stray `/`; a `/` typed by hand stays) and a
+  six-dot grip at its left. Clicking the grip
   selects the block and opens a menu: Hierarchy (current level, submenu), List >, To-do, Quote, Toggle, Group
   (Ctrl+G), AI assistant..., Turn into..., Copy >, Duplicate (Ctrl+D), Remove (Backspace).
 - **Block selection bar** (bottom of the page while blocks are selected): left "N block(s) . M words" with a
@@ -341,6 +352,9 @@ Each starter template pre-fills the new type's properties.
 - **Week view**: a single column of days. Each day: the weekday name colored by weekday (Sunday red, Monday amber
   with a red "Today" pill, Tuesday pink, Wednesday green, Thursday orange, Friday blue), the date as a large
   title, "Week 45", then the note or a "+ Daily Note" button. No month sidebar.
+- **Daily note from a template**: clicking or typing in an empty day's inline note creates the note (from the
+  DailyNote default template, if any) and the typing goes into its own paragraph after the template content (or
+  into the template's first empty paragraph) — never onto the end of the template's last heading.
 - **Day view** on today: the header's right side has a "Tasks dashboard" link to Tasks › Today, which lists the
   same tasks as the Day view's Tasks section (decision T1); other days have no link.
 - **Backlinks** (bottom of an object, a "Backlinks" pill with a count and a collapse toggle): each backlink is an

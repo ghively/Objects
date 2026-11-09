@@ -79,6 +79,20 @@ describe('wikilink presenter', () => {
     cleanup?.()
   })
 
+  test('test Shift+click opens the side panel, Alt+Shift+click the peek (catalog §2 Navigation)', async () => {
+    s().open(objT('Pages/Alpha.md'))
+    const { dom, cleanup } = await chip()
+    const side = vi.spyOn(useTabs.getState(), 'openInSidepanel')
+    dom.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: true }))
+    expect(side).toHaveBeenCalledWith(objT('Pages/Beta.md'))
+    expect(usePeek.getState().path).toBeNull()
+    dom.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: true, altKey: true }))
+    expect(side).toHaveBeenCalledTimes(1)
+    expect(usePeek.getState().path).toBe('Pages/Beta.md')
+    side.mockRestore()
+    cleanup?.()
+  })
+
   test('test inline link icon follows the setting', async () => {
     const { dom, cleanup } = await chip()
     // Shown by default: the type's icon in front of the title.

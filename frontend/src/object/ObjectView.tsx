@@ -246,6 +246,29 @@ function appendPlainText(ed: TiptapEditor, text: string) {
   ed.view.focus()
 }
 
+/**
+ * Fix pass H2 (M4#3): focus a just-created inline note for typing. A body that came from a
+ * template (e.g. `## Yesterday / ## Today / ## Blockers`) must not take the first keystrokes at the
+ * end of its last heading: the caret goes to the template's first empty paragraph, else to a new
+ * empty paragraph after the template content. An empty body just takes the focus.
+ */
+function focusForTyping(ed: TiptapEditor, el: HTMLElement) {
+  const { doc } = ed.state
+  const blank = (n: { type: { name: string }; content: { size: number } }) => n.type.name === 'paragraph' && n.content.size === 0
+  if (doc.childCount === 1 && blank(doc.firstChild!)) {
+    el.focus()
+    return
+  }
+  let pos = -1
+  doc.forEach((node, offset) => {
+    if (pos < 0 && blank(node)) pos = offset + 1
+  })
+  if (pos >= 0) ed.chain().setTextSelection(pos).focus().run()
+  else ed.chain().insertContentAt(doc.content.size, { type: 'paragraph' }).focus('end').run()
+  // The focus command defers DOM focus a frame; take it now so the next keystroke lands here.
+  ed.view.focus()
+}
+
 /** How long `computed` refreshes wait, so a burst of changes makes one read. */
 const COMPUTED_REFRESH_MS = 150
 const OBJECT_EVENT_KINDS = new Set(['created', 'changed', 'deleted', 'renamed'])
@@ -1305,6 +1328,8 @@ export function ObjectView({
     if (text && ed) {
       appendPlainText(ed, text)
       setBodyEmpty(false)
+    } else if (ed) {
+      focusForTyping(ed, el)
     } else {
       el.focus()
     }

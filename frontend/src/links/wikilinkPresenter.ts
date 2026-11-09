@@ -3,7 +3,7 @@
  * the back end, takes its target type's colour, shows the target's title on
  * hover, renders dimmed when unresolved, and opens its target on click
  * (peek; Ctrl/Cmd+click or middle-click opens a new tab, which extends the
- * breadcrumb trail like any link). A small icon of the target's type, in its
+ * breadcrumb trail like any link; Shift+click opens the side panel). A small icon of the target's type, in its
  * colour, sits in front of the title unless "Show object type icon for inline
  * object links" is off (`hideEntityIconsOnInlineLinks`).
  */
@@ -120,6 +120,8 @@ export function presentWikilink(dom: HTMLElement, attrs: WikilinkAttrs): () => v
     e.preventDefault()
     e.stopPropagation()
     if (e.ctrlKey || e.metaKey) useTabs.getState().open({ kind: 'object', path: resolvedPath }, { newTab: true, via: 'link' })
+    // Shift+click: the side panel; Alt+Shift+click: the peek (catalog §2 Navigation, as `openModeFor`).
+    else if (e.shiftKey && !e.altKey) useTabs.getState().openInSidepanel({ kind: 'object', path: resolvedPath })
     else usePeek.getState().peek(resolvedPath)
   }
 
