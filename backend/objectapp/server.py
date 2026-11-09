@@ -213,6 +213,7 @@ from . import (
     schedulerun,
     worktools,
 )
+from .agentrun import running_run_pids
 from .alertwatch import AlertWatch
 from .apictx import ApiContext
 from .computed import Computer, Obj, has_computed
@@ -250,6 +251,7 @@ from .propvalues import InvalidValue
 from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
 from .reviews import ReviewRunner
+from .runfence import RunFenceMiddleware
 from .searchindex import SearchIndex
 from .settings import SettingsProblem, time_zone
 from .settings import patch as patch_settings
@@ -1001,6 +1003,9 @@ def create_app(
     app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=1)
     app.add_middleware(KeyCompatMiddleware)  # request bodies with older key names
     app.add_middleware(ActivityMiddleware, idle=idle)  # M18: inside LocalOnlyMiddleware
+    # 2026-11-08: an agent run (the CLI's process tree) can't use the app's own /api routes;
+    # /api/v1 with a bearer token (the MCP servers' path) and the static files stay as they are.
+    app.add_middleware(RunFenceMiddleware, run_pids=running_run_pids)
     app.add_middleware(LocalOnlyMiddleware)  # added last: the outermost, so it checks first
     app.state.space = space
     app.state.hub = hub
