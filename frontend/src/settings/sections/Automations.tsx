@@ -118,6 +118,7 @@ function unlistedAgent(id: string): Agent {
     revision: null,
     mcpServers: [],
     remote: null,
+    warnings: [],
   }
 }
 

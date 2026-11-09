@@ -108,6 +108,29 @@ describe('ProfileTab', () => {
   })
 })
 
+describe('ProfileTab: fence warnings', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetAgents()
+    useSettings.setState({ settings: { ...settingsDefaults } })
+  })
+  afterEach(() => resetAgents())
+
+  test('test a folder the fence cannot name is said under Folder; a normal agent says nothing', () => {
+    const warning =
+      'The folder "/home/gene/Notes\\Old" can\'t be fenced from this agent\'s file tools because its name contains a backslash. Rename it if the agent shouldn\'t read it.'
+    const { unmount } = render(<ProfileTab agent={agent({ id: RESEARCHER, warnings: [warning] })} />)
+    const folder = screen.getByText('/state/agents/Researcher')
+    const note = screen.getByText(warning)
+    expect(note).toHaveClass('text-danger')
+    // Under the Folder row.
+    expect(folder.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    unmount()
+    render(<ProfileTab agent={agent({ id: RESEARCHER })} />)
+    expect(screen.queryByText(/can't be fenced/)).toBeNull()
+  })
+})
+
 describe('ProfileTab: missing secrets', () => {
   beforeEach(() => {
     vi.clearAllMocks()

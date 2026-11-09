@@ -34,6 +34,7 @@ from objectapp.agentrun import (
     contributors,
     fence_folders,
     fence_rules,
+    fence_warnings,
     nesting_problem,
     rule_path,
 )
@@ -581,6 +582,36 @@ def test_fence_folders(env) -> None:
     # The open space is fenced even when it was passed in by scope only.
     got2 = fence_folders(scope, [], [])
     assert os.path.normcase(str(env["space"].resolve())) in [os.path.normcase(str(p)) for p in got2]
+
+
+def test_fence_warnings_name_the_folders_no_rule_can_fence() -> None:
+    """Decision A-2: a fenced folder whose name holds a backslash (legal on Linux) matches no rule
+    form the CLI accepts, so it is unfenced; Object says so in its own words instead of staying
+    silent. On Windows the backslash is the separator, so nothing is flagged there."""
+    bad = Path("/home/gene/Notes\\Old")
+    want = ('The folder "/home/gene/Notes\\Old" can\'t be fenced from this agent\'s file tools because its '
+            "name contains a backslash. Rename it if the agent shouldn't read it.")
+    assert fence_warnings([Path("/home/gene/Notes"), bad, Path("/srv/Space [2024]")], sep="/") == [want]
+    assert fence_warnings([Path("/home/gene/Notes")], sep="/") == []
+    assert fence_warnings([], sep="/") == []
+    # The same folder in both its forms (given and resolved) warns once.
+    assert fence_warnings([bad, Path("/home/gene/Notes\\Old")], sep="/") == [want]
+    # Windows: ``\`` separates path components and no name can hold one.
+    assert fence_warnings([Path("C:\\Users\\Gene\\My Notes")], sep="\\") == []
+    assert "!" not in want
+
+
+@pytest.mark.skipif(WINDOWS, reason="a folder name can't hold a backslash on Windows")
+def test_fence_logs_the_backslash_warning_once_when_a_run_starts(env, caplog) -> None:
+    import logging
+
+    bad = env["tmp"] / "Notes\\Old"
+    bad.mkdir()
+    Registry(env["state"]).register(bad, touch=False)
+    with caplog.at_level(logging.WARNING, logger="objectapp.agentrun"):
+        _build(_scope(env))
+    hits = [r.getMessage() for r in caplog.records if "can't be fenced" in r.getMessage()]
+    assert hits == [agentrun.BACKSLASH_MESSAGE.format(path=str(bad.resolve()))]
 
 
 def test_fence_uses_the_agent_registry(env) -> None:

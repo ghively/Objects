@@ -2039,6 +2039,9 @@ export interface Agent {
   mcpServers: { name: string; missingVars: string[]; usable: boolean }[]
   /** M20: a remote agent's card and connection; null for a local agent. */
   remote: RemoteInfo | null
+  /** What this agent's runs can't fence (a folder whose name holds a backslash), in Object's words;
+   *  shown under Folder. Empty for most agents and for every remote agent. */
+  warnings: string[]
 }
 
 // ---- M20: remote agents (A2A) ----

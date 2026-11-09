@@ -3,7 +3,8 @@
  * field saves on change with the agent's revision (`PUT /agents/{id}`). The default agent's model
  * is Settings' model (`aiModel`): the route writes it there, and Settings is reloaded after. On a
  * 409 the tab reloads the agent and asks for the change again. "Folder" shows the path with an
- * "Open folder" button; folder MCP servers missing secrets say so (the values come in M19);
+ * "Open folder" button, and under it the agent's `warnings` (a folder its runs can't fence,
+ * decision A-2) one line each; folder MCP servers missing secrets say so (the values come in M19);
  * "Remove" unregisters an agent that isn't the default one. A read-only agent shows
  * its reason and every field is disabled.
  *
@@ -232,6 +233,11 @@ export function ProfileTab({ agent }: { agent: Agent }) {
             {PROFILE_TEXT.openFolder}
           </Button>
         </div>
+        {agent.warnings.map((w) => (
+          <p key={w} role="note" className="text-[13px] text-danger">
+            {w}
+          </p>
+        ))}
       </div>
 
       {needing.length > 0 && (
