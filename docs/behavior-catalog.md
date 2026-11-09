@@ -408,6 +408,11 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   run names them in its `--tools` list, and Claude Code (checked on 2.1.319) then offers them beside the shell;
   only the old `--tools default` dropped them for shell-on runs, which is why greying them out (approved as A-1)
   was not built.
+- **The fence**: a run's file tools are denied every space folder (notes are reached only through Object's tools),
+  the other agents' folders, the agent trash and Object's own state files, through path rules in the run's
+  settings. Known limit, accepted (decisions memo A-2): a folder whose name contains a backslash (`\`, legal in a
+  Linux folder name) can't be fenced — no rule form Claude Code accepts matches it (three forms tried live on
+  2.1.319, Linux). Rename such a folder if an agent should not read it with its file tools.
 
 ## 11. Unlinked mentions
 
