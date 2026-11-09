@@ -33,7 +33,7 @@ The boxes in those files are **not** ticked; this report is the evidence.
 
 ## Counts
 
-67 boxes: DEFERRED-live-CLI 1, MANUAL 1, NOT-RUN 11, PARTIAL 3, PASS 50, SUPERSEDED 1
+67 boxes: DEFERRED-live-CLI 1, MANUAL 1, PARTIAL 4, PASS 60, SUPERSEDED 1
 
 
 ## M15 (m15-acceptance.md)
@@ -120,17 +120,74 @@ The boxes in those files are **not** ticked; this report is the evidence.
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M20.1 | Agents section `+` > "Add remote agent…": typing `http://127.0.0.1:8799` with the bearer `test-token` and pressing "Look up" shows "Fake … | **NOT-RUN** | not reached |
-| M20.2 | Its page shows Profile, Card and Chats only. The token shows as "set" and never as text. "Replace token…" works. | **NOT-RUN** | not reached |
-| M20.3 | Chatting with it in the side panel streams the reply. The header has no model picker. A second message continues the same conversation (t… | **NOT-RUN** | not reached |
-| M20.4 | Typing `A2A:input` gets the question "Which date?" as the reply, and answering it books. | **NOT-RUN** | not reached |
-| M20.5 | `A2A:file` shows a chip whose "Show in folder" opens the agent's `files` folder. `A2A:data` shows a JSON code block. | **NOT-RUN** | not reached |
-| M20.6 | The first message with a context chip shows "This leaves your computer". After Send, the next one doesn't. An "Exclude from AI" page adde… | **NOT-RUN** | not reached |
-| M20.7 | Ask Assistant: "Delegate to Researcher: list my pages tagged rack." The chat shows "Handed a task to Researcher" and a summary. Researche… | **NOT-RUN** | not reached |
-| M20.8 | Ask Assistant to ask Fake Planner something with `remote_agent_call`. The step shows "Asked Fake Planner". | **NOT-RUN** | not reached |
-| M20.9 | Researcher's Tools tab lists "Delegate to another agent", "Call a remote agent" and "List remote agents" under Object agent tools. Switch… | **NOT-RUN** | not reached |
-| M20.10 | Deleting Fake Planner and restoring it from "Deleted agents…" brings it back, still working. | **NOT-RUN** | not reached |
-| M20.11 | `%LOCALAPPDATA%\object\agents\Fake Planner\` holds `.object-agent\agent.json`, `card.json` and `sessions\`, and no token anywhere (search… | **NOT-RUN** | not reached |
+| M20.1 | Agents section `+` > "Add remote agent…": typing `http://127.0.0.1:8799` with the bearer `test-token` and pressing "Look up" shows "Fake … | **PASS** | '+ > Add remote agent…', http://127.0.0.1:8799 + Bearer token, 'Look up' -> 'Fake Planner · A synthetic agent for Object's tests. · Fake Org 1.0.0 · Plan a trip — Plans a short trip.(travel) · Sends messages to 127.0.0.1:8799 · Streaming'; 'Add agent' -> sidebar Agents row 'Fake Planner' with a 'remote' mark. |
+| M20.2 | Its page shows Profile, Card and Chats only. The token shows as "set" and never as text. "Replace token…" works. | **PASS** | Fake Planner page tabs exactly Profile\|Card\|Chats; Profile 'Authentication: Bearer token: set' (no value in any input); 'Replace token…' -> inline None/Bearer/Header + password field + Save -> back to 'Bearer token: set', chat still answered; token only in state/secrets.json. |
+| M20.3 | Chatting with it in the side panel streams the reply. The header has no model picker. A second message continues the same conversation (t… | **PASS** | Side-panel chat with Fake Planner: header has 'Agent for this chat' + 'New chat' only (no model picker, no … menu); 'Hello planner' -> 'Echo: Hello planner / ctx=ctx-10caccd7 task=-'; second message -> same 'ctx=ctx-10caccd7'. (Card says streaming; the fake's reply is too short to watch it grow.) |
+| M20.4 | Typing `A2A:input` gets the question "Which date?" as the reply, and answering it books. | **PASS** | 'A2A:input' -> reply 'Which date?'; answering 'Next Tuesday' -> 'Booked for Next Tuesday'. |
+| M20.5 | `A2A:file` shows a chip whose "Show in folder" opens the agent's `files` folder. `A2A:data` shows a JSON code block. | **PARTIAL** | 'A2A:file' -> chip 'plan.md 6 B' with a 'Show in folder' button; file saved at state/agents/Fake Planner/.object-agent/files/<chat>/plan.md (button not clicked: it opens the OS file manager = MANUAL). 'A2A:data' -> JSON code block '{"rooms": 2}'. |
+| M20.6 | The first message with a context chip shows "This leaves your computer". After Send, the next one doesn't. An "Exclude from AI" page adde… | **PASS** | New chat with context chips 'Meeting notes' + 'Vault Secret' (excluded): first send opened 'This leaves your computer — Fake Planner is a remote agent. The context pages you send go to 127.0.0.1:8799…' (Cancel/Send); after Send the message went (contextNoticeAt set) and the next send showed no notice. A2A:echo-parts echoed Meeting notes' text and 'Left out: Vault Secret (excluded from AI)'; ZEBRA-EXCL-91 absent from the panel and transcript. |
+| M20.7 | Ask Assistant: "Delegate to Researcher: list my pages tagged rack." The chat shows "Handed a task to Researcher" and a summary. Researche… | **PASS** | Assistant (fake) calling delegate {agent: Researcher, goal: 'List my pages tagged rack.'} -> step 'Handed a task to Researcher', result {agent Researcher, chatId 01M6ZAB7…, state 'completed', summary 'Hello from the fake claude.'}; Researcher's Chats tab lists 'List my pages tagged rack.' with 'Delegated by Assistant'. Whether a live model picks delegate from the plain sentence = live CLI (lane A live m20 tests passed). |
+| M20.8 | Ask Assistant to ask Fake Planner something with `remote_agent_call`. The step shows "Asked Fake Planner". | **PASS** | Assistant (fake) calling remote_agent_call {agent: 'Fake Planner', message: 'Plan two days in Lisbon.'} -> step 'Asked Fake Planner'. |
+| M20.9 | Researcher's Tools tab lists "Delegate to another agent", "Call a remote agent" and "List remote agents" under Object agent tools. Switch… | **PASS** | Researcher Tools tab, 'Object agent tools' group lists 'List remote agents', 'Call a remote agent', 'Delegate to another agent'; switching 'Delegate to another agent' off -> toolsOff mcp__object-agent__delegate and a Researcher delegate call shows 'Handed a task to Assistant (failed)'. |
+| M20.10 | Deleting Fake Planner and restoring it from "Deleted agents…" brings it back, still working. | **PASS** | Fake Planner row … > Delete -> gone from agents; '+ > Deleted agents…' lists 'Fake Planner …/state/agents/Fake Planner'; Restore -> back with the same id and 'Bearer token: set'; a new chat answers 'Echo: Still there? / ctx=ctx-1cf4cf59' (still working, token still used). |
+| M20.11 | `%LOCALAPPDATA%\object\agents\Fake Planner\` holds `.object-agent\agent.json`, `card.json` and `sessions\`, and no token anywhere (search… | **PASS** | state/agents/Fake Planner/ holds .object-agent/agent.json, .object-agent/card.json, .object-agent/sessions/*.jsonl (+ files/<chat>/plan.md); `grep -rl test-token` over the folder finds nothing (the token is only in state/secrets.json). |
 | M20.12 | Unlinked mentions still show on the object page. | **PASS** | Page 'Mention probe' with plain text 'Yesterday Ada Lovelace reviewed the plan.' -> Ada Lovelace page tab 'Mentions 1' lists it with a 'Link' button (checked once on this build, after M17-M20 are all in). |
 
+## Bugs found and fixed (one commit each, regression test written first and seen failing)
 
+| Commit | Box | Symptom | Fix | Test |
+|---|---|---|---|---|
+| `ec0dde6` `fix(accept-m17.5)` | M17.5, M17.9 | With an AI chat already open in the side panel, clicking another agent's sidebar row (or a chat in an agent's Chats tab) left the panel on the old agent. | `nav/sidepanel.openInArea` pushes a target naming `agentId`/`chatId` into the open chat entry (it did so only for `path`); `AiChatPanel` already turns that into a new chat / the transcript. | `sidepanel.m10.test.ts` "an agent or a transcript asked for is shown in the chat already there" |
+| `49953d5` `fix(accept-m18.6)` | M18.6 | Editing SKILL.md on the skill page rewrote the YAML frontmatter as `---\n## name: rack-labels description: … created\_by: agent` — the skill lost its name and description. | `SkillDetail` hands only the body to the Markdown editor; the frontmatter is shown above it and saved back byte for byte. | `SkillDetail.test.tsx` "the frontmatter stays out of the editor and is saved byte for byte" |
+| `908c9d0` `fix(accept-m18.7)` | M18.6, M18.7 | After your own skill edit the History list kept its old rows (the client drops events this window caused), so Undo on the newest visible row answered "This changed again since". | `LedgerList` takes `reloadKey`; `SkillDetail` bumps it after each save. | `SkillDetail.test.tsx` "your own save shows in the History at once" |
+| `6b4d08b` `fix(accept-m18.8)` | M18.8 | With "Show archived" on, every active skill was listed twice (`?archived=true` answers active + archived). | The Skills tab adds only the `archived` rows from that answer. | `SkillsTab.test.tsx` "Show archived lists each skill once" |
+
+Gates after the fixes: `npx vitest run` 528 files passed, 1 skipped (3993 tests passed, 1 skipped); `npm run build` clean.
+Each fix was re-checked live on the scratch server after `npm run build`.
+
+## FAIL list
+
+None open: the four failures found were fixed above.
+
+## Findings not fixed (for Gene)
+
+1. **Assistant's agent page has no entry point after the redesign.** Its Memory / Skills / Learning / Chats tabs
+   (M18.1, M18.6–M18.10) were reachable only by clicking a "Saved …" Learning line; the main-nav Assistant has
+   no `…` menu and the Agents section excludes it. A design call (catalog §4), so not changed.
+2. **Import "This space": first run defaults to "Try on a copy"** (M27 behaviour) — the M15.4 box's wording
+   predates it; untick to import for real.
+3. **Obsidian folder "People" isn't singularised**, so into a space that already has Person it becomes a new
+   type "People" in folder "People (2)" instead of joining Person (M15.4).
+4. **Same-title imports rely on a path tiebreak:** Books/Dune and Movies/Dune got the same `createdAt`;
+   `[[Books/Dune|the book]]` was written as `[[Dune|the book]]` and resolves to Books/Dune only because "Books" <
+   "Movies" (M15.3).
+5. **Stopped import wording:** the dialog says "5253 failed" without the report's "not written because the
+   import stopped"; while running it showed two different counters (475/6001 vs "Writing objects: 174 of 6001").
+6. **Add agent folder:** an `agent.json` id that isn't a valid ULID gives "This folder isn't an Object agent."
+   (misleading) (M17.11).
+7. **Tool-step label for a refused write** reads "Created 'X' (failed)" (M17.6) — past tense on a failure.
+8. **Quick-open "Create new" with a slash:** creating "Pages/Alpha" from the search box made `Pages/Pages.md`
+   titled "Pages/Alpha" (seen by accident; outside M15–M20).
+9. **Stale views:** a settings PUT from another client isn't reflected until reload (M16.8); an open agent Tools
+   tab didn't show "Turned off in Settings > Integrations" until reload (M19.6).
+10. **Secret variables:** a row's Delete removes the value at once, no confirm (servers do ask) (M19.9).
+
+## MANUAL / not automatable, by reason
+
+- **Needs a real export:** M15.6 (Anytype).
+- **Visual (light/dark look):** the theme half of M15.7 and M16.1 (both PARTIAL: their DOM/keyboard halves pass).
+- **OS integration (opens the file manager):** "Open folder" (M17.5) and "Show in folder" (M20.5 PARTIAL) were
+  located but not clicked.
+- **Live model wording/choices (DEFERRED-live-CLI):** M18.13 (nothing saved after a refused read); the "saved
+  for next time" wording in M18.2 (PARTIAL). Real-CLI behaviour for M16.6/M16.7/M17.3/M17.5/M17.7/M17.8/M18.1 is
+  cited from lane A.
+
+## Not run
+
+Nothing. Two caveats: M19.1 used the fake stdio MCP server rather than a real `npx` server, and the M20 remote
+agent was `fake_a2a.py`.
+
+## Scratch left behind
+
+`~/.hermes/cache/scratch/lane-c2a/` (spaces `space/`, `notion/`, `obsidian/`, `big/`, `space (trial)/`,
+`state/`, `results.json`, the fake wrapper with lane-C2a markers `LC2:say` and review/curator action files).
