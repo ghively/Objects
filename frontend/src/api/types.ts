@@ -479,6 +479,10 @@ export interface DeviceSettings {
   workAutoRun: boolean
   /** MCP tools (`mcp__<server>__<tool>`) a read-only run may use (at most 500). */
   workReadTools: string[]
+  // ---- Import (2026-11-09) ----
+  /** The languages the import's OCR reads: Tesseract codes joined with `+` (`eng+deu`); `''` = every
+   *  installed language. */
+  ocrLanguages: string
 }
 
 /** M8 `DeviceSettings.language`. */

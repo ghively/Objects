@@ -57,4 +57,6 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   workAgentActs: false,
   workAutoRun: true,
   workReadTools: [],
+  // Import (2026-11-09)
+  ocrLanguages: '',
 }) as DeviceSettings

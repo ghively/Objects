@@ -2,6 +2,9 @@
 // (`import/ImportDialog.tsx`), which detects the source; one row per source Object reads (Notion,
 // Obsidian, Anytype) opens it preset to that source. No migration guides from the web: Object
 // makes no network requests, so each row says in a line how to make the export (our strings).
+//
+// 2026-11-09: "OCR languages" (the `ocrLanguages` device setting) names the Tesseract languages a
+// scanned PDF is read in; empty means every installed one. The field saves on blur (and on Enter).
 import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
@@ -9,8 +12,9 @@ import { Button } from '@/components/ui/button'
 import type { ImportBatch, ImportSourceKind } from '@/api/types'
 import { AGENT_TEXT } from '@/import/agent/text'
 import { useImportDialog } from '@/import/useImportDialog'
+import { useSettings } from '@/settings/useSettings'
 import { useSettingsModal } from '../useSettingsModal'
-import { SectionHeader, SettingGroup } from '../controls'
+import { SaveError, SectionHeader, SettingGroup, errorText } from '../controls'
 
 export const IMPORT_CONTENT_TEXT = {
   heading: 'Import Content',
@@ -35,11 +39,15 @@ export const IMPORT_CONTENT_TEXT = {
   historyObjects: (n: number) => `${n} ${n === 1 ? 'object' : 'objects'}`,
   review: AGENT_TEXT.continueButton,
   reviewLabel: (source: string) => `${AGENT_TEXT.continueButton}: ${source}`,
+  // our strings: the OCR languages setting
+  ocrLanguages: 'OCR languages',
+  ocrLanguagesHelp: 'Tesseract language codes joined with +, for example eng+deu. Leave empty to use every installed language.',
+  ocrLanguagesPlaceholder: 'Every installed language',
 } as const
 
 const T = IMPORT_CONTENT_TEXT
 
-export const IMPORT_CONTENT_SEARCH: string[] = [T.startImporting, T.notion, T.obsidian, T.anytype]
+export const IMPORT_CONTENT_SEARCH: string[] = [T.startImporting, T.notion, T.obsidian, T.anytype, T.ocrLanguages]
 
 const SOURCES: { kind: ImportSourceKind; label: string; help: string }[] = [
   { kind: 'notion', label: T.notion, help: T.notionHelp },
@@ -114,6 +122,47 @@ function ImportHistory() {
   )
 }
 
+/** "OCR languages": the `ocrLanguages` device setting, saved on blur and on Enter. */
+function OcrLanguages() {
+  const value = useSettings((s) => s.settings.ocrLanguages)
+  const [text, setText] = useState(value)
+  const [shown, setShown] = useState(value)
+  const [error, setError] = useState<string | null>(null)
+  if (shown !== value) {
+    setShown(value)
+    setText(value)
+  }
+  const commit = () => {
+    const next = text.trim()
+    if (next === value) return
+    setError(null)
+    useSettings
+      .getState()
+      .patch({ ocrLanguages: next })
+      .catch((e: unknown) => setError(errorText(e)))
+  }
+  return (
+    <SettingGroup title={T.ocrLanguages} help={T.ocrLanguagesHelp}>
+      <input
+        aria-label={T.ocrLanguages}
+        placeholder={T.ocrLanguagesPlaceholder}
+        value={text}
+        spellCheck={false}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            commit()
+          }
+        }}
+        className="h-8 w-full max-w-[420px] rounded-md border border-line bg-transparent px-2 text-[14px] text-fg outline-none focus:border-fg-muted"
+      />
+      <SaveError error={error} />
+    </SettingGroup>
+  )
+}
+
 export function ImportContentSection() {
   return (
     <div>
@@ -150,6 +199,7 @@ export function ImportContentSection() {
           ))}
         </ul>
       </SettingGroup>
+      <OcrLanguages />
       <ImportHistory />
     </div>
   )

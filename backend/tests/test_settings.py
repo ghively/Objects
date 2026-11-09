@@ -54,6 +54,8 @@ CONTRACT_DEFAULTS = {
     "workAgentActs": False,
     "workAutoRun": True,
     "workReadTools": [],
+    # 2026-11-09 (`test_ocr_languages.py` checks it)
+    "ocrLanguages": "",
 }
 
 

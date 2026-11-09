@@ -3,7 +3,8 @@
 The keys are the M7 contract's ``DeviceSettings`` plus M8's (language, decimal
 separator, time zone, backlink defaults, presentation), M22's ``activityName`` (your
 name in a work item's Activity, 1-60 characters, one line) and M23's ``workAlertFolder``
-and ``workAlertIntervals`` (the Work section's monitoring folder watch); `read` merges the file over
+and ``workAlertIntervals`` (the Work section's monitoring folder watch) and ``ocrLanguages`` (the
+import's OCR languages, 2026-11-09); `read` merges the file over
 `DEFAULTS` (a missing file reads as the defaults, revision ``''``, and is not
 created). `patch` checks each key's shape, replaces the patched top-level keys,
 keeps unknown keys already in the file, and writes atomically against the
@@ -105,6 +106,9 @@ DEFAULTS: dict[str, Any] = {
     "workAgentActs": False,
     "workAutoRun": True,
     "workReadTools": [],
+    # 2026-11-09: the languages the import's OCR reads (Tesseract codes joined with ``+``, such as
+    # ``eng+deu``); "" means every installed language.
+    "ocrLanguages": "",
 }
 
 # A model name or alias for ``claude --model``: the one rule, in `aimodels` (M16).
@@ -167,7 +171,11 @@ WORK_ALERT_INTERVAL_MAX = 10080
 WORK_READ_TOOLS_MAX = 500
 _READ_TOOL_ID = re.compile(r"mcp__[A-Za-z0-9_-]{1,64}__\S{1,128}")
 _AGENT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+# Tesseract language codes joined with ``+`` (``eng``, ``chi_sim+eng``); "" is "every installed language".
+OCR_LANGUAGES_MAX = 200
+_OCR_LANGUAGES = re.compile(r"[a-z_]{3,}(?:\+[a-z_]{3,})*")
 _PROBLEM_MESSAGES = {
+    "ocrLanguages": "OCR languages are Tesseract codes joined with +, for example eng+deu.",
     "workReadTools": "A read tool is mcp__<server>__<tool> (at most 500).",
     "workAgentId": "The work agent is one of Object's agents.",
     "workAlertFolder": "Pick a folder (a full path).",
@@ -242,6 +250,10 @@ def _valid(key: str, value: Any) -> bool:
             isinstance(value, list)
             and len(value) <= WORK_READ_TOOLS_MAX
             and all(isinstance(v, str) and _READ_TOOL_ID.fullmatch(v) is not None for v in value)
+        )
+    if key == "ocrLanguages":
+        return isinstance(value, str) and (
+            value == "" or (len(value) <= OCR_LANGUAGES_MAX and _OCR_LANGUAGES.fullmatch(value) is not None)
         )
     if key == "startupSpacePath":
         return value is None or isinstance(value, str)

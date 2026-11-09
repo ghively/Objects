@@ -1,7 +1,12 @@
 """``.pdf``: the text layer, page by page. A page with no (or a negligible) text layer that holds an
 image is a scanned page: "Needs OCR", read with a local ``tesseract`` when one is installed and merged
-in page order, so a mixed PDF (text pages and scanned pages) keeps every page's text. English only:
-``tesseract`` is called without ``-l``.
+in page order, so a mixed PDF (text pages and scanned pages) keeps every page's text.
+
+Languages: the engine is asked once per process which languages it has (``tesseract --list-langs``,
+cached; ``osd`` is no language) and every one goes into ``-l eng+deu+...``, so a scan in any installed
+language is read. The ``ocrLanguages`` device setting (``eng+deu``) names the languages instead when it
+is set. When the list can't be read and the setting is empty, ``tesseract`` is called without ``-l``
+(its own default, English).
 
 OCR text is cached in memory by the sha256 of each image's bytes (bounded, never written anywhere), so
 the import wizard's sensitive-content scan, the import's own scan and the import's reader read each
@@ -11,6 +16,7 @@ scanned page once.
 from __future__ import annotations
 
 import hashlib
+import re
 import shutil
 import subprocess
 import tempfile
@@ -29,6 +35,10 @@ NEGLIGIBLE_TEXT = 32
 OCR_CACHE_MAX = 1024  # images; a page's text is a few kB at most
 _OCR_CACHE: OrderedDict[str, str] = OrderedDict()
 _OCR_LOCK = threading.Lock()
+# Per engine path: its installed languages, or None when ``--list-langs`` could not be read.
+_LANGS_CACHE: dict[str, list[str] | None] = {}
+# A Tesseract language code: ``eng``, ``deu``, ``chi_sim`` (the ``ocrLanguages`` setting's rule too).
+_LANG_CODE = re.compile(r"[a-z_]{3,}")
 
 
 def ocr_engine() -> str | None:
@@ -37,13 +47,75 @@ def ocr_engine() -> str | None:
 
 
 def clear_ocr_cache() -> None:
+    """Forget the OCR text and the installed-languages answer (tests)."""
     with _OCR_LOCK:
         _OCR_CACHE.clear()
+        _LANGS_CACHE.clear()
 
 
-def _ocr_image(engine: str, name: str, data: bytes, tmp: Path, n: int) -> str | None:
-    """One image's OCR text ("" when it has none), or None when the engine failed (not cached)."""
-    key = hashlib.sha256(engine.encode("utf-8") + b"\0" + data).hexdigest()
+def parse_list_langs(output: str) -> list[str]:
+    """The language codes in ``tesseract --list-langs`` output: a header line ("List of available
+    languages (3):") then one code per line. ``osd`` (orientation and script detection) is no
+    language, and a line that is no code (an error, a ``script/`` name) is left out."""
+    out: list[str] = []
+    for line in output.splitlines():
+        code = line.strip()
+        if code and code != "osd" and _LANG_CODE.fullmatch(code) and code not in out:
+            out.append(code)
+    return out
+
+
+def installed_languages(engine: str) -> list[str] | None:
+    """The engine's installed languages, asked once per process; None when the list can't be
+    read (the engine failed or printed no code)."""
+    with _OCR_LOCK:
+        if engine in _LANGS_CACHE:
+            return _LANGS_CACHE[engine]
+    langs: list[str] | None
+    try:
+        r = subprocess.run([engine, "--list-langs"], capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.TimeoutExpired):
+        langs = None
+    else:
+        # Older engines print the list to stderr.
+        langs = parse_list_langs((r.stdout or "") + "\n" + (r.stderr or "")) if r.returncode == 0 else None
+        if not langs:
+            langs = None
+    with _OCR_LOCK:
+        _LANGS_CACHE[engine] = langs
+    return langs
+
+
+def language_arg(installed: list[str] | None, setting: str | None) -> list[str]:
+    """The ``-l`` arguments of an OCR call: the ``ocrLanguages`` setting as given when it is set,
+    else every installed language joined with ``+``; nothing when neither is known."""
+    chosen = setting.strip() if isinstance(setting, str) else ""
+    if not chosen and installed:
+        chosen = "+".join(installed)
+    return ["-l", chosen] if chosen else []
+
+
+def configured_languages() -> str:
+    """The ``ocrLanguages`` device setting; "" when it is unset or the settings file can't be read
+    (a reader never stops an import over it)."""
+    from .. import settings
+
+    try:
+        value = settings.read()[0].get("ocrLanguages")
+    except Exception:  # `ReadOnly` (a damaged settings.json) or an unreadable state dir
+        return ""
+    return value if isinstance(value, str) else ""
+
+
+def ocr_languages(engine: str) -> list[str]:
+    """The ``-l`` arguments for `engine` (see `language_arg`)."""
+    return language_arg(installed_languages(engine), configured_languages())
+
+
+def _ocr_image(engine: str, name: str, data: bytes, tmp: Path, n: int, langs: list[str]) -> str | None:
+    """One image's OCR text ("" when it has none), or None when the engine failed (not cached).
+    `langs`: the ``-l`` arguments (`ocr_languages`); the cache is per engine and language set."""
+    key = hashlib.sha256(engine.encode("utf-8") + b"\0" + "+".join(langs).encode("utf-8") + b"\0" + data).hexdigest()
     with _OCR_LOCK:
         hit = _OCR_CACHE.get(key)
         if hit is not None:
@@ -52,7 +124,7 @@ def _ocr_image(engine: str, name: str, data: bytes, tmp: Path, n: int) -> str | 
     f = tmp / f"i{n}{Path(name).suffix or '.png'}"
     f.write_bytes(data)
     try:
-        r = subprocess.run([engine, str(f), "stdout"], capture_output=True, text=True, timeout=120)
+        r = subprocess.run([engine, str(f), "stdout", *langs], capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.TimeoutExpired):
         return None
     if r.returncode != 0:
@@ -72,11 +144,11 @@ def _page_images(page) -> list:
         return []
 
 
-def _ocr_page(page, engine: str, tmp: Path, counter: list[int]) -> str:
+def _ocr_page(page, engine: str, tmp: Path, counter: list[int], langs: list[str]) -> str:
     out: list[str] = []
     for img in _page_images(page):
         counter[0] += 1
-        text = _ocr_image(engine, img.name, img.data, tmp, counter[0])
+        text = _ocr_image(engine, img.name, img.data, tmp, counter[0], langs)
         if text:
             out.append(text)
     return "\n\n".join(out)
@@ -111,9 +183,10 @@ def read(path: Path) -> ReadResult:
     read_pages: list[int] = []
     if engine:
         counter = [0]
+        langs = ocr_languages(engine)
         with tempfile.TemporaryDirectory() as tmp:
             for i in scanned:
-                ocr = _ocr_page(reader.pages[i], engine, Path(tmp), counter)
+                ocr = _ocr_page(reader.pages[i], engine, Path(tmp), counter, langs)
                 if ocr:
                     pages[i] = ocr
                     read_pages.append(i + 1)

@@ -156,9 +156,11 @@ class FakeTesseract:
     def __init__(self, text: str):
         self.text = text
         self.calls = 0
+        self.args: list[list[str]] = []
 
     def __call__(self, args, **_kw):
         self.calls += 1
+        self.args.append(list(args))
         return subprocess.CompletedProcess(args, 0, stdout=self.text + "\n", stderr="")
 
 
@@ -168,6 +170,7 @@ def fake_ocr(monkeypatch):
 
     fake = FakeTesseract("Beta scanned page about herons")
     monkeypatch.setattr(pdf, "ocr_engine", lambda: "/fake/tesseract")
+    monkeypatch.setattr(pdf, "installed_languages", lambda engine: ["eng", "deu"])
     monkeypatch.setattr(pdf.subprocess, "run", fake)
     if hasattr(pdf, "clear_ocr_cache"):
         pdf.clear_ocr_cache()
@@ -187,6 +190,8 @@ def test_mixed_pdf_ocrs_the_scanned_page_in_order(tmp_path, fake_ocr):
     assert md.index("Alpha") < md.index("herons") < md.index("Gamma")
     assert fake_ocr.calls == 1  # only the scanned page; text pages are never OCR'd
     assert r.notes == ["Needs OCR: page 2 read with the local OCR engine"]
+    # Every installed language is read (known limit "OCR is English only", 2026-11-09).
+    assert fake_ocr.args[0][-2:] == ["-l", "eng+deu"]
 
 
 def test_mixed_pdf_without_an_engine_says_which_page(tmp_path, monkeypatch):
