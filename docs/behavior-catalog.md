@@ -404,6 +404,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   others with "This run can't use {tool}." even if the CLI let a call through; an agent's Tools-tab switch-off of
   Memory, Change skills, Delegate or Call a remote agent is enforced by Object, not only by Claude Code. Read-only
   runs (Work read, filing a brain dump, Desk sync, import filing) can never write the agent's memory or skills.
+- **Shell and search**: with the shell on, Find files (Glob) and Search in files (Grep) stay ordinary switches. The
+  run names them in its `--tools` list, and Claude Code (checked on 2.1.319) then offers them beside the shell;
+  only the old `--tools default` dropped them for shell-on runs, which is why greying them out (approved as A-1)
+  was not built.
 
 ## 11. Unlinked mentions
 
