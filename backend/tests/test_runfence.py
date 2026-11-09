@@ -8,18 +8,30 @@ one of its descendants; `RunFenceMiddleware` refuses such requests with 403 unle
 
 from __future__ import annotations
 
+import json
 import socket
 import subprocess
 import sys
 import textwrap
+import threading
 import time
 import types
 from collections import namedtuple
+from pathlib import Path
 
+import httpx
 import psutil
 import pytest
+import uvicorn
+from fake_claude import install
+from fastapi.testclient import TestClient
 
-from objectapp import runfence
+from objectapp import agentrun, runfence
+from objectapp import settings as device_settings
+from objectapp.agentmodel import DEFAULT_AGENT_ID
+from objectapp.server import create_app
+from objectapp.space import Space
+from objectapp.tokens import TokenStore
 
 Addr = namedtuple("Addr", "ip port")
 Conn = namedtuple("Conn", "fd family type laddr raddr status pid")
@@ -49,7 +61,7 @@ class FakePsutil:
             raise self.fail
         return list(self.conns)
 
-    def Process(self, pid: int):  # noqa: N802 - psutil's name
+    def Process(self, pid: int):
         if pid not in self.tree:
             raise psutil.NoSuchProcess(pid)
         tree = self.tree
@@ -183,3 +195,172 @@ def test_peer_pid_finds_a_real_child_process() -> None:
         finally:
             child.kill()
             child.wait(10)
+
+
+# -- the middleware ------------------------------------------------------------------------------
+
+RUN_PID = 4242
+
+
+@pytest.fixture
+def run_registered():
+    agentrun.register_run_pid(RUN_PID)
+    try:
+        yield RUN_PID
+    finally:
+        agentrun.unregister_run_pid(RUN_PID)
+
+
+def test_run_pid_registry() -> None:
+    assert RUN_PID not in agentrun.running_run_pids()
+    agentrun.register_run_pid(RUN_PID)
+    try:
+        assert RUN_PID in agentrun.running_run_pids()
+    finally:
+        agentrun.unregister_run_pid(RUN_PID)
+        agentrun.unregister_run_pid(RUN_PID)  # twice is fine
+    assert RUN_PID not in agentrun.running_run_pids()
+
+
+def test_middleware_refuses_a_run_process_on_the_apps_routes(space_dir: Path, monkeypatch, run_registered) -> None:
+    peers = {"pid": RUN_PID, "asked": 0}
+
+    def fake_peer(host: str, port: int) -> int | None:
+        peers["asked"] += 1
+        return peers["pid"]
+
+    monkeypatch.setattr(runfence, "peer_pid", fake_peer)
+    monkeypatch.setattr(runfence, "is_run_process", lambda pid, pids: pid in pids)
+    app = create_app(Space(space_dir), None, watch=False)
+    _rec, secret = TokenStore(space_dir).ephemeral("Assistant", "read", agent=DEFAULT_AGENT_ID)
+    try:
+        with TestClient(app) as http:
+            res = http.get("/api/space")
+            assert res.status_code == 403 and res.json() == {"detail": runfence.REFUSED_MESSAGE}
+            res = http.post("/api/import/preview", json={})
+            assert res.status_code == 403 and res.json()["detail"] == runfence.REFUSED_MESSAGE
+            # the MCP servers' path: /api/v1 with a bearer token is not the fence's business
+            res = http.get("/api/v1/whoami", headers={"Authorization": f"Bearer {secret}"})
+            assert res.status_code == 200, res.text
+            # /api/v1 without a token is still fenced (it would be 401 anyway)
+            res = http.get("/api/v1/whoami")
+            assert res.status_code == 403 and res.json()["detail"] == runfence.REFUSED_MESSAGE
+            # another process is untouched
+            peers["pid"] = RUN_PID + 1
+            assert http.get("/api/space").status_code == 200
+            peers["pid"] = None  # psutil couldn't tell: let through
+            assert http.get("/api/space").status_code == 200
+            # with no run running nothing is looked up
+            agentrun.unregister_run_pid(RUN_PID)
+            peers["pid"] = RUN_PID
+            asked = peers["asked"]
+            assert http.get("/api/space").status_code == 200
+            assert peers["asked"] == asked
+    finally:
+        TokenStore.drop_ephemeral(secret)
+
+
+class Live:
+    """The app on a free loopback port, with the fake claude as its CLI (as the M18 tests do)."""
+
+    def __init__(self, space_dir: Path, tmp_path: Path, monkeypatch) -> None:
+        self.claude = install(tmp_path / "bin")
+        self.log = tmp_path / "claude-log.jsonl"
+        monkeypatch.setenv("FAKE_CLAUDE_LOG", str(self.log))
+        _data, revision = device_settings.read()
+        device_settings.patch({"claudePath": str(self.claude)}, revision)
+        self.app = create_app(Space(space_dir), None, watch=False)
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            self.port = s.getsockname()[1]
+        self.server = uvicorn.Server(uvicorn.Config(self.app, host="127.0.0.1", port=self.port, log_level="warning"))
+        self.thread = threading.Thread(target=self.server.run, daemon=True)
+        self.thread.start()
+        self.base = f"http://127.0.0.1:{self.port}"
+        self.http = httpx.Client(base_url=self.base, timeout=120)
+        for _ in range(400):
+            try:
+                if self.http.get("/api/space").status_code == 200:
+                    return
+            except httpx.HTTPError:
+                pass
+            time.sleep(0.05)
+        raise AssertionError("the app didn't start")
+
+    def chat(self, prompt: str) -> list[dict]:
+        body = {"mode": "chat", "prompt": prompt, "contextPaths": [], "history": []}
+        res = self.http.post("/api/ai/chat", json=body)
+        assert res.status_code == 200, res.text
+        frames = _frames(res.text)
+        assert frames[-1]["type"] == "done", frames[-1]
+        return frames
+
+    def runs(self) -> list[dict]:
+        if not self.log.exists():
+            return []
+        return [json.loads(line) for line in self.log.read_text(encoding="utf-8").splitlines() if line]
+
+    def stop(self) -> None:
+        self.http.close()
+        self.server.should_exit = True
+        self.thread.join(30)
+
+
+def _frames(raw: str) -> list[dict]:
+    out = []
+    for frame in raw.replace("\r\n", "\n").split("\n\n"):
+        data = [line[5:].lstrip(" ") for line in frame.split("\n") if line.startswith("data:")]
+        if data:
+            out.append(json.loads("\n".join(data)))
+    return out
+
+
+@pytest.fixture
+def live(space_dir: Path, tmp_path: Path, monkeypatch):
+    if not _psutil_can_list_connections():
+        pytest.skip("psutil cannot list connections on this machine")
+    runfence.reset_cache()
+    env = Live(space_dir, tmp_path, monkeypatch)
+    try:
+        yield env
+    finally:
+        env.stop()
+
+
+def test_a_run_cannot_reach_the_apps_routes_but_its_mcp_server_can(live: Live) -> None:
+    """The fake CLI (the run's root process) GETs the app's routes itself and starts Object's own
+    MCP server, which talks to /api/v1 with the run's token."""
+    own = f"{live.base}/api/objects"
+    v1 = f"{live.base}/api/v1/whoami"
+    frames = live.chat(f"Please check.\nFAKE:curl {own}\nFAKE:curl {v1}\nFAKE:mcp:object:schema:{{}}")
+    text = frames[-1]["text"]
+    assert f"curl {own} -> 403" in text, text
+    assert runfence.REFUSED_MESSAGE in text
+    assert f"curl {v1} -> 200" in text, text
+    [schema] = [f for f in frames if f.get("type") == "tool" and f.get("name") == "schema"
+                and f.get("result") is not None]
+    assert schema["isError"] is False, schema
+    assert "types" in schema["result"]
+    # the test process (not a run) was never fenced
+    assert live.http.get("/api/objects").status_code == 200
+
+
+def test_other_clients_are_untouched_while_a_run_is_running(live: Live) -> None:
+    out: list[list[dict]] = []
+    thread = threading.Thread(target=lambda: out.append(live.chat("FAKE:wait")), daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline and not live.runs():
+        time.sleep(0.05)
+    [run] = live.runs()
+    try:
+        assert run["pid"] in agentrun.running_run_pids()
+        res = live.http.get("/api/objects")
+        assert res.status_code == 200
+        with httpx.Client(base_url=live.base, timeout=30) as fresh:  # a brand-new connection
+            assert fresh.get("/api/space").status_code == 200
+    finally:
+        Path(str(live.log) + ".go").touch()
+        thread.join(60)
+    assert out and out[0][-1]["type"] == "done"
+    assert run["pid"] not in agentrun.running_run_pids()

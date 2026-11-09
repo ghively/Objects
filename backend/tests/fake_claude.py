@@ -94,6 +94,10 @@ M20 (A2A and delegation). More markers:
 - ``FAKE:long:<n>``: the reply is ``n`` characters long (delegation's summary cap)
 - ``FAKE:echo-env``: the reply names ``MCP_TOOL_TIMEOUT``'s value
   (``MCP_TOOL_TIMEOUT=<value, or unset>``)
+- ``FAKE:curl <url>`` (one per line, the url running to the line's end; the run fence): an HTTP
+  GET of that url from the fake's own process, no proxy; a ``/api/v1`` url carries the ``object``
+  server's token as ``Authorization: Bearer``. The reply holds one line per url:
+  ``curl <url> -> <status> <first 200 characters of the body>``, or ``-> error: <reason>``.
 
 M27 (import filing). When the prompt holds ``Filing pass for an import batch.``, the reply is a fenced
 ``json`` block ``{"decisions": [...]}`` with one decision per ``Object: <path>`` line, taken from
@@ -541,6 +545,40 @@ def _object_env(config: dict | None, name: str) -> str | None:
     return os.environ.get(name)
 
 
+def _curl_calls(prompt: str, config: dict | None) -> list[str]:
+    """The ``FAKE:curl <url>`` markers: one GET each from this process (the run's root), no proxy;
+    a ``/api/v1`` url gets the ``object`` server's token. One report line per url."""
+    import urllib.error
+    import urllib.request
+    from urllib.parse import urlsplit
+
+    out: list[str] = []
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    for line in prompt.splitlines():
+        at = line.find("FAKE:curl ")
+        if at < 0:
+            continue
+        url = line[at + len("FAKE:curl "):].strip()
+        if not url:
+            continue
+        headers: dict[str, str] = {}
+        path = urlsplit(url).path
+        token = _object_env(config, "OBJECT_API_TOKEN")
+        if token and (path == "/api/v1" or path.startswith("/api/v1/")):
+            headers["Authorization"] = f"Bearer {token}"
+        request = urllib.request.Request(url, headers=headers)
+        try:
+            with opener.open(request, timeout=10) as res:
+                status, body = res.status, res.read(200).decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as e:
+            status, body = e.code, e.read(200).decode("utf-8", errors="replace")
+        except (urllib.error.URLError, OSError) as e:
+            out.append(f"curl {url} -> error: {e}")
+            continue
+        out.append(f"curl {url} -> {status} {body}".rstrip())
+    return out
+
+
 def main(argv: list[str]) -> int:
     if "--version" in argv:
         if os.environ.get("FAKE_CLAUDE_VERSION_FAIL") == "1":
@@ -673,6 +711,9 @@ def main(argv: list[str]) -> int:
         final = ("0123456789" * (size // 10 + 1))[:size]
     elif "FAKE:echo-env" in prompt:
         final = f"MCP_TOOL_TIMEOUT={os.environ.get('MCP_TOOL_TIMEOUT', 'unset')}"
+    curls = _curl_calls(prompt, config)
+    if curls:
+        final = "\n".join(curls)
     half = len(final) // 2
     _stream_text("msg_2", [final[:half], final[half:]], session)
     _result(final, session)
