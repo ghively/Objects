@@ -109,6 +109,49 @@ def test_imported_image_is_an_image_object(client, tmp_path):
     assert [o["type"] for o in objects_from(client, "notes.txt")] == ["page"]
 
 
+def test_preview_counts_images_under_image(client, tmp_path):
+    """Fix pass 2026-11-09: the preview applies the writer's rule (AC-2). An image the Page row
+    would take is counted and listed under an Image row, not under Page, so the preview's numbers
+    are the import's: the Page row's count leaves the images out, the Image row (the basic media
+    type, no properties of its own) has them, the samples name it, and the types count includes
+    it. Into this space the row names the space's Image type once it has one."""
+    src = library(tmp_path)  # photo.png and notes.txt
+    p = preview(client, src)
+    rows = {t["key"]: t for t in p["types"]}
+    assert [t["key"] for t in p["types"]] == ["page", "image"]
+    assert rows["page"]["objectCount"] == 1 and rows["image"]["objectCount"] == 1
+    image = rows["image"]
+    assert image["name"] == "Image" and image["pluralName"] == "Images" and image["properties"] == []
+    assert image["originLabel"] == "Image files" and image["skip"] is False
+    assert image["existingTypeId"] is None  # the sample space has no Image type yet
+    assert {s["sourcePath"]: s["typeKey"] for s in p["samples"]} == {"photo.png": "image", "notes.txt": "page"}
+    assert p["counts"]["objects"] == 2 and p["counts"]["types"] == 2
+    # the same mapping previews the same
+    r = client.post("/api/import/preview", json={"source": {"path": str(src), "kind": "files"}, "target": "currentSpace",
+                                                 "mapping": p["mapping"]})
+    assert r.status_code == 200 and r.json()["counts"] == p["counts"]
+    # and the import makes what the preview said
+    res = run(client, src)
+    assert res["objects"] == 2 and res["types"] == 1  # the Image type, made for the import
+    assert [o["type"] for o in objects_from(client, "photo.png")] == ["image"]
+    assert [o["type"] for o in objects_from(client, "notes.txt")] == ["page"]
+    rows = {t["key"]: t for t in preview(client, src)["types"]}
+    assert rows["image"]["existingTypeId"] == "image" and rows["image"]["objectCount"] == 1
+
+
+def test_the_image_row_cannot_be_changed(client, tmp_path):
+    """The Image row is the writer's rule shown, not a mapping row: an override of it is refused."""
+    src = library(tmp_path)
+    for over in ({"skip": True}, {"name": "Picture"}, {"existingTypeId": "page"}):
+        r = client.post("/api/import/preview", json={"source": {"path": str(src), "kind": "files"}, "target": "currentSpace",
+                                                     "mapping": {"types": {"image": over}}})
+        assert r.status_code == 422, r.text
+        assert r.json()["detail"] == "Images always become Image objects, so the Image row can't be changed."
+    r = client.post("/api/import/preview", json={"source": {"path": str(src), "kind": "files"}, "target": "currentSpace",
+                                                 "mapping": {"properties": {"image": {"x": {"skip": True}}}}})
+    assert r.status_code == 422, r.text
+
+
 def test_image_rerun_is_unchanged(client, tmp_path):
     src = library(tmp_path)
     run(client, src)
@@ -127,6 +170,10 @@ def test_image_imported_as_page_before_is_kept_as_page(client, tmp_path, monkeyp
         run(client, src)
     root = client.space_root
     assert fm_and_body(root, "Pages/photo.md")[0]["type"] == "Page"
+    # The re-run's preview knows it stays a Page: no Image row, the Page row counts both files.
+    p = preview(client, src)
+    assert [(t["key"], t["objectCount"]) for t in p["types"]] == [("page", 2)]
+    assert [s["typeKey"] for s in p["samples"] if s["sourcePath"] == "photo.png"] == ["page"]
     second = run(client, src)
     assert second["objects"] == 0 and second["unchanged"] == 2, second
     assert [o["path"] for o in objects_from(client, "photo.png")] == ["Pages/photo.md"]
@@ -166,6 +213,9 @@ def test_image_in_a_mapped_type_follows_the_mapping(client, tmp_path):
                                                  "mapping": mapping})
     assert r.status_code == 200, r.text
     p = r.json()
+    # the preview says so too: the images stay with their folder type, and there is no Image row
+    assert [(t["key"], t["objectCount"]) for t in p["types"]] == [("folder:Shots", 2)]
+    assert p["counts"]["types"] == 1
     r = client.post("/api/import/start", json={"previewId": p["previewId"], "mapping": p["mapping"], "target": {"kind": "currentSpace"}})
     assert r.status_code == 202, r.text
     assert wait_job(client, r.json()["jobId"], timeout=60)["phase"] == "done"

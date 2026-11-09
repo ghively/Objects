@@ -63,8 +63,13 @@ if TYPE_CHECKING:
 __all__ = ["MappingProblem", "Planned", "Target", "importable_type", "plan", "to_preview"]
 
 PAGE_KEY = "page"
+IMAGE_KEY = "image"
+"""The preview's row for the images the Page row would take (AC-2): the writer's rule shown, not a
+mapping row, so a mapping entry for it is refused (`IMAGE_ROW_FIXED`)."""
 IMAGE_TYPE = "Image"
 IMAGE_FOLDER = "Images"
+IMAGE_ORIGIN = "Image files"
+IMAGE_ROW_FIXED = "Images always become Image objects, so the Image row can't be changed."
 TAG_FOLDER = "Tags"
 MAX_PREVIEW_SKIPPED = 500
 MAX_SAMPLES = 20
@@ -225,6 +230,10 @@ class Planned:
     """(object source path, link as written) of links that stay unresolved."""
     pdefs: dict[tuple[str, str], PropertyDefinition] = field(default_factory=dict)
     """(plan type key, property key) -> the definition its values were encoded for."""
+    image_sources: frozenset[str] = frozenset()
+    """Source paths of the objects the writer makes Image objects (AC-2): the preview's Image row."""
+    image_type_id: str | None = None
+    """Into this space: the id of its Image type, when it has one (the Image row's ``existingTypeId``)."""
 
 
 def _stamp(dt: datetime) -> str:
@@ -363,7 +372,12 @@ def plan(
         order.append((PAGE_KEY, "Page", "Pages", "page", _PAGE_ORIGIN[type_source]))
     known_keys = {k for k, *_ in order}
     for key in list(mapping.types) + list(mapping.properties):
-        if key not in known_keys:
+        if key == IMAGE_KEY:
+            if not lenient:
+                raise MappingProblem(IMAGE_ROW_FIXED)
+            mapping.types.pop(key, None)
+            mapping.properties.pop(key, None)
+        elif key not in known_keys:
             if not lenient:
                 raise MappingProblem(f'The mapping names an unknown type "{key}".')
             mapping.types.pop(key, None)
@@ -662,6 +676,21 @@ def plan(
         writes.append(w)
         write_by_source[o.sourcePath] = w
 
+    # The preview's Image row: the images the writer makes Image objects (AC-2). An image an earlier
+    # import made into a Page stays that Page (the writer's rule), so it is counted under Page.
+    image_sources: set[str] = set()
+    for w in writes:
+        if w.media != "image":
+            continue
+        if w.existing and target.space is not None:
+            try:
+                ex_type = target.space.get(w.existing).type
+            except KeyError:
+                ex_type = None  # gone: the writer makes the Image object afresh
+            if ex_type is not None and (image_type is None or ex_type != image_type.id):
+                continue
+        image_sources.add(w.obj.sourcePath)
+
     # 6. The target's link names, for the link text (as `Space._link_text` answers it).
     existing_summaries = target.summaries()
     existing_tags = {fold(s.title) for s in existing_summaries if s.type == "tag"}
@@ -838,7 +867,7 @@ def plan(
     kept_types = [pt for pt in plan_types if not pt.skip]
     counts = ImportCounts(
         objects=len(objects),
-        types=len(kept_types),
+        types=len(kept_types) + (1 if image_sources else 0),  # the Image row (AC-2)
         properties=sum(1 for pt in kept_types for p in pt.properties if not p.skip and not p.systemKey),
         attachments=len(attachments),
         attachmentBytes=sum(a.size for a in attachments.values()),
@@ -892,6 +921,8 @@ def plan(
         renamed=renamed,
         unresolved=unresolved,
         pdefs=pdefs,
+        image_sources=frozenset(image_sources),
+        image_type_id=image_type.id if image_type is not None and target.kind == "currentSpace" else None,
     )
 
 
@@ -959,8 +990,13 @@ def _is_day_text(text: str) -> bool:
 def to_preview(p: Planned, preview_id: str) -> ImportPreview:
     types: list[PlannedType] = []
     counts_by_type: dict[str, int] = {}
+
+    def preview_key(po: PlanObject) -> str:
+        # AC-2: an image the writer makes an Image object is shown under Image, not its Page row.
+        return IMAGE_KEY if po.sourcePath in p.image_sources else po.typeKey
+
     for po in p.plan.objects:
-        counts_by_type[po.typeKey] = counts_by_type.get(po.typeKey, 0) + 1
+        counts_by_type[preview_key(po)] = counts_by_type.get(preview_key(po), 0) + 1
     skipped_counts: dict[str, int] = {}
     for s in p.plan.skipped:
         if s.reason == "userSkipped":
@@ -999,8 +1035,23 @@ def to_preview(p: Planned, preview_id: str) -> ImportPreview:
                 properties=props,
             )
         )
+    if p.image_sources:
+        # The basic media type Image (made by the import when the space has none): no properties
+        # of its own to map, and no mapping row (`IMAGE_ROW_FIXED`).
+        types.append(
+            PlannedType(
+                key=IMAGE_KEY,
+                name=IMAGE_TYPE,
+                pluralName=IMAGE_FOLDER,
+                origin="page",
+                originLabel=IMAGE_ORIGIN,
+                objectCount=counts_by_type.get(IMAGE_KEY, 0),
+                existingTypeId=p.image_type_id,
+                properties=[],
+            )
+        )
     samples = [
-        PlannedObjectSample(title=po.title, typeKey=po.typeKey, path=po.targetPath, sourcePath=po.sourcePath)
+        PlannedObjectSample(title=po.title, typeKey=preview_key(po), path=po.targetPath, sourcePath=po.sourcePath)
         for po in p.plan.objects[:MAX_SAMPLES]
     ]
     return ImportPreview(
