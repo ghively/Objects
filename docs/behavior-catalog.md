@@ -37,6 +37,9 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 
 A two-pane modal: left nav with a "Search settings" field, right pane for the chosen page. Groups:
 Account, General, Space, Integrations. Footer of the nav: version, Reload (Object has no Diagnostics row).
+Device settings changed elsewhere (another window, the API) load into an open window without a reload (a
+`settings` change event), and an open agent's Tools tab reads its groups again when an outside server is turned
+on or off or a secret is set.
 
 **Account** **(out of scope)**: account, password and authentication, active sessions, subscription and billing.
 Object has no accounts.
@@ -191,9 +194,11 @@ Each starter template pre-fills the new type's properties.
   Today, Your queues, Agent queue, Captures), and **More views** folds **Plan** (Scheduled, Flow, Projects
   map, On the floor), **Manage** (Status, Open, Deadline, Recurring, Reminders, Context, Tags, All) and
   **Review** (Stuck, Wins, Alerts, Tickets, Everything, Completed); a folded view that is open stays on the
-  row. The task sections are list views of the dashboard, each with the quick add on top (a new task gets
+  row. Wins (and its count) follows every object change once loaded, and Alerts follows a settings change (the
+  monitoring folder), so neither needs a reload. The task sections are list views of the dashboard, each with the quick add on top (a new task gets
   the values the section's filter implies). **Today** is one view: the day timeline (meetings, focus lines,
-  the now-line, deadline countdowns) with **Today's tasks** under it — the Calendar Day view's Tasks section for
+  the now-line, deadline countdowns; it spans 07:00-17:30 at least and widens to the whole hour of any earlier or
+  later meeting, so evening meetings are on it) with **Today's tasks** under it — the Calendar Day view's Tasks section for
   today (decision T1, one list in both places): tasks whose date covers today, whose deadline is today, and the
   open overdue ones under "Overdue (n)"; done ones stay, struck; "N open, M done" and the `+` menu (Create task,
   Move all open tasks to); "Open in Calendar" under it opens the Calendar's Day view on today. Today's badge
@@ -344,6 +349,9 @@ Each starter template pre-fills the new type's properties.
   objects show the linking block with its parent context. A leading radio-dot marks each reference; hovering shows
   small action icons (expand, `...`, and three more at the right). Unlinked Mentions is a separate section
   (section 11).
+- **Backlinks stay live**: when another object gains or loses a link to the open one (Link on a mention, an
+  outside edit adding `[[X]]`), the Properties panel's Backlinks chips and the Tasks dashboard's Context grouping
+  update without a reload (a change to any other object re-reads them).
 - **Inline tag**: a `#tag` typed in a paragraph renders as a colored chip in the text.
 - **Export dialog** (object `...` > Export, Ctrl+E): a modal with format tiles PDF, Markdown, Microsoft Word,
   Latex. PDF: Style cards (Notes: matches the page's styling; Essay and Academic, both Experimental),
@@ -365,16 +373,26 @@ Each starter template pre-fills the new type's properties.
   queue a question or a break-down; anything else is filed as typed. The capture is never deleted by filing.
 - **Captures** view (Work switcher, icon lightbulb, no key; count = New + Needs you): filters All, New, Needs you,
   Filed; a row shows Captured, From, Filed to, Linked item and, for Needs you, the question with **Reply to the
-  agent** + **Send**; **Mark filed**; empty text "Nothing waiting to be filed.".
+  agent** + **Send**; **Mark filed**; empty text "Nothing waiting to be filed.". A parked dump picked in Now's
+  "Parked dumps need you" opens Captures on Needs you with that dump's reply box focused (the capture's own page
+  has no reply box).
 - **Agent acts on my approvals** (switch; Agent queue and Settings > Work): off = approvals, answers, notes and
   requests only wait in the Agent queue; on = Object runs due entries one at a time. **Agent runs by itself**
   (Settings > Work): an Agent step that becomes current runs once, read-only. At most 3 auto-runs of one item in a
   row since Gene last acted on it (decision S3): the 4th Agent step stays Open and is listed in Stuck under
   **Waiting for Run now** ("The agent ran 3 steps of this item in a row by itself. Press Run now to let it go on.");
   any action of Gene's on the item (Run now included) starts the count again. The count survives a restart.
+- **Withdraw** (an approved Approve step's button, a `reopen`) logs "Gene withdrew the approval of step n …" in
+  Activity; reopening a done or declined step still logs "reopened".
+- **A step list that can't be read** (a hand-edited entry with an unknown kind or state): the readable steps show,
+  but no step offers an action (`stepsUnreadable`, every step's `actions` empty), and the work header lists the
+  problems ("Step 3 has an unknown kind "maybe".") until the file is fixed — the server refuses every step write.
 - **Settings > Work**: **Create the Work agent** (shell warning; offers to copy your `change-reviewer`),
   **Read tools** (mark a server's read-only tools; no more than 500), **Set up Desk sync** (an off schedule at
   07:00 every weekday that updates ticket fields only; never writes to Jira or ServiceNow).
+- **Agent page > Schedules**: each row's menu offers **Run now** (turned-on schedules only; one run outside the
+  schedule, same guards as a due occurrence, through `POST /automations/{id}/run-now`), **Edit**, **Run log** and
+  **Delete**. A turned-off schedule's summary reads "Off · Every weekday at 7:00 AM".
 - **Queue entry states**: pending, running, done, failed (reason + **Retry**), withdrawn. A failed run says why
   ("The run didn't finish within 30 minutes.", "The agent finished without marking the step done.", "Object closed
   during this run.") or asks Gene one question (a Question step is inserted before the step).
@@ -437,7 +455,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **Normalise tags and options**: near-duplicate tags and option values (for example Prod / prod / Production) with
   **Merge into** and **Merge N groups**; "Nothing looks like a duplicate." when there are none.
 - **Import inbox**: low-confidence pages land in a collection named "Import inbox"; the last step says
-  "N objects in the Import inbox for you to look at." with **Open Import inbox**.
+  "N objects in the Import inbox for you to look at." with **Open Import inbox**. The open window learns of the collection
+  the pass made: an import's resync reloads the collections, and a collection page opened on an id the window
+  doesn't know yet fetches the collections once more before it says "Unknown collection".
 - **MCP**: `import_scan`, `import_proposal`, `import_report` (read) and `save_import_proposal`, `save_import_decisions`
   (write), the prompt `migrate_a_source` and the resource `object://skills/migrate-a-source` let an outside agent run the
   same workflow; `start_import` refuses a mapping that creates types outside an approved proposal (for the open space or a trial copy; a brand-new space is not checked).

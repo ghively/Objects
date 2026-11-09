@@ -8,6 +8,7 @@ import type { WorkBoardItem } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { useTabs } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
+import { useCaptures } from '../captures/useCaptures'
 import { Chip } from '../components/Chip'
 import { deadlines } from '../logic/deadlines'
 import { focusProgress, isCleared } from '../logic/focusLines'
@@ -15,6 +16,7 @@ import { STEP_ENERGY, upNext } from '../logic/scoring'
 import { FocusEditor } from '../page/FocusEditor'
 import { KeepOnTopButton } from '../session/KeepOnTopButton'
 import type { WorkDataState } from '../state/useWorkData'
+import { useWorkUi } from '../state/useWorkUi'
 import { openItemPanel } from '../state/workActions'
 import { WORK_ICONS } from '../workIcons'
 import { WORK_TEXT } from '../workText'
@@ -154,7 +156,11 @@ function Dumps({ data }: { data: WorkDataState }): JSX.Element | null {
           type="button"
           data-now-row={d.path}
           className={ROW}
-          onClick={() => useTabs.getState().openInSidepanel({ kind: 'object', path: d.path })}
+          onClick={() => {
+            // Fix pass H: the reply box lives in Captures (the capture's own page has none).
+            useCaptures.getState().reply(d.path)
+            useWorkUi.getState().setView('captures')
+          }}
         >
           <span className="shrink-0 text-[var(--work-capture)]">
             <Icon name={WORK_ICONS.capture} size={13} />

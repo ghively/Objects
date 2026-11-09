@@ -20,6 +20,7 @@ import { useWorkOverlay } from '../state/useWorkOverlay'
 import { loadWorkUi, useWorkUi } from '../state/useWorkUi'
 import { resetWorkToasts } from '../state/workToasts'
 import { NowView } from './NowView'
+import { resetCaptures, useCaptures } from '../captures/useCaptures'
 
 const mocked = vi.mocked(api)
 const BOARD = boardJson as unknown as WorkBoard
@@ -229,4 +230,27 @@ describe('NowView', () => {
     // No parked dumps: the widget hides.
     expect(document.querySelector('[data-now-side="dumps"]')).toBeNull()
   })
+
+// Fix pass H: a parked dump's reply lives in Captures, so its Now row opens Captures there.
+describe('NowView parked dumps', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    loadWorkUi(null)
+    resetWorkData()
+    resetCaptures()
+    useTabs.getState().reset()
+  })
+  afterEach(() => cleanup())
+
+  test('a parked dump opens Captures on its reply, not a page without one', () => {
+    const side = vi.spyOn(useTabs.getState(), 'openInSidepanel')
+    show({ needsYou: [{ path: 'Captures/b.md', text: 'Order toner', question: 'Which line?' }] as never })
+    const row = document.querySelector('[data-now-side="dumps"] [data-now-row="Captures/b.md"]') as HTMLElement
+    fireEvent.click(row)
+    expect(useWorkUi.getState().view).toBe('captures')
+    expect(useCaptures.getState().replyTo).toBe('Captures/b.md')
+    expect(side).not.toHaveBeenCalled()
+  })
+})
+
 })

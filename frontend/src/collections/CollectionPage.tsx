@@ -1,7 +1,7 @@
 // A collection: header (icon, name, menu, New), the Overview / All / query tabs, and "Add existing".
 // The collection's own definition (name, types, views, pins, templates) is saved through
 // `saveCollectionEdit`; membership is the `collections:` key of each object.
-import { useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { Collection, DashboardSectionKey, Layout, ObjectSummary, Query, Row, TypeDef, ViewState, Views } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
@@ -36,7 +36,7 @@ import { NewSplitButton, SectionTab, TabPill } from '@/types/TypePage'
 import { CustomizeOverview } from '@/types/TypeOverview'
 import { SectionView, searchRows } from '@/types/SectionView'
 import { templateKey } from '@/types/TemplateManager'
-import { useDefinitions, useDefs } from '@/types/useDefinitions'
+import { reloadDefinitions, useDefinitions, useDefs } from '@/types/useDefinitions'
 import { DataView, type RowMenuItem } from '@/views/DataView'
 import { matchingValues } from '@/views/matching'
 import { FULL_VIEW_LAYOUTS, defaultViewState } from '@/views/model'
@@ -301,11 +301,23 @@ export function CollectionPage({ id }: { id: string }) {
   const titleCtx = useTitleCtx(allTypes)
   const sections = useMemo(() => (c ? collectionSections(c, defs.queries, titleCtx) : []), [c, defs.queries, titleCtx])
   const tabs = sections.filter((s) => !s.hidden && s.inFullView)
+  // An id the window's store doesn't know (a collection made server side, e.g. the filing pass's
+  // Import inbox) is fetched once more before the page says "Unknown collection" (M27 UI-9).
+  const [refetched, setRefetched] = useState<string | null>(null)
+  const missing = defs.loaded && !c
+  useEffect(() => {
+    if (!missing || refetched === id) return
+    let live = true
+    void reloadDefinitions().finally(() => live && setRefetched(id))
+    return () => {
+      live = false
+    }
+  }, [missing, refetched, id])
 
   if (!c) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center">
-        {defs.loaded ? (
+        {defs.loaded && refetched === id ? (
           <div>
             <p className="font-semibold">Unknown collection</p>
             <p className="mt-1 text-fg-muted">{id}</p>

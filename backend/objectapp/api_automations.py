@@ -8,6 +8,8 @@
 - ``DELETE /automations/{id}?clientId=`` -> ``{trashId}`` (restorable); 404, 423.
 - ``POST /automations/{id}/run`` ``{path, clientId?}`` -> ``AutomationRun``; 404 (rule or
   object), 422 (not a button rule, turned off, out of scope, a template), 423.
+- ``POST /automations/{id}/run-now`` -> ``AutomationRun``, or 202 ``{queued: true}`` for an agent
+  schedule (run by the agent jobs); 404, 422 (not a schedule rule, turned off), 423.
 - ``GET /automations/{id}/runs?limit=`` (1-200, default 200) -> ``{runs}`` newest first; 404.
 - ``GET /automations/catch-up`` -> ``{items}``; ``POST /automations/catch-up``
   ``{ruleId, choice, clientId?}`` -> ``{runs, queued}`` (M21: ``queued`` counts an agent
@@ -161,6 +163,20 @@ def router(ctx: ApiContext, engine: AutomationEngine) -> APIRouter:
             if exc.status == 423:
                 return _locked(exc.detail)
             return _error(exc.status, exc.detail)
+
+    @r.post("/automations/{rule_id}/run-now")
+    def run_now(rule_id: str):
+        if find(rule_id) is None:
+            return _error(404, f'There is no automation "{rule_id[:60]}".')
+        try:
+            run = engine.run_now(rule_id)
+        except RuleRefused as exc:
+            if exc.status == 423:
+                return _locked(exc.detail)
+            return _error(exc.status, exc.detail)
+        if run is None:  # an agent schedule: handed to the agent jobs
+            return JSONResponse({"queued": True}, status_code=202)
+        return run
 
     @r.get("/automations/{rule_id}/runs")
     def get_runs(rule_id: str, limit: int = Query(default=200, ge=1, le=200)):

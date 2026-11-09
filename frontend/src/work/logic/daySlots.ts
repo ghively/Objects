@@ -26,12 +26,42 @@ const minutes = (hhmm: string): number => {
   return h * 60 + (m || 0)
 }
 
+export interface DayRange {
+  /** Minutes after midnight. */
+  start: number
+  end: number
+}
+
+/** 07:00-17:30: the least the timeline shows. */
+export const DEFAULT_DAY_RANGE: DayRange = { start: DAY_START, end: DAY_END }
+
+/** A meeting's minutes; one that ends past midnight (or before it starts) ends at midnight. */
+function meetingSpan(m: MeetingSlot): [number, number] {
+  const a = minutes(m.startLocal)
+  const b = minutes(m.endLocal)
+  return [a, b <= a ? 24 * 60 : b]
+}
+
+/**
+ * The timeline's range (fix pass H): 07:00-17:30, widened to the whole hour of any meeting that
+ * starts earlier or ends later, so evening and early meetings are on it.
+ */
+export function dayRange(meetings: MeetingSlot[]): DayRange {
+  let { start, end } = DEFAULT_DAY_RANGE
+  for (const m of meetings) {
+    const [a, b] = meetingSpan(m)
+    if (a < start) start = Math.max(0, Math.floor(a / 60) * 60)
+    if (b > end) end = Math.min(24 * 60, Math.ceil(b / 60) * 60)
+  }
+  return { start, end }
+}
+
 /** The day's blocks by start: the brief, meetings, focus lines in the free gaps, the wrap-up. */
 export function dayBlocks(meetings: MeetingSlot[], focus: FocusLine[], nowMinutes: number): DayBlock[] {
   const blocks: DayBlock[] = [{ ...BRIEF, kind: 'brief', label: WORK_TEXT.morningBrief, path: null }]
   const meetingBlocks: DayBlock[] = meetings.map((m) => ({
-    start: minutes(m.startLocal),
-    end: minutes(m.endLocal),
+    start: meetingSpan(m)[0],
+    end: meetingSpan(m)[1],
     kind: 'meeting',
     label: m.title,
     path: m.path,
@@ -58,5 +88,6 @@ export function dayBlocks(meetings: MeetingSlot[], focus: FocusLine[], nowMinute
     blocks.push({ start: slot[0], end: slot[1] - FOCUS_EARLY, kind: 'focus', label: line.label, path })
   })
   blocks.push({ ...WRAP_UP, kind: 'wrapUp', label: WORK_TEXT.wrapUp, path: null })
-  return blocks.filter((b) => b.end > DAY_START && b.start < DAY_END).sort((a, b) => a.start - b.start)
+  const range = dayRange(meetings)
+  return blocks.filter((b) => b.end > range.start && b.start < range.end).sort((a, b) => a.start - b.start)
 }

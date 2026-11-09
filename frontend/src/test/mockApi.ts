@@ -625,6 +625,7 @@ export function workItem(partial: Partial<WorkItem> = {}): WorkItem {
     lastActivity: null,
     lastTouched: '2026-11-05T10:00:00.000Z',
     problems: [],
+    stepsUnreadable: false,
     fields: {},
     steps,
     verified: [],
@@ -1047,6 +1048,7 @@ function defaults(): Api {
     deleteAutomation: async () => ({ trashId: 'trash-automation-1' }),
     runAutomation: async (id: string, path: string) =>
       automationRun({ ruleId: id, trigger: { kind: 'button', path, scheduledFor: null, catchUp: false } }),
+    runScheduleNow: async (id: string) => automationRun({ ruleId: id }),
     automationRuns: async () => [],
     automationCatchUp: async () => [],
     confirmAutomationCatchUp: async () => [],

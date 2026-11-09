@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -8,7 +8,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
-import type { McpGroupStatus, ToolGroup } from '@/api/types'
+import type { ChangeEvent, McpGroupStatus, ToolGroup } from '@/api/types'
 import { MCP_TEXT } from '@/mcp/mcpText'
 import { agent } from '@/test/mockApi'
 import { AGENT_TEXT } from './agentText'
@@ -44,6 +44,22 @@ describe('ToolsTab', () => {
     mocked.saveAgent.mockImplementation(async (id, input, base) => agent({ id, toolsOff: input.toolsOff ?? [], revision: `${base}+1` }))
   })
   afterEach(() => resetAgents())
+
+  // Fix pass H (M19.6): a server turned off in Settings (another window or page) shows in an open
+  // Tools tab without a reload.
+  test('test an mcpServers change reloads the groups', async () => {
+    let listener: (e: ChangeEvent) => void = () => undefined
+    mocked.onChange.mockImplementation((fn: (e: ChangeEvent) => void) => {
+      listener = fn
+      return () => undefined
+    })
+    render(<Live />)
+    await screen.findByRole('switch', { name: 'Read files' })
+    await waitFor(() => expect(mocked.refreshAgentTools).toHaveBeenCalledTimes(1))
+    mocked.agentTools.mockResolvedValue([...GROUPS, { id: 'later', label: 'Later group', tools: [{ id: 'X', label: 'Later tool', on: true, warning: null }] }])
+    act(() => listener({ kind: 'mcpServers', path: '01JSRV', version: null, origin: null }))
+    expect(await screen.findByRole('switch', { name: 'Later tool' })).toBeInTheDocument()
+  })
 
   test('test Tools saves toolsOff and the shell asks first', async () => {
     const user = userEvent.setup()

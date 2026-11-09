@@ -112,6 +112,32 @@ describe('SchedulesTab', () => {
     await waitFor(() => expect(mocked.deleteAutomation).toHaveBeenCalledWith('r1'))
   })
 
+  test('test Run now runs the schedule once and says it started', async () => {
+    mocked.runScheduleNow.mockResolvedValue({ queued: true })
+    render(<SchedulesTab agent={AGENT} />)
+    await menu('Weekly review', 'Run now')
+    await waitFor(() => expect(mocked.runScheduleNow).toHaveBeenCalledWith('r1'))
+    expect(await screen.findByRole('status')).toHaveTextContent('Weekly review is running now.')
+  })
+
+  test('test Run now shows a refusal', async () => {
+    mocked.runScheduleNow.mockRejectedValue(new Error('This automation is turned off.'))
+    render(<SchedulesTab agent={AGENT} />)
+    await menu('Weekly review', 'Run now')
+    expect(await screen.findByRole('alert')).toHaveTextContent('This automation is turned off.')
+  })
+
+  test('test a turned-off schedule says Off and offers no Run now', async () => {
+    mocked.automations.mockResolvedValue([{ ...WEEKLY, enabled: false }])
+    const user = userEvent.setup()
+    render(<SchedulesTab agent={AGENT} />)
+    const weekly = await row('Weekly review')
+    expect(weekly.getByTestId('schedule-summary')).toHaveTextContent(/^Off · Every week on Monday/)
+    await user.click(weekly.getByRole('button', { name: 'Schedule menu' }))
+    await screen.findByRole('menuitem', { name: 'Run log' })
+    expect(screen.queryByRole('menuitem', { name: 'Run now' })).toBeNull()
+  })
+
   test('test Edit opens the schedule dialog', async () => {
     render(<SchedulesTab agent={AGENT} />)
     await menu('Weekly review', 'Edit')

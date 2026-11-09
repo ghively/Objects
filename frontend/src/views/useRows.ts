@@ -37,7 +37,17 @@ export function rollupsMayChange(scope: RowsScope, rows: Row[], changed: string[
   return changed.some((p) => !rollupRows.has(p))
 }
 
-export function useRows(scope: RowsScope): UseRows {
+export interface UseRowsOptions {
+  /**
+   * The rows' backlinks matter (the Tasks dashboard's Context grouping; fix pass H, M5#5): a
+   * change to an object that isn't one of the rows may have added or removed a link to one, so
+   * it reloads everything instead of fetching that path in the scope (which finds nothing).
+   */
+  backlinks?: boolean
+}
+
+export function useRows(scope: RowsScope, options: UseRowsOptions = {}): UseRows {
+  const backlinks = !!options.backlinks
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const key = JSON.stringify(scope)
@@ -78,6 +88,10 @@ export function useRows(scope: RowsScope): UseRows {
       if (everything) return reload()
       if (changed.length === 0) return
       if (rollupsMayChange(scopeRef.current, rowsRef.current, changed)) return reload()
+      if (backlinks) {
+        const have = new Set(rowsRef.current.map((r) => r.summary.path))
+        if (changed.some((p) => !have.has(p))) return reload()
+      }
       const inScope = scopeRef.current.paths
       const wanted = inScope ? changed.filter((p) => inScope.includes(p)) : changed
       if (wanted.length === 0) return
@@ -110,7 +124,7 @@ export function useRows(scope: RowsScope): UseRows {
       off()
       if (timer) clearTimeout(timer)
     }
-  }, [reload])
+  }, [reload, backlinks])
 
   const patchRow = useCallback((path: string, row: Row) => {
     setRows((cur) => cur.map((r) => (r.summary.path === path ? row : r)))

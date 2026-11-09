@@ -86,6 +86,18 @@ describe('TodayView', () => {
     expect(line.style.left).toBe(`${(180 / 630) * 100}%`)
   })
 
+  // Fix pass H: tonight's meetings are on the timeline, with the now-line.
+  test('test an evening meeting widens the timeline to it', () => {
+    const late = { path: 'Meetings/Late call.md', title: 'Late call', start: '2026-11-05T22:40:00.000Z', end: '2026-11-05T23:20:00.000Z', startLocal: '22:40', endLocal: '23:20' }
+    useWorkData.setState({ board: BOARD, today: { day: '2026-11-05', now: '', nowLocal: '22:13', meetings: [late] } })
+    render(<TodayView data={useWorkData.getState()} now={new Date('2026-11-05T22:13:00.000Z')} />)
+    expect(screen.getAllByText('Late call').length).toBeGreaterThan(0)
+    const marks = [...document.querySelectorAll('[data-hour-mark]')].map((m) => m.getAttribute('data-hour-mark'))
+    expect(marks[0]).toBe('7')
+    expect(marks.at(-1)).toBe('23')
+    expect(document.querySelector('[data-work-now-line]')).toHaveAttribute('data-time', '22:13')
+  })
+
   test('test no now-line outside the day', () => {
     useWorkData.setState({ board: BOARD, today: { day: '2026-11-05', now: '', nowLocal: '18:00', meetings: [] } })
     render(<TodayView data={useWorkData.getState()} now={new Date('2026-11-05T18:00:00.000Z')} />)

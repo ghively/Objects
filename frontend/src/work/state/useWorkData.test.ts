@@ -105,6 +105,10 @@ describe('useWorkData', () => {
     expect(partsForEvent(ev('work', 'floor'), TYPES, false)).toEqual(['general'])
     expect(partsForEvent(ev('workQueue', '*'), TYPES, false)).toEqual(['agent'])
     expect(partsForEvent(ev('ui', 'ui.json'), TYPES, false)).toEqual([])
+    // Fix pass H: Wins (once loaded) follows every object change; Alerts follows the settings
+    // (the monitoring folder and its intervals).
+    expect(partsForEvent(ev('changed', 'Tasks/A.md'), TYPES, false, true)).toEqual(['board', 'needsYou', 'wins'])
+    expect(partsForEvent(ev('settings', 'settings.json'), TYPES, false)).toEqual(['alerts'])
   })
 
   test('test events reload the right parts once per burst', async () => {

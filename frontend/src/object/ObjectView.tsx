@@ -463,7 +463,9 @@ export function ObjectView({
         .object(path)
         .then((fresh) => {
           if (n !== computedSeq.current) return
-          setDetail((d) => (d && d.summary.path === fresh.summary.path ? { ...d, computed: fresh.computed } : d))
+          setDetail((d) =>
+            d && d.summary.path === fresh.summary.path ? { ...d, computed: fresh.computed, backlinks: fresh.backlinks } : d,
+          )
         })
         .catch(() => undefined)
     }, COMPUTED_REFRESH_MS)
@@ -612,9 +614,10 @@ export function ObjectView({
         return
       }
       // This object's own changes reload it (or are our writes, refreshed above). Any other
-      // object may be one a rollup reads (a related object, or its title).
+      // object may be one a rollup reads (a related object, or its title), or may have gained or
+      // lost a link to this one (the Backlinks property; fix pass H, M5#5).
       if (e.path === path || !OBJECT_EVENT_KINDS.has(e.kind)) return
-      if (typeHas(typeId, (k) => k === 'rollup')) refreshComputed()
+      if (typeHas(typeId, (k) => k === 'rollup' || k === 'entity_backlinks')) refreshComputed()
     })
   }, [path, refreshComputed])
 

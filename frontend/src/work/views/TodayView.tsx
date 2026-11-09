@@ -8,22 +8,20 @@ import { useTabs } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
 import { formatInZone, zonedParts } from '@/lib/zonedTime'
 import { Chip, type ChipTone } from '../components/Chip'
-import { dayBlocks, type DayBlock } from '../logic/daySlots'
+import { dayBlocks, dayRange, type DayBlock, type DayRange } from '../logic/daySlots'
 import { blockCaptions, CAPTION_GAP_PX, type BlockCaption } from '../logic/timelineCaptions'
 import { deadlines } from '../logic/deadlines'
 import type { WorkDataState } from '../state/useWorkData'
 import { WORK_ICONS } from '../workIcons'
 import { WORK_TEXT } from '../workText'
 
-const DAY_START = 7 * 60
-const DAY_END = 17 * 60 + 30
-const SPAN = DAY_END - DAY_START
 /** Deadline countdowns turn amber under this many days (ported). */
 const DEADLINE_AMBER = 21
 
 const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
-const clamp = (m: number) => Math.min(Math.max(m, DAY_START), DAY_END)
-const pct = (m: number) => `${((clamp(m) - DAY_START) / SPAN) * 100}%`
+// The track spans `dayRange` (07:00-17:30 at least, widened to the day's meetings; fix pass H).
+const clamp = (r: DayRange, m: number) => Math.min(Math.max(m, r.start), r.end)
+const pct = (r: DayRange, m: number) => `${((clamp(r, m) - r.start) / (r.end - r.start)) * 100}%`
 
 const BLOCK_TONE: Record<DayBlock['kind'], ChipTone> = {
   meeting: 'you',
@@ -43,9 +41,9 @@ const BLOCK_CLASS: Record<DayBlock['kind'], string> = {
 
 const CAPTION_LANE_PX = 16
 
-function Block({ b, caption }: { b: DayBlock; caption?: BlockCaption }): JSX.Element {
-  const start = clamp(b.start)
-  const end = clamp(b.end)
+function Block({ b, caption, range }: { b: DayBlock; caption?: BlockCaption; range: DayRange }): JSX.Element {
+  const start = clamp(range, b.start)
+  const end = clamp(range, b.end)
   const time = `${hhmm(b.start)}-${hhmm(b.end)}`
   // A short block keeps its colour in the track and hangs its label and time, on one line, under it.
   const body = caption ? (
@@ -67,7 +65,7 @@ function Block({ b, caption }: { b: DayBlock; caption?: BlockCaption }): JSX.Ele
       <span className="truncate text-[11px] opacity-80">{time}</span>
     </>
   )
-  const style = { left: pct(start), width: `${((end - start) / SPAN) * 100}%` }
+  const style = { left: pct(range, start), width: `${((end - start) / (range.end - range.start)) * 100}%` }
   const cls = cn(
     'absolute top-0 flex h-full min-w-0 flex-col justify-center rounded border px-1.5 text-left',
     caption ? 'overflow-visible' : 'overflow-hidden',
@@ -127,12 +125,16 @@ export function TodayView({ data, now }: { data: WorkDataState; now: Date }): JS
   const track = useRef<HTMLDivElement>(null)
   const trackPx = useTrackWidth(track)
 
-  const blocks = dayBlocks(data.today?.meetings ?? [], data.focus?.lines ?? [], nowMinutes)
+  const meetings = data.today?.meetings ?? []
+  const range = dayRange(meetings)
+  const blocks = dayBlocks(meetings, data.focus?.lines ?? [], nowMinutes)
   const focusBlocks = blocks.filter((b) => b.kind === 'focus')
   const due = deadlines(data.board?.items ?? [], day)
-  const hours = Array.from({ length: 11 }, (_, k) => 7 + k)
-  const inRange = nowMinutes >= DAY_START && nowMinutes <= DAY_END
-  const captions = blockCaptions(blocks, trackPx)
+  const firstHour = Math.ceil(range.start / 60)
+  const lastHour = Math.min(23, Math.floor(range.end / 60))
+  const hours = Array.from({ length: lastHour - firstHour + 1 }, (_, k) => firstHour + k)
+  const inRange = nowMinutes >= range.start && nowMinutes <= range.end
+  const captions = blockCaptions(blocks, trackPx, range)
   const lanes = Math.max(0, ...[...captions.values()].map((c) => c.lane + 1))
 
   return (
@@ -149,7 +151,7 @@ export function TodayView({ data, now }: { data: WorkDataState; now: Date }): JS
         >
           <div className="relative h-4 text-[11px] text-fg-muted">
             {hours.map((h) => (
-              <span key={h} data-hour-mark={h} className="absolute -translate-x-1/2" style={{ left: pct(h * 60) }}>
+              <span key={h} data-hour-mark={h} className="absolute -translate-x-1/2" style={{ left: pct(range, h * 60) }}>
                 {String(h).padStart(2, '0')}
               </span>
             ))}
@@ -160,11 +162,11 @@ export function TodayView({ data, now }: { data: WorkDataState; now: Date }): JS
                 key={h}
                 aria-hidden="true"
                 className="absolute top-0 h-full border-l border-line"
-                style={{ left: pct(h * 60) }}
+                style={{ left: pct(range, h * 60) }}
               />
             ))}
             {blocks.map((b) => (
-              <Block key={`${b.kind}-${b.start}-${b.label}`} b={b} caption={captions.get(b)} />
+              <Block key={`${b.kind}-${b.start}-${b.label}`} b={b} caption={captions.get(b)} range={range} />
             ))}
             {inRange && (
               <span
@@ -172,7 +174,7 @@ export function TodayView({ data, now }: { data: WorkDataState; now: Date }): JS
                 data-time={hhmm(nowMinutes)}
                 aria-hidden="true"
                 className="absolute -top-1 z-10 h-[calc(100%+0.5rem)] w-0.5 bg-[var(--work-critical)]"
-                style={{ left: `${((nowMinutes - DAY_START) / SPAN) * 100}%` }}
+                style={{ left: `${((nowMinutes - range.start) / (range.end - range.start)) * 100}%` }}
               />
             )}
           </div>

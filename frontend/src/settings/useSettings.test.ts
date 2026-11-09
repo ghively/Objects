@@ -5,9 +5,10 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
-import { api, ConflictError } from '@/api/client'
+import { api, CLIENT_ID, ConflictError } from '@/api/client'
+import type { ChangeEvent } from '@/api/types'
 import { deviceSettings } from '@/test/mockApi'
-import { settingsDefaults, useSettings } from './useSettings'
+import { resetSettingsWatch, settingsDefaults, useSettings } from './useSettings'
 
 const mocked = vi.mocked(api)
 
@@ -87,4 +88,22 @@ describe('useSettings first load', () => {
     expect(useSettings.getState().settings.themeMode).toBe('light')
     expect(useSettings.getState().loaded).toBe(true)
   })
+})
+
+// Fix pass H (M16.8): a settings change made in another window (or server side) is loaded here; our
+// own writes' events are not.
+test('test a settings event from elsewhere reloads the settings', async () => {
+  let listener: (e: ChangeEvent) => void = () => undefined
+  mocked.onChange.mockImplementation((fn: (e: ChangeEvent) => void) => {
+    listener = fn
+    return () => undefined
+  })
+  resetSettingsWatch()
+  mocked.settings.mockResolvedValueOnce({ settings: deviceSettings({ font: 'serif' }), revision: 'r1' })
+  await useSettings.getState().load()
+  mocked.settings.mockResolvedValueOnce({ settings: deviceSettings({ font: 'monospace' }), revision: 'r2' })
+  listener({ kind: 'settings', path: 'settings.json', version: 'r2', origin: CLIENT_ID })
+  expect(mocked.settings).toHaveBeenCalledTimes(1)
+  listener({ kind: 'settings', path: 'settings.json', version: 'r2', origin: 'other-window' })
+  await vi.waitFor(() => expect(useSettings.getState()).toMatchObject({ revision: 'r2', settings: { font: 'monospace' } }))
 })

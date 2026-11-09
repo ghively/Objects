@@ -651,6 +651,8 @@ export type ChangeKind =
   | 'work'
   /** M23 (announced by M24): the work agent's queue changed. */
   | 'workQueue'
+  /** Fix pass H: the device settings changed (`path` `settings.json`, `version` their revision). */
+  | 'settings'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -2600,6 +2602,8 @@ export interface WorkItemSummary {
   lastTouched: string
   /** Unreadable steps, duplicate ids, a field of the wrong kind… */
   problems: string[]
+  /** Fix pass H: a step entry can't be read, so the server refuses every step write until the file is fixed. */
+  stepsUnreadable?: boolean
 }
 
 export interface WorkItem extends WorkItemSummary {
