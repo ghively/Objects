@@ -175,7 +175,9 @@ Each starter template pre-fills the new type's properties.
   current one, a divider, "+ Create space".
 - Main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant (Gene's 2026-11-08 redesign;
   Calendar is the space's opening view). The Assistant is the built-in, always-on helper — a program
-  feature, not an "agent" — shown with its own icon; a click opens its chat. "All notes" is gone from the
+  feature, not an "agent" — shown with its own icon; a click opens its chat. Like an agent row it carries a
+  hover `…` menu (Open chat, Settings, Memory & skills — no Duplicate/Delete: it is built in), the way into
+  its own page (Profile, Instructions, Memory, Skills, Learning, Chats…). "All notes" is gone from the
   sidebar — with many note types it was a dumping ground; the view stays reachable through queries and the
   palette.
 - Agents (M17), a section of its own with the standard section header, directly below the main navigation;

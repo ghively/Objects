@@ -459,7 +459,7 @@ export function Sidebar({
           onClick={(e) => onOpenTarget?.({ kind: 'graph' }, { newTab: e.ctrlKey || e.metaKey })}
         />
         {/* The built-in Assistant, not an agent: directly under Graph. */}
-        <AssistantNavButton />
+        <AssistantNavButton onOpenTarget={onOpenTarget} />
       </nav>
 
       {/* M17: the agents, a section of their own, below the main navigation. */}
