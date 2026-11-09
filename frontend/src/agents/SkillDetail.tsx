@@ -26,6 +26,12 @@ export const SKILL_SAVE_MS = MEMORY_SAVE_MS
 
 const SKILL_MD = 'SKILL.md'
 
+/** A file's leading YAML frontmatter (`---` lines, BOM and line endings kept) and the rest. */
+export function splitFrontmatter(text: string): [string, string] {
+  const m = /^(\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$))/.exec(text)
+  return m ? [m[1], text.slice(m[1].length)] : ['', text]
+}
+
 /** Our strings for this view, beside `LEARNING_TEXT`'s. */
 export const SKILL_DETAIL_TEXT = {
   close: 'Close',
@@ -208,6 +214,10 @@ export function SkillDetail({ agentId, name, archived: archivedProp, onClose }: 
 
   const readOnly = agentReadOnly || archived
   const files = detail?.files ?? [{ path: SKILL_MD, size: 0 }]
+  // The Markdown editor would read YAML frontmatter as text (and save it back as a heading), so it
+  // shows only the body; the frontmatter is shown as written and saved back byte for byte.
+  const [head, body] = shown?.text ? splitFrontmatter(shown.text) : ['', shown?.text ?? '']
+  const onBodyChange = (value: string) => onChange(head + value)
 
   return (
     <div className="flex flex-col gap-4" data-skill={name} data-archived={archived ? '' : undefined}>
@@ -281,10 +291,15 @@ export function SkillDetail({ agentId, name, archived: archivedProp, onClose }: 
         </p>
       ) : (
         <div className="min-h-[200px] rounded-md border border-line px-3 py-2" data-file={shown.path}>
+          {head && (
+            <pre data-frontmatter="" className="mb-2 whitespace-pre-wrap font-mono text-[12px] text-fg-muted">
+              {head.replace(/\r\n/g, '\n').trimEnd()}
+            </pre>
+          )}
           <StringEditor
             key={`${shown.path}:${shown.n}`}
-            value={shown.text}
-            onChange={onChange}
+            value={body}
+            onChange={onBodyChange}
             onBlur={() => void flush()}
             readOnly={readOnly}
             ariaLabel={shown.path}
