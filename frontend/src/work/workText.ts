@@ -41,7 +41,7 @@ export const WORK_TEXT = {
   viewNow: 'Now',
   viewFlow: 'Flow',
   viewProjects: 'Projects map',
-  viewToday: 'Timeline', // Gene's redesign: "Today" is the task list's name; this is the day's timeline
+  viewToday: 'Today', // Gene's redesign: the day's timeline and today's task list, one view
   viewFloor: 'On the floor',
   viewQueues: 'Your queues',
   viewAgent: 'Agent queue',

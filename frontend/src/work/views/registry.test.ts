@@ -16,6 +16,8 @@ import boardJson from '../__fixtures__/board.json'
 import { WorkPage } from '../page/WorkPage'
 import { resetWorkData, useWorkData, type WorkDataState } from '../state/useWorkData'
 import { loadWorkUi, useWorkUi } from '../state/useWorkUi'
+import { TASK_TYPE, taskRow } from '@/tasks/taskFixtures'
+import { resetTaskRows, useTaskRows } from '@/tasks/useTaskRows'
 import { registerWorkView, resetWorkViews, WORK_VIEWS, workViews, type WorkViewDef } from './registry'
 
 const mocked = vi.mocked(api)
@@ -34,6 +36,7 @@ describe('work view registry', () => {
     loadWorkUi(null)
     resetWorkData()
     resetWorkViews()
+    resetTaskRows()
   })
   afterEach(() => {
     resetWorkViews()
@@ -45,7 +48,7 @@ describe('work view registry', () => {
       'Now',
       'Flow',
       'Projects map',
-      'Timeline',
+      'Today',
       'On the floor',
       'Your queues',
       'Agent queue',
@@ -78,7 +81,7 @@ describe('work view registry', () => {
     expect(countOf('now', d)).toBe(7)
     expect(countOf('flow', d)).toBe(9) // the active items (Last week fix is done)
     expect(countOf('projects', d)).toBe(3) // Scanner rollout, Printers, No area
-    expect(countOf('today', d)).toBe(1) // Waiting on Pat's deadline
+    expect(countOf('today', d)).toBe(0) // phase 2: today's tasks (the Task rows feed is empty here)
     expect(countOf('floor', d)).toBe(1) // the general list's open row
     expect(countOf('queues', d)).toBe(8)
     expect(countOf('agent', d)).toBe(2)
@@ -91,6 +94,25 @@ describe('work view registry', () => {
     // Energy Low: only the quick steps (Question, Approve).
     act(() => useWorkUi.getState().setEnergy('low'))
     expect(countOf('now', d)).toBe(3)
+  })
+
+  test("test Today counts today's tasks from the page's Task rows feed", () => {
+    const day = (n: number) => {
+      const t = new Date(NOW)
+      t.setDate(t.getDate() + n)
+      return { start: t.toISOString().slice(0, 10), resolution: 'day' as const }
+    }
+    useTaskRows.setState({
+      taskType: { ...TASK_TYPE, basic: true },
+      loading: false,
+      rows: [
+        taskRow('Tasks/Overdue.md', { status: ['Next Up'], date: day(-2) }, 'v1'),
+        taskRow('Tasks/Now.md', { status: ['In Progress'], date: day(0) }, 'v2'),
+        taskRow('Tasks/Done.md', { status: ['Done'], date: day(0) }, 'v3'),
+        taskRow('Tasks/Later.md', { status: ['Not Started'], date: day(5) }, 'v4'),
+      ],
+    })
+    expect(countOf('today', data())).toBe(2) // overdue and due today, not done
   })
 
   test('test registerWorkView adds and replaces', () => {

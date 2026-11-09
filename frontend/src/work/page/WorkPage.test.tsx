@@ -1,7 +1,7 @@
 // M23 Task 9, Gene's redesign: the Tasks dashboard frame: the Tasks header and the bars on every
 // view, the Drive row with More views, the task lists as views, Just one thing, energy, the agent
 // pill, the search and a work target's view.
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -26,6 +26,9 @@ vi.mock('../views/EverythingView', async () => {
 import { api } from '@/api/client'
 import type { WorkBoard } from '@/api/types'
 import { agentStatus, workAlerts } from '@/test/mockApi'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { usePeek } from '@/nav/tabs'
+import { TASK_TYPE } from '@/tasks/taskFixtures'
 import boardJson from '../__fixtures__/board.json'
 import { resetWorkData } from '../state/useWorkData'
 import { loadWorkUi, useWorkUi } from '../state/useWorkUi'
@@ -59,6 +62,8 @@ describe('WorkPage', () => {
     resetWorkData()
     resetWorkViews()
     clearWorkSearch()
+    resetLinkIndex()
+    usePeek.getState().close()
     mocked.workBoard.mockResolvedValue(board)
   })
   afterEach(() => {
@@ -92,15 +97,15 @@ describe('WorkPage', () => {
       within(switcher())
         .getAllByRole('button')
         .map((b) => b.getAttribute('data-work-view') ?? b.textContent)
-    // Drive (of the default views): Now, Your queues, Agent queue; the rest is folded.
-    expect(row()).toEqual(['now', 'queues', 'agent', 'More views'])
+    // Drive (of the default views): Now, Today, Your queues, Agent queue; the rest is folded.
+    expect(row()).toEqual(['now', 'today', 'queues', 'agent', 'More views'])
     await user.click(within(switcher()).getByRole('button', { name: 'More views' }))
     expect(within(switcher()).getAllByRole('region').map((r) => r.getAttribute('aria-label'))).toEqual(['Plan', 'Review'])
     expect(
       within(within(switcher()).getByRole('region', { name: 'Plan' }))
         .getAllByRole('button')
         .map((b) => b.getAttribute('data-work-view')),
-    ).toEqual(['today', 'flow', 'projects', 'floor'])
+    ).toEqual(['flow', 'projects', 'floor'])
     expect(
       within(within(switcher()).getByRole('region', { name: 'Review' }))
         .getAllByRole('button')
@@ -109,18 +114,39 @@ describe('WorkPage', () => {
     // Picking a folded view and folding again keeps it on the row.
     await user.click(switcher().querySelector('[data-work-view="wins"]') as HTMLElement)
     await user.click(within(switcher()).getByRole('button', { name: 'Fewer views' }))
-    expect(row()).toEqual(['now', 'queues', 'agent', 'wins', 'More views'])
+    expect(row()).toEqual(['now', 'today', 'queues', 'agent', 'wins', 'More views'])
     expect(selectedView()).toBe('wins')
   })
 
   test('test the task lists are views of the dashboard (registered through the glob)', () => {
     const ids = registeredAtImport.map((v) => v.id)
-    for (const id of ['list-inbox', 'list-today', 'list-scheduled', 'list-status', 'list-completed', 'list-all']) {
+    for (const id of ['list-inbox', 'list-scheduled', 'list-status', 'list-completed', 'list-all']) {
       expect(ids).toContain(id)
     }
     expect(registeredAtImport.find((v) => v.id === 'list-inbox')?.label).toBe('Inbox')
-    // The dashboard's day timeline is named Timeline, so "Today" means the task list.
-    expect(registeredAtImport.find((v) => v.id === 'today')?.label).toBe('Timeline')
+    // Phase 2: one Today — the day timeline with today's tasks; no separate Today list view.
+    expect(ids).not.toContain('list-today')
+    expect(registeredAtImport.find((v) => v.id === 'today')?.label).toBe('Today')
+  })
+
+  test('test Today shows the day timeline with today\u2019s tasks under it', async () => {
+    await show('today')
+    const body = document.querySelector('[data-work-view-body="today"]') as HTMLElement
+    expect(body.querySelector('[data-work-view="today"]')).not.toBeNull() // the timeline
+    const tasks = within(body).getByRole('region', { name: 'Today\u2019s tasks' })
+    expect(tasks.querySelector('[data-task-section="today"]')).not.toBeNull()
+    expect(within(tasks).getByRole('textbox', { name: 'Task title' })).toBeInTheDocument()
+  })
+
+  test('test Create task creates a task and opens it in the peek', async () => {
+    const user = userEvent.setup()
+    useLinkIndex.setState({ types: [{ ...TASK_TYPE, basic: true }], objects: [], loaded: true })
+    mocked.createObject.mockResolvedValue({ path: 'Tasks/New.md', version: 'v1' })
+    mocked.templates.mockResolvedValue([])
+    await show()
+    await user.click(screen.getByRole('button', { name: 'Create task' }))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', {}))
+    await waitFor(() => expect(usePeek.getState().path).toBe('Tasks/New.md'))
   })
 
   test('test just one thing shows only Now and dims the app', async () => {

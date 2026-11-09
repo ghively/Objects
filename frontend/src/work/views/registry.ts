@@ -3,7 +3,6 @@
 // (WorkPage loads those through `import.meta.glob`), so no M23 file changes for it.
 import type { ComponentType } from 'react'
 import type { WorkBoardItem, WorkViewId } from '@/api/types'
-import { deadlines } from '../logic/deadlines'
 import { floorGroups } from '../logic/floor'
 import { linkedPaths } from '../logic/focusLines'
 import { projectLines } from '../logic/stations'
@@ -24,7 +23,8 @@ import { ProjectsMapView } from './ProjectsMapView'
 import { QueuesView } from './QueuesView'
 import { StuckView } from './StuckView'
 import { TicketsView } from './TicketsView'
-import { TodayView } from './TodayView'
+import { TodayWithTasks } from './TodayWithTasks'
+import { sectionCount } from '@/tasks/TasksPage'
 import { WinsView } from './WinsView'
 
 export interface WorkViewProps {
@@ -89,8 +89,9 @@ export const WORK_VIEWS: WorkViewDef[] = [
     label: WORK_TEXT.viewToday,
     icon: WORK_ICONS.today,
     key: 't',
-    count: (d) => (d.board ? deadlines(d.board.items, d.board.today).length : 0),
-    Component: TodayView,
+    // Phase 2: one Today — the day timeline and today's task list; the badge counts today's tasks.
+    count: (_d, now) => sectionCount('today', now),
+    Component: TodayWithTasks,
   },
   {
     id: 'floor',

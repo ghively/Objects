@@ -178,11 +178,14 @@ Each starter template pre-fills the new type's properties.
   header (icon, title, Search work, Create task); the brain-dump bar with Energy, Just one thing and the
   agent pill beside it; the focus rail (only when today has focus lines; Now's Focus card keeps Edit); the
   view row; the view. Views are grouped so the page opens calm on Now: **Drive** on one row (Now, Inbox,
-  Today, Your queues, Agent queue, Captures), and **More views** folds **Plan** (Scheduled, Timeline, Flow,
-  Projects map, On the floor), **Manage** (Status, Open, Deadline, Recurring, Reminders, Context, Tags, All)
-  and **Review** (Stuck, Wins, Alerts, Tickets, Everything, Completed); a folded view that is open stays on
-  the row. The task sections are list views of the dashboard; the dashboard's day timeline is named
-  **Timeline** so "Today" means the task list. Controls use the app's pill style (14px, `bg-hover-2` when
+  Today, Your queues, Agent queue, Captures), and **More views** folds **Plan** (Scheduled, Flow, Projects
+  map, On the floor), **Manage** (Status, Open, Deadline, Recurring, Reminders, Context, Tags, All) and
+  **Review** (Stuck, Wins, Alerts, Tickets, Everything, Completed); a folded view that is open stays on the
+  row. The task sections are list views of the dashboard, each with the quick add on top (a new task gets
+  the values the section's filter implies). **Today** is one view: the day timeline (meetings, focus lines,
+  the now-line, deadline countdowns) with **Today's tasks** (overdue and due today, not done) under it; its
+  badge counts today's tasks, Inbox's counts the inbox. The Task rows load once for the page. The old Tasks
+  page (header and section tabs) is retired. Controls use the app's pill style (14px, `bg-hover-2` when
   on).
 - Object Types header: fold chevron, count, a `...` menu (Sort manually with a check, Sort alphabetically) and
   a `+` (the gallery above) on hover.
