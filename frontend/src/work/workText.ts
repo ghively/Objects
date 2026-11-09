@@ -160,6 +160,7 @@ export const WORK_TEXT = {
   blockedQuiet: 'Blocked and quiet for 7+ days',
   waitingOnSomeone: 'Waiting on someone',
   failedRuns: 'Failed agent runs',
+  heldRuns: 'Waiting for Run now', // ours (decision S3)
   nothingStuck: 'Nothing is stuck', // ours
 
   // ---- Wins ----

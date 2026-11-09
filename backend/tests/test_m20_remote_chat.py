@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 import time
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -538,3 +539,34 @@ def test_call_remote_marks_delegated(fake, tmp_path: Path) -> None:
     assert _sent_messages(fake)[-1]["contextId"] == result.context_id
     assert [line["type"] for line in _lines(rec, result.chat_id)] == ["chat", "user", "assistant", "user",
                                                                       "assistant"]
+
+
+def test_second_turn_on_a_running_remote_chat_is_refused(api, fake) -> None:
+    """Decision S8 (2026-11-08): a remote agent's chat gets the local chats' in-flight guard. The
+    same chat open in two tabs, both sending: the second turn gets one ``error`` frame
+    (``CHAT_BUSY``) before anything is written or sent, so one A2A call goes out."""
+    _space, client, _ = api
+    rec = _add_remote(fake)
+    chat_id = _chat(client, "hello", rec.id)[0]["chatId"]
+    first: list = []
+
+    def turn_one() -> None:
+        first.extend(_chat(client, "A2A:slow:2", rec.id, chatId=chat_id))
+
+    t = threading.Thread(target=turn_one, daemon=True)
+    t.start()
+    try:
+        deadline = time.monotonic() + 20
+        while len(_sent_messages(fake)) < 2 and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert len(_sent_messages(fake)) == 2
+        second = _chat(client, "Second question", rec.id, chatId=chat_id)
+    finally:
+        t.join(60)
+    assert second == [{"type": "error", "message": "This chat is still answering."}]
+    assert first[-1]["type"] == "done"
+    assert len(_sent_messages(fake)) == 2  # no A2A call for the refused turn
+    users = [line["text"] for line in _lines(rec, chat_id) if line["type"] == "user"]
+    assert users == ["hello", "A2A:slow:2"]
+    # The chat is free again once the first turn ended.
+    assert _chat(client, "Third", rec.id, chatId=chat_id)[-1]["type"] == "done"

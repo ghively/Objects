@@ -39,6 +39,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://127.0.0.1:8790',
+      // Decision S6: the one-time link that hands this tab the launch key's cookie.
+      '/_open': 'http://127.0.0.1:8790',
     },
   },
   build: {

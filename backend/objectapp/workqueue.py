@@ -2,6 +2,8 @@
 
 The file is ``<state>/work-queue-<space key>.json``. Listing never writes; a ``running`` entry whose
 runner isn't live in this process is served failed (CRASHED) and saved as failed on the next write.
+Decision S3: ``autoStreaks`` counts each item's auto-runs since Gene last acted on it and
+``autoHeld`` names the Agent step the cap held back, so a restart keeps both.
 """
 
 from __future__ import annotations
@@ -125,22 +127,32 @@ class QueueStore:
         try:
             raw = self.file.read_bytes()
         except FileNotFoundError:
-            return {"v": 1, "entries": [], "autoRuns": []}
+            return self._empty()
         except OSError:
             self._bad = True
-            return {"v": 1, "entries": [], "autoRuns": []}
+            return self._empty()
         try:
             data = json.loads(raw.decode("utf-8"))
             if not isinstance(data, dict) or not isinstance(data.get("entries", []), list):
                 raise ValueError
         except (ValueError, UnicodeDecodeError):
             self._bad = True
-            return {"v": 1, "entries": [], "autoRuns": []}
+            return self._empty()
         data["entries"] = [e for e in data["entries"] if isinstance(e, dict) and e.get("id")]
         runs = data.get("autoRuns")
         data["autoRuns"] = [r for r in runs if isinstance(r, str)] if isinstance(runs, list) else []
+        streaks = data.get("autoStreaks")
+        data["autoStreaks"] = ({k: v for k, v in streaks.items() if isinstance(k, str) and isinstance(v, int)
+                                and not isinstance(v, bool) and v > 0} if isinstance(streaks, dict) else {})
+        held = data.get("autoHeld")
+        data["autoHeld"] = ({k: v for k, v in held.items() if isinstance(k, str) and isinstance(v, dict)}
+                            if isinstance(held, dict) else {})
         data["v"] = 1
         return data
+
+    @staticmethod
+    def _empty() -> dict[str, Any]:
+        return {"v": 1, "entries": [], "autoRuns": [], "autoStreaks": {}, "autoHeld": {}}
 
     @staticmethod
     def _crashed(e: dict[str, Any]) -> bool:
@@ -188,6 +200,19 @@ class QueueStore:
         with _LOCK:
             return key in self._load()["autoRuns"]
 
+    def auto_streak(self, path: str) -> int:
+        """Auto-runs of the item at `path` since Gene last acted on it (decision S3)."""
+        with _LOCK:
+            return self._load()["autoStreaks"].get(path, 0)
+
+    def held(self) -> list[dict[str, Any]]:
+        """The Agent steps the auto-run cap held back, oldest first (decision S3)."""
+        with _LOCK:
+            data = self._load()
+        rows = [{**v, "path": k} for k, v in data["autoHeld"].items()]
+        rows.sort(key=lambda r: (str(r.get("at") or ""), r["path"]))
+        return rows
+
     # -- writing ---------------------------------------------------------
     def _save(self, data: dict[str, Any], now: datetime | None = None) -> None:
         self._settle(data, now)
@@ -200,6 +225,10 @@ class QueueStore:
             drop |= {e["id"] for e in finished[: max(0, len(finished) - KEEP_FINISHED)]}
         data["entries"] = [e for e in entries if e["id"] not in drop]
         data["autoRuns"] = data["autoRuns"][-KEEP_AUTO_RUNS:]
+        for name in ("autoStreaks", "autoHeld"):
+            kept = data.get(name) or {}
+            if len(kept) > KEEP_AUTO_RUNS:  # insertion order: the oldest go first
+                data[name] = dict(list(kept.items())[-KEEP_AUTO_RUNS:])
         path = self.file
         path.parent.mkdir(parents=True, exist_ok=True)
         if self._bad:
@@ -318,10 +347,41 @@ class QueueStore:
             self._save(data, now)
             return dict(e)
 
-    def record_auto_run(self, key: str) -> None:
+    def record_auto_run(self, key: str, path: str | None = None) -> None:
+        """Remember that the step behind `key` was auto-run; with `path`, count it in that item's
+        streak (decision S3) in the same write."""
         with _LOCK:
             data = self._load()
             if key in data["autoRuns"]:
                 return
             data["autoRuns"].append(key)
+            if path is not None:
+                data["autoStreaks"][path] = data["autoStreaks"].get(path, 0) + 1
+                data["autoHeld"].pop(path, None)
             self._save(data)
+
+    def hold_auto_run(self, path: str, fields: dict[str, Any]) -> bool:
+        """Record the Agent step the cap holds back (decision S3). False when it already was."""
+        with _LOCK:
+            data = self._load()
+            old = data["autoHeld"].get(path)
+            if old is not None and old.get("stepId") == fields.get("stepId"):
+                return False
+            data["autoHeld"][path] = dict(fields)
+            self._save(data)
+        return True
+
+    def reset_auto_streak(self, path: str, *, keep_count: bool = False) -> bool:
+        """Gene acted on the item at `path`: its streak starts again and nothing is held (decision
+        S3). With `keep_count`, only the held step is let go (it isn't current any more). False when
+        there was nothing to change (no write)."""
+        with _LOCK:
+            data = self._load()
+            had = path in data["autoHeld"] or (not keep_count and path in data["autoStreaks"])
+            if not had:
+                return False
+            data["autoHeld"].pop(path, None)
+            if not keep_count:
+                data["autoStreaks"].pop(path, None)
+            self._save(data)
+        return True

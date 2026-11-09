@@ -253,6 +253,7 @@ from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
 from .reviews import ReviewRunner
 from .runfence import RunFenceMiddleware
+from .uikey import LaunchKey, UiKeyMiddleware
 from .vcsservice import VcsService
 from .searchindex import SearchIndex
 from .settings import SettingsProblem, time_zone
@@ -891,8 +892,14 @@ def create_app(
     watch: bool = True,
     on_switch: Callable[[Path], None] | None = None,
     base_url: str | None = None,
+    ui_key: LaunchKey | None = None,
 ) -> FastAPI:
     """The app for `space`. With `watch`, a `SpaceWatcher` runs for the app's lifespan.
+
+    Decision S6: `ui_key` is the launcher's per-launch key (`uikey.LaunchKey`); with it every
+    ``/api`` request (bar ``/api/v1`` with a bearer token) and the page itself need the key
+    (`UiKeyMiddleware`), and ``/_open`` hands it to the window. Without it (tests, acceptance
+    scripts) there is no key check; the run fence applies either way.
 
     M21: `base_url` is the app's own loopback URL (``__main__.build_server_config`` passes it);
     agent schedule runs give it to the agent as ``OBJECT_API_URL``. Without it (tests) they use
@@ -1022,6 +1029,9 @@ def create_app(
     # 2026-11-08: an agent run (the CLI's process tree) can't use the app's own /api routes;
     # /api/v1 with a bearer token (the MCP servers' path) and the static files stay as they are.
     app.add_middleware(RunFenceMiddleware, run_pids=running_run_pids)
+    if ui_key is not None:
+        # Decision S6: the launch key, checked before the run fence (its second layer).
+        app.add_middleware(UiKeyMiddleware, key=ui_key)
     app.add_middleware(LocalOnlyMiddleware)  # added last: the outermost, so it checks first
     app.state.space = space
     app.state.vcs = vcs_service

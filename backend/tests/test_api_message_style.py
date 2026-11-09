@@ -54,6 +54,7 @@ FORWARDED = {"exc"}
 STATUS_PREFIXED = {
     "f'{res.status_code}: {detail} {json.dumps(extra, default=str)}'",
     "f'{res.status_code}: {detail or body}'",
+    "f'Conflict: {detail}'",  # a 409 refusal without a version (decision S5's delete_collection)
 }
 DETAIL_KEYWORDS = {"detail", "message"}
 

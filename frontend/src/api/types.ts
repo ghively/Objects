@@ -2753,12 +2753,24 @@ export interface AgentQueueRow {
   result: string | null
   error: string | null
 }
+/** Decision S3: an Agent step the auto-run cap held back (3 in a row); it waits for Run now. */
+export interface AgentHeldRow {
+  path: string
+  title: string
+  stepId: string | null
+  n: number | null
+  stepText: string | null
+  heldAt: string | null
+  reason: string
+}
 export interface AgentStatus {
   available: boolean
   agentName: string | null
   actsOnApprovals: boolean
   carrying: number
   rows: AgentQueueRow[]
+  /** Decision S3; absent while the agent loop is unavailable. */
+  held?: AgentHeldRow[]
   note: string | null
 }
 export type CaptureFrom = WorkViewId | 'focusSession' | 'keepOnTop' | 'panel'

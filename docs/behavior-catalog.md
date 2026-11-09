@@ -337,7 +337,10 @@ Each starter template pre-fills the new type's properties.
   agent** + **Send**; **Mark filed**; empty text "Nothing waiting to be filed.".
 - **Agent acts on my approvals** (switch; Agent queue and Settings > Work): off = approvals, answers, notes and
   requests only wait in the Agent queue; on = Object runs due entries one at a time. **Agent runs by itself**
-  (Settings > Work): an Agent step that becomes current runs once, read-only.
+  (Settings > Work): an Agent step that becomes current runs once, read-only. At most 3 auto-runs of one item in a
+  row since Gene last acted on it (decision S3): the 4th Agent step stays Open and is listed in Stuck under
+  **Waiting for Run now** ("The agent ran 3 steps of this item in a row by itself. Press Run now to let it go on.");
+  any action of Gene's on the item (Run now included) starts the count again. The count survives a restart.
 - **Settings > Work**: **Create the Work agent** (shell warning; offers to copy your `change-reviewer`),
   **Read tools** (mark a server's read-only tools; no more than 500), **Set up Desk sync** (an off schedule at
   07:00 every weekday that updates ticket fields only; never writes to Jira or ServiceNow).
@@ -413,6 +416,22 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   settings. Known limit, accepted (decisions memo A-2): a folder whose name contains a backslash (`\`, legal in a
   Linux folder name) can't be fenced — no rule form Claude Code accepts matches it (three forms tried live on
   2.1.319, Linux). Rename such a folder if an agent should not read it with its file tools.
+
+## 10e. Agent and API guards (Object's own; decisions memo 2026-11-08)
+
+- **One turn per chat** (S8): a second message on a chat that is still answering (the same chat open in two tabs
+  or windows) gets one error, "This chat is still answering.", before anything is written, run or sent. Local
+  agents and remote (A2A) agents share the guard.
+- **Deleting a collection over the API** (S5): `delete_collection` (MCP and `DELETE /api/v1/collections/{id}`) is
+  refused (409, "This collection holds pages excluded from AI; delete it in Object.") when any member is excluded
+  from AI, with or without confirm; nothing changes. Deleting it in Object is unchanged.
+- **Only Object's own window uses `/api`** (S6): each launch makes a random key; the window (and the keep-on-top
+  window) opens at a one-time `/_open` link that hands it over as a session cookie, so every request the UI makes
+  carries it. Without it `/api` answers 401 "Only Object's own window can use this." and the page shows "This page
+  isn't connected to Object" ("Only the window Object opened can use this space. Open Object again from its
+  launcher."). With `--browser` the launcher also prints the link (it works once, for 5 minutes) and Enter in its
+  terminal prints and opens a new one. `/api/v1` with a token keeps its own auth; the run fence stays as a second
+  layer.
 
 ## 11. Unlinked mentions
 

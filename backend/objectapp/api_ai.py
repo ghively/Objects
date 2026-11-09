@@ -132,12 +132,9 @@ class SaveChatRequest(BaseModel):
 PROPOSAL_MODES = ("askBlock", "tagBlock", "tagObject", "autofill", "rephrase")
 """Modes that run read-only, so their Accept step stays meaningful (M17)."""
 MISSING_FOLDER = 'This agent\'s folder "{path}" is missing.'
-CHAT_BUSY = "This chat is still answering."  # our string
-_RUNNING: set[tuple[str, str]] = set()
-"""The ``(agent id, chat id)`` of every local turn this process is running. A second turn on a
-running chat (the same chat open in two tabs or windows) would append its user line and its
-answer between the first's, and resume the same CLI session twice; it gets one ``error`` frame
-(`CHAT_BUSY`) before anything is written or started."""
+CHAT_BUSY = ai.CHAT_BUSY
+_RUNNING = ai.RUNNING_CHATS
+"""Shared with remote chats (`remotechat.respond`, decision S8); see `ai.RUNNING_CHATS`."""
 
 
 def _now() -> str:
