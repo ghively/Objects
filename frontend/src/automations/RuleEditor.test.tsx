@@ -9,7 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api, ApiError, RevisionConflictError } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { automationRule, typeDef } from '@/test/mockApi'
+import { automationRule, propertyDef, typeDef } from '@/test/mockApi'
 import { RuleEditorDialog } from './RuleEditor'
 
 const mocked = vi.mocked(api)
@@ -124,5 +124,30 @@ describe('RuleEditorDialog', () => {
     const sent = mocked.createAutomation.mock.calls[0][0]
     expect(sent.trigger).toMatchObject({ kind: 'schedule', repeat: 'every week on mon', time: '09:00' })
     expect(sent.actions).toEqual([{ kind: 'appendToDailyNote', text: 'Review' }])
+  })
+
+  test('a date set to nothing (Now unticked, no date) is refused with an inline message', async () => {
+    const COMPLETED = propertyDef({ id: 'completed', key: 'completed', name: 'Completed', type: 'datetime' })
+    useLinkIndex.setState({ types: [{ ...TASK, propertyDefinitions: [...TASK.propertyDefinitions, COMPLETED] }] })
+    // A rule saved before the check: it keeps running; the editor names the problem.
+    const saved = automationRule({
+      id: 'r2',
+      name: 'Stamp completion',
+      revision: 'b1',
+      trigger: { kind: 'objectCreated', scope: { kind: 'type', id: 'task' } },
+      actions: [{ kind: 'setProperty', key: 'completed', value: null }],
+    })
+    const { user } = setup({ rule: saved })
+    const dialog = screen.getByRole('dialog', { name: 'Edit automation' })
+    expect(within(dialog).getByText('Pick a date or tick Now.')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Pick a date or tick Now.')
+    expect(mocked.saveAutomation).not.toHaveBeenCalled()
+    // Ticking Now makes it whole.
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Now' }))
+    expect(within(dialog).queryByText('Pick a date or tick Now.')).toBeNull()
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(mocked.saveAutomation).toHaveBeenCalledTimes(1))
+    expect(mocked.saveAutomation.mock.calls[0][0].actions).toEqual([{ kind: 'setProperty', key: 'completed', value: null, now: true }])
   })
 })

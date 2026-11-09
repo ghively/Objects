@@ -73,6 +73,10 @@ Object has no accounts.
   audit doc item 27), Delete object type. Basic types' properties cannot be edited. Field lists per built-in
   type are in audit item 28.
 - Task management: "Hide Task Management" per space.
+- Automations (M14): in the rule editor, "Set a property" on a date needs a date or "Now" ticked; with neither it
+  shows "Pick a date or tick Now." under the value and Save refuses with the same message (it would write the
+  date empty, `completed: null`). A rule saved like that before keeps running unchanged; opening it shows the
+  message.
 
 **Integrations** **(later)**
 - Calendar Integrations; Task actions.

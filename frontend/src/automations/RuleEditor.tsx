@@ -41,6 +41,7 @@ import {
   cleanRule,
   defaultStart,
   isDateKind,
+  missingDate,
   newAction,
   newRuleInput,
   parseTime,
@@ -160,10 +161,19 @@ function RuleEditorBody({
     setDraft((d) => ({ ...d, ...patch }))
   }
 
+  const trigger = draft.trigger
+  const scope: AutomationScope | null = 'scope' in trigger ? trigger.scope : null
+  const isSchedule = trigger.kind === 'schedule'
+  const choices = useMemo(() => scopeChoices(scope, types, collections), [scope, types, collections])
+  const scopedTypes = useMemo(() => scopeTypes(scope, types, collections), [scope, types, collections])
+
   const save = async () => {
     const clean = cleanRule(draft)
     const problem = ruleProblem(clean)
     if (problem) return setError(problem)
+    // A date set to nothing would empty the date when the rule runs (`completed: null`).
+    const defs = writableDefs(scopedTypes)
+    if (clean.actions.some((a) => missingDate(a, defs))) return setError(RULE_TEXT.needDate)
     setSaving(true)
     try {
       let saved: AutomationRule
@@ -184,12 +194,6 @@ function RuleEditorBody({
       setSaving(false)
     }
   }
-
-  const trigger = draft.trigger
-  const scope: AutomationScope | null = 'scope' in trigger ? trigger.scope : null
-  const isSchedule = trigger.kind === 'schedule'
-  const choices = useMemo(() => scopeChoices(scope, types, collections), [scope, types, collections])
-  const scopedTypes = useMemo(() => scopeTypes(scope, types, collections), [scope, types, collections])
 
   return (
     <>
@@ -697,7 +701,7 @@ function ValueField({
   const Cell = cellForDef(def)
   const date = isDateKind(def.type)
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2">
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
       {date && (
         <label className="flex shrink-0 items-center gap-1">
           <input
@@ -712,6 +716,11 @@ function ValueField({
         <div aria-label={T.value} role="group" className="min-w-[10rem] flex-1 rounded-md border border-line px-2 py-0.5">
           <Cell def={def} value={action.value ?? null} density="table" onChange={(value: unknown) => onChange({ ...action, value })} />
         </div>
+      )}
+      {missingDate(action, [def]) && (
+        <p data-date-needed="" className="basis-full text-[12px] text-[var(--danger)]">
+          {RULE_TEXT.needDate}
+        </p>
       )}
     </div>
   )
