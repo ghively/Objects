@@ -242,7 +242,8 @@ def test_cli_flags(env) -> None:
     assert _value(cmd.args, "--permission-mode") == "dontAsk"
     assert _value(cmd.args, "--permission-prompts") == "none"
     assert "--strict-mcp-config" in cmd.args
-    assert _value(cmd.args, "--tools") == "default"
+    tools = _value(cmd.args, "--tools").split(",")  # decisions memo S1: explicit, no "default"
+    assert "Read" in tools and "Bash" not in tools and tools[-2:] == ["Skill", "ToolSearch"]
     assert "--model" not in cmd.args and "--resume" not in cmd.args
     cmd2 = _build(_scope(env), model="haiku", resume="0f8fad5b-d9cb-469f-a165-70867728950e")
     assert _value(cmd2.args, "--model") == "haiku"

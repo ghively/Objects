@@ -24,6 +24,7 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 | Calendar Month and Week views, backlinks, Export dialog | specified (section 10) |
 | Unlinked mentions | specified (section 11) |
 | Brain dump, Work agent | specified (section 10b) |
+| Agents: run tools and the fence | specified in part (section 10d) |
 | Import: Source line, Files source, scan, proposal, trial, normalise, Import inbox | specified (section 10c); the exact strings live in the code |
 | Tab and sidebar context menus, Overview tab, collection page, outline | specified (section 9) |
 | Views: layouts, toolbar, Overview | specified (sections 8, 9); the inner screens of the filter, sort and group editors and Customize are not specified yet |
@@ -390,6 +391,28 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **MCP**: `import_scan`, `import_proposal`, `import_report` (read) and `save_import_proposal`, `save_import_decisions`
   (write), the prompt `migrate_a_source` and the resource `object://skills/migrate-a-source` let an outside agent run the
   same workflow; `start_import` refuses a mapping that creates types outside an approved proposal (for the open space or a trial copy; a brand-new space is not checked).
+
+## 10d. Agents: tools and the fence (M17-M18)
+
+- **Built-in tools** (decisions memo S1): a run is offered only the Claude Code built-ins whose Tools-tab row is on,
+  plus the skill tool and `ToolSearch` (which Object's MCP tools load behind); the run passes them as an explicit
+  `--tools` list, never `--tools default`. A built-in the CLI adds later (on 2.1.319: CronCreate, RemoteTrigger,
+  SendMessage, ScheduleWakeup, Workflow, Monitor...) stays off until it gets a Tools-tab row. Read-only work runs
+  get only Web fetch and the skill tool; an import filing run gets none.
+- **What a run's token may call** (decisions memo S2): every run (chats, Work, filing, schedules, delegation,
+  reviews) carries, on its token, the Object agent tools its tool lists allow, so Object itself refuses the
+  others with "This run can't use {tool}." even if the CLI let a call through; an agent's Tools-tab switch-off of
+  Memory, Change skills, Delegate or Call a remote agent is enforced by Object, not only by Claude Code. Read-only
+  runs (Work read, filing a brain dump, Desk sync, import filing) can never write the agent's memory or skills.
+- **Shell and search**: with the shell on, Find files (Glob) and Search in files (Grep) stay ordinary switches. The
+  run names them in its `--tools` list, and Claude Code (checked on 2.1.319) then offers them beside the shell;
+  only the old `--tools default` dropped them for shell-on runs, which is why greying them out (approved as A-1)
+  was not built.
+- **The fence**: a run's file tools are denied every space folder (notes are reached only through Object's tools),
+  the other agents' folders, the agent trash and Object's own state files, through path rules in the run's
+  settings. Known limit, accepted (decisions memo A-2): a folder whose name contains a backslash (`\`, legal in a
+  Linux folder name) can't be fenced — no rule form Claude Code accepts matches it (three forms tried live on
+  2.1.319, Linux). Rename such a folder if an agent should not read it with its file tools.
 
 ## 11. Unlinked mentions
 
