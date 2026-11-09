@@ -83,7 +83,7 @@ def router(ctx: ApiContext) -> APIRouter:
         """The agent ready for a write: 404 for a missing folder, 423 for an unreadable
         ``agent.json``; the default agent's folder made first when it has none."""
         if agent.missing:  # AgentRegistry's words for the same case
-            raise Denied(AgentNotFound.status, f"This agent's folder is missing: {agent.folder}")
+            raise Denied(AgentNotFound.status, f'This agent\'s folder "{agent.folder}" is missing.')
         if agent.read_only_reason:
             raise Denied(AgentReadOnly.status, agent.read_only_reason)
         if agent.default and not agent.exists:

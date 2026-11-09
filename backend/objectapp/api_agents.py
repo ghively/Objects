@@ -339,7 +339,7 @@ def router(ctx: ApiContext) -> APIRouter:
         except AgentError as exc:
             return _fail(exc)
         if not rec.folder.is_dir():
-            return _fail(AgentNotFound(f"This agent's folder is missing: {rec.folder}"))
+            return _fail(AgentNotFound(f'This agent\'s folder "{rec.folder}" is missing.'))
         server.reveal_in_file_manager(rec.folder)
         return {"ok": True}
 

@@ -411,7 +411,7 @@ def test_self_and_unknown_targets(env: Env, tmp_path: Path) -> None:
     shutil.rmtree(gone.folder)
     res = env.delegate(agent="Gone")
     assert res.status_code == 409
-    assert res.json()["detail"] == f"Gone can't run: This agent's folder is missing: {gone.folder}"
+    assert res.json()["detail"] == f'Gone can\'t run: This agent\'s folder "{gone.folder}" is missing.'
     locked = env.registry.create(AgentInput(name="Locked"), "x")
     (Path(locked.folder) / ".object-agent" / "agent.json").write_text("{", encoding="utf-8")
     res = env.delegate(agent="Locked")
@@ -431,7 +431,7 @@ def test_self_and_unknown_targets(env: Env, tmp_path: Path) -> None:
     shutil.rmtree(far.folder)
     res = env.delegate(agent="Far Planner")
     assert res.status_code == 409
-    assert res.json()["detail"] == f"Far Planner can't run: This agent's folder is missing: {far.folder}"
+    assert res.json()["detail"] == f'Far Planner can\'t run: This agent\'s folder "{far.folder}" is missing.'
     tokenless = add_remote("Tokenless Planner")
     remotesecrets.remove(tokenless.id)
     res = env.delegate(agent="Tokenless Planner")

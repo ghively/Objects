@@ -587,9 +587,9 @@ class AgentRegistry:
         try:
             parent = _resolve(location)
             if not parent.is_dir():
-                raise AgentNotFound(f"Not a folder: {parent}")  # our string, as Create space
+                raise AgentNotFound(f'"{parent}" isn\'t a folder.')  # our string, as Create space
         except (OSError, ValueError):
-            raise AgentNotFound(f"Not a folder: {str(location)[:60]!r}") from None
+            raise AgentNotFound(f'"{str(location)[:60]}" isn\'t a folder.') from None
         target = parent / stem
         self._check_nesting(target)
         try:
@@ -654,7 +654,7 @@ class AgentRegistry:
         inp = clean_input(inp)
         source = self.get(source_id)
         if source.missing:
-            raise AgentNotFound(f"This agent's folder is missing: {source.folder}")
+            raise AgentNotFound(f'This agent\'s folder "{source.folder}" is missing.')
         with _lock:
             src_off = source.data.get("toolsOff")
             src_off = [t for t in src_off if isinstance(t, str)] if isinstance(src_off, list) else default_off()
@@ -685,9 +685,9 @@ class AgentRegistry:
             folder = _resolve(path)
             is_dir = folder.is_dir()
         except (OSError, ValueError):
-            raise AgentNotFound(f"Not a folder: {str(path)[:60]!r}") from None
+            raise AgentNotFound(f'"{str(path)[:60]}" isn\'t a folder.') from None
         if not is_dir:
-            raise AgentNotFound(f"Not a folder: {folder}")
+            raise AgentNotFound(f'"{folder}" isn\'t a folder.')
         try:
             data, _ = agentfiles.read_agent_file(folder)
         except ValueError:
@@ -826,7 +826,7 @@ class AgentRegistry:
     def _writable(self, agent_id: str) -> AgentRecord:
         rec = self.get(agent_id)
         if rec.missing:
-            raise AgentNotFound(f"This agent's folder is missing: {rec.folder}")
+            raise AgentNotFound(f'This agent\'s folder "{rec.folder}" is missing.')
         if rec.read_only_reason:
             raise AgentReadOnly(rec.read_only_reason)
         return rec

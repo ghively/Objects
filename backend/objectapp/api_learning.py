@@ -153,7 +153,7 @@ def router(ctx: ApiContext, *, reviews: ReviewRunner | None = None, curator: Cur
         """The agent ready for a write: 404 for a missing folder, 423 for an unreadable
         ``agent.json``; the default agent's folder made first when it has none."""
         if agent.missing:
-            raise AgentNotFound(f"This agent's folder is missing: {agent.folder}")
+            raise AgentNotFound(f'This agent\'s folder "{agent.folder}" is missing.')
         if agent.read_only_reason:
             raise AgentReadOnly(agent.read_only_reason)
         if agent.default and not agent.exists:
