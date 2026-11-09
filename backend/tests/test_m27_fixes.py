@@ -83,7 +83,10 @@ def v1(client):
 
     def start(pv, tmp_path, name="Copy", **extra):
         target = {"kind": "newSpace", "name": name, "location": str(tmp_path)}
-        r = client.post("/api/v1/import/start", headers=headers, json={"previewId": pv["previewId"], "target": target, **extra})
+        # an agent's import needs an approved proposal for every type it would create, into a new
+        # space too; these tests are about the scan, so every page becomes a Page
+        body = {"previewId": pv["previewId"], "target": target, "mapping": {"typeSource": "none"}, **extra}
+        r = client.post("/api/v1/import/start", headers=headers, json=body)
         assert r.status_code == 202, r.text
         job = wait_job(client, r.json()["jobId"])
         assert job["phase"] == "done", job

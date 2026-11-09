@@ -249,7 +249,7 @@ def router(ctx: ApiContext) -> APIRouter:
             planned = plan(read, req.mapping, target, reuse=reuse, lenient=read is not previewed)
         except MappingProblem as exc:
             return _error(422, str(exc))
-        if req.requireApproved and req.target.kind != "newSpace":
+        if req.requireApproved:  # an agent's import, into this space or a new one alike (Gene, 2026-11-08)
             names = agentwire.unapproved_types(planned, ctx.space.root, req.batch)
             if names:
                 return _error(422, "The mapping would create types no approved schema proposal creates: "
