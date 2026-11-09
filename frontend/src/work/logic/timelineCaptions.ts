@@ -1,12 +1,7 @@
 // Today's timeline captions: a block too short for its label and time (a 24-minute Morning brief is
 // about 35px wide at 1440px and read "M…") hangs the two, on one line, under the track. Captions that
 // would meet take the next row down. Pure; `TodayView` renders them.
-import type { DayBlock } from './daySlots'
-
-const DAY_START = 7 * 60 // 07:00, as TodayView's track
-const DAY_END = 17 * 60 + 30 // 17:30
-const SPAN = DAY_END - DAY_START
-const clamp = (m: number) => Math.min(Math.max(m, DAY_START), DAY_END)
+import { DEFAULT_DAY_RANGE, type DayBlock, type DayRange } from './daySlots'
 
 /** Blocks shorter than this (minutes) show their label and time as a caption under the track. */
 export const SHORT_BLOCK_MINUTES = 50
@@ -18,15 +13,22 @@ export const CAPTION_GAP_PX = 4
 export interface BlockCaption {
   /** The caption row under the track, 0 nearest it. */
   lane: number
-  /** Hangs from the block's start, or from its end when it would run past 17:30. */
+  /** Hangs from the block's start, or from its end when it would run past the range's end. */
   align: 'start' | 'end'
 }
 
 /** A caption's width in minutes on a `trackPx` wide track (a generous guess: 12px label, 11px time). */
-const captionMinutes = (b: DayBlock, trackPx: number): number => ((b.label.length * 6.5 + 76) / trackPx) * SPAN
+const captionMinutes = (b: DayBlock, trackPx: number, span: number): number => ((b.label.length * 6.5 + 76) / trackPx) * span
 
 /** The short blocks' captions: each in the first row free at its span (greedy, in start order). */
-export function blockCaptions(blocks: readonly DayBlock[], trackPx = TRACK_MIN_PX): Map<DayBlock, BlockCaption> {
+export function blockCaptions(
+  blocks: readonly DayBlock[],
+  trackPx = TRACK_MIN_PX,
+  range: DayRange = DEFAULT_DAY_RANGE,
+): Map<DayBlock, BlockCaption> {
+  const { start: DAY_START, end: DAY_END } = range
+  const SPAN = DAY_END - DAY_START
+  const clamp = (m: number) => Math.min(Math.max(m, DAY_START), DAY_END)
   const px = Math.max(trackPx, TRACK_MIN_PX)
   const gap = (CAPTION_GAP_PX / px) * SPAN
   const out = new Map<DayBlock, BlockCaption>()
@@ -35,7 +37,7 @@ export function blockCaptions(blocks: readonly DayBlock[], trackPx = TRACK_MIN_P
     const start = clamp(b.start)
     const end = clamp(b.end)
     if (end - start >= SHORT_BLOCK_MINUTES) continue
-    const w = captionMinutes(b, px)
+    const w = captionMinutes(b, px, SPAN)
     const align = start + w <= DAY_END ? 'start' : 'end'
     const from = align === 'start' ? start : Math.max(DAY_START, end - w)
     let lane = laneEnds.findIndex((e) => e + gap <= from)

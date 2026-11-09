@@ -197,7 +197,8 @@ Each starter template pre-fills the new type's properties.
   row. Wins (and its count) follows every object change once loaded, and Alerts follows a settings change (the
   monitoring folder), so neither needs a reload. The task sections are list views of the dashboard, each with the quick add on top (a new task gets
   the values the section's filter implies). **Today** is one view: the day timeline (meetings, focus lines,
-  the now-line, deadline countdowns) with **Today's tasks** under it — the Calendar Day view's Tasks section for
+  the now-line, deadline countdowns; it spans 07:00-17:30 at least and widens to the whole hour of any earlier or
+  later meeting, so evening meetings are on it) with **Today's tasks** under it — the Calendar Day view's Tasks section for
   today (decision T1, one list in both places): tasks whose date covers today, whose deadline is today, and the
   open overdue ones under "Overdue (n)"; done ones stay, struck; "N open, M done" and the `+` menu (Create task,
   Move all open tasks to); "Open in Calendar" under it opens the Calendar's Day view on today. Today's badge
