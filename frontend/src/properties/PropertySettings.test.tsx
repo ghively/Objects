@@ -255,6 +255,40 @@ describe('PropertyMenu', () => {
     expect(next.propertyDefinitions.find((d) => d.id === 'p-note')?.visibility).toBe('hideWhenEmpty')
   })
 
+  test('PropertyMenu: Enter commits the name and a later Escape keeps it', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    render(<PropertyMenu type={PROJECT} def={NOTE} onSave={onSave} onEditProperty={vi.fn()} onDelete={vi.fn()} />)
+    const name = screen.getByRole('textbox', { name: 'Property name' })
+    await user.clear(name)
+    await user.type(name, 'Remark{Enter}')
+    expect((onSave.mock.calls[0][0] as TypeDef).propertyDefinitions.find((d) => d.id === 'p-note')?.name).toBe('Remark')
+    // The type's save has not come back yet (def.name is still "Note"): Escape must not revert.
+    name.focus()
+    await user.keyboard('{Escape}')
+    expect(name).toHaveValue('Remark')
+    // An uncommitted edit still goes back to the committed name.
+    await user.type(name, 's')
+    await user.keyboard('{Escape}')
+    expect(name).toHaveValue('Remark')
+    expect(onSave).toHaveBeenCalledTimes(1)
+  })
+
+  test('Property settings: Enter commits the name, so Escape (closing the dialog) keeps it', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.saveType).mockImplementation(async (t: TypeDef) => ({ type: { ...t, revision: 'r2' }, rewritten: [], skipped: [] }))
+    const onOpenChange = vi.fn()
+    render(<PropertySettings typeId="project" propertyId="p-note" open onOpenChange={onOpenChange} onOpenProperty={vi.fn()} />)
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    await user.clear(name)
+    await user.type(name, 'Remark{Enter}')
+    await waitFor(() => expect(api.saveType).toHaveBeenCalledTimes(1))
+    expect(savedDef('p-note')?.name).toBe('Remark')
+    await user.keyboard('{Escape}')
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(api.saveType).toHaveBeenCalledTimes(1)
+  })
+
   test('the name saves on blur and number properties offer Format', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()

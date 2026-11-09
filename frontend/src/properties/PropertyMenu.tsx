@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Icon as IconValue, PropertyDef, TypeDef, Visibility } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
@@ -69,17 +69,24 @@ function MenuButton({
 /** A property row's menu: icon and name, Format (numbers), Visibility, Edit Property, Delete. */
 export function PropertyMenu({ type, def, onSave, onEditProperty, onDelete }: PropertyMenuProps) {
   const [name, setName] = useState(def.name)
+  // The last name committed here (Enter or blur): Escape goes back to it, never past it, even
+  // while the type's save is still on its way.
+  const committed = useRef(def.name)
   const [iconOpen, setIconOpen] = useState(false)
   const [formatOpen, setFormatOpen] = useState(false)
-  useEffect(() => setName(def.name), [def.name])
+  useEffect(() => {
+    committed.current = def.name
+    setName(def.name)
+  }, [def.name])
 
   const save = (patch: Partial<PropertyDef> | ((d: PropertyDef) => PropertyDef)) =>
     void onSave(updateProperty(type, def.id, patch))
 
   const commitName = () => {
     const next = name.trim()
-    if (!next) setName(def.name)
-    else if (next !== def.name) save({ name: next })
+    if (!next) return setName(committed.current)
+    committed.current = next
+    if (next !== def.name) save({ name: next })
   }
 
   const setIcon = (icon: IconValue | null) => {
@@ -107,7 +114,7 @@ export function PropertyMenu({ type, def, onSave, onEditProperty, onDelete }: Pr
           onBlur={commitName}
           onKeyDown={(e) => {
             if (e.key === 'Enter') e.currentTarget.blur()
-            if (e.key === 'Escape') setName(def.name)
+            if (e.key === 'Escape') setName(committed.current)
           }}
           className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-[14px] font-medium outline-none focus:bg-hover"
         />
