@@ -296,6 +296,6 @@ describe('WorkPage', () => {
   })
 
   test('test WorkPage lists Captures (M24 registers it through the glob)', () => {
-    expect(registeredAtImport).toContainEqual({ id: 'captures', label: 'Captures', key: null })
+    expect(registeredAtImport).toContainEqual({ id: 'captures', label: 'Captures', key: 'c' }) // decision D3: g then c
   })
 })

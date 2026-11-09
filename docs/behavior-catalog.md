@@ -89,19 +89,20 @@ Object has no accounts.
 
 Opened from the arrow icon next to the theme toggle; a scrolling list grouped General, Text editing,
 Markdown, Block editing, Page, Navigation, Calendar, AI Assistant, Table, Date picker, PDF viewer, Weblink.
-Ctrl means Cmd on Mac. "Shift" is written as Shift here.
+Ctrl means Cmd on Mac. "Shift" is written as Shift here. "(not in Object)" marks a catalogued key that Object leaves
+unbound on purpose; "(not bound)" one whose key is taken by another action (decision D3).
 
 **General**: Open settings Ctrl+, | Create new task Ctrl+Shift+T | Add new content Ctrl+U | Search
-this space Ctrl+P or Ctrl+K | Open extended search Ctrl+Shift+P | Toggle dark mode Ctrl+Shift+L |
+this space Ctrl+P or Ctrl+K | Open extended search Ctrl+Shift+P (not in Object) | Toggle dark mode Ctrl+Shift+L |
 Toggle focus mode Ctrl+Shift+M | Toggle left sidebar Ctrl+Shift+Left | Toggle right side panel
-Ctrl+Shift+Right | Toggle side panel entry list Ctrl+Shift+Down | Toggle media sidebar Ctrl+Alt+Right | Close
+Ctrl+Shift+Right | Toggle side panel entry list Ctrl+Shift+Down (not in Object) | Toggle media sidebar Ctrl+Alt+Right (not in Object) | Close
 current tab Ctrl+W | Show or hide the list of open tabs Ctrl+Shift+Up | Undo Ctrl+Z | Redo Ctrl+Shift+Z
-or Ctrl+Y | Go to Calendar Ctrl+Alt+H (press twice to jump to today) | Open Explore Ctrl+J | Open Explore in the
-side panel Ctrl+Shift+J | Multi-select blocks and objects Ctrl+Shift+Click | Show or hide the shortcuts list Ctrl+Shift+B |
-Show/hide the getting-started checklist Ctrl+Shift+A.
+or Ctrl+Y | Go to Calendar Ctrl+Alt+H (press twice to jump to today) | Open Explore Ctrl+J (not in Object) | Open Explore in the
+side panel Ctrl+Shift+J (not in Object) | Multi-select blocks and objects Ctrl+Shift+Click | Show or hide the shortcuts list Ctrl+Shift+B |
+Show/hide the getting-started checklist Ctrl+Shift+A (not in Object).
 
 **Text editing**: Cut, copy, paste Ctrl+X/C/V | Paste as plain text Ctrl+Shift+V | Make this block a task
-Ctrl+Shift+T | Format as code Ctrl+E | Format as TeX formula Ctrl+M | Insert/format as link Ctrl+K | Format bold Ctrl+B |
+Ctrl+Shift+T | Format as code Ctrl+E | Format as TeX formula Ctrl+M | Insert/format as link Ctrl+K (not bound: Ctrl+K is Search this space, taken first; decision D3) | Format bold Ctrl+B |
 Italicize Ctrl+I | Strikethrough Ctrl+Shift+S | Underline (unbound) | Highlight the selected text Ctrl+Shift+H | Move active block up or
 down Alt+Up/Down | Move this block up or down among its siblings Alt+Shift+Up/Down | Tick or untick the to-do in this block Ctrl+Enter | Expand or collapse the toggle in this block
 Ctrl+Up/Down (inserts and focuses a child block if none) | Select this block as a whole Esc or Ctrl+A |
@@ -122,13 +123,13 @@ Tick or untick the to-do in this block Ctrl+Enter | Open or close all toggles on
 Code block: leave downwards or upwards (Ctrl+Shift+Down/Up) | Math block likewise | Merge text blocks
 Ctrl+Shift+G.
 
-**Page**: Favorite or unfavorite this page Ctrl+Shift+* | Import, Export this page (Ctrl+E), Share menu Ctrl+S |
+**Page**: Favorite or unfavorite this page Ctrl+Shift+* | Import, Export this page (Ctrl+E), Share menu Ctrl+S (not in Object) |
 Start presentation mode Ctrl+Alt+P; back one slide / next presentation slide; exit presentation mode Esc | Find in page Ctrl+F | Select all top-level blocks |
 Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down) | Scroll to top Home, bottom End,
 page up/down.
 
 **Navigation**: Navigate back Ctrl+Left or Ctrl+[ | Navigate forward Ctrl+Right or Ctrl+] | Open in new tab Ctrl+Click | Open in
-side panel (Shift+Click) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y.
+side panel (Shift+Click) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y (not in Object).
 
 **Calendar**: Go to monthly view M | Go to weekly view W | Show the day before and after R (decision C9) | Go to daily view D | Jump to today T | Back / forward one day, week or month
 Left/Right | Toggle calendar sidebar Ctrl+Alt+S.
@@ -138,17 +139,18 @@ note; retry Ctrl+Alt+R; close chat Ctrl+Alt+X; rephrase Ctrl+Alt+U.
 
 **Work** (M23; on the Work page only, never while typing in a field or editor): Search work / |
 Brain dump B | Go to Now, Flow, Projects map, Today, On the floor, Your queues, Agent queue, Stuck, Wins,
-Alerts, Everything: G then N, W, P, T, O, Q, H, S, Y, L, E (within 1.5 s; in Just one thing only G then N) |
+Alerts, Everything, Inbox, Captures: G then N, W, P, T, O, Q, H, S, Y, L, E, I, C (I and C: decision D3; the other task
+lists and Tickets have no key; G then I does nothing while task management is hidden; within 1.5 s; in Just one thing only G then N) |
 Next row J | Previous row K | Open Enter | Peek Space | Previous item [ | Next item ] | Close Esc (the work item
 panel first, else the focus line and the search) | Shortcuts ?.
 
-**Table**: expand selection in four directions (Shift+arrows) | fill selected cells Ctrl+resize | insert
+**Table** (not in Object; decision D3: these groups stay unbound): expand selection in four directions (Shift+arrows) | fill selected cells Ctrl+resize | insert
 rows below / columns after | delete rows/columns Ctrl+Shift+Backspace-style | move row/column Alt+arrows |
 select all cells | enter cell editing | clear cells | toggle identifier reference mode F4.
 
-**Date picker**: toggle include time | toggle end date Ctrl+R | arrow keys move by day, week, month (Alt+Shift
-for the end date), year | **PDF viewer**: search, capture snapshot Ctrl+Shift+D, zoom Ctrl+0, set/next/previous
-page | **Weblink**: search.
+**Date picker** (not in Object; the date picker binds only Enter): toggle include time | toggle end date Ctrl+R | arrow keys move by day, week, month (Alt+Shift
+for the end date), year | **PDF viewer** (not in Object: no PDF viewer): search, capture snapshot Ctrl+Shift+D, zoom Ctrl+0, set/next/previous
+page | **Weblink** (not in Object: no Weblink viewer): search.
 
 ## 3. "Add new object type" gallery (the `+` next to "Object Types")
 
