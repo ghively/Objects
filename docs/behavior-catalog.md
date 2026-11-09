@@ -130,7 +130,7 @@ page up/down.
 **Navigation**: Navigate back Ctrl+Left or Ctrl+[ | Navigate forward Ctrl+Right or Ctrl+] | Open in new tab Ctrl+Click | Open in
 side panel (Shift+Click) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y.
 
-**Calendar**: Go to monthly view M | Go to weekly view W | Show three days from today R | Go to daily view D | Jump to today T | Back / forward one day, week or month
+**Calendar**: Go to monthly view M | Go to weekly view W | Show the day before and after R (decision C9) | Go to daily view D | Jump to today T | Back / forward one day, week or month
 Left/Right | Toggle calendar sidebar Ctrl+Alt+S.
 
 **AI Assistant**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; send a message to the daily

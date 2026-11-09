@@ -13,7 +13,7 @@ import { useCalendar, type StepKey } from './useCalendar'
 const VIEW_TABS: { view: CalendarView; label: string; tooltip: string }[] = [
   { view: 'month', label: 'Month', tooltip: 'Go to monthly view' },
   { view: 'week', label: 'Week', tooltip: 'Go to weekly view' },
-  { view: 'rolling', label: 'Three days', tooltip: 'Show three days from today' },
+  { view: 'rolling', label: 'Three days', tooltip: 'Show the day before and after' },
   { view: 'day', label: 'Day', tooltip: 'Go to daily view' },
 ]
 
