@@ -1,5 +1,5 @@
 // The sidebar's "Help & Resources" section, under Graph and Trash: Keyboard shortcuts (the
-// Shortcuts sheet), Getting started and Markdown reference (bundled texts shown read-only). The
+// Shortcuts sheet), Getting started, Markdown reference and How-to guides (bundled texts shown read-only). The
 // heading folds the section; the fold is kept per browser. Local only: no link leaves the app.
 import { Suspense, useState } from 'react'
 import { Icon } from '@/components/Icon'
@@ -57,6 +57,7 @@ export function HelpSection() {
           <HelpRow icon="ph-keyboard" label={HELP_TEXT.shortcuts} onClick={() => useSettingsModal.getState().openShortcuts()} />
           <HelpRow icon="ph-lightbulb" label={HELP_TEXT.gettingStarted} onClick={() => setDoc('gettingStarted')} />
           <HelpRow icon="ph-markdown-logo" label={HELP_TEXT.markdownReference} onClick={() => setDoc('markdownReference')} />
+          <HelpRow icon="ph-book-open-text" label={HELP_TEXT.guides} onClick={() => setDoc('guides')} />
         </ul>
       )}
       {doc && (

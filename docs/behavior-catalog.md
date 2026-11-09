@@ -36,7 +36,7 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 ## 1. Settings
 
 A two-pane modal: left nav with a "Search settings" field, right pane for the chosen page. Groups:
-Account, General, Space, Integrations. Footer of the nav: version, Diagnostics, Reload.
+Account, General, Space, Integrations. Footer of the nav: version, Reload (Object has no Diagnostics row).
 
 **Account** **(out of scope)**: account, password and authentication, active sessions, subscription and billing.
 Object has no accounts.
@@ -76,6 +76,10 @@ Object has no accounts.
   timeline view's Customize › Sub-items and dependencies; decision AC-1). Field lists per built-in
   type are in audit item 28.
 - Task management: "Hide Task Management" per space.
+- Automations (M14): in the rule editor, "Set a property" on a date needs a date or "Now" ticked; with neither it
+  shows "Pick a date or tick Now." under the value and Save refuses with the same message (it would write the
+  date empty, `completed: null`). A rule saved like that before keeps running unchanged; opening it shows the
+  message.
 
 **Integrations** **(later)**
 - Calendar Integrations; Task actions.
@@ -223,7 +227,11 @@ Each starter template pre-fills the new type's properties.
 - **Header**, top to bottom: type pill (icon + name; click to change type), a relation button, then any
   property surfaced in the header (a Status chip such as "In Progress"), a "Collections" chip; the title in
   large bold; the Description property as a paragraph under the title; a "Tags" row of colored tag chips with a
-  small list icon; a divider; the body.
+  small list icon; a divider; the body. A freshly created object (the New menu, a type's `+`, Ctrl+U and the
+  other create buttons) opens with its title focused and selected, in the peek and on the full page, so typing
+  names it; "Add description" puts the caret in the description it reveals. Renaming an object (its title, a
+  table's title cell, a whiteboard's name) rewrites the links to it in other objects and then says so with a short
+  notice, "Updated links in 3 objects" ("1 object"); nothing is shown when no other object linked to it.
 - **Property value editors**:
   - Date: a chip; click opens a picker: an input with an info icon, presets (Yesterday, Today, Tomorrow, In 1
     week, In 2 weeks), month and year dropdowns, a month grid with the chosen day as a pill, toggles
@@ -233,6 +241,9 @@ Each starter template pre-fills the new type's properties.
     colored chips each with a checkbox (multi-select). Two tag objects with the same title are different
     objects with their own colors.
   - Text, number, checkbox, label: not specified yet.
+- **Property name** (a property label's menu, and "Name" in Property settings): Enter or leaving the field commits
+  the new name; Escape goes back only to the last committed name, so Enter then Escape keeps the new one (Escape
+  in Property settings closes the dialog).
 - **Tags** are objects of the Tag type with a color; the chip uses that color.
 
 ## 6. Editor chrome and menus
@@ -251,6 +262,10 @@ Each starter template pre-fills the new type's properties.
 - **Slash menu**, **@ picker**, **markdown shortcuts**: see audit items 41-43 and section 2.
 - **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).
 - **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves.
+- **Edited lines are written in the editor's standard Markdown form**: the line of a block you edit is rewritten
+  that way (`_b_` becomes `*b*`, `[X]` becomes `[x]`, a setext heading becomes ATX `#`, a bare URL becomes
+  `[url](url)`, `\#` escapes appear); it renders the same, and only that line changes in the file — every untouched
+  line keeps its bytes (Gene's decision D5).
 
 ## 7. Graph, Trash, Explore, Help
 
@@ -264,7 +279,11 @@ Each starter template pre-fills the new type's properties.
 - **Explore** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
   (objects related to the page you are on) with "Find More". Toggled with Ctrl+Shift+Right; the tooltip reads
   "Hide sidepanel".
-- **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback.
+- **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback. Object's own
+  section is local only: Keyboard shortcuts, Getting started, Markdown reference and **How-to guides** (Gene's
+  decision D1). How-to guides opens a read-only list (People, Meetings, Projects, Books — one per basic-setup type —
+  and The Tasks dashboard); a guide shows read-only with "All guides" to go back. The guides ship with the app and
+  are never seeded into a space as objects (they would land in All notes and the counts).
 - **Theme toggle** in the sidebar footer switches dark and light immediately (it persists).
 
 ## 8. Search, New menu, view toolbar
@@ -276,6 +295,9 @@ Each starter template pre-fills the new type's properties.
   - Filter popover: "where" row builder with "Filter" and "Filter group" buttons. Sort popover: "+ Sort".
     Group by: a "Group by" button. Customize: "Card view" and "Calculations".
   - Tab strip: Overview | All | custom tabs (including Query-backed ones) | `+` to add a tab.
+- **Query builder search mode**: Auto | Title. Exact and Semantic are hidden until real full-text search exists
+  (Gene's decision Q-1: they matched exactly like Auto). A saved query that uses one still runs as Auto (the
+  server keeps accepting both) and shows Auto; the next edit of its search saves it as Auto.
   - Type page header: type icon + plural name; search icon; `...` (New collection, Pin to sidebar, Pin to…,
     Object type settings, Import CSV, Save as query, Delete object type; "New from template" is in the sidebar's
     type menu); a split "New" button.

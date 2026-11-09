@@ -9,7 +9,9 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { activeTab, currentTarget, usePeek, useTabs, type Target } from '@/nav/tabs'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { typeDef } from '@/test/mockApi'
-import { openModeFor, openObject } from './createAndOpen'
+import { api } from '@/api/client'
+import { createAndOpen, openModeFor, openObject } from './createAndOpen'
+import { resetFresh, takeFresh } from './freshObjects'
 
 const objT = (path: string): Target => ({ kind: 'object', path })
 const s = useTabs.getState
@@ -82,5 +84,15 @@ describe('opening modes (M7)', () => {
     expect(usePeek.getState().path).toBeNull()
     // Alt+Shift still opens the peek.
     expect(openModeFor({ altKey: true, shiftKey: true }, 'task')).toBe('peek')
+  })
+})
+
+describe('createAndOpen', () => {
+  test('marks the new object as fresh, so its header focuses the title (M2#3)', async () => {
+    resetFresh()
+    vi.mocked(api.createObject).mockResolvedValue({ path: 'Pages/Untitled.md', version: 'v1' } as never)
+    await createAndOpen('page')
+    expect(takeFresh('Pages/Untitled.md')).toBe(true)
+    expect(takeFresh('Pages/Untitled.md')).toBe(false)
   })
 })

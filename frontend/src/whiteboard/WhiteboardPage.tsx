@@ -25,6 +25,7 @@ import { useVersionHistory } from '@/history/useVersionHistory'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { DeleteObjectDialog, useDeleteRequest } from '@/object/DeleteObjectDialog'
 import { DeletedBanner } from '@/object/DeletedBanner'
+import { announceRelinked } from '@/object/relinkNotice'
 import { BoardHeader } from './BoardHeader'
 import type { BoardExporter, CanvasControls } from './WhiteboardCanvas'
 import { WhiteboardCanvas } from './WhiteboardCanvas'
@@ -287,6 +288,7 @@ export function WhiteboardPage({
       setNotes((n) => (n ? { ...n, version: res.version } : n))
       setTitle(next)
       if (res.path !== path) useTabs.getState().retarget(path, res.path)
+      announceRelinked(res)
       void invalidateLinkIndex()
     },
     [flushAll, path],

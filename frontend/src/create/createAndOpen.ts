@@ -10,6 +10,7 @@ import type { CreatedFile } from '@/api/types'
 import { invalidateLinkIndex, typeOf } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { useSettings } from '@/settings/useSettings'
+import { markFresh } from './freshObjects'
 
 export interface OpenMods {
   ctrlKey?: boolean
@@ -59,6 +60,8 @@ export async function createAndOpen(
   if (opts.templateId !== undefined) req.templateId = opts.templateId
   if (opts.values !== undefined && Object.keys(opts.values).length > 0) req.values = opts.values
   const res = await api.createObject(typeId, req)
+  // Its header focuses the title once it shows (M2#3).
+  markFresh(res.path)
   openObject(res.path, mods, typeId)
   void invalidateLinkIndex()
   return res

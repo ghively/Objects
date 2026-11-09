@@ -798,6 +798,13 @@ export function PropertySettings({
                   if (!n) setName(def.name)
                   else if (n !== def.name) save({ ...def, name: n })
                 }}
+                onKeyDown={(e) => {
+                  // Enter commits (through the blur), so a later Escape closes the dialog and keeps it.
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    e.currentTarget.blur()
+                  }
+                }}
                 className="mt-1 w-full rounded border border-line bg-transparent px-2 py-1 text-[14px] outline-none"
               />
             </label>

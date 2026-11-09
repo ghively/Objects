@@ -261,6 +261,23 @@ describe('serialized writes', () => {
     await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Projects/Plans.md' }))
   })
 
+  test('a rename that relinked other objects says so (M2#8)', async () => {
+    const user = userEvent.setup()
+    mocked.renameObject.mockImplementation(async (_p: string, title: string, base: string) => ({
+      path: `Projects/${title}.md`,
+      version: `${base}+r`,
+      relinked: ['Pages/A.md', 'Pages/B.md', 'Pages/C.md'],
+      skipped: [],
+    }))
+    useTabs.getState().open({ kind: 'object', path: PATH })
+    await openPage()
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    await user.clear(title)
+    await user.type(title, 'Plans{Enter}')
+    await waitFor(() => expect(screen.getByText('Updated links in 3 objects')).toBeInTheDocument())
+    document.querySelector('[data-editor-toasts]')?.remove()
+  })
+
   test('a rename that keeps the path updates the title, so renaming back is still sent', async () => {
     const user = userEvent.setup()
     // safe_filename cuts at the first illegal character: both titles stay at the same path.

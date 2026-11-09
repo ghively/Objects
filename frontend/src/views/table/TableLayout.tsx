@@ -9,6 +9,7 @@ import type { PropertyDef, Row, TableColumn, TableViewConfig, TypeDef } from '@/
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cellValue } from '@/object/PropertyPanel'
+import { announceRelinked } from '@/object/relinkNotice'
 import { plainText, textStats, TEXT_STATS_TEXT } from '@/object/textStats'
 import { useTypeEditor } from '@/object/useTypeEditor'
 import { useTabs } from '@/nav/tabs'
@@ -507,7 +508,10 @@ export function TableLayout(props: TableLayoutProps) {
 
   const rename = useCallback(
     (row: Row, title: string) => {
-      void writes.run(row, (version) => api.renameObject(row.summary.path, title, version)).catch((err: unknown) => fail(row, err))
+      void writes
+        .run(row, (version) => api.renameObject(row.summary.path, title, version))
+        .then(announceRelinked)
+        .catch((err: unknown) => fail(row, err))
     },
     [writes, fail],
   )
