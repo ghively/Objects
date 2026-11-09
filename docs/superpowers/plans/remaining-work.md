@@ -87,7 +87,11 @@ The history below is in the order it was written: the per-milestone sections new
   `ocrLanguages` setting (Settings > Import Content); `--browser` prints the one-time link only when no browser
   opened or with `--print-link`; agents warn about a folder a backslash keeps unfenced (A-2); `GET /v1/types` and
   `GET /v1/queries` list definitions on the token API; chart Export SVG writes the chart's own SVG. Catalog updated
-  in each section. Not done: the Anytype reader (waits for a real export).
+  in each section. Not done: the Anytype reader (waits for a real export). Review found two regressions, both
+  fixed before the gate (a newly qualifying row never appeared on the dashboard; renames and relation sync reset
+  other items' S3 counts). **Gate (Linux):** back end 3437 passed, 19 skipped (two budget tests, a 0.35 s compute
+  and a 20 s import wait, failed only with the front-end suite running beside them and pass alone); front end 4095
+  passed, 1 skipped (one 100 ms budget test likewise); `tsc`, lint and build clean; headless launch smoke run clean.
 
 ### Needs Gene
 
