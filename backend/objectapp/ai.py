@@ -74,6 +74,13 @@ __all__ = [
 
 MODES = ("chat", "askBlock", "tagBlock", "tagObject", "autofill", "rephrase")
 TURN_TIMEOUT = 300.0
+CHAT_BUSY = "This chat is still answering."  # our string
+RUNNING_CHATS: set[tuple[str, str]] = set()
+"""The ``(agent id, chat id)`` of every chat turn this process is running, local (`api_ai`) and
+remote (`remotechat`, decision S8). A second turn on a running chat (the same chat open in two
+tabs or windows) would append its user line and its answer between the first's, and resume the
+same CLI session (or A2A context) twice; it gets one ``error`` frame (`CHAT_BUSY`) before anything
+is written, started or sent."""
 """Seconds a turn may run before the CLI is stopped."""
 STATUS_TIMEOUT = 10.0
 MAX_CONTEXT_CHARS = 60_000

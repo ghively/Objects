@@ -409,12 +409,18 @@ def respond(ctx: ApiContext, registry: AgentRegistry, record: AgentRecord, req: 
         ctx.announce(ChangeEvent("agentChats", record.id, chat_id, origin=None))
 
     async def stream():
-        pack = await asyncio.to_thread(ai.gather_context, space, list(req.contextPaths))
-        deadline = asyncio.get_running_loop().time() + ai.TURN_TIMEOUT
-        turn = stream_turn(record, chat_id=chat_id, prompt=req.prompt, pack=pack, space_name=space.name,
-                           space_key=space_key_of(space.root), deadline=deadline)
+        key = (record.id, chat_id)
+        if key in ai.RUNNING_CHATS:  # decision S8: the local chats' in-flight guard
+            yield frame({"type": "error", "message": ai.CHAT_BUSY})
+            return
+        ai.RUNNING_CHATS.add(key)  # nothing awaits between the check above and here
+        turn = None
         ended = False
         try:
+            pack = await asyncio.to_thread(ai.gather_context, space, list(req.contextPaths))
+            deadline = asyncio.get_running_loop().time() + ai.TURN_TIMEOUT
+            turn = stream_turn(record, chat_id=chat_id, prompt=req.prompt, pack=pack, space_name=space.name,
+                               space_key=space_key_of(space.root), deadline=deadline)
             async for event in turn:
                 kind = event.get("type")
                 if kind == "chat":
@@ -424,10 +430,12 @@ def respond(ctx: ApiContext, registry: AgentRegistry, record: AgentRecord, req: 
                     written()
                 yield frame(event)
         finally:
-            with anyio.CancelScope(shield=True):
-                await turn.aclose()
-            if not ended:
-                written()  # the stopped line
+            ai.RUNNING_CHATS.discard(key)
+            if turn is not None:
+                with anyio.CancelScope(shield=True):
+                    await turn.aclose()
+                if not ended:
+                    written()  # the stopped line
 
     return EventSourceResponse(stream(), ping=15, sep="\n")
 

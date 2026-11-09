@@ -344,6 +344,12 @@ Each starter template pre-fills the new type's properties.
   ("The run didn't finish within 30 minutes.", "The agent finished without marking the step done.", "Object closed
   during this run.") or asks Gene one question (a Question step is inserted before the step).
 
+## 10d. Agent and API guards (Object's own; decisions memo 2026-11-08)
+
+- **One turn per chat** (S8): a second message on a chat that is still answering (the same chat open in two tabs
+  or windows) gets one error, "This chat is still answering.", before anything is written, run or sent. Local
+  agents and remote (A2A) agents share the guard.
+
 ## 10c. Import and migration (M15 and M25-M27)
 
 The catalog has no import dialog (only the Import menu entries in sections 4 and 9), so everything here is Object's
