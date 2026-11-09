@@ -24,7 +24,7 @@ import { QueuesView } from './QueuesView'
 import { StuckView } from './StuckView'
 import { TicketsView } from './TicketsView'
 import { TodayWithTasks } from './TodayWithTasks'
-import { sectionCount } from '@/tasks/TasksPage'
+import { todayTaskCount } from '@/tasks/TasksPage'
 import { WinsView } from './WinsView'
 
 export interface WorkViewProps {
@@ -89,8 +89,9 @@ export const WORK_VIEWS: WorkViewDef[] = [
     label: WORK_TEXT.viewToday,
     icon: WORK_ICONS.today,
     key: 't',
-    // Phase 2: one Today — the day timeline and today's task list; the badge counts today's tasks.
-    count: (_d, now) => sectionCount('today', now),
+    // Phase 2: one Today — the day timeline and today's task list. Decision T1: the list is the
+    // Calendar Day view's, and the badge counts its open tasks (its "N open").
+    count: (_d, now) => todayTaskCount(now),
     Component: TodayWithTasks,
   },
   {

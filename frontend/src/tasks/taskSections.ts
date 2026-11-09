@@ -5,11 +5,13 @@
 // `preset` is only the starting view (layout, sorts, grouping) that the user can change and that
 // is saved per section in `ui.tasks.views`. Icons are ours.
 import type { DateValue, Row, TaskSectionKey, TypeDef, ViewState } from '@/api/types'
-import { zonedDayDate } from '@/lib/zonedShell'
+import { addDays } from '@/calendar/dates'
+import { zonedParts } from '@/lib/zonedTime'
+import { daySpan } from '@/views/dates'
 import { emptyFilterGroup } from '@/views/model'
 import { isOpen, statusText } from './statusCategory'
 import { parseRemind } from './remind'
-import { localDayOf, parseRepeat } from './repeat'
+import { parseRepeat } from './repeat'
 
 export interface TaskSection {
   title: string
@@ -50,10 +52,41 @@ const asDate = (v: unknown): DateValue | null =>
   v && typeof v === 'object' && typeof (v as DateValue).start === 'string' && (v as DateValue).start ? (v as DateValue) : null
 
 
-/** The local day the row's `date` starts on, or null. */
-function dateDay(row: Row): Date | null {
-  const d = asDate(row.values.date)
-  return d ? localDayOf(d.start) : null
+/**
+ * The first and last local day (`YYYY-MM-DD`, in the Time zone setting) a date value covers, by the
+ * Calendar's rule (`calendarquery.py` `span`): a timed end at exactly 00:00 leaves that day out, and
+ * an end before the start counts as no end.
+ */
+export function coveredDays(v: DateValue): { first: string; last: string } | null {
+  const span = daySpan(v)
+  if (!span) return null
+  let last = span.end && span.end > span.start ? span.end : span.start
+  if (span.resolution === 'time' && v.end && span.end) {
+    const start = Date.parse(v.start)
+    const end = Date.parse(v.end)
+    if (!(end >= start)) last = span.start
+    else if (end > start) {
+      const p = zonedParts(end)
+      if (p.hour === 0 && p.minute === 0 && p.second === 0 && end % 1000 === 0) last = addDays(span.end, -1)
+    }
+    if (last < span.start) last = span.start
+  }
+  return { first: span.start, last }
+}
+
+/**
+ * Decision T1: a task is on today's list when the Calendar Day view lists it on today: its `date`
+ * covers today, its `deadline` is today (done or not), or it is open and its `date` ended before
+ * today (Overdue). Recurring occurrences are only ever future days, so never today.
+ */
+export function isTodayTask(row: Row, type: TypeDef | undefined, now: Date): boolean {
+  const today = zonedParts(now).date
+  const date = asDate(row.values.date)
+  const span = date ? coveredDays(date) : null
+  if (span && span.first <= today && today <= span.last) return true
+  if (span && span.last < today && isOpen(row, type)) return true
+  const deadline = asDate(row.values.deadline)
+  return !!deadline && coveredDays(deadline)?.first === today
 }
 
 const hasRepeat = (row: Row) => !!asDate(row.values.date) && parseRepeat(row.values.repeat) !== null
@@ -86,10 +119,8 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
     description: 'Tasks that matter today',
     icon: 'ph-sun',
     preset: () => view('list', { sorts: [{ propertyId: 'date', option: 'ascending' }] }),
-    match: (row, type, now) => {
-      const d = dateDay(row)
-      return isOpen(row, type) && !!d && d.getTime() <= zonedDayDate(now).getTime()
-    },
+    // Decision T1: the Calendar Day view's list for today (done tasks stay, struck).
+    match: isTodayTask,
   },
   inbox: {
     title: 'Inbox',
@@ -168,4 +199,9 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
 export function sectionRows(key: TaskSectionKey, rows: Row[], type: TypeDef | undefined, now: Date): Row[] {
   const s = TASK_SECTIONS[key]
   return rows.filter((r) => s.match(r, type, now))
+}
+
+/** Today's open tasks: the Today badge, the "N open" of the list's "N open, M done" (decision T1). */
+export function todayOpenCount(rows: Row[], type: TypeDef | undefined, now: Date): number {
+  return rows.filter((r) => isTodayTask(r, type, now) && isOpen(r, type)).length
 }

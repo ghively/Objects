@@ -8,6 +8,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { taskRow } from '@/tasks/taskFixtures'
+import { currentTarget, useTabs } from '@/nav/tabs'
 import { taskEntry } from '@/test/mockApi'
 import { mocked, pageRow, resetDayMocks, setDay, setRows, TODAY } from './dayFixtures'
 import { DayView } from './DayView'
@@ -118,5 +119,16 @@ describe('DayView', () => {
     expect(mocked.createDailyNote).not.toHaveBeenCalled()
     expect(mocked.rows).not.toHaveBeenCalled()
     expect(screen.getByTestId('day-view').className).toContain('max-w-[50rem]')
+  })
+
+  test('T1: on today the header links to the Tasks dashboard’s Today; other days have no link', async () => {
+    const user = userEvent.setup()
+    useTabs.getState().open({ kind: 'calendar' })
+    const { rerender } = render(<DayView day={TODAY} />)
+    const header = screen.getByTestId('day-header')
+    await user.click(within(header).getByRole('button', { name: 'Tasks dashboard' }))
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'work', view: 'today' })
+    rerender(<DayView day="2026-10-24" />)
+    expect(within(screen.getByTestId('day-header')).queryByRole('button', { name: 'Tasks dashboard' })).toBeNull()
   })
 })

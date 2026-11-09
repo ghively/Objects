@@ -188,8 +188,11 @@ Each starter template pre-fills the new type's properties.
   **Review** (Stuck, Wins, Alerts, Tickets, Everything, Completed); a folded view that is open stays on the
   row. The task sections are list views of the dashboard, each with the quick add on top (a new task gets
   the values the section's filter implies). **Today** is one view: the day timeline (meetings, focus lines,
-  the now-line, deadline countdowns) with **Today's tasks** (overdue and due today, not done) under it; its
-  badge counts today's tasks, Inbox's counts the inbox. While the space hides task management ("Hide Task
+  the now-line, deadline countdowns) with **Today's tasks** under it — the Calendar Day view's Tasks section for
+  today (decision T1, one list in both places): tasks whose date covers today, whose deadline is today, and the
+  open overdue ones under "Overdue (n)"; done ones stay, struck; "N open, M done" and the `+` menu (Create task,
+  Move all open tasks to); "Open in Calendar" under it opens the Calendar's Day view on today. Today's badge
+  counts that list's open tasks, Inbox's counts the inbox. While the space hides task management ("Hide Task
   Management"), the Tasks entry stays — the dashboard is the work dashboard too — and the dashboard leaves
   out the task lists (the list views and Today's tasks) instead; the work views and the timeline stay. On
   Today's timeline a block too short for its label and time (the 24-minute Morning brief) shows the two on
@@ -310,6 +313,8 @@ Each starter template pre-fills the new type's properties.
 - **Week view**: a single column of days. Each day: the weekday name colored by weekday (Sunday red, Monday amber
   with a red "Today" pill, Tuesday pink, Wednesday green, Thursday orange, Friday blue), the date as a large
   title, "Week 45", then the note or a "+ Daily Note" button. No month sidebar.
+- **Day view** on today: the header's right side has a "Tasks dashboard" link to Tasks › Today, which lists the
+  same tasks as the Day view's Tasks section (decision T1); other days have no link.
 - **Backlinks** (bottom of an object, a "Backlinks" pill with a count and a collapse toggle): each backlink is an
   embedded reference, not a link list. A task shows as a task row (circle checkbox, title, status chip with a
   dropdown, date icon, priority pill) plus the line that links here ("Parent project: <object chip>"); other

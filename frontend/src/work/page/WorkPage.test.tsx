@@ -134,9 +134,11 @@ describe('WorkPage', () => {
     await show('today')
     const body = document.querySelector('[data-work-view-body="today"]') as HTMLElement
     expect(body.querySelector('[data-work-view="today"]')).not.toBeNull() // the timeline
+    // Decision T1: the Calendar Day view's Tasks section for today, with its + menu, not the old list.
     const tasks = within(body).getByRole('region', { name: 'Today\u2019s tasks' })
-    expect(tasks.querySelector('[data-task-section="today"]')).not.toBeNull()
-    expect(within(tasks).getByRole('textbox', { name: 'Task title' })).toBeInTheDocument()
+    expect(tasks.getAttribute('data-testid')).toBe('section-tasks')
+    expect(within(tasks).queryByRole('textbox', { name: 'Task title' })).toBeNull()
+    expect(within(body).getByRole('button', { name: 'Open in Calendar' })).toBeInTheDocument()
   })
 
   // The space's Hide Task Management hides the task lists (the old Tasks page), not the dashboard:
