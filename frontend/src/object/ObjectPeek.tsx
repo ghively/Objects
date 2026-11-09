@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { api } from '@/api/client'
+import { useState } from 'react'
+import type { ObjectDetail } from '@/api/types'
 import { ReviewedButton } from '@/calendar/DayHeader'
 import { useCalendar } from '@/calendar/useCalendar'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -28,30 +28,24 @@ function dailyNoteDay(frontmatter: Record<string, unknown>, title: string, path:
   return null
 }
 
+/** What the daily note's header shows, read from the view's detail (`dailyNoteOf`). */
+interface DailyNote {
+  path: string
+  reviewed: boolean
+  day: string | null
+}
+
+function dailyNoteOf(d: ObjectDetail): DailyNote {
+  return { path: d.summary.path, reviewed: d.frontmatter.reviewed === true, day: dailyNoteDay(d.frontmatter, d.summary.title, d.summary.path) }
+}
+
 /**
  * A daily note's peek header controls: the Reviewed checkbox (the calendar's own) and "Calendar",
- * which opens the calendar's Day view on that day. `version` is the one the peek's view holds, so
- * the Reviewed write never races a body save; the note's `reviewed` and day are read once per version.
+ * which opens the calendar's Day view on that day. `note` and `version` are the peek's view's own
+ * (its detail and the version it holds), so the header reads nothing itself and the Reviewed
+ * write never races a body save; after the write the view's change handling updates `note`.
  */
-function DailyNoteControls({ path, version, onDismiss }: { path: string; version: string | undefined; onDismiss(): void }) {
-  const [note, setNote] = useState<{ path: string; reviewed: boolean; day: string | null } | null>(null)
-  // Bumped after a Reviewed write: a 409 (the note changed meanwhile) re-reads `reviewed` as it is.
-  const [reloads, setReloads] = useState(0)
-  useEffect(() => {
-    let live = true
-    api
-      .object(path)
-      .then((d) => {
-        if (!live) return
-        setNote({ path, reviewed: d.frontmatter.reviewed === true, day: dailyNoteDay(d.frontmatter, d.summary.title, path) })
-      })
-      .catch(() => {
-        /* the view shows the load's error */
-      })
-    return () => {
-      live = false
-    }
-  }, [path, version, reloads])
+function DailyNoteControls({ path, note, version, onDismiss }: { path: string; note: DailyNote | null; version: string | undefined; onDismiss(): void }) {
   if (!note || note.path !== path) return null
   const openCalendar = () => {
     if (note.day) {
@@ -64,7 +58,7 @@ function DailyNoteControls({ path, version, onDismiss }: { path: string; version
   }
   return (
     <div className="absolute top-3.5 left-1/2 z-10 flex h-10 -translate-x-1/2 items-center gap-0.5 rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] px-1">
-      <ReviewedButton note={note} version={version} onWritten={() => setReloads((n) => n + 1)} />
+      <ReviewedButton note={note} version={version} />
       <button
         type="button"
         onClick={openCalendar}
@@ -114,8 +108,9 @@ export function ObjectPeek() {
   const summary = path ? summaryOf(path) : undefined
   const title = path ? (summary?.title ?? stemOf(path)) : ''
   const dailyNote = !!summary && isDailyNoteType(typeOf(summary.type), summary.type)
-  // The version the peek's view adopts (load, saves, reloads); reset with the path.
+  // The version the peek's view adopts (load, saves, reloads) and its detail; reset with the path.
   const [version, setVersion] = useState<{ path: string; version: string } | null>(null)
+  const [note, setNote] = useState<DailyNote | null>(null)
 
   return (
     <Dialog open={path !== null} onOpenChange={(open) => !open && close()}>
@@ -144,6 +139,7 @@ export function ObjectPeek() {
               path={path}
               mode="peek"
               onVersion={(v) => setVersion({ path, version: v })}
+              onDetail={(d) => setNote(dailyNoteOf(d))}
               onExpand={() => {
                 useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
                 close()
@@ -153,7 +149,12 @@ export function ObjectPeek() {
             />
           ))}
         {path && dailyNote && !whiteboard && (
-          <DailyNoteControls path={path} version={version?.path === path ? version.version : undefined} onDismiss={close} />
+          <DailyNoteControls
+            path={path}
+            note={note?.path === path ? note : null}
+            version={version?.path === path ? version.version : undefined}
+            onDismiss={close}
+          />
         )}
       </DialogContent>
     </Dialog>

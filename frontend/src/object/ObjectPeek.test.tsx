@@ -184,6 +184,8 @@ describe('ObjectPeek', () => {
     const reviewed = await within(dialog).findByRole('checkbox', { name: 'Reviewed' })
     expect(reviewed).toHaveAttribute('aria-checked', 'false')
     await waitFor(() => expect(reviewed).toBeEnabled())
+    // The header reads `reviewed` and the day from the view's own load: no read of its own.
+    expect(mocked.object).toHaveBeenCalledTimes(1)
     fireEvent.click(reviewed)
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith(DAILY_PATH, { reviewed: true }, 'v-daily'))
     expect(reviewed).toHaveAttribute('aria-checked', 'true')
@@ -214,9 +216,12 @@ describe('ObjectPeek', () => {
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith(DAILY_PATH, { reviewed: true }, 'v-daily'))
     const reads = mocked.object.mock.calls.length
     act(() => {
-      for (const l of listeners) l({ path: DAILY_PATH, kind: 'modified', version: 'v-daily+1' })
+      for (const l of listeners) l({ path: DAILY_PATH, kind: 'changed', version: 'v-daily+1' })
     })
     await waitFor(() => expect(mocked.object.mock.calls.length).toBeGreaterThan(reads))
+    // One read: the view's re-check of the disk. The header follows the view's detail.
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mocked.object).toHaveBeenCalledTimes(reads + 1)
     // Let the view settle, then the document is the very instance from before.
     await new Promise((r) => setTimeout(r, 50))
     expect(editor.state.doc).toBe(docBefore)
