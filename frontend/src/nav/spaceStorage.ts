@@ -9,7 +9,9 @@ import type { StoreApi } from 'zustand'
 
 /** The persist API zustand's `persist` middleware adds to a store (only what this module uses). */
 interface PersistApi {
-  persist: {
+  /** Missing when zustand found no usable storage (pywebview's Linux private mode turns
+   *  localStorage off); the store then works in memory only and these helpers do nothing. */
+  persist?: {
     getOptions(): { name?: string }
     setOptions(o: { name: string }): void
     rehydrate(): Promise<void> | void
@@ -55,8 +57,10 @@ export async function switchStoreSpace<S>(
   root: string | null,
   empty: Partial<S>,
 ): Promise<void> {
+  const persist = store.persist
+  if (!persist) return
   const name = spaceKey(base, root)
-  const current = store.persist.getOptions().name
+  const current = persist.getOptions().name
   if (root) {
     const legacy = read(base)
     if (legacy !== null) {
@@ -64,12 +68,12 @@ export async function switchStoreSpace<S>(
       remove(base)
     }
   }
-  if (current !== name) store.persist.setOptions({ name })
+  if (current !== name) persist.setOptions({ name })
   if (read(name) === null) {
     if (current !== name) store.setState(empty)
     return
   }
-  await store.persist.rehydrate()
+  await persist.rehydrate()
 }
 
 /** The `state` zustand's `persist` wrapped in a stored value, or null when it isn't one. */
@@ -103,9 +107,10 @@ export function followStorage<S>(
   store: StoreApi<S> & PersistApi,
   merge: (incoming: unknown, previous: unknown, current: S) => Partial<S> | null,
 ): () => void {
-  if (typeof window === 'undefined') return () => undefined
+  const persist = store.persist
+  if (typeof window === 'undefined' || !persist) return () => undefined
   const onStorage = (e: StorageEvent) => {
-    if (e.key !== store.persist.getOptions().name) return
+    if (e.key !== persist.getOptions().name) return
     const incoming = persistedState(e.newValue)
     if (incoming === null) return
     const state = store.getState()

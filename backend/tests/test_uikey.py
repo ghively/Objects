@@ -165,7 +165,7 @@ def test_the_launcher_opens_each_window_at_its_own_one_time_link(tmp_path: Path,
     def create_window(title, url, **_kw):
         opened.append(url)
 
-    def start():
+    def start(**_kw):
         windowhost.open_window(f"http://127.0.0.1:{port}/?mini=work")
         for url in opened:
             req = urllib.request.Request(url)
@@ -183,3 +183,14 @@ def test_the_launcher_opens_each_window_at_its_own_one_time_link(tmp_path: Path,
     assert opened[0] != opened[1]
     assert [code for code, _c in answers] == [303, 303]
     assert all(c and c.startswith(f"object-ui-{port}=") and "HttpOnly" in c for _code, c in answers)
+
+
+def test_linux_window_keeps_web_storage_in_the_state_dir(tmp_path: Path, monkeypatch) -> None:
+    """pywebview's GTK backend turns localStorage off in private mode, which left the UI's
+    persisted stores without storage (main pane: "e.persist.getOptions" is undefined); Linux
+    runs non-private with its web data under the state dir; other platforms keep the default."""
+    monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path / "state"))
+    opts = launcher._webview_start_options("linux")
+    assert opts == {"private_mode": False, "storage_path": str(tmp_path / "state" / "webview")}
+    assert launcher._webview_start_options("win32") == {}
+    assert launcher._webview_start_options("darwin") == {}

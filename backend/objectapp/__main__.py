@@ -193,6 +193,21 @@ def _reopen_on_enter(key: LaunchKey, url: str) -> None:
         _open_in_browser(key, url)
 
 
+def _webview_start_options(platform: str) -> dict:
+    """``webview.start`` options for this platform.
+
+    On Linux pywebview's GTK backend in private mode (its default) turns localStorage off
+    (``enable_html5_local_storage = False``), and the UI's persisted stores (tabs, recents,
+    per-space view state) then have no storage, which crashed the main pane. So Linux runs
+    non-private with its web data in the state dir (``<state>/webview``). The launch key is a
+    session cookie and changes every launch, so a kept cookie never opens a later run.
+    Windows (Edge WebView2) keeps localStorage in private mode and stays as it was.
+    """
+    if platform.startswith("linux"):
+        return {"private_mode": False, "storage_path": str(state_dir() / "webview")}
+    return {}
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="objectapp", description=__doc__)
     parser.add_argument("--space", type=Path, help="space folder to open")
@@ -236,7 +251,7 @@ def main(argv: list[str] | None = None) -> None:
                     "Object focus", host.ui_key.open_url(u), width=360, height=470, on_top=True
                 )
             )
-            webview.start()
+            webview.start(**_webview_start_options(sys.platform))
     except KeyboardInterrupt:
         pass
     finally:
