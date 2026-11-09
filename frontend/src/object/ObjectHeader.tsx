@@ -4,7 +4,7 @@
  * and "Add aliases" for whichever is empty. Every edit writes through `onPropertiesChange` (the
  * view's serialized `updateProperties`); the title commits through `onRename`.
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { Icon as IconValue, ObjectSummary, PropertyDef, TypeDef } from '@/api/types'
 import { ColorPicker } from '@/components/ColorPicker'
@@ -70,11 +70,12 @@ export interface ObjectHeaderProps {
   onOpenTag?(name: string): void
 }
 
-function HoverAction({ label, icon, onClick }: { label: string; icon: string; onClick?: () => void }) {
+/** A hover action. Used as a popover trigger (`asChild`), so it passes the trigger's ref and props on. */
+function HoverAction({ label, icon, ...props }: { label: string; icon: string } & ComponentProps<'button'>) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      {...props}
       className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[14px] text-fg-muted hover:bg-hover hover:text-fg"
     >
       <Icon name={icon} size={14} />

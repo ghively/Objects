@@ -140,6 +140,20 @@ describe('ObjectHeader', () => {
     expect(screen.getByRole('button', { name: 'Add aliases' })).toBeInTheDocument()
   })
 
+  test('the Add icon and Add cover image triggers reach their button, so the popover can anchor to it', async () => {
+    // Acceptance M2 #7: the popover's trigger passes its ref and props through `asChild`; a trigger that drops
+    // them leaves the popover unpositioned (off screen at translate(0, -200%)) in a real browser.
+    const user = userEvent.setup()
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={vi.fn()} onPropertiesChange={vi.fn()} />)
+    for (const name of ['Add icon', 'Add cover image']) {
+      const button = screen.getByRole('button', { name })
+      expect(button).toHaveAttribute('aria-haspopup', 'dialog')
+      await user.click(button)
+      expect(button).toHaveAttribute('aria-expanded', 'true')
+      await user.keyboard('{Escape}')
+    }
+  })
+
   test('an existing icon opens the picker, and "Remove" clears it', async () => {
     const user = userEvent.setup()
     const onPropertiesChange = vi.fn()
