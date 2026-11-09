@@ -156,7 +156,7 @@ Grouped by reason. PARTIAL boxes appear where their remaining half belongs.
   (lane B found the reader's gaps against Anytype's exporter source).
 - **Live model wording and choices** (DEFERRED): M18.13, M21-5, M24-6, and the wording half of M18.2. The rest of
   the real-CLI behaviour is covered by lane A's live run.
-- **OS file manager:** M17.5 ("Open folder"), M20.5 ("Show in folder"); the Source line's "Show file" was not clicked either.
+- **OS file manager:** M17.5 ("Open folder"), M20.5 ("Show in folder"), M25-2 (the Source line's "Show file").
 - **Interactions a headless harness can't drive:** M6#18 (two windows), M6#24 (connector handles), M6#51 (palette
   drag onto a board, NOT-RUN), M7#7 and M7#29 (file drop), M7#20 (block drag), M7#21 (Shift+click extend), M9#12
   (bulk actions), and the pointer half of M9#15 (sidebar sections; the keyboard reorder passes).
