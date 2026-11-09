@@ -199,6 +199,7 @@ from . import (
     api_tasks,
     api_v1,
     api_v1_tools,
+    api_vcs,
     delegation,
     api_v1_captures,
     api_v1_desksync,
@@ -252,6 +253,7 @@ from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
 from .reviews import ReviewRunner
 from .runfence import RunFenceMiddleware
+from .vcsservice import VcsService
 from .searchindex import SearchIndex
 from .settings import SettingsProblem, time_zone
 from .settings import patch as patch_settings
@@ -951,6 +953,7 @@ def create_app(
     async def lifespan(_app: FastAPI):
         hub.loop = asyncio.get_running_loop()
         hub.closed = False
+        vcs_service.start()
         scheduler.start()
         search.start()
         automations.start()
@@ -965,6 +968,7 @@ def create_app(
                 await asyncio.to_thread(work_loop.stop)
                 await asyncio.to_thread(automations.stop)
                 await asyncio.to_thread(alert_watch.stop)
+                await asyncio.to_thread(vcs_service.stop)  # the closing commit
                 hub.close()
                 await asyncio.to_thread(search.stop)
                 await asyncio.to_thread(scheduler.stop)
@@ -984,6 +988,7 @@ def create_app(
             await asyncio.to_thread(work_loop.stop)
             await asyncio.to_thread(automations.stop)
             await asyncio.to_thread(alert_watch.stop)
+            await asyncio.to_thread(vcs_service.stop)  # the closing commit
             hub.close()
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -991,6 +996,17 @@ def create_app(
             await asyncio.to_thread(watcher.stop)
             await asyncio.to_thread(search.stop)
             await asyncio.to_thread(scheduler.stop)
+
+    # 2026-11-08: version control. Off until the user turns it on for a space; the worker commits
+    # after a quiet spell (app writes reset the wait through the space listener).
+    def registered_spaces() -> list[Path]:
+        try:
+            return [Path(e.path) for e in Registry(state_dir()).list(current=space.root) if not e.missing]
+        except (OSError, ValueError):
+            return []
+
+    vcs_service = VcsService(space, registered_spaces=registered_spaces)
+    space.add_listener(lambda _change: vcs_service.touch())
 
     app = FastAPI(
         title="Object", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
@@ -1008,6 +1024,7 @@ def create_app(
     app.add_middleware(RunFenceMiddleware, run_pids=running_run_pids)
     app.add_middleware(LocalOnlyMiddleware)  # added last: the outermost, so it checks first
     app.state.space = space
+    app.state.vcs = vcs_service
     app.state.hub = hub
     app.state.reminders = scheduler
     app.state.search = search
@@ -2298,6 +2315,10 @@ def create_app(
     api.include_router(api_agents.router(ctx))
     # M10: the AI assistant (status, a chat turn over SSE, saved AI chats).
     api.include_router(api_ai.router(ctx, reviews=reviews, curator=curator))
+    # 2026-11-08: version control and backup (`vcsservice`); fenced from agent runs like every
+    # /api route, and not an MCP tool.
+    vcs_service.on_restored = lambda target, changed: api_vcs.reload_after_restore(ctx, target, changed)
+    api.include_router(api_vcs.router(ctx, vcs_service))
     app.include_router(api)
     # M6: the whiteboard routes carry their own /api prefix.
     app.include_router(whiteboard_router(space, announce_whiteboard))
