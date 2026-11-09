@@ -366,7 +366,8 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   original kept in `Attachments/Originals/` (over 100 MB: not copied, listed in the report). A file that cannot be
   read becomes an "Original only" page. Sheets over 200 rows or 20 columns are not shown ("see the original").
   An image (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`) is an **Image object** in the Image type's folder
-  (`Images/`): MIME type, file size, width, height and source (the kept original) as its system fields, the image
+  (`Images/`; the basic media type Image, made when the space has none): MIME type, file size, width, height and
+  source (the kept original) as its read-only system fields, the image
   in its body (the design's call, approved by Gene as AC-2 on 2026-11-08; not a Page holding the image). Only images
   the Page row would take: a mapping that puts them in a folder or key type, or the Page row into another type, wins.
   The report's Originals section says "1 image became an Image object."; File objects mode makes no second object for

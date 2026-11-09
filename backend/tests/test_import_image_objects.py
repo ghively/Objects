@@ -95,6 +95,13 @@ def test_imported_image_is_an_image_object(client, tmp_path):
     assert (root / fm["source"]).read_bytes() == data
     assert fm["importSource"]["id"] == "photo.png" and fm["importSource"]["original"] == fm["source"]
     assert "![](Attachments/Originals/photo.png)" in body
+    # The basic media type Image: its media fields are system fields, not loose frontmatter.
+    t = next(t for t in client.get("/api/space").json()["types"] if t["id"] == "image")
+    assert t["basic"] is True and t["folder"] == "Images"
+    props = {p["key"]: p for p in t["propertyDefinitions"]}
+    for key, kind in (("mimeType", "text"), ("fileSize", "number"), ("width", "number"), ("height", "number"), ("source", "text")):
+        assert props[key]["type"] == kind and props[key]["id"] == key, props.get(key)
+    assert "content" not in props
     report = (root / res["reportPath"]).read_text(encoding="utf-8")
     assert "Original only" not in report
     assert "- 1 image became an Image object." in report
@@ -164,3 +171,17 @@ def test_image_in_a_mapped_type_follows_the_mapping(client, tmp_path):
     assert wait_job(client, r.json()["jobId"], timeout=60)["phase"] == "done"
     objs = objects_from(client, "Shots/photo.png")
     assert len(objs) == 1 and objs[0]["type"] != "image", objs
+
+
+def test_create_media_type_is_the_basic_media_type(space_dir):
+    from objectapp.propvalues import InvalidValue
+
+    space = Space(space_dir)
+    t = space.create_media_type("Image")
+    assert t.basic and t.id == "image" and t.prop("width").type == "number" and t.prop("category") is not None
+    reopened = Space(space_dir).type_by_id("image")
+    assert reopened is not None and reopened.basic and reopened.prop("mimeType").id == "mimeType"
+    with pytest.raises(InvalidValue):
+        space.create_media_type("Image")
+    with pytest.raises(InvalidValue):
+        space.create_media_type("Gadget")

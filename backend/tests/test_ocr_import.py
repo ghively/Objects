@@ -120,7 +120,8 @@ def _text_pdf(text: str) -> bytes:
         b"<</Length %d>>\nstream\n" % len(stream) + stream + b"\nendstream",
         b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
     ]
-    out = io.BytesIO(b"%PDF-1.4\n")
+    out = io.BytesIO()
+    out.write(b"%PDF-1.4\n")  # BytesIO(initial) would start writing at 0, over the header
     offs = []
     for i, o in enumerate(objs, 1):
         offs.append(out.tell())

@@ -452,10 +452,15 @@ def _place_unique(space: Space, rel: str, title: str, data: bytes) -> str | None
 
 
 def _media_type(space: Space, state: WriteState, type_name: str) -> Any:
-    """The space's media type ``type_name`` (Image, PDF, ...), made when it has none."""
+    """The space's media type ``type_name`` (Image, PDF, ...), made when it has none. Image is
+    made as the basic media type (AC-2: its media fields are system fields); the others as
+    before (a custom type of that name)."""
     t = space.type_by_id(space._type_id(type_name))
     if t is None:
-        t = space.create_type(type_name, _MEDIA_PLURALS[type_name])
+        if type_name == "Image":
+            t = space.create_media_type(type_name)
+        else:
+            t = space.create_type(type_name, _MEDIA_PLURALS[type_name])
         state.types += 1
     return t
 
