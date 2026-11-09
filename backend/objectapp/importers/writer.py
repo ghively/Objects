@@ -235,6 +235,7 @@ def write_import(planned: Planned, space: Space, state: WriteState, src: Source 
         removed=len(state.removed),
         leftOut=c.get("leftOut", 0),
         failed=c.get("failed", 0),
+        notWritten=c.get("notWritten", 0) if state.stopped else 0,
         originals=state.originals_kept,
         sourceItems=c.get("sourceItems", 0),
     )

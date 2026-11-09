@@ -151,6 +151,8 @@ def test_2_stopped_import_announces_one_resync(client, tmp_path, monkeypatch):
     preview = _preview(client, folder, target="currentSpace").json()
     job = _import(client, preview, {"kind": "currentSpace"}, phase="cancelled")
     assert job["result"]["reportPath"]
+    # fix pass H: the result says how many of the failed were not written because it stopped (like the report)
+    assert job["result"]["notWritten"] > 0 and job["result"]["failed"] >= job["result"]["notWritten"]
     _settle(events, 1)
     assert events == [ChangeEvent("types", RESYNC_PATH, None, origin=None)]
 

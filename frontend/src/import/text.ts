@@ -139,9 +139,13 @@ export const IMPORT_TEXT = {
   tryCopyNote: 'Imports into a copy of this space, made next to it under the name below, for you to look at before the real run.',
   copyName: 'Name of the copy',
   copyDefaultName: (space: string) => `${space} (trial)`,
-  accountedFor: (r: Pick<ImportResult, 'sourceItems' | 'objects' | 'updated' | 'unchanged' | 'changedInBoth' | 'leftOut' | 'failed'>) =>
+  accountedFor: (
+    r: Pick<ImportResult, 'sourceItems' | 'objects' | 'updated' | 'unchanged' | 'changedInBoth' | 'leftOut' | 'failed' | 'notWritten'>,
+  ) =>
     `${plural(r.sourceItems ?? 0, 'source item', 'source items')}: ${r.objects} imported, ${r.updated ?? 0} updated, ` +
-    `${r.unchanged ?? 0} unchanged, ${r.changedInBoth ?? 0} changed in both, ${r.leftOut ?? 0} left out, ${r.failed ?? 0} failed`,
+    `${r.unchanged ?? 0} unchanged, ${r.changedInBoth ?? 0} changed in both, ${r.leftOut ?? 0} left out, ${r.failed ?? 0} failed` +
+    // the Import report's wording: "Failed includes N not written because the import stopped"
+    (r.notWritten ? ` (${r.notWritten} not written because the import stopped)` : ''),
   removedAtSource: (n: number) => `${plural(n, 'object is', 'objects are')} no longer in the source. They stay in the space; the Import report lists them.`,
   moveBatch: 'Move batch to Trash',
   moveBatchConfirm: (n: number) => `Move the ${plural(n, 'object', 'objects')} this import created to the Trash?`,

@@ -427,7 +427,8 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   and can be switched to **Leave out**.
 - **Re-runs**: the same source updates its objects in place (the old text goes to version history), reuses identical
   attachments and never overwrites Gene's edits. Finish step and Import report: counts that add up (source items =
-  imported + updated + unchanged + changed in both + left out + failed), **Changed in both** (**Take source** /
+  imported + updated + unchanged + changed in both + left out + failed; after **Stop import** both say how many of the
+  failed were "not written because the import stopped"), **Changed in both** (**Take source** /
   **Keep mine**, and **Take source for all** / **Keep mine for all**), **Removed at source** (listed, never trashed).
   **Move batch to Trash** moves the objects the batch created (not the ones it only updated) to the Trash.
 - **Proposed schema** (finish step offers **Review proposed schema**; so does each row of **Settings > Import Content >

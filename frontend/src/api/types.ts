@@ -1568,6 +1568,8 @@ export interface ImportResult {
   removed?: number
   leftOut?: number
   failed?: number
+  /** Of `failed`, the objects not written because the import stopped. */
+  notWritten?: number
   originals?: number
   sourceItems?: number
 }
