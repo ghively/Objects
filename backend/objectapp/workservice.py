@@ -425,6 +425,49 @@ class WorkService:
         )])
         return result
 
+    def withdraw_approval(self, path: str, step_id: str, result: str, why: str | None = None) -> dict | None:
+        """Object's own move of an approved step back to Open once the run it started ended failed
+        (M24; Gene, 2026-11-08): the approval is spent, so the user approves again before a retry.
+        ``result`` is shown on the step (its ``result``); ``why`` (the run's failure reason) goes
+        into the Activity line. Answers a ``WorkWriteResult``, or None when the step isn't approved
+        any more (nothing is written). Raises `KeyError`, `NotWorkItem`, `ReadOnly`."""
+        rel = self._check(path)
+        now = self.space.clock()
+        actor = Actor("app", "Object")
+        lines = _Lines()
+        seen: dict[str, Any] = {}
+
+        def raw(fm: dict) -> dict[str, Any]:
+            steps = read_steps_strict(fm.get("steps"))
+            i = _find(steps, step_id)
+            if i is None or steps[i].state != "approved":
+                raise _Stale(step_id)
+            new = [copy.copy(s) for s in steps]
+            step = new[i]
+            step.state = "open"
+            step.approvedAt = step.notBefore = None
+            step.result = one_line(result, MAX_NOTE) or None
+            seen.update(n=i + 1, kind=step.kind, step_text=step.text, id=step.id)
+            return {"steps": encode_steps(new) or []}
+
+        def body(text_: str, _fm: dict) -> str:
+            event = WorkEvent(kind="reopen", who=actor.name, n=seen["n"], step_text=seen["step_text"],
+                              step_kind=seen["kind"], text=None, not_before_local=None, date=self._day(now))
+            detail = one_line(why or "", 300).rstrip(".")
+            detail = f" ({detail})" if detail else ""
+            return self._append(text_, lines, event, now, activity=activity_text(event) + detail)
+
+        try:
+            outcome = self._write(rel, None, lines, raw=raw, body=body)
+        except _Stale:
+            return None
+        out = self._result(rel, outcome, lines)
+        _notify(self.space, [self._notice(
+            rel, "reopen", actor, now, outcome.version, step_id=seen["id"], n=seen["n"], kind=seen["kind"],
+            step_text=seen["step_text"], before="approved", after="open",
+        )])
+        return out
+
     def edit_steps(self, path: str, ops: list[dict], actor: Actor) -> dict:
         """Apply step ops (``add``, ``edit``, ``move``, ``remove``) in order, in one write."""
         rel = self._check(path)

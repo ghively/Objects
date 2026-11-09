@@ -3,6 +3,9 @@
 One `WorkLoop` per app (an app serves one space), one worker thread, one run at a time. Runs are
 M20 headless chats of the work agent. Only a run for a current, approved Approve step gets the
 agent's full tool set (purpose ``work``); the pre-run check is made again at the moment of claiming.
+An approval is spent by the run it starts: when that run ends failed (timed out, stopped, an error,
+Object closed), the step goes back to Open and the entry is withdrawn with `REAPPROVE`, so Retry
+asks for approval again (Gene, 2026-11-08). Steps of other kinds keep Retry.
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ from .watcher import ChangeEvent
 from .workagent import ensure_work_agent, work_agent
 from .workagentmodel import (
     ALREADY_FILED,
+    CRASHED,
     GONE,
     NOT_FILED,
     NOT_MARKED,
@@ -42,7 +46,7 @@ from .workagentmodel import (
 from .workbody import one_line
 from .workfields import is_work_type
 from .workprompts import entry_prompt
-from .workqueue import QueueStore, auto_run_key, plan_for_notice
+from .workqueue import QueuePlan, QueueStore, auto_run_key, plan_for_notice
 from .workread import NotWorkItem
 from .workrules import IllegalMove
 from .workservice import Actor, StepChanged, add_work_listener, in_work_write
@@ -56,6 +60,7 @@ log = logging.getLogger(__name__)
 
 __all__ = [
     "POLL_SECONDS",
+    "REAPPROVE",
     "RUNNER_ID",
     "TEST_TIMEOUT_ENV",
     "WORK_RUN_TIMEOUT",
@@ -76,6 +81,9 @@ TEST_TIMEOUT_ENV = "OBJECT_TEST_WORK_TIMEOUT"
 CAPTURE_UNREADABLE = "This brain dump couldn't be read. Try again."
 CHANGED_409 = "This step changed. Look again."
 GONE_409 = "This item is gone or isn't a work item any more."
+REAPPROVE = "The run didn't finish; approve the step again to retry."
+"""An Approve step whose run ended failed goes back to Open and its entry is withdrawn with this
+reason (Gene, 2026-11-08): the approval was spent by the run it started; Retry answers 409 with it."""
 _RETRY_409 = {ALREADY_FILED: ALREADY_FILED, GONE: GONE_409}
 """What Retry answers for the pre-run check's reason: a brain dump filed meanwhile and a gone item
 say so; a changed step says `CHANGED_409`."""
@@ -213,6 +221,7 @@ class WorkLoop:
         self._queued: set[tuple[str, str]] = set()
         self._changed_lock = threading.Lock()
         self._changed: set[str] = set()  # work items written since the worker last looked (any write)
+        self._settled_crashes = False  # crashed Approve runs are looked at once per start, when the agent acts
         self._unsubscribe_space: Callable[[], None] | None = None
         with _loops_lock:
             _loops[self._key(space)] = self
@@ -227,6 +236,7 @@ class WorkLoop:
         if self._thread is not None and self._thread.is_alive():
             return
         self._quit.clear()
+        self._settled_crashes = False
         self._unsubscribe = add_work_listener(self.on_notice)
         self._unsubscribe_space = self.space.add_listener(self._on_space_change)
         self._thread = threading.Thread(target=self._work, name="work-loop", daemon=True)
@@ -362,6 +372,38 @@ class WorkLoop:
         except (KeyError, NotWorkItem, ValueError, OSError):
             return None
 
+    def _reopen_step(self, entry: dict, why: str | None) -> bool:
+        """Move the Approve step of ``entry`` back to Open (its approval was spent by the run that
+        failed with ``why``). False when it isn't approved any more or couldn't be written (logged;
+        Retry tries again)."""
+        try:
+            done = self.service.withdraw_approval(entry.get("path") or "", str(entry.get("stepId")), REAPPROVE, why)
+        except Exception:
+            log.exception("Reopening the step of %s failed", entry.get("id"))
+            return False
+        return done is not None
+
+    def _reapprove(self, entry: dict) -> bool:
+        """After a failed run of an approved Approve step: the step goes back to Open, the entry
+        (and any pending entry of the step) is withdrawn with `REAPPROVE`. False when the step was
+        not approved any more: the entry is left as it is."""
+        if not self._reopen_step(entry, entry.get("reason")):
+            return False
+        now = self.clock()
+        self.store.apply(QueuePlan(entry.get("path") or "", str(entry.get("stepId")), False, False, None), now=now)
+        self.store.update(entry["id"], state="withdrawn", reason=REAPPROVE,
+                          finishedAt=entry.get("finishedAt") or _iso(now))
+        self._event(entry["id"])
+        return True
+
+    def _settle_crashed_approvals(self) -> None:
+        """Approve entries whose run Object closed on (served failed, CRASHED): their steps go back
+        to Open and they are withdrawn, so nothing runs them again under the old approval."""
+        for e in self.store.entries():
+            if e.get("kind") == "approve" and e.get("state") == "failed" and e.get("reason") == CRASHED \
+                    and e.get("retryable"):
+                self._reapprove(e)
+
     def _requeue_approved(self, item: dict) -> dict | None:
         """Queue the current approved step again when its last entry was withdrawn while it stayed
         approved (it was moved away and back, so the claim found it not current). Only a step Gene
@@ -473,6 +515,8 @@ class WorkLoop:
 
     def retry(self, entry_id: str) -> dict:
         e = self.store.get(entry_id)  # KeyError
+        if e.get("state") == "withdrawn" and e.get("reason") == REAPPROVE:
+            raise QueueRefused(409, REAPPROVE)
         if not e.get("retryable"):
             raise QueueRefused(422, NOT_RETRYABLE)
         item = self._item(e.get("path"))
@@ -480,6 +524,11 @@ class WorkLoop:
         verdict, _p, reason = precheck(e, item, cap, self.clock())
         if verdict == "withdraw":
             raise QueueRefused(409, _RETRY_409.get(reason or "", CHANGED_409))
+        if e.get("kind") == "approve":
+            # the step is still approved: its approval was spent by the failed run, so it goes back
+            # to Open and the user approves again instead of the old approval being run again
+            self._reapprove(e)
+            raise QueueRefused(409, REAPPROVE)
         fields = {k: e.get(k) for k in (
             "kind", "path", "objectId", "title", "stepId", "stepN", "stepKind", "stepText", "text",
             "capturePath", "notBefore", "auto", "by")}
@@ -545,6 +594,9 @@ class WorkLoop:
         agent, _problem = work_agent(self.registry(), settings)
         if agent is None:
             return False
+        if not self._settled_crashes:
+            self._settled_crashes = True
+            self._settle_crashed_approvals()
         now = self.clock()
         entry = self.store.claim_next(now, RUNNER_ID)
         if entry is None:
@@ -583,8 +635,10 @@ class WorkLoop:
                 self._stops.pop(entry["id"], None)
             try:
                 if self.store.get(entry["id"]).get("state") == "running":
-                    self.store.update(entry["id"], state="failed", finishedAt=_iso(self.clock()),
-                                      reason=one_line(str(exc) or "The run failed.", 500))
+                    failed = self.store.update(entry["id"], state="failed", finishedAt=_iso(self.clock()),
+                                               reason=one_line(str(exc) or "The run failed.", 500))
+                    if failed.get("kind") == "approve":
+                        self._reapprove(failed)
                 self._event(entry["id"])
             except Exception:
                 log.exception("Failing the entry %s failed", entry["id"])
@@ -648,6 +702,11 @@ class WorkLoop:
         state, text, reason = outcome(entry, result, notices, filed, timed_out=timed_out, withdrawn=withdrawn)
         if self._quit.is_set() and state == "failed" and result.state == "stopped":
             reason = STOPPED
+        if not withdrawn and state == "failed" and entry["kind"] == "approve" and self._reopen_step(entry, reason):
+            # the approval was spent by this run: the step is Open again, the user approves again
+            state, reason = "withdrawn", REAPPROVE
+            self.store.apply(QueuePlan(entry.get("path") or "", str(entry.get("stepId")), False, False, None),
+                             now=self.clock())
         now = self.clock()
         fields: dict[str, Any] = {"finishedAt": _iso(now), "chatId": result.chat_id or None}
         if not withdrawn:

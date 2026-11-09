@@ -12,7 +12,8 @@ from objectapp.mcpmodel import McpServerInput
 from objectapp.mcpprobe import ProbeResult
 from objectapp.mcpstore import McpStore
 from objectapp.workagentmodel import NOT_RETRYABLE, NOT_SET, REMOTE_REFUSED
-from objectapp.workloop import RUNNER_ID, loop_for
+from objectapp.workloop import REAPPROVE, RUNNER_ID, loop_for
+from objectapp.workservice import Actor
 from test_m23_api import PRINTER, Env, _make
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -148,6 +149,28 @@ def test_m23_agent_routes_are_live(env: Env) -> None:
     assert r.status_code == 200, r.text
     assert any(row["state"] == "pending" and row["reason"] == "Request" for row in r.json()["rows"])
     assert not any(row["id"] == g["id"] for row in r.json()["rows"])
+
+
+def test_retry_of_a_spent_approval_asks_for_approval_again(env: Env) -> None:
+    # Gene's decision (2026-11-08): Retry on a failed Approve step run asks for approval again.
+    w = entry(env, "approve", "withdrawn", 5, stepId="r8k1pd", reason=REAPPROVE)
+    r = env.c.post("/api/work/agent/retry", json={"id": w["id"]})
+    assert r.status_code == 409 and r.json()["detail"] == REAPPROVE
+    service = env.loop.service  # type: ignore[attr-defined]
+    rev = next(s["rev"] for s in service.item(PRINTER)["steps"] if s["id"] == "r8k1pd")
+    service.step(PRINTER, "r8k1pd", rev, "approve", Actor("user", "Gene"))
+    f = entry(env, "approve", "failed", 6, stepId="r8k1pd", stepN=2, stepKind="approve", stepText="x")
+    r = env.c.post("/api/work/agent/retry", json={"id": f["id"]})
+    assert r.status_code == 409 and r.json()["detail"] == REAPPROVE
+    step = next(s for s in service.item(PRINTER)["steps"] if s["id"] == "r8k1pd")
+    assert step["state"] == "open" and step["result"] == REAPPROVE
+    states = {e["id"]: e["state"] for e in env.loop.store.entries()}  # type: ignore[attr-defined]
+    assert states[f["id"]] == "withdrawn"
+    assert "pending" not in states.values()  # the approval's own entry went with it
+    # the Agent queue row carries the reason
+    rows = env.c.get("/api/work/agent").json()["rows"]
+    row = next(x for x in rows if x["id"] == f["id"])
+    assert row["state"] == "withdrawn" and row["error"] == REAPPROVE
 
 
 def test_read_tools(env: Env) -> None:
