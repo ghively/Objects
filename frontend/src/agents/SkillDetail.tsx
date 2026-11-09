@@ -64,6 +64,8 @@ export function SkillDetail({ agentId, name, archived: archivedProp, onClose }: 
   const [archived, setArchived] = useState(archivedProp)
   const [detail, setDetail] = useState<SkillDetailData | null>(null)
   const [shown, setShown] = useState<Shown | null>(null)
+  /** Saves this view made: the History reloads after each (its own events don't come back to this window). */
+  const [saves, setSaves] = useState(0)
   const [path, setPath] = useState(SKILL_MD)
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -138,6 +140,7 @@ export function SkillDetail({ agentId, name, archived: archivedProp, onClose }: 
         const res = await api.saveAgentSkillFile(agentId, name, file, next, revision.current)
         revision.current = res?.revision ?? revision.current
         setError(null)
+        setSaves((n) => n + 1)
       } catch (e) {
         // Keep what was typed: it is saved again after a reload, or by the next edit.
         if (pending.current === null) pending.current = next
@@ -307,7 +310,7 @@ export function SkillDetail({ agentId, name, archived: archivedProp, onClose }: 
         </div>
       )}
 
-      <LedgerList agentId={agentId} query={{ skill: name }} highlight={highlight} readOnly={agentReadOnly} />
+      <LedgerList agentId={agentId} query={{ skill: name }} highlight={highlight} readOnly={agentReadOnly} reloadKey={saves} />
     </div>
   )
 }

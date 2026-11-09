@@ -175,4 +175,18 @@ describe('SkillDetail', () => {
     await user.click(within(rows[0]).getByRole('button', { name: `${T.undo}: Patched 'rack-labels'` }))
     expect(mocked.undoLedgerEntry).toHaveBeenCalledWith(RESEARCHER, '01JLEDGER00000000000000002')
   })
+
+  test('test your own save shows in the History at once', async () => {
+    // accept-m18.7: this window's own agentLearning event is not delivered back to it, so the list kept
+    // the old rows and Undo on them answered "changed again since".
+    mocked.agentLedger.mockResolvedValue({ entries: [], more: false })
+    mocked.saveAgentSkillFile.mockResolvedValueOnce({ revision: 'r2' })
+    render(<SkillDetail agentId={RESEARCHER} name="rack-labels" archived={false} onClose={() => undefined} />)
+    const editor = await screen.findByRole('textbox', { name: 'SKILL.md' })
+    await waitFor(() => expect(mocked.agentLedger).toHaveBeenCalledTimes(1))
+    fireEvent.change(editor, { target: { value: `${BODY} Edited.` } })
+    fireEvent.blur(editor)
+    await waitFor(() => expect(mocked.saveAgentSkillFile).toHaveBeenCalled())
+    await waitFor(() => expect(mocked.agentLedger).toHaveBeenCalledTimes(2))
+  })
 })

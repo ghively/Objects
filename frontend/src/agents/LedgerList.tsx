@@ -23,6 +23,8 @@ export interface LedgerListProps {
   query: { target?: string; skill?: string; run?: string }
   highlight?: string[]
   readOnly?: boolean
+  /** Bumped by the owner after its own write: this window's own events don't come back to it. */
+  reloadKey?: number
 }
 
 interface Page {
@@ -58,7 +60,7 @@ function message(e: unknown): string {
   return String(e)
 }
 
-export function LedgerList({ agentId, query, highlight, readOnly }: LedgerListProps) {
+export function LedgerList({ agentId, query, highlight, readOnly, reloadKey }: LedgerListProps) {
   const [entries, setEntries] = useState<LedgerSummary[] | null>(null)
   const [more, setMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -99,7 +101,7 @@ export function LedgerList({ agentId, query, highlight, readOnly }: LedgerListPr
       live = false
       off()
     }
-  }, [load, agentId])
+  }, [load, agentId, reloadKey])
 
   const marked = highlight ?? []
   const markedKey = marked.join(',')
