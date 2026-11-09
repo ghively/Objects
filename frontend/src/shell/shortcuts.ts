@@ -12,6 +12,7 @@
 import { toggleCalendarSidebar } from '@/calendar/calendarUi'
 import { useCalendar } from '@/calendar/useCalendar'
 import { createAndOpen } from '@/create/createAndOpen'
+import { showToast } from '@/editor/media/upload'
 import { useLinkIndex } from '@/links/linkIndex'
 import { M7_SHORTCUTS, registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'
 import { currentTarget, useTabs } from '@/nav/tabs'
@@ -45,11 +46,16 @@ export function taskTypeId(): string | undefined {
   return (types.find((t) => t.basic && t.name.toLowerCase() === 'task') ?? types.find((t) => t.id === 'task'))?.id
 }
 
-/** "Create new task" (Ctrl+Shift+T): the New menu's flow for the Task type, outside editable targets. */
+export const CREATE_TASK_FAILED = 'Could not create the task.'
+
+/**
+ * "Create new task" (Ctrl+Shift+T): the New menu's flow for the Task type, outside editable
+ * targets. A failure shows its message as a toast, as the New menu shows it.
+ */
 export function createNewTask(): void {
   const id = taskTypeId()
   if (!id) return
-  void createAndOpen(id).catch((err: unknown) => console.warn('Could not create a task:', err))
+  void createAndOpen(id).catch((err: unknown) => showToast(err instanceof Error && err.message ? err.message : CREATE_TASK_FAILED))
 }
 
 /**
