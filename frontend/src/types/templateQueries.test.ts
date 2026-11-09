@@ -39,7 +39,6 @@ const CASES: Record<string, { hit: [string, Values, Summary?][]; miss: [string, 
   film: { hit: [['Heat', { rating: 5 }], ['Alien', { rating: 4 }]], miss: [['Flop', { rating: 2 }], ['Unrated', {}]] },
   tvSeries: { hit: [['Andor', { watchedOn: day('2026-03-01') }]], miss: [['Lost', { watchedOn: day('2025-03-01') }]] },
   podcast: { hit: [['Episode', { listenedOn: day('2026-11-02') }]], miss: [['Old', { listenedOn: day('2026-09-02') }]] },
-  day: { hit: [['Tuesday', { day: day('2026-11-03') }]], miss: [['Later', { day: day('2026-11-20') }]] },
   week: {
     hit: [['Week 46', { period: day('2026-11-09', '2026-11-15') }]],
     miss: [['Week 32', { period: day('2026-08-03', '2026-08-09') }]],
@@ -57,7 +56,7 @@ const NOW = new Date(2026, 10, 4, 12, 0) // Wednesday 2026-11-04
 describe('the starter templates’ saved queries', () => {
   test('every gallery template has a query and a case here', () => {
     expect(Object.keys(TEMPLATES).sort()).toEqual(Object.keys(CASES).sort())
-    expect(Object.keys(TEMPLATES)).toHaveLength(14)
+    expect(Object.keys(TEMPLATES)).toHaveLength(13)
   })
 
   test.each(Object.keys(CASES))('%s: the query picks its objects', (key) => {
