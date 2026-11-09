@@ -246,6 +246,8 @@ class VcsService:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._started_sync: threading.Thread | None = None
+        self._last_app_write: float | None = None
+        """When the open space last saw an app write (`touch`); `check` folds it into the wait."""
 
     # -- settings files -----------------------------------------------------------------------
 
@@ -555,15 +557,10 @@ class VcsService:
             raise VcsRefused(exc.message) from exc
 
     def touch(self) -> None:
-        """An app write just happened in the open space: the commit waits from now."""
-        if self.space is None:
-            return
-        sid = space_id(self.space.root)
-        if sid is None:
-            return
-        t = self._targets.get(f"space:{sid}")
-        if t is not None:
-            t.last_change = self.clock()
+        """An app write just happened in the open space: the commit waits from now.
+
+        Called from a space listener, under the space's lock: it only records the time."""
+        self._last_app_write = self.clock()
 
     def _fingerprint(self, target: RepoTarget, changes: list[vcs.Change]) -> str:
         h = hashlib.sha1()
@@ -594,6 +591,9 @@ class VcsService:
             if fp != target.fingerprint:
                 target.fingerprint = fp
                 target.last_change = now
+            wrote = self._last_app_write
+            if target.lock is not None and wrote is not None and (target.last_change is None or wrote > target.last_change):
+                target.last_change = wrote
             if ours and target.last_change is not None and now - target.last_change >= cfg["commitDelaySeconds"]:
                 try:
                     self._commit(target)
