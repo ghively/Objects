@@ -530,6 +530,8 @@ export interface ObjectDetail {
 /** PUT /api/object/body → 200 */
 export interface SaveResult {
   version: string
+  /** The paths whose backlinks this save may have changed (as `ChangeEvent.linked`); absent when unknown. */
+  linked?: string[]
 }
 
 /** A datetime value as the API reads and writes it. */
@@ -553,6 +555,8 @@ export interface SkippedFile {
 
 /** PUT /api/object/properties */
 export interface UpdateResult {
+  /** As `SaveResult.linked`. */
+  linked?: string[]
   version: string
   frontmatter: Record<string, unknown>
   links: Record<string, (string | null)[]>

@@ -482,8 +482,10 @@ export function announceLocalChange(path: string, version: string | null): void 
   emitLocal([changed(path, version)])
 }
 
-function changed(path: string, version: string | null = null): ChangeEvent {
-  return { kind: 'changed', path, version, origin: CLIENT_ID }
+function changed(path: string, version: string | null = null, linked?: string[]): ChangeEvent {
+  const e: ChangeEvent = { kind: 'changed', path, version, origin: CLIENT_ID }
+  if (linked) e.linked = linked
+  return e
 }
 
 function created(path: string, version: string | null = null): ChangeEvent {
@@ -643,7 +645,10 @@ export const api = {
       body: JSON.stringify({ path, body, baseVersion, clientId: CLIENT_ID }),
     })
     if (res && res.version && res.version !== baseVersion) {
+      // `linked` lets a backlink-keyed view in this window (the Tasks dashboard) refresh
+      // only the rows this save may have linked, as the SSE event does for other windows.
       const event: ChangeEvent = { kind: 'changed', path, version: res.version, origin: CLIENT_ID }
+      if (res.linked) event.linked = res.linked
       // Next task: the saving view adopts the new version first, so it ignores this.
       setTimeout(() => emit(event), 0)
     }
@@ -666,7 +671,7 @@ export const api = {
     Object.assign(body, { baseVersion, clientId: CLIENT_ID })
     const res = await request<UpdateResult>('/object/properties', json('PUT', body))
     const events: ChangeEvent[] = []
-    if (res.version !== baseVersion) events.push(changed(path, res.version))
+    if (res.version !== baseVersion) events.push(changed(path, res.version, res.linked))
     for (const p of res.synced ?? []) events.push(changed(p))
     emitLocal(events)
     return res

@@ -1251,18 +1251,20 @@ def create_app(
             return {}
         return Computer(space).values(Obj(summary.path, fm, summary, t))
 
-    def announce(event: ChangeEvent) -> None:
-        """Publish `event` to the SSE clients from a worker thread.
+    def announce(event: ChangeEvent) -> ChangeEvent:
+        """Publish `event` to the SSE clients from a worker thread; returns the event as published.
 
         An object event gets `ChangeEvent.linked` here, the paths whose backlinks the change may
         have altered, read from the link index after the write (every write of one request is
         done by its first announce, so that event carries the lot; the later ones get ``()``).
+        The save routes return it so the saving window's own local event can carry the same list.
         """
         if event.kind in LINKED_KINDS and event.linked is None:
             event = replace(event, linked=space.links.take_linked())
         loop = hub.loop
         if loop is not None and loop.is_running() and not hub.closed:
             loop.call_soon_threadsafe(hub.publish, event)
+        return event
 
     # M14: rules run on the engine's worker after the request returns; every write notice of
     # the space goes to it (it drops an automation's own writes: the loop guard).
@@ -1325,11 +1327,13 @@ def create_app(
     def put_body(req: SaveBodyRequest):
         try:
             version = space.save_body(req.path, req.body, req.baseVersion)
+            linked: tuple[str, ...] | None = None
             if version != req.baseVersion:
                 # The watcher suppresses the app's own writes; tell every other
-                # window (and view) about the new version here instead.
+                # window (and view) about the new version here instead. The saving window
+                # gets no echo, so the response carries `linked` for its local event.
                 rel = PurePosixPath(req.path.replace("\\", "/")).as_posix()
-                announce(ChangeEvent("changed", rel, version, origin=req.clientId))
+                linked = announce(ChangeEvent("changed", rel, version, origin=req.clientId)).linked
         except Conflict as exc:
             return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
         except ReadOnly as exc:
@@ -1338,7 +1342,10 @@ def create_app(
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
             return _error(404, f'There is no object at "{req.path}".')
-        return {"version": version}
+        out: dict[str, Any] = {"version": version}
+        if linked is not None:
+            out["linked"] = list(linked)
+        return out
 
     def _norm(path: str) -> str:
         return PurePosixPath(path.replace("\\", "/")).as_posix()
@@ -1360,8 +1367,10 @@ def create_app(
         except (KeyError, FileNotFoundError):
             return _error(404, f'There is no object at "{req.path}".')
         rel = _norm(req.path)
+        linked: tuple[str, ...] | None = None
         if result.version != req.baseVersion:
-            announce(ChangeEvent("changed", rel, result.version, origin=req.clientId))
+            # As in `put_body`: the saving window's local event needs `linked` too.
+            linked = announce(ChangeEvent("changed", rel, result.version, origin=req.clientId)).linked
         for path in result.synced:
             announce(
                 ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId)
@@ -1373,6 +1382,8 @@ def create_app(
             "synced": result.synced,
             "skipped": [asdict(s) for s in result.skipped],
         }
+        if linked is not None:
+            out["linked"] = list(linked)
         if result.task is not None:  # only when a Task's status changed category
             out["task"] = result.task.to_api()
         return _display_safe(out)

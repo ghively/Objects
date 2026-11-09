@@ -255,3 +255,45 @@ def test_sse_payload_names_linked(links_space_dir: Path):
                 if time.monotonic() > deadline:
                     pytest.fail("no change event on the SSE stream")
             app.state.hub.close()
+
+
+# -- the saving window's own echo (client.ts announces its own saves locally) -----------------
+
+
+def test_body_save_response_carries_linked(links_space_dir: Path):
+    """The window that saved gets no SSE echo, so the response names the linked paths for its
+    local `changed` event (else a Tasks dashboard in that window would still reload fully)."""
+    space, c, published = _client(links_space_dir)
+    with c:
+        space.backlinks(ADA)
+        v = c.get("/api/object", params={"path": LOOSE}).json()["version"]
+        r = c.put("/api/object/body", json={"path": LOOSE, "body": "See [[Ada]].\n", "baseVersion": v})
+        assert r.status_code == 200, r.text
+        assert r.json()["linked"] == [ADA]
+        assert _changed(published, LOOSE).linked == (ADA,)  # the SSE event still says the same
+
+
+def test_properties_save_response_carries_linked(links_space_dir: Path):
+    space, c, published = _client(links_space_dir)
+    with c:
+        space.backlinks(ADA)
+        v = c.get("/api/object", params={"path": BABBAGE}).json()["version"]
+        r = c.put(
+            "/api/object/properties",
+            json={"path": BABBAGE, "updates": {"manager": None}, "baseVersion": v},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["linked"] == [ADA]
+        assert _changed(published, BABBAGE).linked == (ADA,)
+
+
+def test_save_response_omits_linked_when_unknown(links_space_dir: Path):
+    """Before the link index is built the before-state is unknown: no `linked` key, as in the event."""
+    space, c, published = _client(links_space_dir)
+    with c:
+        # No read of the links yet (``GET /api/object`` would build the index).
+        v = space.cached_version(LOOSE)
+        r = c.put("/api/object/body", json={"path": LOOSE, "body": "See [[Ada]].\n", "baseVersion": v})
+        assert r.status_code == 200, r.text
+        assert "linked" not in r.json()
+        assert _changed(published, LOOSE).linked is None

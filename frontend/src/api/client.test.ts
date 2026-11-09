@@ -34,6 +34,32 @@ describe('api client', () => {
     }
   })
 
+  test("a save's local event carries the linked paths the server returned", async () => {
+    // The saving window gets no SSE echo, so `linked` (the paths whose backlinks the save may
+    // have changed) comes back in the response and rides on the local event.
+    vi.stubGlobal('fetch', respond(200, { version: 'v2', linked: ['Tasks/B.md'] }))
+    const seen: ChangeEvent[] = []
+    const off = api.onChange((e) => seen.push(e))
+    try {
+      await api.saveBody('Pages/A.md', 'x', 'v1')
+      await new Promise((r) => setTimeout(r, 0))
+      expect(seen).toEqual([{ kind: 'changed', path: 'Pages/A.md', version: 'v2', origin: CLIENT_ID, linked: ['Tasks/B.md'] }])
+
+      vi.stubGlobal('fetch', respond(200, { version: 'v3', frontmatter: {}, links: {}, synced: [], skipped: [], linked: [] }))
+      await api.updateProperties('Pages/A.md', { status: 'Done' }, 'v2')
+      await new Promise((r) => setTimeout(r, 0))
+      expect(seen[1]).toEqual({ kind: 'changed', path: 'Pages/A.md', version: 'v3', origin: CLIENT_ID, linked: [] })
+
+      // Without `linked` in the answer (an older server) the event has no such field.
+      vi.stubGlobal('fetch', respond(200, { version: 'v4', frontmatter: {}, links: {}, synced: [], skipped: [] }))
+      await api.updateProperties('Pages/A.md', { status: 'Open' }, 'v3')
+      await new Promise((r) => setTimeout(r, 0))
+      expect(seen[2]).toEqual({ kind: 'changed', path: 'Pages/A.md', version: 'v4', origin: CLIENT_ID })
+    } finally {
+      off()
+    }
+  })
+
   test("errors carry the server's detail message", async () => {
     vi.stubGlobal('fetch', respond(404, { detail: "No object at 'X.md'" }))
     const err = await api.object('X.md').catch((e: unknown) => e)
