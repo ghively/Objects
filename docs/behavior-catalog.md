@@ -69,7 +69,7 @@ Object has no accounts.
 - Space Settings: Icon, Name, Description, Delete space.
 - Object Types: "Custom object types" and "Basic object types" tile grids plus Create; per type: Icon, Name,
   Plural, Color, Description, Properties (Add Property), Templates (New Template), Configuration (see the
-  audit doc item 27), Delete object Type. Basic types' properties cannot be edited. Field lists per built-in
+  audit doc item 27), Delete object type. Basic types' properties cannot be edited. Field lists per built-in
   type are in audit item 28.
 - Task management: "Hide Task Management" per space.
 
@@ -117,7 +117,7 @@ Ctrl+Shift+C, paste styles | Make a copy of the selected blocks Ctrl+D | Delete 
 Increase/decrease text hierarchy Ctrl+Plus/Minus | Copy block reference Ctrl+Alt+L | Add to selection
 Ctrl+Click | Select above/below Up/Down, grow the block selection up/down Shift+Up/Down | Select the blocks at this level, then the level above
 Ctrl+A | Extend to clicked block Shift+Click | Move selected blocks Alt+Up/Down (among their siblings: Shift+Alt+Up/Down) |
-Tick or untick to-dos Ctrl+Enter | Open/close all toggles in the view Ctrl+O | Open toggles Right, close Left |
+Tick or untick the to-do in this block Ctrl+Enter | Open or close all toggles on the page Ctrl+O | Open toggles Right, close Left |
 Code block: leave downwards or upwards (Ctrl+Shift+Down/Up) | Math block likewise | Merge text blocks
 Ctrl+Shift+G.
 
@@ -240,8 +240,9 @@ Each starter template pre-fills the new type's properties.
   - Filter popover: "where" row builder with "Filter" and "Filter group" buttons. Sort popover: "+ Sort".
     Group by: a "Group by" button. Customize: "Card view" and "Calculations".
   - Tab strip: Overview | All | custom tabs (including Query-backed ones) | `+` to add a tab.
-  - Type page header: type icon + plural name; search icon; `...` (New from template >, New collection, Pin to
-    sidebar, Object type settings, Export, Import); a split "New" button.
+  - Type page header: type icon + plural name; search icon; `...` (New collection, Pin to sidebar, Pin to…,
+    Object type settings, Import CSV, Save as query, Delete object type; "New from template" is in the sidebar's
+    type menu); a split "New" button.
 - **Wall cards** show: the type label, the icon and title, the description, then one row per card-view property
   with its icon and value or "Empty" (Collaborators, Time frame, Status on Projects).
 

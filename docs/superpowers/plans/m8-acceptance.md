@@ -80,6 +80,7 @@ The write routes are covered by checks 2–7 above. Every `api/client.ts` M8 met
 
 These are the gaps the lanes reported. Each is fixed and tested.
 
+- **A space with no `calendar.weekStart` counts weeks from Sunday (2026-11-08).** The reader `recurrence.week_start_of` defaulted to Monday while the calendar showed Sunday-first weeks; it now answers Sunday when the setting is absent, so recurrence, the Tasks page, automations and the local API agree with the calendar. On such a space an existing "every 2 weeks on Sunday, Monday" task's next date can move by a week (from Sun 2026-11-08: 2026-11-16 to 2026-11-09). Set "Start of the week" to Monday to keep the old anchors.
 - **The week start was not reaching recurrence.** `ui.json` `calendar.weekStart` now reaches M4's completion hook (`space.py` → `taskhook.on_status_change(…, week_start=)`) and the calendar's virtual occurrences (`calendarquery.py`). Before this, both counted weeks from Monday. Tests: `backend/tests/test_m8_integration.py`.
 - **Board relinks were not versioned.** A board relinked by a rename or merge now keeps a version (`whiteboardtrash.relink_board_file` calls the history hook). A restore brings the pre-relink board back.
 - **Recordings read back as video.** Recordings are now saved as `Recording <date time>.weba` (WebM audio). The server (`media.py`) and the editor (`annotations.ts`, `upload.ts`) class `.weba` as audio, so a reloaded recording shows the audio player. Task 30 reported this gap. Before the fix, `.webm` was read back as video. The extension is our choice.
