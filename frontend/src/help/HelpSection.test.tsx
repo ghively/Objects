@@ -57,12 +57,10 @@ describe('Help & Resources (sidebar)', () => {
     fetchSpy.mockRestore()
   })
 
-  it('renders the section below Graph and Trash with its three entries', () => {
+  it('renders the section below the object types with its three entries', () => {
     render(<Sidebar types={TYPES} />)
     const section = helpSection()
-    const space = screen.getByRole('navigation', { name: 'Space' })
-    // Below the space entries (and so below the object types).
-    expect(space.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // Below the object types, at the end of the sidebar's scrolling content.
     const types = screen.getByRole('heading', { name: 'Object Types' })
     expect(types.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     const entries = within(section).getAllByRole('listitem').map((li) => li.textContent)

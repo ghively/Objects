@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useTabs, type Target } from '@/nav/tabs'
 import { cn } from '@/lib/utils'
+import { SectionHeader } from '@/shell/SectionHeader'
 import { AddAgentFolderDialog } from './AddAgentFolderDialog'
 import { AddRemoteAgentDialog } from './AddRemoteAgentDialog'
 import { requestAgentTab } from './AgentPage'
@@ -168,29 +169,32 @@ export function AgentsSection({ onOpenTarget }: AgentsSectionProps) {
 
   return (
     <section aria-labelledby="sb-agents" data-agents-section="" className="pb-2">
-      <div className="group/sh flex items-center pr-1">
-        <h2 id="sb-agents" className="flex flex-1 items-center gap-1.5 px-2 pt-1 pb-2 text-[14px] font-semibold text-[var(--text-section)]">
-          {T.heading}
-        </h2>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label={T.addMenu}
-              title={T.addMenu}
-              className="flex size-6 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
-            >
-              <Icon name="ph-plus" size={14} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="border-line bg-raised text-fg">
-            <DropdownMenuItem onSelect={() => newAgent(null)}>{T.newAgent}</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setAddOpen(true)}>{T.addFolder}</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setRemoteOpen(true)}>{REMOTE_TEXT.addRemote}</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setTrashOpen(true)}>{T.deletedAgents}</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <SectionHeader
+        id="sb-agents"
+        icon="ph-robot"
+        action={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={T.addMenu}
+                title={T.addMenu}
+                className="flex size-6 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
+              >
+                <Icon name="ph-plus" size={14} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="border-line bg-raised text-fg">
+              <DropdownMenuItem onSelect={() => newAgent(null)}>{T.newAgent}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setAddOpen(true)}>{T.addFolder}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setRemoteOpen(true)}>{REMOTE_TEXT.addRemote}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setTrashOpen(true)}>{T.deletedAgents}</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      >
+        {T.heading}
+      </SectionHeader>
       <ul aria-label={T.heading} className="flex flex-col gap-0.5">
         {agents.map((a) => (
           <AgentRow

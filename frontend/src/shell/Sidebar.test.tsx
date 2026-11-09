@@ -101,8 +101,8 @@ describe('Sidebar', () => {
     const onOpenTarget = vi.fn()
     const { rerender } = render(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} />)
     const nav = screen.getByRole('navigation', { name: /main/i })
-    const lower = screen.getByRole('navigation', { name: 'Space' })
-    const graph = within(lower).getByRole('button', { name: 'Graph' })
+    const bottom = screen.getByRole('navigation', { name: 'Space' })
+    const graph = within(nav).getByRole('button', { name: 'Graph' })
     expect(graph).toBeEnabled()
     expect(graph.querySelector('[data-icon="ph-graph"]')).not.toBeNull()
     expect(graph).not.toHaveAttribute('aria-current')
@@ -113,11 +113,11 @@ describe('Sidebar', () => {
     await user.hover(graph)
     expect(screen.queryByText(/arrives in M5/)).toBeNull()
     rerender(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} graphActive />)
-    expect(within(lower).getByRole('button', { name: 'Graph' })).toHaveAttribute('aria-current', 'page')
-    // Seen in the live app: Graph and Trash sit together below the object types, not in the top list.
-    expect(within(nav).queryByRole('button', { name: 'Graph' })).toBeNull()
-    expect(within(lower).getByRole('button', { name: 'Trash' })).toBeInTheDocument()
-    expect(nav.compareDocumentPosition(lower) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(nav).getByRole('button', { name: 'Graph' })).toHaveAttribute('aria-current', 'page')
+    // Graph sits in the top navigation; Trash is alone in its own group at the very bottom.
+    expect(within(bottom).queryByRole('button', { name: 'Graph' })).toBeNull()
+    expect(within(bottom).getByRole('button', { name: 'Trash' })).toBeInTheDocument()
+    expect(nav.compareDocumentPosition(bottom) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(nav).getByRole('button', { name: 'Calendar' })).not.toHaveAttribute('aria-current')
   })
 
@@ -125,9 +125,12 @@ describe('Sidebar', () => {
     // Regression guard (green from the start).
     render(<Sidebar types={TYPES} />)
     const nav = screen.getByRole('navigation', { name: /main/i })
-    for (const name of ['All notes', 'Calendar', 'Tasks']) {
+    for (const name of ['Calendar', 'Tasks', 'Graph']) {
       expect(within(nav).getByRole('button', { name })).toBeEnabled()
     }
+    // All notes is gone from the sidebar: with many note types it was a dumping ground
+    // (the view itself stays reachable through queries and the palette).
+    expect(screen.queryByRole('button', { name: 'All notes' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Queries' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Pinned' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument()
@@ -163,7 +166,8 @@ describe('Sidebar', () => {
   it('test M3 sidebar items still present', () => {
     render(<Sidebar types={TYPES} />)
     const nav = screen.getByRole('navigation', { name: /main/i })
-    expect(within(nav).getByRole('button', { name: 'All notes' })).toBeInTheDocument()
+    expect(within(nav).getByRole('button', { name: 'Calendar' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'All notes' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Queries' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Pinned' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument()

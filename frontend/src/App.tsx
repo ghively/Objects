@@ -357,7 +357,6 @@ export default function App() {
                 trashActive={target?.kind === 'trash'}
                 onOpenTarget={(t, o) => open(t, o)}
                 queriesActive={target?.kind === 'queries'}
-                allNotesActive={target?.kind === 'allNotes'}
                 calendarActive={target?.kind === 'calendar'}
                 tasksActive={target?.kind === 'tasks'}
                 graphActive={target?.kind === 'graph'}

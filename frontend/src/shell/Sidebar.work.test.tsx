@@ -13,7 +13,7 @@ import { AGENT_TEXT } from '@/agents/agentText'
 import { resetAgents } from '@/agents/useAgents'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { agent } from '@/test/mockApi'
-import { ALL_NOTES_LABEL, Sidebar, WORK_LABEL } from './Sidebar'
+import { Sidebar, WORK_LABEL } from './Sidebar'
 
 const mocked = vi.mocked(api)
 
@@ -25,16 +25,15 @@ describe('Sidebar Work entry', () => {
     mocked.agents.mockResolvedValue([agent({ id: 'assistant', exists: false })])
   })
 
-  test('test Work is the first item after the Agents section and before All notes', async () => {
+  test('test Work sits below the Agents section, after the main navigation', async () => {
     render(<Sidebar types={[]} />)
+    const main = screen.getByRole('navigation', { name: 'Main' })
     const agents = await screen.findByRole('region', { name: AGENT_TEXT.heading })
     const work = screen.getByRole('navigation', { name: 'Work' })
+    // Order: the main navigation, then the agents, then Work (the agent loop's dashboard).
+    expect(main.compareDocumentPosition(agents) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(agents.nextElementSibling).toBe(work)
-    const main = screen.getByRole('navigation', { name: 'Main' })
-    expect(work.nextElementSibling).toBe(main)
     const button = screen.getByRole('button', { name: WORK_LABEL })
-    const allNotes = screen.getByRole('button', { name: ALL_NOTES_LABEL })
-    expect(button.compareDocumentPosition(allNotes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(button.querySelector('[data-icon="ph-briefcase"]')).not.toBeNull()
   })
 
@@ -62,8 +61,8 @@ describe('Sidebar Work entry', () => {
     render(<Sidebar types={[]} />)
     expect(screen.queryByRole('region', { name: AGENT_TEXT.heading })).toBeNull()
     expect(screen.getByRole('button', { name: WORK_LABEL })).toBeInTheDocument()
-    expect(screen.getByRole('navigation', { name: 'Work' }).nextElementSibling).toBe(
-      screen.getByRole('navigation', { name: 'Main' }),
+    expect(screen.getByRole('navigation', { name: 'Main' }).nextElementSibling).toBe(
+      screen.getByRole('navigation', { name: 'Work' }),
     )
   })
 })

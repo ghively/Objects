@@ -33,14 +33,13 @@ describe('AgentsSection', () => {
     resetAgents()
   })
 
-  test('test the section sits above the main navigation and lists the default agent first', async () => {
+  test('test the section sits below the main navigation and lists the default agent first', async () => {
     render(<Sidebar types={[]} />)
     const section = await screen.findByRole('region', { name: AGENT_TEXT.heading })
     const nav = screen.getByRole('navigation', { name: 'Main' })
-    expect(section.compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    // Directly above: the next element after the section is M23's Work entry, then the main navigation.
+    // Directly below the main navigation; the next element after the section is the Work entry.
+    expect(nav.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(section.nextElementSibling).toBe(screen.getByRole('navigation', { name: 'Work' }))
-    expect(section.nextElementSibling?.nextElementSibling).toBe(nav)
     await waitFor(() => expect(section.querySelectorAll('[data-agent]')).toHaveLength(2))
     const rows = [...section.querySelectorAll('[data-agent]')].map((r) => r.getAttribute('data-agent'))
     expect(rows).toEqual(['assistant', RESEARCHER])
