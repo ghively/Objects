@@ -1,5 +1,16 @@
 # Decisions memo, 2026-11-08
 
+> **Approved by Gene, 2026-11-08: every Recommendation below, as written** ("I am going to accept your
+> recommendations"). S4 and S7 were settled by the live-CLI run the same day (`live-cli-check-2026-11-08.md`:
+> S4 fixed by escaping `[ ]`, `fix(sweep-18)`; S7 `--resume` PASS). Also approved the same day, from the
+> live-CLI and acceptance runs: **A-1** hide/grey the Glob and Grep switches when the shell is on (CLI 2.1.319
+> gives shell runs neither), with a note why; **A-2** accept and document that a `\` in a Linux folder name
+> can't be fenced; **AC-1** allow sub-items and dependencies on the basic Task type; **AC-2** imported images
+> become Image objects (the design's call), not a Page holding the image; **OCR** fix mixed PDFs (OCR the
+> scanned pages of a PDF that has a text layer elsewhere) and the double OCR in the scan step, English only
+> for now; **Q-1** hide the query modes Exact and Semantic until real full-text search exists; **C9** the
+> Three days tooltip says "Show the day before and after".
+
 Every open decision and review item from `remaining-work.md` ("What remains", items 3-5; "What is left", item 2),
 `bug-audit-2026-11-07.md` ("Fix status"), `bug-audit-2026-11-08.md` ("Decisions for Gene", "Choices made in
 the fixes", "Open items", LOW 13-22), `m17`, `m20`, `m24`, `m27-acceptance.md` and `polish-audit-2026-11-02.md`
