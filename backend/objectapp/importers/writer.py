@@ -544,7 +544,9 @@ def _native_body(
     sp = w.read.sourcePath
     title = w.obj.title
     media = _media_block(orig_rel) if orig_rel else None
+    notes = list(page.notes)
     if page.original_only or not page.markdown.strip():
+        notes = [n for n in notes if n != "Original only"]  # the line below says it once
         lines = [f"# {title}", ""]
         if media:
             lines.append(media)
@@ -562,7 +564,7 @@ def _native_body(
             first, _, rest = md.partition("\n")
             md = f"{first}\n\n{media}\n{rest}" if first.startswith("#") else f"{media}\n\n{md}"
         out = md if md.endswith("\n") else md + "\n"
-    for note in page.notes:
+    for note in dict.fromkeys(notes):
         state.losses.append((sp, note))
     if file_obj:
         out += f"\nOriginal: [[{file_obj[:-3]}]]\n"
