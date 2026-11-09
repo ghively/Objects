@@ -6,7 +6,7 @@
 > live-CLI and acceptance runs: **A-1** hide/grey the Glob and Grep switches when the shell is on (CLI 2.1.319
 > gives shell runs neither), with a note why; **A-2** accept and document that a `\` in a Linux folder name
 > can't be fenced; **AC-1** allow sub-items and dependencies on the basic Task type; **AC-2** imported images
-> become Image objects (the design's call), not a Page holding the image; **OCR** fix mixed PDFs (OCR the
+> become Image objects (the design's call), not a Page holding the image (2026-11-09: the preview lists them under an Image row); **OCR** fix mixed PDFs (OCR the
 > scanned pages of a PDF that has a text layer elsewhere) and the double OCR in the scan step, English only
 > for now; **Q-1** hide the query modes Exact and Semantic until real full-text search exists; **C9** the
 > Three days tooltip says "Show the day before and after".
@@ -52,7 +52,7 @@ Checked in code; listed so nobody reopens them.
 - Current: `on_notice` calls `_auto_check` for every work notice, the agent's own included (`workloop.py:328-331`). When an Agent step becomes current and is Open, with **Agent acts on my approvals** on and **Agent runs by itself** on (default `True`, `settings.py:102`), `_auto_check` runs it as the app (`workloop.py:424-447`), which queues an `auto` entry (`workqueue.py:68-70,91-92`). A `work-read` run may complete Agent steps and add steps (`worktools.py:50-55`; `workrules.py:476-487` refuses only an Agent step placed before an open Approve gate) and remove done Agent steps (`workrules.py:454-455` locks only Approve steps). The dedupe key is path + step id + text (`workqueue.py:108-109`), and each new step gets a new id. The chain is bounded only by `MAX_STEPS = 50` steps per item (`workmodel.py:101`), and removing done steps resets that.
 - Risk: an agent that keeps adding "next" Agent steps runs read-only CLI sessions back to back with no human in the loop (up to 30 minutes each, `workagentmodel.py:67`). That costs usage and fills the queue; it can't write outside the step tools.
 - Options: (a) leave; (b) cap consecutive auto-runs per item since the last user action at N, then leave the step Open with a reason shown in Stuck; (c) never auto-run a step the agent itself added.
-- **Recommendation: (b) with N=3 consecutive auto-runs per work item, reset by any user action on that item; the 4th waits for Run now.**
+- **Recommendation: (b) with N=3 consecutive auto-runs per work item, reset by any user action on that item; the 4th waits for Run now.** (2026-11-09: a property or body edit made in the app counts as the user's action too.)
 
 **S4 / Glob characters in fence rule paths (sweep finding 18)**
 - Current: `rule_path` (`agentrun.py:322-329`) writes the folder path as is into `Read(<path>/**)`/`Edit(<path>/**)`; `[`, `]`, `{`, `}`, `*`, `?` are not escaped. Whether the CLI reads `[2024]` as a character class is unchecked (live CLI only).

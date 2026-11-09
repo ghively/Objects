@@ -173,7 +173,8 @@ A popover: "Add new object type", "Create your own", then template groups with a
 - Meetings (who attended, and when), People, Projects (status, collaborators, meetings).
 - Research: Atomic notes, Definitions.
 - Media: Books (authors, rating, genre), Films, TV series, Podcasts.
-- Planning and reflection: Days (energy, mood, what stood out), Weeks, Months.
+- Planning and reflection: Weeks, Months (for weekly and monthly reviews; the Calendar's daily notes already cover
+  each day, so the gallery offers no Day type; removed 2026-11-09).
 - Organizations, Areas (areas of responsibility).
 Each starter template pre-fills the new type's properties.
 
@@ -328,6 +329,9 @@ Each starter template pre-fills the new type's properties.
 - **New menu**: popover with Search; types in recent-use order; footer hints.
 - **View toolbar** (type pages, `All` tab): count pill, Filter, Sort, Group by, a layout dropdown, Customize.
   - Layouts (`views/model.ts`): List, Wall, Kanban, Gallery, Table, Embed, Calendar, Timeline, Chart, Gallery strip.
+    Chart export (the Customize page): **Export PNG** renders the frame at 2x; **Export SVG** saves the chart's own
+    SVG as vector shapes with its styles written on the shapes and the legend drawn below (fix pass 2026-11-09);
+    the number chart, which draws no SVG, exports its rendered frame.
   - Filter popover: "where" row builder with "+ Filter" and "+ Filter group" buttons (below). Sort popover: "Add
     sort". Group by: a "Group by" button. Customize: "Customize view" (below).
   - Tab strip: Overview | All | custom tabs (including Query-backed ones) | `+` to add a tab.
@@ -568,7 +572,9 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   (Settings > Work): an Agent step that becomes current runs once, read-only. At most 3 auto-runs of one item in a
   row since Gene last acted on it (decision S3): the 4th Agent step stays Open and is listed in Stuck under
   **Waiting for Run now** ("The agent ran 3 steps of this item in a row by itself. Press Run now to let it go on.");
-  any action of Gene's on the item (Run now included) starts the count again. The count survives a restart.
+  any action of Gene's on the item (Run now included) starts the count again, and so does his edit of the item's
+  properties or body in the app (fix pass 2026-11-09; the window's own change event); writes by agents, automations,
+  the token API or a program outside the app don't. The count survives a restart.
 - **Withdraw** (an approved Approve step's button, a `reopen`) logs "Gene withdrew the approval of step n …" in
   Activity; reopening a done or declined step still logs "reopened".
 - **A step list that can't be read** (a hand-edited entry with an unknown kind or state): the readable steps show,
@@ -619,13 +625,17 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   source (the kept original) as its read-only system fields, the image
   in its body (the design's call, approved by Gene as AC-2 on 2026-11-08; not a Page holding the image). Only images
   the Page row would take: a mapping that puts them in a folder or key type, or the Page row into another type, wins.
-  The report's Originals section says "1 image became an Image object."; File objects mode makes no second object for
+  The import preview lists such images under their own **Image** row ("Image files", the count, no properties;
+  the row can't be mapped: "Images always become Image objects, so the Image row can't be changed.") and the Page
+  row's count leaves them out (fix pass 2026-11-09). The report's Originals section says "1 image became an Image object."; File objects mode makes no second object for
   an image; the File, PDF, Audio and Video objects it makes belong to the basic media types (made when the space has
   none, like Image), so their MIME type, file size and source are read-only system fields, not External properties. An image an earlier import made into a Page stays that Page on a re-run (matched by source id, updated in
   place, never duplicated or migrated) and the report notes "Kept as a Page: an earlier import made it before images
   became Image objects".
 - **Scanned PDF pages (OCR)**: a page with no text layer (or one under 32 characters) that holds an image is read with
-  a local `tesseract`, English only, and its text merged in page order, so a PDF mixing text and scanned pages keeps
+  a local `tesseract` in every language it has installed (`tesseract --list-langs`, asked once), or the list in
+  **Settings > Import Content > OCR languages** (`ocrLanguages`, Tesseract codes joined with `+`, e.g. `eng+deu`;
+  empty = every installed language; fix pass 2026-11-09), and its text merged in page order, so a PDF mixing text and scanned pages keeps
   every page's text (Gene's call, 2026-11-08). The report names the pages: "Needs OCR: page 2 read with the local OCR
   engine", or "Needs OCR: page 2 has no text layer" without `tesseract`; a PDF with no text layer at all still says
   "Needs OCR: read with the local OCR engine" (or "Needs OCR"). Each scanned page is OCR'd once: **Check for
@@ -685,7 +695,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   the other agents' folders, the agent trash and Object's own state files, through path rules in the run's
   settings. Known limit, accepted (decisions memo A-2): a folder whose name contains a backslash (`\`, legal in a
   Linux folder name) can't be fenced — no rule form Claude Code accepts matches it (three forms tried live on
-  2.1.319, Linux). Rename such a folder if an agent should not read it with its file tools.
+  2.1.319, Linux). Rename such a folder if an agent should not read it with its file tools. Object says so instead
+  of staying silent (fix pass 2026-11-09): the agent page's Profile tab shows, under Folder, `The folder "…" can't be
+  fenced from this agent's file tools because its name contains a backslash. Rename it if the agent shouldn't read
+  it.` (the agent API's `warnings`), and the app log gets the same line once per run.
 
 - **Refused steps** (our wording): a tool step the run was not allowed to make reads "Not allowed to create 'X'
   (this agent has the tool switched off)" (or "(the file is outside what this agent may read)", or the refusal's own
@@ -707,9 +720,20 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   window) opens at a one-time `/_open` link that hands it over as a session cookie, so every request the UI makes
   carries it. Without it `/api` answers 401 "Only Object's own window can use this." and the page shows "This page
   isn't connected to Object" ("Only the window Object opened can use this space. Open Object again from its
-  launcher."). With `--browser` the launcher also prints the link (it works once, for 5 minutes) and Enter in its
-  terminal prints and opens a new one. `/api/v1` with a token keeps its own auth; the run fence stays as a second
-  layer.
+  launcher."). With `--browser` the browser gets the one-time link alone and the terminal says "Object is running
+  at <url> (opened in your browser)."; the link is printed only when no browser could be opened, with `--print-link`,
+  or on Enter in the terminal (which prints and opens a new one; it works once, for 5 minutes). `/api/v1` with a
+  token keeps its own auth; the run fence stays as a second layer.
+- **Maintaining a running space over the token API**: type and saved-query definitions can be listed (`GET
+  /api/v1/types`, `GET /api/v1/queries`, added 2026-11-09), read, made, edited and deleted while Object is open with
+  a `read-write` token (or the `objectapp-mcp` tools `type_definition`, `create_type`, `edit_type`, `delete_type`,
+  `saved_query`, `create_query`, `edit_query`, `delete_query`), through the same Space code as the window: the same
+  validation, revision checks (409), read-only types (423), a saved version before each save and the Trash on
+  delete. Never hand-write `.object/*.json`.
+- **Live refresh**: an object change event (`created`, `changed`, `deleted`, `renamed`) may carry `linked`, the
+  sorted paths whose backlinks the change may have altered (absent when the link index can't say). Views keyed on
+  backlinks (the Tasks dashboard's Context grouping) refresh only those rows; without the field they reload as
+  before. A window's own saves carry the same list in the save response (fix pass 2026-11-09).
 
 ## 11. Unlinked mentions
 

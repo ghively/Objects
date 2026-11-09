@@ -26,11 +26,11 @@ Milestones and plans (`docs/superpowers/plans/`): M1-M9 the base app; M10 AI ass
 uv sync && (cd frontend && npm ci && npm run build)
 uv run objectapp --space <folder>                      # pywebview window
 uv run objectapp --space <folder> --browser            # the browser instead
-BROWSER=/usr/bin/true uv run objectapp --space <folder> --port 88xx --browser   # headless (no display)
+BROWSER=/usr/bin/true uv run objectapp --space <folder> --port 88xx --browser --print-link   # headless (no display)
 ```
 
 - **Gene runs Object as a desktop app, not a browser tab.** On GH-DT (Omarchy/Hyprland) it starts from the launcher entry `~/.local/share/applications/object.desktop` ("Object"), logging to `~/.local/state/objectapp/app.log`. Linux window facts (`0916bf5`): pywebview's GTK backend needs `pygobject` + `pycairo` (pyproject, linux marker); GTK **private mode turns localStorage off**, which left the zustand stores without their `persist` API and crashed the main pane ("e.persist.getOptions" undefined), so Linux starts non-private with web data in `<state>/webview` (`__main__._webview_start_options`) and `nav/spaceStorage.ts` tolerates a missing `persist`. A process started without the session's environment needs `XDG_RUNTIME_DIR=/run/user/$UID WAYLAND_DISPLAY=wayland-1 GDK_BACKEND=wayland`, or GTK says "cannot open display".
-- **The server needs its per-launch key** (decision S6, `backend/objectapp/uikey.py`). Without it `/api` answers 401 and `/` shows "This page isn't connected to Object". The window opens at a one-time `/_open?code=…` link that sets the key as a session cookie. With `--browser` the launcher prints that link (works once, for 5 minutes); Enter in its terminal prints and opens a new one. Open the printed link, not the bare URL.
+- **The server needs its per-launch key** (decision S6, `backend/objectapp/uikey.py`). Without it `/api` answers 401 and `/` shows "This page isn't connected to Object". The window opens at a one-time `/_open?code=…` link that sets the key as a session cookie. With `--browser` the browser gets the one-time link alone; the terminal prints it only when no browser could be opened, with `--print-link`, or on Enter (which prints and opens a new one; it works once, for 5 minutes). Open the printed link, not the bare URL.
 - **Scripts against a launched server** send the key as the `X-Object-Key` header (`SpaceHost.ui_key.secret`), or call `host.ui_key.open_url(url)` for a fresh link. `/api/v1` with a token keeps its own auth (MCP, agent runs).
 - **Tests and acceptance scripts** that build the app with `create_app(...)` and no `ui_key` have no key check.
 - Use a scratch `OBJECT_STATE_DIR` and a copy of a fixture space for anything automated; port 8790 is Gene's.

@@ -79,6 +79,16 @@ The history below is in the order it was written: the per-milestone sections new
   console, page or HTTP errors. Opening the space changed no `.md` file (only M1's first-open type files, since the
   fixture has no `.object/types/`).
 
+- **Known-limits fix pass (2026-11-09, four lanes by file ownership, one review, one gate):** object change events
+  carry `linked` and the Tasks dashboard refreshes only those rows (a window's own saves too, through the save
+  response); Gene's property or body edit of a work item restarts its S3 auto-run count (`workloop.on_change`,
+  wired from `server.announce`); the import preview lists images under an Image row (AC-2); the gallery's Day
+  template is gone and Week/Month say they are for reviews; OCR reads every installed Tesseract language or the
+  `ocrLanguages` setting (Settings > Import Content); `--browser` prints the one-time link only when no browser
+  opened or with `--print-link`; agents warn about a folder a backslash keeps unfenced (A-2); `GET /v1/types` and
+  `GET /v1/queries` list definitions on the token API; chart Export SVG writes the chart's own SVG. Catalog updated
+  in each section. Not done: the Anytype reader (waits for a real export).
+
 ### Needs Gene
 
 1. **Hand-checks:** the list in `auto-acceptance-2026-11-08.md`, "What needs Gene by hand" (Windows and pywebview,
@@ -105,33 +115,28 @@ The history below is in the order it was written: the per-milestone sections new
 ### Known limits
 
 - **Launch key (S6)** (`backend/objectapp/uikey.py:23-30`): a local process running as Gene can still read the
-  browser's memory or, with `--browser`, a session cookie that session restore wrote to disk; and it can read the
-  printed `/_open` link before the browser uses it. `/api/v1` with a token is open by design. The run fence behind it
+  browser's memory or, with `--browser`, a session cookie that session restore wrote to disk (the one-time link is
+  printed only when no browser opened, with `--print-link`, or on Enter; 2026-11-09). `/api/v1` with a token is
+  open by design. The run fence behind it
   (`runfence.py:22-37`) misses processes that detach from the run's tree and is off where `psutil` can't see
   connection owners (macOS without root).
 - **Backslash fence (A-2):** a folder whose name contains `\` can't be fenced from an agent's file tools; rename it
-  (catalog §10d).
-- **Chart "Export SVG"** (`views/layouts/chart/exportChart.ts:1-4`): `html-to-image` wraps the chart's HTML in an SVG
-  `<foreignObject>`, so the file is not vector shapes; browsers show it, vector editors may not. Options: keep it;
-  serialise the chart's own `<svg>` (the layouts already draw SVG, `chart/BarChart.tsx:71`) with its styles inlined;
-  or offer PNG only.
-- **Import preview counts:** the preview lists images under the Page row; the import makes them Image objects
-  (`importers/planner.py:109-119`, AC-2).
-- **Tasks dashboard reloads its rows** whenever any object outside the task rows changes, to keep the Context
-  grouping's backlinks live (`views/useRows.ts:91-94`, `tasks/useTaskRows.ts:37-38`); a cost on big spaces.
-- **S3 count reset:** only Gene's work actions on an item (step actions, Run now; `workloop.py:307-311`) start its
-  auto-run count again; editing one of its properties does not.
+  (catalog §10d). Since 2026-11-09 Object names the folder on the agent page and in the log instead of staying silent.
+- **Chart "Export SVG"**: fixed 2026-11-09 (the chart's own SVG, styles on the shapes, legend below); the number
+  chart, which draws no SVG, still exports its rendered frame through `html-to-image`.
+- **Tasks dashboard refresh** (fixed 2026-11-09): change events carry `linked`; the dashboard refreshes only those
+  rows. One conservative full reload remains when the link index is first built with a write already pending (a
+  write through the token API before any link read on a fresh server); the next event is exact again.
 - **Anytype reader** (`ocr-mcp-check-2026-11-08.md`, "Anytype reader"): against the exporter's source, the type
   sits under `Object type`, titles come out as slugs, `Creation date` is not `createdAt`, the `id` is an ordinary
   property, relations come out as file-name labels, and the `schemas/*.schema.json` formats are ignored. Medium risk;
   waiting on a real export.
-- **OCR is English only:** `tesseract` runs without `-l` (`readers/pdf.py:4`).
-- **Maintenance on a running space:** since S6 no outside process can call `/api` of a launched app (by design), so a
-  scripted change to Gene's live space (types, queries) means closing the window, running the change through
-  `Space(...)` (the same code the routes call, Trash included), and reopening it. Never hand-write `.object/*.json`.
-- **Starter gallery overlap:** the gallery's Day template duplicates the built-in daily note (one note per day);
-  Week and Month only pay off for periodic reviews. Gene removed all three from `main`; whether the gallery should
-  keep offering Day is open.
+- **OCR languages**: every installed Tesseract language, or the `ocrLanguages` setting (2026-11-09). Codes like
+  `script/Latin` are left out of the installed list; an uninstalled code in the setting makes a page keep "Needs OCR".
+- **Maintenance on a running space:** the window's own `/api` stays closed to other processes (S6), but type and
+  saved-query definitions are maintainable while Object runs through `/api/v1/types` and `/api/v1/queries` with a
+  `read-write` token or the MCP tools (catalog §10e; `GET` lists added 2026-11-09). `Space(...)` with the window
+  closed remains the offline fallback. Never hand-write `.object/*.json`.
 - **SharePoint:** no fetch code (by design); a Microsoft 365 MCP server would download into a Files folder first.
 - Closed on the same day, listed so nobody reopens them: the `settings` event is in `RESYNC_EVENTS`
   (`api/client.ts:540`, `d79f60f`), so a reconnect reloads device settings.
