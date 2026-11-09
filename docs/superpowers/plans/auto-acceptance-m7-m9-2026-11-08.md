@@ -2,7 +2,7 @@
 
 Generated from `results.json` (lane C1b scratch). Gene's `mN-acceptance.md` boxes are NOT ticked; this file records what an agent could verify.
 
-**Counts:** MANUAL 59, NOT-RUN 24, PARTIAL 9, PASS 22, SUPERSEDED 1 (total 115)
+**Counts:** MANUAL 59, NOT-RUN 22, PARTIAL 9, PASS 24, SUPERSEDED 1 (total 115)
 
 ## How this was run
 
@@ -111,8 +111,8 @@ Generated from `results.json` (lane C1b scratch). Gene's `mN-acceptance.md` boxe
 | M8#30 | The microphone prompt appears in the pywebview window, and recording, pausing, stopping and playback work. | MANUAL | **MANUAL** | Windows pywebview microphone permission + recording |
 | M8#31 | The clipboard read prompt for the palette's paste actions. | MANUAL | **MANUAL** | Clipboard-read permission prompt (pywebview) |
 | M8#32 | Deleting a space goes to the Recycle Bin, and the permanent delete works when the bin is unavailable. | MANUAL | **MANUAL** | Windows Recycle Bin. Server side verified by m8_acceptance check 6: delete -> {"trashed": true} via the trash hook; trash unavailable -> 428 (folder kept), then permanent -> 200 {"trashed": false}, folder gone |
-| M8#33 | Skip and Excuse from the checkbox menu, the overdue dialog (all choices), the custom repeat "On" row, and a reminder on a deadline. | ? | **NOT-RUN** | not reached |
-| M8#34 | The Completion Log under Task Stats (deleting one entry changes only its line), and "Remove date" on a recurring task with history asking... | ? | **NOT-RUN** | not reached |
+| M8#33 | Skip and Excuse from the checkbox menu, the overdue dialog (all choices), the custom repeat "On" row, and a reminder on a deadline. | AUTO | **PASS** | Tasks dashboard > More views > All, Water plants row: Status menu has Recurrence "Skip \| Excuse". Skip -> dialog "has 15 missed dates" (This occurrence only / All missed before today / Also skips all missed) -> date 2026-10-24 -> 10-25 + log line `2026-10-24 skipped`; Excuse -> "Excuse a missed repeat" (2 choices) -> `2026-10-25 excused`; checkbox -> "Complete a repeating task" (3 choices), "Marks every missed date done too" -> one completed line per missed date, date -> 2026-11-08. Custom repeat: Week shows the "On" row Mo..Su; Mon+Fri+Save -> `repeat: every day` -> `repeat: every week on mon, fri`. Deadline popover on Submit report shows "Reminder: 1 day before" (fixture reminders map); firing checked by m8_acceptance check 3 (one at 09:00:30, none at 08:59) |
+| M8#34 | The Completion Log under Task Stats (deleting one entry changes only its line), and "Remove date" on a recurring task with history asking... | AUTO | **PASS** | Water plants page: Completion Log entry "Delete Oct 22, 2026" -> "Remove this entry from the log? / It will be gone from the task history for good." -> Delete -> diff = that one log line (+lastUpdated). Date popover > Remove date on the recurring task asks "Remove date? ... Clearing the date throws that history away." with Keep date / Remove date; Keep date wrote nothing |
 | M8#35 | Save as Query, the palette's paste and space actions, backlink modes and the backlinks side panel (drag to swap), graph PNG export, and f... | ? | **NOT-RUN** | not reached |
 | M8#36 | The merge dialog (object and tag), and version history with preview and restore. | ? | **NOT-RUN** | not reached |
 | M8#37 | Whiteboards: | ? | **NOT-RUN** | not reached |
