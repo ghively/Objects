@@ -37,8 +37,9 @@ _OCR_CACHE: OrderedDict[str, str] = OrderedDict()
 _OCR_LOCK = threading.Lock()
 # Per engine path: its installed languages, or None when ``--list-langs`` could not be read.
 _LANGS_CACHE: dict[str, list[str] | None] = {}
-# A Tesseract language code: ``eng``, ``deu``, ``chi_sim`` (the ``ocrLanguages`` setting's rule too).
-_LANG_CODE = re.compile(r"[a-z_]{3,}")
+# A Tesseract language code: ``eng``, ``deu``, ``chi_sim``, or a script model such as
+# ``script/Latin`` (the ``ocrLanguages`` setting's rule too).
+_LANG_CODE = re.compile(r"[A-Za-z_]{3,}|script/[A-Za-z_]+")
 
 
 def ocr_engine() -> str | None:
@@ -56,7 +57,7 @@ def clear_ocr_cache() -> None:
 def parse_list_langs(output: str) -> list[str]:
     """The language codes in ``tesseract --list-langs`` output: a header line ("List of available
     languages (3):") then one code per line. ``osd`` (orientation and script detection) is no
-    language, and a line that is no code (an error, a ``script/`` name) is left out."""
+    language, and a line that is no code (an error) is left out."""
     out: list[str] = []
     for line in output.splitlines():
         code = line.strip()
@@ -67,7 +68,8 @@ def parse_list_langs(output: str) -> list[str]:
 
 def installed_languages(engine: str) -> list[str] | None:
     """The engine's installed languages, asked once per process; None when the list can't be
-    read (the engine failed or printed no code)."""
+    read (the engine failed or printed no code). A failure is not remembered, so one slow or
+    broken answer doesn't leave every later scan without languages."""
     with _OCR_LOCK:
         if engine in _LANGS_CACHE:
             return _LANGS_CACHE[engine]
@@ -81,8 +83,9 @@ def installed_languages(engine: str) -> list[str] | None:
         langs = parse_list_langs((r.stdout or "") + "\n" + (r.stderr or "")) if r.returncode == 0 else None
         if not langs:
             langs = None
-    with _OCR_LOCK:
-        _LANGS_CACHE[engine] = langs
+    if langs is not None:
+        with _OCR_LOCK:
+            _LANGS_CACHE[engine] = langs
     return langs
 
 
@@ -125,6 +128,13 @@ def _ocr_image(engine: str, name: str, data: bytes, tmp: Path, n: int, langs: li
     f.write_bytes(data)
     try:
         r = subprocess.run([engine, str(f), "stdout", *langs], capture_output=True, text=True, timeout=120)
+        if r.returncode != 0 and langs:
+            # A configured code the engine doesn't have: once more with the installed languages
+            # (or the engine's own default), so the page is still read.
+            fallback = language_arg(installed_languages(engine), None)
+            if fallback == langs:
+                fallback = []
+            r = subprocess.run([engine, str(f), "stdout", *fallback], capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.TimeoutExpired):
         return None
     if r.returncode != 0:

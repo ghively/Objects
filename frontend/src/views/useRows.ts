@@ -97,8 +97,12 @@ export function useRows(scope: RowsScope, options: UseRowsOptions = {}): UseRows
       if (rollupsMayChange(scopeRef.current, rowsRef.current, changed)) return reload()
       let wanted = changed
       if (backlinks) {
+        // Every changed path is asked for (the server answers nothing for one outside the
+        // scope, and a row for an object that now qualifies, e.g. a page turned into a task),
+        // plus the rows an outside change may have linked; an outside change whose links are
+        // unknown means a full reload.
         const have = new Set(rowsRef.current.map((r) => r.summary.path))
-        const rows = new Set(changed.filter((p) => have.has(p)))
+        const rows = new Set(changed)
         for (const p of changed) {
           if (have.has(p)) continue
           const l = links.get(p)

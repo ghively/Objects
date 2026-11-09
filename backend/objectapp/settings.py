@@ -171,9 +171,11 @@ WORK_ALERT_INTERVAL_MAX = 10080
 WORK_READ_TOOLS_MAX = 500
 _READ_TOOL_ID = re.compile(r"mcp__[A-Za-z0-9_-]{1,64}__\S{1,128}")
 _AGENT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
-# Tesseract language codes joined with ``+`` (``eng``, ``chi_sim+eng``); "" is "every installed language".
+# Tesseract language codes joined with ``+`` (``eng``, ``chi_sim+eng``, ``script/Latin``); "" is
+# "every installed language".
 OCR_LANGUAGES_MAX = 200
-_OCR_LANGUAGES = re.compile(r"[a-z_]{3,}(?:\+[a-z_]{3,})*")
+_OCR_LANG = r"(?:[A-Za-z_]{3,}|script/[A-Za-z_]+)"
+_OCR_LANGUAGES = re.compile(_OCR_LANG + r"(?:\+" + _OCR_LANG + r")*")
 _PROBLEM_MESSAGES = {
     "ocrLanguages": "OCR languages are Tesseract codes joined with +, for example eng+deu.",
     "workReadTools": "A read tool is mcp__<server>__<tool> (at most 500).",

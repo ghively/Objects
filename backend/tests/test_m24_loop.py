@@ -850,3 +850,20 @@ def test_genes_property_edit_lets_a_held_item_go(env: Env, monkeypatch: pytest.M
     # an event for a space with no loop, or an object that is gone, is nothing
     workloop.on_change_event(Space(env.root / "Projects"), ChangeEvent("changed", B, None, origin="x"))
     env.loop.on_change(ChangeEvent("changed", "Tasks/Gone.md", None, origin="3f1c2b4e-window"))
+
+
+def test_genes_edit_in_the_app_lets_a_held_item_go(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The same through the app's own route (the editor's property save, `PUT /api/object/properties`
+    with the window's client id): the server hands the event to the loop, the held step runs."""
+    _held_after_three(env, monkeypatch)
+    base = f"http://127.0.0.1:{env.port}"
+    assert [h["path"] for h in env.loop.agent_status()["held"]] == [B]
+    version = httpx.get(f"{base}/api/object", params={"path": B}).json()["version"]
+    res = httpx.put(
+        f"{base}/api/object/properties",
+        json={"path": B, "updates": {"priority": ["Low"]}, "baseVersion": version, "clientId": "3f1c2b4e-window"},
+    )
+    assert res.status_code == 200, res.text
+    env.idle()
+    assert [e["auto"] for e in env.entries() if e["kind"] == "run"] == [True] * 6
+    assert [h["path"] for h in env.loop.agent_status()["held"]] == [B]  # held again after three more

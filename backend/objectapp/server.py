@@ -152,6 +152,7 @@ a file the OS refused to write (locked by another program, say) is ``503 {detail
 
 from __future__ import annotations
 
+import logging
 import asyncio
 import contextlib
 import copy
@@ -1260,14 +1261,24 @@ def create_app(
         The save routes return it so the saving window's own local event can carry the same list.
         """
         if event.kind in LINKED_KINDS and event.linked is None:
-            event = replace(event, linked=space.links.take_linked())
-        # Decision S3 (fix pass 2026-11-09): Gene's own edit of a work item, told apart by the
-        # event's origin (his window's client id), starts its auto-run count again.
-        on_change_event(space, event)
+            try:
+                event = replace(event, linked=space.links.take_linked())
+            except Exception:  # the write is done; an index problem must not fail the request
+                logging.getLogger(__name__).exception("Reading the links changed by %s failed", event.path)
         loop = hub.loop
         if loop is not None and loop.is_running() and not hub.closed:
             loop.call_soon_threadsafe(hub.publish, event)
         return event
+
+    def gene_edited(event: ChangeEvent) -> None:
+        """Decision S3 (fix pass 2026-11-09): Gene's own edit of a work item, a body save or a
+        property set from his window (the event's origin is its client id), starts the item's
+        auto-run count again (`workloop.on_change_event`). Only the object he edited: the
+        relation-synced, relinked or retyped objects other routes announce are not his action."""
+        try:
+            on_change_event(space, event)
+        except Exception:  # the write is done; the loop's bookkeeping must not fail the request
+            logging.getLogger(__name__).exception("Telling the Work loop about an edit of %s failed", event.path)
 
     # M14: rules run on the engine's worker after the request returns; every write notice of
     # the space goes to it (it drops an automation's own writes: the loop guard).
@@ -1336,7 +1347,9 @@ def create_app(
                 # window (and view) about the new version here instead. The saving window
                 # gets no echo, so the response carries `linked` for its local event.
                 rel = PurePosixPath(req.path.replace("\\", "/")).as_posix()
-                linked = announce(ChangeEvent("changed", rel, version, origin=req.clientId)).linked
+                event = announce(ChangeEvent("changed", rel, version, origin=req.clientId))
+                linked = event.linked
+                gene_edited(event)
         except Conflict as exc:
             return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
         except ReadOnly as exc:
@@ -1373,7 +1386,9 @@ def create_app(
         linked: tuple[str, ...] | None = None
         if result.version != req.baseVersion:
             # As in `put_body`: the saving window's local event needs `linked` too.
-            linked = announce(ChangeEvent("changed", rel, result.version, origin=req.clientId)).linked
+            event = announce(ChangeEvent("changed", rel, result.version, origin=req.clientId))
+            linked = event.linked
+            gene_edited(event)
         for path in result.synced:
             announce(
                 ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId)

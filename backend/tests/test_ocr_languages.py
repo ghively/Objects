@@ -35,7 +35,7 @@ def test_list_langs_output_is_parsed_without_the_header_or_osd() -> None:
     assert pdf.parse_list_langs("List of available languages (0):\n") == []
     assert pdf.parse_list_langs("") == []
     # A line that is no language code (an error line, a script name) is left out.
-    assert pdf.parse_list_langs("Error opening data file\neng\nscript/Latin\n") == ["eng"]
+    assert pdf.parse_list_langs("Error opening data file\neng\nscript/Latin\n") == ["eng", "script/Latin"]
 
 
 def test_language_argument_from_installed_from_setting_and_absent() -> None:
@@ -127,7 +127,7 @@ def test_configured_languages_is_the_device_setting(state: Path) -> None:
         ("eng+deu", "eng+"),
         ("chi_sim+eng", "+eng"),
         ("eng", "eng deu"),
-        ("eng", "Eng"),
+        ("script/Latin", "eng/deu"),
         ("eng", "eng,deu"),
         ("eng", "e" * 201),
     ],

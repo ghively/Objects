@@ -867,7 +867,8 @@ def plan(
     kept_types = [pt for pt in plan_types if not pt.skip]
     counts = ImportCounts(
         objects=len(objects),
-        types=len(kept_types) + (1 if image_sources else 0),  # the Image row (AC-2)
+        # The Image row (AC-2) counts as a type to make only when the space has no Image type.
+        types=len(kept_types) + (1 if image_sources and image_type is None else 0),
         properties=sum(1 for pt in kept_types for p in pt.properties if not p.skip and not p.systemKey),
         attachments=len(attachments),
         attachmentBytes=sum(a.size for a in attachments.values()),

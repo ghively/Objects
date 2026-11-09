@@ -66,23 +66,28 @@ const window = async () => {
 }
 
 describe('useRows with backlinks', () => {
-  test('a change elsewhere naming a row refreshes that row only', async () => {
+  test('a change elsewhere naming a row refreshes that row and asks for the changed path', async () => {
+    // The changed path itself is asked for too (it may now be a row); People/X.md is no row.
     await mount()
     act(() => {
       fire({ kind: 'changed', path: 'DailyNotes/2026-11-09.md', version: 'v', linked: ['Tasks/B.md', 'People/X.md'] })
     })
     await window()
     expect(mocked.rows).toHaveBeenCalledTimes(1)
-    expect(mocked.rows).toHaveBeenCalledWith({ ...SCOPE, paths: ['Tasks/B.md'], preview: false })
+    const call = mocked.rows.mock.calls[0][0] as { paths?: string[] }
+    expect([...(call.paths ?? [])].sort()).toEqual(['DailyNotes/2026-11-09.md', 'Tasks/B.md'])
   })
 
-  test('a change elsewhere with no linked targets asks for nothing', async () => {
+  test('a change elsewhere with no linked targets asks only for that path', async () => {
+    // Not nothing: the changed object may now qualify as a row (a page turned into a task); the
+    // server answers nothing for a path outside the scope.
     await mount()
     act(() => {
       fire({ kind: 'changed', path: 'DailyNotes/2026-11-09.md', version: 'v', linked: [] })
     })
     await window()
-    expect(mocked.rows).not.toHaveBeenCalled()
+    expect(mocked.rows).toHaveBeenCalledTimes(1)
+    expect(mocked.rows).toHaveBeenCalledWith({ ...SCOPE, paths: ['DailyNotes/2026-11-09.md'], preview: false })
   })
 
   test('a change elsewhere without linked reloads everything, as before', async () => {
@@ -115,6 +120,6 @@ describe('useRows with backlinks', () => {
     await window()
     expect(mocked.rows).toHaveBeenCalledTimes(1)
     const call = mocked.rows.mock.calls[0][0] as { paths?: string[] }
-    expect([...(call.paths ?? [])].sort()).toEqual(['Tasks/A.md', 'Tasks/B.md'])
+    expect([...(call.paths ?? [])].sort()).toEqual(['DailyNotes/2026-11-09.md', 'Tasks/A.md', 'Tasks/B.md'])
   })
 })

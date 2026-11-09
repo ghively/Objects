@@ -107,8 +107,10 @@ def _from_ui(origin: str | None) -> bool:
 
 
 def on_change_event(space: Space, event: ChangeEvent) -> None:
-    """`server`'s ``announce`` hands every change event to the space's loop (`WorkLoop.on_change`);
-    nothing when the space has no loop yet."""
+    """`server`'s body and property save routes hand their change event to the space's loop
+    (`WorkLoop.on_change`); nothing when the space has no loop yet. Only those two: the
+    relation-synced, relinked or retyped objects other routes announce with the window's origin
+    are not Gene's action on them (review of the 2026-11-09 fix pass)."""
     with _loops_lock:
         loop = _loops.get(WorkLoop._key(space))
     if loop is not None:
@@ -367,7 +369,7 @@ class WorkLoop:
             log.exception("Auto-run check failed for %s", notice.path)
 
     def on_change(self, event: ChangeEvent) -> None:
-        """A change event the app announces (`on_change_event`): a write of Gene's own to a work
+        """A change event of a direct save (`on_change_event`): a write of Gene's own to a work
         item, one of his windows' ``clientId`` as its origin (a property set in the editor, a body
         save), is his action on the item, so its auto-run count starts again and a held step is let
         go, then the item is looked at for auto-run as after a notice (decision S3). The writes of

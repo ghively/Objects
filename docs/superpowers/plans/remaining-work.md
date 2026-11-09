@@ -82,7 +82,7 @@ The history below is in the order it was written: the per-milestone sections new
 - **Known-limits fix pass (2026-11-09, four lanes by file ownership, one review, one gate):** object change events
   carry `linked` and the Tasks dashboard refreshes only those rows (a window's own saves too, through the save
   response); Gene's property or body edit of a work item restarts its S3 auto-run count (`workloop.on_change`,
-  wired from `server.announce`); the import preview lists images under an Image row (AC-2); the gallery's Day
+  called by the body and property save routes only, so a rename's relinked objects or a relation sync don't count); the import preview lists images under an Image row (AC-2); the gallery's Day
   template is gone and Week/Month say they are for reviews; OCR reads every installed Tesseract language or the
   `ocrLanguages` setting (Settings > Import Content); `--browser` prints the one-time link only when no browser
   opened or with `--print-link`; agents warn about a folder a backslash keeps unfenced (A-2); `GET /v1/types` and
