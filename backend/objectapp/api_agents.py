@@ -51,6 +51,7 @@ from .settings import RevisionConflict, SettingsProblem
 from .settings import patch as patch_settings
 from .settings import read as read_settings
 from .space import ReadOnly
+from .spaces import is_full_path
 from .watcher import ChangeEvent
 
 __all__ = ["agent_tool_groups", "router"]
@@ -109,6 +110,9 @@ def _error(status: int, detail: str) -> JSONResponse:
     return JSONResponse({"detail": detail}, status_code=status)
 
 
+FULL_PATH_ONLY = "Choose a folder by its full path."
+
+
 def _location(text: str | None) -> Path | None:
     return Path(text) if isinstance(text, str) and text.strip() else None
 
@@ -164,6 +168,10 @@ def router(ctx: ApiContext) -> APIRouter:
     def create_agent(req: CreateAgentRequest):
         reg = registry()
         location = _location(req.location)
+        # A relative location would be read against the server's working folder, which is
+        # nothing the user chose (sweep 2026-11-08, as `POST /api/spaces`).
+        if location is not None and not is_full_path(location):
+            return _error(404, FULL_PATH_ONLY)
         try:
             if req.duplicateOf is not None:
                 rec = reg.duplicate(req.duplicateOf.id, req.agent, memory=req.duplicateOf.memory,
@@ -177,6 +185,8 @@ def router(ctx: ApiContext) -> APIRouter:
 
     @r.post("/agents/add-folder", status_code=201)
     def add_folder(req: AddFolderRequest):
+        if not is_full_path(req.path):
+            return _error(404, FULL_PATH_ONLY)
         try:
             rec = registry().add_folder(Path(req.path))
         except AgentError as exc:
