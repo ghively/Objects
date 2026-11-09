@@ -27,11 +27,13 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 | Agents: run tools and the fence | specified in part (section 10d) |
 | Import: Source line, Files source, scan, proposal, trial, normalise, Import inbox | specified (section 10c); the exact strings live in the code |
 | Tab and sidebar context menus, Overview tab, collection page, outline | specified (section 9) |
-| Views: layouts, toolbar, Overview | specified (sections 8, 9); the inner screens of the filter, sort and group editors and Customize are not specified yet |
+| Drag and drop | specified (section 9b) |
+| Views: layouts, toolbar, filter, sort and group editors, Customize view, Queries page, Overview | specified (sections 8, 9) |
 | Object page: header, properties, side panel | specified (section 5); outline and stats in section 9; backlinks in section 10; unlinked mentions in section 11 |
-| Editor: block menu, selection toolbar, slash, @ | specified (section 6); the default table in section 10; the look of Two Columns, Code, Math, Toggle, Group and Horizontal line blocks is not specified yet |
+| Editor: block menu, selection toolbar, slash, @, markdown list shortcuts | specified (section 6); the default table, Two Columns, Code, Math, Toggle, Group and Horizontal line blocks, and media blocks in section 10 |
+| PDF, Weblink, image and file objects | specified (section 10) |
 | Version control and backup (git) | specified (section 12) |
-| Graph, Trash, Explore panel, shortcuts | specified (section 7); export dialog in section 10 (PDF, Markdown; Word and LaTeX options not specified yet); the import dialog is described in section 10c |
+| Graph, Trash, Explore panel, shortcuts | specified (section 7); export dialog (PDF, Markdown, Word, LaTeX) in section 10; the import dialog is described in section 10c |
 
 ## 1. Settings
 
@@ -275,7 +277,17 @@ Each starter template pre-fills the new type's properties.
   dropdown, delete (red), AI, close.
 - **Inline code** renders as a purple monospace token with a tinted background; **tables** are bordered with a
   header row; the empty body's placeholder reads "Start writing, or type / for blocks..."; the title placeholder "Untitled".
-- **Slash menu**, **@ picker**, **markdown shortcuts**: see audit items 41-43 and section 2.
+- **Slash menu**, **@ picker**: see audit items 41-43 and section 2.
+- **Markdown list shortcuts** (decision C11; `editor/extensions/markdownShortcuts.ts`, `editor/document.ts`):
+  - At a block's start, typed marks followed by Space convert: `|` quote, `>` toggle, `*` or `-` bullet, `1.`
+    numbered, `a)` alphabetical, `i)` roman, `[]` to-do, `()` icon, `#`-`####` heading. `---` makes a horizontal
+    line.
+  - Marks combine, with Space only after the last (`>#` + Space = heading 1 in a toggle). They apply inside out:
+    heading, icon, quote, list, toggle. Two marks of one kind (two lists, two headings) stay text.
+  - A single bullet, number or heading mark is StarterKit's own rule. `> ` makes a toggle, not a quote; `[] ` makes
+    a to-do list like the menus.
+  - `()` always gives the same icon (Object keeps no last-used icon).
+  - "Turn off automatic numbered lists" removes `1.` as a mark, alone and combined.
 - **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).
 - **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves.
 - **Edited lines are written in the editor's standard Markdown form**: the line of a block you edit is rewritten
@@ -307,17 +319,82 @@ Each starter template pre-fills the new type's properties.
 - **Search palette**: see audit backlog item 2 (placeholder text, Today/Earlier groups, type at the right).
 - **New menu**: popover with Search; types in recent-use order; footer hints.
 - **View toolbar** (type pages, `All` tab): count pill, Filter, Sort, Group by, a layout dropdown, Customize.
-  - Layouts: List, Wall (cards), Kanban, Gallery, Table, Embed.
-  - Filter popover: "where" row builder with "Filter" and "Filter group" buttons. Sort popover: "+ Sort".
-    Group by: a "Group by" button. Customize: "Card view" and "Calculations".
+  - Layouts (`views/model.ts`): List, Wall, Kanban, Gallery, Table, Embed, Calendar, Timeline, Chart, Gallery strip.
+  - Filter popover: "where" row builder with "+ Filter" and "+ Filter group" buttons (below). Sort popover: "Add
+    sort". Group by: a "Group by" button. Customize: "Customize view" (below).
   - Tab strip: Overview | All | custom tabs (including Query-backed ones) | `+` to add a tab.
-- **Query builder search mode**: Auto | Title. Exact and Semantic are hidden until real full-text search exists
-  (Gene's decision Q-1: they matched exactly like Auto). A saved query that uses one still runs as Auto (the
-  server keeps accepting both) and shows Auto; the next edit of its search saves it as Auto. The Search page's **Save as
-  Query** saves Auto too, with or without **Text matches only** (that toggle filters the Search page only).
   - Type page header: type icon + plural name; search icon; `...` (New collection, Pin to sidebar, Pin to…,
     Object type settings, Import CSV, Save as query, Delete object type; "New from template" is in the sidebar's
     type menu); a split "New" button.
+- **Filter editor** (decision C1; `views/FilterEditor.tsx`, `views/filter.ts`):
+  - Popover body: rows that start "where", then the group operator (a menu "and | or" on the second row, plain
+    text on the rest), Property, Operator, value editor and a `…` menu (Turn into group, Remove; Remove only, one
+    level down).
+  - "+ Filter" and "+ Filter group"; a new group takes the opposite operator and two filters. A nested group is
+    boxed and titled "Filter group", with `…` Ungroup and Remove and its own "+ Filter". Removing a group's last
+    filter removes the group. Nesting goes two levels deep.
+  - No filterable property: "No properties can be filtered here". A broken filter shows "Invalid — Will be ignored".
+  - Operators by kind:
+    - Text, URL, email, phone, ID: is empty, is not empty, includes, does not include, is, is not, starts with,
+      ends with.
+    - Number: = ≠ ≥ > ≤ <.
+    - Checkbox: is selected, is not selected.
+    - Label, relation, tags: is empty, is not empty, includes, does not include.
+    - Object type: is, is not. Collections and backlinks: includes.
+    - Date: is empty, is not empty, is, is before, is after, is on or before, is on or after. A date with an end
+      adds the "start …" and "end …" forms. The Task date adds is recurring, is not recurring, has reminder, has no
+      reminder.
+    - Files, steps, floor items, blocks: is empty, is not empty.
+  - Date values (`views/dates.ts`): overdue, today, yesterday, tomorrow, this week, this month, this year, one week
+    ago, in one week, one month ago, in one month, Specific date. "This week" follows "Start of the week".
+- **Sort editor** (decision C2; `views/SortEditor.tsx`, `views/sort.ts`): rows of Property and Order, a "Move to
+  top" arrow on every row but the first, and an × to remove. "Add sort" adds the next unused property; with no
+  sorts it reads "No sort". Dates: Oldest first, Newest first, is empty first, is empty last. Everything else:
+  ascending, descending. Object type, steps and floor items can't be sorted.
+- **Group editor** (decision C3; `views/GroupEditor.tsx`, `views/group.ts`):
+  - "Group by": a property menu starting with "None", then "Group option" and "Sort groups by"; one level of
+    grouping.
+  - Options: status label default | By category; long text By Text | By Linked Objects; number By Exact Value |
+    By Range (Min, Max, Group every); date By Hour | By Day | By Week | By Month | By Year | Relative | Scheduled.
+  - Group order: label Order | Order inverse, others default; then ascending, descending, (relations: Created
+    oldest first, Created newest first), smallest first, largest first, Manual.
+  - Long text with paragraphs, files, steps, text lists and floor items can't be grouped.
+- **Customize view** (decision C4; `views/CustomizeMenu.tsx`, `views/cards/CardCustomize.tsx`), a 16rem menu:
+  - "Layout" (only when the toolbar is under 480 px).
+  - The layout's own page: Table (one type only), Card view (Wall, Gallery, Gallery strip, Kanban), Calendar,
+    Timeline, Chart.
+  - "Sub-items and dependencies".
+  - "Groups", "Calculations", and "Show details" / "Hide details".
+  - "Groups": "Visible groups" and "Hidden groups" with an eye per row; "Show all groups", "Hide all groups";
+    switches "Hide new groups" and "Hide empty groups". Ungrouped: "Group the view by a property first."
+  - "Calculations": one row per calculation ("<Property>: <kind>", ×), and an add row with Property and
+    Calculation. Kinds (`views/calc.ts`): Count all, Count values, Count unique values, Count empty, Count not
+    empty, Percent empty, Percent not empty, Checked, Unchecked, Percent checked, Percent unchecked, Earliest
+    date, Latest date, Date range, Sum, Average, Median, Min, Max, Range.
+  - "Card view", per type: the type name with a gear (opens Object type settings) and a "Use default" switch.
+    "Selected Properties" can be dragged to reorder and removed with ×; "Add Properties" lists the rest, or "All
+    properties are already added". With "Use default" on, the list is read-only.
+- **Queries page and a query** (decision C5; `queries/QueriesPage.tsx`, `QueryPage.tsx`, `QueryBuilder.tsx`,
+  `runQuery.ts`):
+  - Sidebar "Queries" (in the Object Types block) opens a list headed "Queries" with "New". Each row has Open, Pin
+    to Sidebar, Delete. Empty: "No queries" / "Queries you save show up here."
+  - "New" creates a draft and opens it. A query page has an icon, an editable name (Enter commits, Escape
+    reverts) and `…`: Pin to Sidebar, Pin to object type / Unpin, Pin to dashboard / Unpin, Delete. "Edit query"
+    / "Close editor" toggles the builder. Results are a data view.
+  - A draft with no search term, tag or type: "Query isn’t ready" / "The draft is kept, but it lists nothing
+    until it has a search term, a tag or an object type." No results: "No content found".
+  - Builder: Types: All, or picked types (four shown), plus "Exclude object types" (excluding needs a search term
+    or a tag first, and is ignored while particular types are picked). Collection: All | In any collection | In no
+    collection. "Tags or backlinks": Any of | All of, plus "Leave out tags or backlinks". Search: up to five terms
+    of two or more characters; Enter adds a term, and a result needs to match one. Mode: Auto | Title (below).
+    Limit: 1, 3, 5, 10, 25, 50, No limit.
+  - During a search, sorting and property filters are off: "Sorting and property filters are off during a search."
+  - A query's automatic title: "Tasks, Pages tagged work …", or "All notes" with no types (`queries/autoTitle.ts`).
+- **Query builder search mode**: Auto | Title. Auto looks for the words in titles, aliases, descriptions and text (a
+  case-folded substring); Title looks in titles only. Exact and Semantic are hidden until real full-text search exists
+  (Gene's decision Q-1: they matched exactly like Auto). A saved query that uses one still runs as Auto (the
+  server keeps accepting both) and shows Auto; the next edit of its search saves it as Auto. The Search page's **Save as
+  Query** saves Auto too, with or without **Text matches only** (that toggle filters the Search page only).
 - **Wall cards** show: the type label, the icon and title, the description, then one row per card-view property
   with its icon and value or "Empty" (Collaborators, Time frame, Status on Projects).
 
@@ -342,6 +419,31 @@ Each starter template pre-fills the new type's properties.
   of a paragraph, made with `()` Space), tables with a header row, tags row with colored chips, inline code.
 - **Note**: opening an object and selecting text must not change its "Last Updated"; only a real edit does.
 
+## 9b. Drag and drop (decision C10)
+
+Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
+
+- **Editor**: a block moves by its handle with its bytes intact (`editor/handles/dragMove.ts`). Columns dividers and
+  media sizes drag and write on release. Files dropped in upload (section 10, media objects).
+- **Sidebar**: sections reorder by drag (`shell/SidebarSections.tsx`). Pinned and custom-section items reorder; an
+  object pin dragged onto a whiteboard adds it there (`shell/PinnedSection.tsx`). Types drag in manual sort.
+- **Side panel**: an entry's title dragged onto the main view swaps them (`shell/SidePanelArea.tsx`). The divider
+  drags between 10 % and 90 %; a double click resets it to 45 % (`nav/sidepanel.ts`).
+- **Search palette**: a result row dragged onto a whiteboard adds that object; the palette closes as the drag starts
+  (`palette/SearchView.tsx`).
+- **Views**:
+  - Kanban cards drag between columns and write the group value. A card that can't move gets "This card can't be
+    moved here." and no drag starts.
+  - Calendar-layout chips move by whole days and write one property; a range moves whole
+    (`views/layouts/CalendarLayout.tsx`).
+  - Timeline: the bar body moves both dates, an edge moves one, written on drop; "No date" tray items drag onto the
+    axis (`views/layouts/TimelineLayout.tsx`).
+  - Table columns resize, clamped live (`views/table/TableLayout.tsx`).
+- **Lists that reorder by drag**: label options (on Task status, dragging to another section changes its category,
+  `properties/LabelMenu.tsx`), text-list items, templates, Overview sections, card properties, automation actions
+  (`automations/RuleEditor.tsx`) and Work steps (`work/StepList.tsx`).
+- **Cover image**: "Drag to move the image" while repositioning (`object/CoverImage.tsx`).
+
 ## 10. Calendar views, backlinks, export, blocks
 
 - **Month view**: header "Nov 2026" at the left, the view switcher (Month, Week, Three days, Day) centered,
@@ -353,6 +455,12 @@ Each starter template pre-fills the new type's properties.
 - **Week view**: a single column of days. Each day: the weekday name colored by weekday (Sunday red, Monday amber
   with a red "Today" pill, Tuesday pink, Wednesday green, Thursday orange, Friday blue), the date as a large
   title, "Week 45", then the note or a "+ Daily Note" button. No month sidebar.
+- **Three days view** (decision C9; `calendar/ThreeDaysView.tsx`, `calendar/dates.ts`, `calendar/useCalendar.ts`):
+  three equal columns, the anchor day with the day before and after (yesterday, today, tomorrow when anchored on
+  today). Each is the small day header over the daily-note slot, and nothing else (Tasks, Created and Backlinks are
+  Day-view sections). The pill (Reviewed, "Open as Page", `…`) shows on an existing note; a missing note shows "+
+  Daily Note". Previous and next move one day; Up and Down move one week. The switcher tooltip and the R shortcut
+  read "Show the day before and after".
 - **Daily note from a template**: clicking or typing in an empty day's inline note creates the note (from the
   DailyNote default template, if any) and the typing goes into its own paragraph after the template content (or
   into the template's first empty paragraph) — never onto the end of the template's last heading.
@@ -369,14 +477,70 @@ Each starter template pre-fills the new type's properties.
   update without a reload (a change to any other object re-reads them).
 - **Inline tag**: a `#tag` typed in a paragraph renders as a colored chip in the text.
 - **Export dialog** (object `...` > Export, Ctrl+E): a modal with format tiles PDF, Markdown, Microsoft Word,
-  Latex. PDF: Style cards (Notes: matches the page's styling; Essay and Academic, both Experimental),
-  Options (Include embeds; Include outline; Hide empty properties, on by default; Show type labels),
-  Format (A4 | Letter), Properties (All properties, with a per-property list), and an Export button.
-  Markdown: "Include subpages (as a folder)" (zip), Include media, Add the title as a top heading, Links as
-  wikilinks. The Word and Latex options are not specified yet.
+  Latex; Markdown is selected on open. PDF: Style cards (Notes: matches the page's styling; Essay; Academic — all
+  three available, none marked Experimental), Options (Include embeds; Include outline; Hide empty properties, on by
+  default; Show type labels), Format (A4 | Letter), Properties (All properties, with a per-property list), and an
+  Export button. Markdown: "Include subpages (as a folder)" (zip), Include media, Add the title as a top heading,
+  Links as wikilinks.
+- **Word and Latex export** (decision C8; `object/ExportDialog.tsx`, `backend/objectapp/exportdoc.py`):
+  - Options: "Hide empty properties", "Show type labels" and the Properties list ("All properties" plus one per
+    property). No Style or paper choice.
+  - Both come from one reading of the body (headings, paragraphs, lists and to-dos, quotes, code, math, tables,
+    horizontal lines, images, object embeds; block annotations dropped).
+  - Word: paper is A4 with 2 cm margins; the title uses the Title style, the type the Subtitle style. To-dos show as
+    ☐/☑. Code and math are Consolas "Code" paragraphs (math as its TeX source). Tables have a bold first row. Images
+    keep only their alt text, in italics. Embeds show a bold blue title, then the embedded blocks. Web and mail links
+    become real hyperlinks; wikilinks are blue text.
+  - Latex: an `article` with `amssymb`, `ulem` and `hyperref`; unnumbered headings (`\section*` …). Lists map to
+    `itemize` / `enumerate`; to-dos to `[$\square$]` / `[$\boxtimes$]`. Code in `verbatim`, math in `\[ … \]`,
+    tables in a ruled `tabular` with a bold first row. Images become a `% image: <src>` comment plus their alt text.
 - **Table block** (slash > Table): a 2 column by 3 row empty table with a rounded border, header row styling,
-  and cells that edit in place. The look of Two Columns, Code, Math, Toggle, Group and Horizontal line blocks is
-  not specified beyond section 6 (code and math) and the shortcut sheet in section 2 (keyboard behavior).
+  and cells that edit in place.
+- **Blocks** (decision C7):
+  - **Two Columns** (`editor/nodes/columns.ts`, `editor/layout/ColumnsView.tsx`, `editor/layout/Divider.tsx`): slash
+    "Two Columns" inserts 2 even columns (`<!-- columns widths=… -->`). Dividers drag in whole percent, each column at
+    least 10, and write `widths` on release. Hover shows "Column layout" (Columns | Grid: Grid wraps responsively,
+    without dividers), "Add column" and "Remove column", for 1 to 6 columns; widths are spread evenly again.
+  - **Code** (`editor/nodes/codeBlock.ts`, `editor/code/CodeBlockView.tsx`): the bar shows on hover or focus: "Select
+    language", "Wrap lines", "Lock editing" (text read-only until unlocked; moving or deleting the block still
+    works), "Copy to clipboard", "Download as file". Markdown and Mermaid blocks add Edit | Edit & Display | Display
+    (default Display). Highlighting is a decoration only; the bytes never change. Slash "Mermaid Diagram" shows only
+    while searching.
+  - **Math** (`editor/nodes/mathBlock.ts`, `editor/math/MathBlockView.tsx`): `$$…$$` rendered with KaTeX, one row per
+    blank-line-separated part. A click opens the TeX source with a live preview and "Close". Enter inserts a
+    paragraph (above at the very start, else below); Shift+Enter is a line break; Escape closes and selects the block.
+  - **Toggle** (`editor/nodes/toggle.ts`): `<!-- toggle open -->…<!-- /toggle -->`; the first child is the toggle's
+    line. A caret rotates when open and dims with no children; an outliner line runs along the children unless "Hide
+    outliner lines" is on. With Toggle style Bullet, the caret shows as a bullet until hovered. A click writes `open`
+    to the file.
+  - **Group** (`editor/nodes/group.ts`, `editor/layout/GroupView.tsx`): `<!-- group color=… -->`; a rounded box,
+    neutral fill by default, with `color` and `align`. Placeholder "Box heading..." on an empty first line. Hover
+    shows "Ungroup". Ctrl+G groups or ungroups the selected blocks.
+  - **Horizontal line** (`editor/slash/slashItems.ts`): slash "Horizontal line" inserts it below the block (in place
+    of an empty block); `---` at a block start does the same.
+- **PDF, Weblink, image and file objects** (decision C6; `backend/objectapp/typemodel.py`,
+  `editor/media/MediaView.tsx`):
+  - There is no separate PDF or Weblink viewer: an object of a media type is a page whose body holds the media
+    block.
+  - The media types (Weblink, File, Image, PDF, Audio, Video, Tweet) are basic types with fixed, read-only system
+    fields: Weblink: URL, domain, iframe URL, preview image. Tweet: URL, source. File, PDF, Audio: MIME type, file
+    size, source. Image and Video add width and height.
+  - Editable extras with built-in option sets: PDF: Number of Pages, Table of Contents, Document type, Topic. Image:
+    Category, Colors. Weblink: Category, Topic. Audio: Duration, Origin, Category.
+  - A Weblink's preview image is the card image when it is a space file (`views/cards/SmallCard.tsx`).
+  - Import makes every image a Page row would take an Image object (section 10c). With "Keep originals as File
+    objects" picked, each other original becomes a File, PDF, Audio or Video object of the basic media type (made when
+    the space has none); otherwise originals go to `Attachments/Originals/` (`importers/writer.py`).
+  - Media blocks: Image: resizable, alignable, caption. PDF: an iframe, 600 px tall by default, with a bottom drag
+    handle. Audio: controls and caption. Video: resizable, alignable, caption. File: a card with icon, name, size,
+    "Open … on system" and "Download …". Missing file: "File not found." Every media block's `…` menu has "Remove
+    Block".
+  - Web link block: a card with title, domain and URL that opens in the system browser. Nothing is fetched
+    (`editor/nodes/bookmark.ts`).
+  - Resizing writes once, on release. Align left, center or right; "Add caption" / "Remove caption", placeholder
+    "Caption..." (`editor/media/ResizableEmbed.tsx`).
+  - Files dropped or pasted into the editor upload to `Attachments/` (never overwriting, 100 MiB limit checked first)
+    and insert a media block at the drop point (`editor/extensions/fileDrop.ts`, `editor/media/upload.ts`).
 - **Delete** of a page from the list or the peek `...` menu uses the same confirmation as before and the object
   goes to Trash.
 
