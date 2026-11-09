@@ -42,13 +42,37 @@ The history below is in the order it was written: the per-milestone sections new
 - **Acceptance:** all 435 boxes run by agents; 4 FAILs, all fixed; fix passes G and H closed the findings
   (`auto-acceptance-2026-11-08.md`). The catalog gained the approved C1-C11 write-ups.
 
+### Done on 2026-11-09
+
+- **Native window on Linux** (`0916bf5`): Gene uses Object as a desktop app (as on Windows), not a browser tab.
+  pywebview's GTK backend needed `pygobject` + `pycairo` (now in `pyproject.toml` with a linux marker), and its
+  private mode turns localStorage off, which crashed the main pane ("e.persist.getOptions" undefined). Linux now
+  starts non-private with web data in `<state>/webview`; the nav stores tolerate a missing `persist`. Regression
+  tests: `test_uikey.py::test_linux_window_keeps_web_storage_in_the_state_dir`, `nav/spaceStorage.test.ts`. On GH-DT
+  it starts from the launcher entry "Object" (`~/.local/share/applications/object.desktop`). Gate: front end 4075
+  passed; launcher tests pass.
+- **Gene's `main` space set up** (data only, no code): the starter gallery's types were added through the app's own
+  code, then trimmed on Gene's call. **Day, Week and Month were deleted** (in the Trash for 30 days, with their saved
+  queries "This week's days", "This month's weeks", "This year's months"): the Calendar's built-in daily notes already
+  give one note per day, and Gene wants periods as an *organisation of the daily notes*, not separate objects. Kept:
+  Area, Atomic note, Book, Definition, Film, Meeting, Organization, Person, Podcast, Project, TV series (plus Page,
+  Tag, and DailyNote once the first daily note exists).
+- **Daily notes by period, decided: a grouped query, not collections.** Gene suggested rolling daily notes into
+  collections by week/month/year. Collections are filled by hand, so every note would need adding (or an automation
+  kept up); a query grouped by the note's date (Group by → By Week / By Month / By Year, catalog §8) files every new
+  note on its own and stores nothing twice, and the Calendar's Month and Week views already browse by period. The
+  space has a saved query **"Daily notes"** (`.object/queries/daily-notes.json`: type DailyNote, grouped By Month,
+  newest first); pin it from its `…` menu ("Pin to Sidebar"). Creating it needed today's daily note
+  (`DailyNotes/2026-11-09.md`), because a query can only name a type the space has, and DailyNote exists once the
+  first daily note does.
+
 ### Needs Gene
 
 1. **Hand-checks:** the list in `auto-acceptance-2026-11-08.md`, "What needs Gene by hand" (Windows and pywebview,
    Wacom, look and themes, real data and scale, live model wording, the file manager, decisions). Re-read the "Box
    texts that are out of date" table there before ticking. Boxes stay unticked in `mN-acceptance.md` until he does.
-2. **Your extra custom object types:** the list of types beyond the basic setup's four that your spaces should
-   start with, so they can be added through the app's own API.
+2. **Your extra custom object types:** the list of types beyond the starter types now in `main` (see "Done on
+   2026-11-09") that your spaces should start with, so they can be added through the app's own code.
 3. **An Anytype export** (a few objects, Markdown with files), to confirm and fix the reader's gaps (below).
 4. **A git remote address**, when you want backup off this machine (Settings > Space > Version control > Remote;
    any https or ssh remote; the system's git credentials are used).
@@ -89,6 +113,12 @@ The history below is in the order it was written: the per-milestone sections new
   property, relations come out as file-name labels, and the `schemas/*.schema.json` formats are ignored. Medium risk;
   waiting on a real export.
 - **OCR is English only:** `tesseract` runs without `-l` (`readers/pdf.py:4`).
+- **Maintenance on a running space:** since S6 no outside process can call `/api` of a launched app (by design), so a
+  scripted change to Gene's live space (types, queries) means closing the window, running the change through
+  `Space(...)` (the same code the routes call, Trash included), and reopening it. Never hand-write `.object/*.json`.
+- **Starter gallery overlap:** the gallery's Day template duplicates the built-in daily note (one note per day);
+  Week and Month only pay off for periodic reviews. Gene removed all three from `main`; whether the gallery should
+  keep offering Day is open.
 - **SharePoint:** no fetch code (by design); a Microsoft 365 MCP server would download into a Files folder first.
 - Closed on the same day, listed so nobody reopens them: the `settings` event is in `RESYNC_EVENTS`
   (`api/client.ts:540`, `d79f60f`), so a reconnect reloads device settings.

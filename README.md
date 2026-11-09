@@ -154,6 +154,8 @@ uv run objectapp --space /path/to/space            # opens its own window
 uv run objectapp --space /path/to/space --browser  # or in your browser
 ```
 
+The window is pywebview: Edge WebView2 on Windows (nothing to install), GTK with the system WebKit2GTK 4.1 on Linux. On Linux `uv sync` installs `pygobject` and `pycairo`, which build against the system libraries (on Arch: `webkit2gtk-4.1`, `python-gobject`, `cairo`). The Linux window keeps its web data (tabs, recents) in Object's state folder under `webview/`. Without a display (a server, an SSH session) use `--browser`.
+
 The server listens on `http://127.0.0.1:8790` only (`--port` changes the port). Only the window Object opens can use it: each launch makes a random key, and the window opens at a one-time `/_open` link that hands the key over as a session cookie. With `--browser` the launcher prints that link (it works once, for 5 minutes; press Enter in the terminal for a new one); a bare `http://127.0.0.1:8790` tab shows "This page isn't connected to Object". Other programs use the token API under `/api/v1` (see MCP below), which keeps its own tokens. Point `--space` at an empty folder to start fresh, or at an existing folder of Markdown files. A space keeps its metadata in `.object/` and a rebuildable search cache in `.object-cache/`.
 
 AI features need the [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) CLI (`claude`) installed and signed in. Everything else works without it.
