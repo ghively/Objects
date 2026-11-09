@@ -400,6 +400,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   file) and **Show file** (shows the kept original in the file manager). Every imported object carries the system
   frontmatter block `importSource` (system, url, id, version, author, created, modified, original, contentHash, batch,
   importedAt).
+- **Links between imported pages**: a source link names a page by path or by name; when several pages share the name
+  (Books/Dune and Movies/Dune) the one nearest the linking page wins (its own folder, then the deepest shared folder,
+  then the shortest path), and the written link is the title only when the space resolves it to that object, else its
+  path.
 - **Queryable import fields**: filters, sorts and columns offer **Imported from**, **Import batch** and **Source modified**
   (the last is a text filter on the ISO date).
 - **Files source**: every non-Markdown file is one page (text and images where they appeared) with the untouched

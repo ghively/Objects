@@ -267,6 +267,18 @@ def test_5_special_types_are_not_matched_by_name(tmp_path):
                  Target("currentSpace", space))
 
 
+def test_duplicate_page_names_link_to_the_nearest():
+    """Fix pass H: [[Dune]] with Books/Dune and Movies/Dune goes to the one in the linking page's folder
+    (then the deepest shared folder), not to whichever path sorts first."""
+    idx = SourceIndex(["Books/Dune.md", "Movies/Dune.md", "Movies/Watchlist.md", "Movies/Lists/Best.md", "Home.md",
+                       "Books/Reading.md"], [], [])
+    assert idx.page("Dune", "Movies/Watchlist.md") == "Movies/Dune.md"
+    assert idx.page("Dune", "Movies/Lists/Best.md") == "Movies/Dune.md"
+    assert idx.page("Dune", "Books/Reading.md") == "Books/Dune.md"
+    assert idx.page("Dune", "Home.md") == "Books/Dune.md"  # no nearer one: shortest path, as before
+    assert idx.page("Books/Dune", "Movies/Watchlist.md") == "Books/Dune.md"  # an exact path always wins
+
+
 def test_people_folder_joins_the_person_type(tmp_path):
     """Fix pass H: an Obsidian 'People' folder joins Person instead of becoming 'People (2)'; a folder named
     like an existing type's plural joins that type even when the plain rule misses (Indices -> Index)."""

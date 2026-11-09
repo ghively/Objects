@@ -160,6 +160,12 @@ class SourceIndex:
         if "/" in t:
             suffix = "/" + t.lower() + ".md"
             candidates = [c for c in candidates if ("/" + c.lower()).endswith(suffix)]
+        if from_page and len(candidates) > 1:
+            # Several pages share the name (Books/Dune, Movies/Dune): the one nearest the linking
+            # page wins (its own folder, then the deepest shared folder), as Obsidian prefers the
+            # linking note's folder; shortest path only breaks the remaining ties.
+            here = PurePosixPath(from_page).parent.parts
+            candidates = sorted(candidates, key=lambda c: -_shared_depth(here, PurePosixPath(c).parent.parts))
         return candidates[0] if candidates else None
 
     def file(self, target: str, from_page: str | None = None) -> str | None:
@@ -223,6 +229,16 @@ class SourceIndex:
         if page:
             return "object", page
         return "unresolved", None
+
+
+def _shared_depth(a: tuple[str, ...], b: tuple[str, ...]) -> int:
+    """How many leading folders two paths share."""
+    n = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        n += 1
+    return n
 
 
 def _shortest(p: str) -> tuple[int, int, str]:
