@@ -315,9 +315,12 @@ def test_put_remote(api, fake: FakeA2A) -> None:
     assert res.json()["remote"]["auth"] == {"kind": "none", "headerName": None, "set": False}
 
 
-def test_url_change_drops_the_secret(api, fake: FakeA2A) -> None:
-    client = api["client"]
+def test_url_change_drops_the_secret_and_waits_for_the_move(api, fake: FakeA2A) -> None:
+    """Gene, 2026-11-08: on a host change the stored endpoint stays and the token goes; the new
+    address is answered as pending with a notice, and used only once it is confirmed."""
+    client, published = api["client"], api["published"]
     agent = _add(client, fake.base_url)
+    old_endpoint = fake.base_url + "/a2a"
     other = FakeA2A()
     other.start()
     try:
@@ -326,12 +329,57 @@ def test_url_change_drops_the_secret(api, fake: FakeA2A) -> None:
         res = client.post(f"/api/remote-agents/{agent['id']}/refresh", json={"clientId": "win-3"})
         assert res.status_code == 200, res.text
         body = res.json()
-        assert body["remote"]["endpointUrl"] == f"http://localhost:{port}/a2a"
+        assert body["remote"]["endpointUrl"] == old_endpoint  # kept until the move is confirmed
         assert body["remote"]["auth"]["set"] is False
         assert body["name"] == "Fake Planner"
+        assert body["remote"]["pendingEndpoint"] == {"url": f"http://localhost:{port}/a2a",
+                                                     "host": f"localhost:{port}"}
+        assert body["notice"] == f"The agent's address moved to localhost:{port}. Confirm the move to use it."
+        assert client.get(f"/api/agents/{agent['id']}").json()["remote"]["endpointUrl"] == old_endpoint
+
+        # Confirming switches and clears the pending address.
+        count = len(published)
+        res = client.post(f"/api/remote-agents/{agent['id']}/confirm-endpoint", json={"clientId": "win-3"})
+        assert res.status_code == 200, res.text
+        assert res.json()["remote"]["endpointUrl"] == f"http://localhost:{port}/a2a"
+        assert res.json()["remote"]["pendingEndpoint"] is None
+        assert res.json()["remote"]["auth"]["set"] is False
+        revision = res.json()["revision"]
+        _wait(published, count + 1)
+        assert any(e.kind == "agents" and e.path == agent["id"] and e.origin == "win-3" for e in published[count:])
+        res = client.post(f"/api/remote-agents/{agent['id']}/confirm-endpoint", json={})
+        assert res.status_code == 422  # nothing pending
+
+        # The token is given again (the card fetch needs it); a same-host refresh (a new path on
+        # the confirmed host) records no move, switches at once and keeps the token.
+        res = client.put(f"/api/remote-agents/{agent['id']}", json={
+            "name": "Fake Planner", "auth": _bearer(), "baseRevision": revision})
+        assert res.status_code == 200, res.text
+        fake.card_override = _moved_card(fake, f"http://localhost:{port}/a2a/v2")
+        res = client.post(f"/api/remote-agents/{agent['id']}/refresh", json={})
+        assert res.status_code == 200, res.text
+        assert res.json()["remote"]["pendingEndpoint"] is None and res.json()["notice"] is None
+        assert res.json()["remote"]["endpointUrl"] == f"http://localhost:{port}/a2a/v2"
+        assert res.json()["remote"]["auth"]["set"] is True
+
+        # Dismissing keeps the stored address and clears the pending one.
+        fake.card_override = _moved_card(fake, old_endpoint)  # back to 127.0.0.1: a move again
+        res = client.post(f"/api/remote-agents/{agent['id']}/refresh", json={})
+        assert res.status_code == 200, res.text
+        assert res.json()["remote"]["pendingEndpoint"]["host"] == fake.base_url.removeprefix("http://")
+        assert res.json()["remote"]["auth"]["set"] is False
+        res = client.delete(f"/api/remote-agents/{agent['id']}/pending-endpoint?clientId=win-3")
+        assert res.status_code == 200, res.text
+        assert res.json()["remote"]["endpointUrl"] == f"http://localhost:{port}/a2a/v2"
+        assert res.json()["remote"]["pendingEndpoint"] is None
     finally:
         other.stop()
     assert all(r["headers"].get("Authorization") is None for r in other.requests)
+    assert client.post("/api/remote-agents/01JC7ZK3T9Q4M2X8B5N6R1V0WE/confirm-endpoint", json={}).status_code == 404
+    assert client.delete("/api/remote-agents/01JC7ZK3T9Q4M2X8B5N6R1V0WE/pending-endpoint").status_code == 404
+    local = client.get("/api/agents").json()["agents"][0]  # the default agent
+    res = client.post(f"/api/remote-agents/{local['id']}/confirm-endpoint", json={})
+    assert (res.status_code, res.json()["detail"]) == (422, "That isn't a remote agent.")
 
 
 def test_endpoint_refusal_rules() -> None:
@@ -419,6 +467,11 @@ def test_refresh_drops_the_secret_when_the_endpoint_loses_https(api, fake: FakeA
     assert res.status_code == 200, res.text
     assert res.json()["remote"]["auth"]["set"] is False
     assert not remotesecrets.is_set(agent["id"])
+    assert res.json()["remote"]["endpointUrl"].startswith("https://")  # kept until confirmed
+    assert res.json()["remote"]["pendingEndpoint"]["url"] == fake.base_url + "/a2a"
+    res = client.post(f"/api/remote-agents/{agent['id']}/confirm-endpoint", json={})
+    assert res.status_code == 200, res.text
+    assert res.json()["remote"]["endpointUrl"] == fake.base_url + "/a2a"
     # http -> http (no change) keeps a secret set again.
     res = client.put(f"/api/remote-agents/{agent['id']}", json={
         "name": "Fake Planner", "auth": _bearer(), "baseRevision": res.json()["revision"]})

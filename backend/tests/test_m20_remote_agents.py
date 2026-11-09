@@ -211,10 +211,59 @@ def test_refresh_keeps_name_and_drops_secret_on_host_change(reg: AgentRegistry) 
     assert json.loads((rec.folder / ".object-agent" / "card.json").read_bytes())["name"] == "Renamed Upstream"
     assert remotesecrets.get(rec.id) == TOKEN
     assert remote_card(fresh).streaming is False and remote_card(fresh).endpoint_url.endswith("/a2a/v2")
+    assert fresh.data.get("pendingEndpoint") is None  # the same host: no move to confirm
+    assert fresh.to_api({})["remote"]["pendingEndpoint"] is None
     moved = _card_raw("http://127.0.0.2:9/a2a")
     fresh = reg.refresh_remote(rec.id, _card(moved), moved, card_url)
     assert not remotesecrets.is_set(rec.id)
     assert fresh.to_api({})["remote"]["auth"]["set"] is False
+
+
+def test_refresh_on_host_change_waits_for_the_move_to_be_confirmed(reg: AgentRegistry) -> None:
+    """Gene, 2026-11-08: a card whose endpoint moved to another host keeps the stored endpoint and
+    drops the token; the new address is pending until it is confirmed (or dismissed)."""
+    rec = _add(reg)
+    card_url = "http://127.0.0.1:9/.well-known/agent-card.json"
+    moved = _card_raw("http://127.0.0.2:9/a2a", name="Moved Upstream")
+    fresh = reg.refresh_remote(rec.id, _card(moved), moved, card_url)
+    assert fresh.data["endpoint"]["url"] == "http://127.0.0.1:9/a2a"  # kept
+    assert fresh.data["pendingEndpoint"] == {"url": "http://127.0.0.2:9/a2a", "protocolVersion": "1.0",
+                                             "binding": "JSONRPC"}
+    assert not remotesecrets.is_set(rec.id)
+    assert json.loads((rec.folder / ".object-agent" / "card.json").read_bytes())["name"] == "Moved Upstream"
+    # Chat keeps using the stored endpoint until the move is confirmed.
+    assert remote_card(fresh).endpoint_url == "http://127.0.0.1:9/a2a"
+    info = fresh.to_api({})["remote"]
+    assert info["endpointUrl"] == "http://127.0.0.1:9/a2a"
+    assert info["pendingEndpoint"] == {"url": "http://127.0.0.2:9/a2a", "host": "127.0.0.2:9"}
+    RemoteAgentFile.model_validate(fresh.data)
+
+    switched = reg.confirm_endpoint(rec.id)
+    assert switched.data["endpoint"]["url"] == "http://127.0.0.2:9/a2a"
+    assert switched.data.get("pendingEndpoint") is None
+    assert remote_card(switched).endpoint_url == "http://127.0.0.2:9/a2a"
+    assert switched.to_api({})["remote"]["pendingEndpoint"] is None
+    with pytest.raises(AgentInvalid):
+        reg.confirm_endpoint(rec.id)  # nothing pending any more
+
+    # A move that is dismissed: the pending address goes, the endpoint stays.
+    back = _card_raw("https://127.0.0.2:9/a2a")  # the scheme changed: that is a move too
+    fresh = reg.refresh_remote(rec.id, _card(back), back, card_url)
+    assert fresh.data["pendingEndpoint"]["url"] == "https://127.0.0.2:9/a2a"
+    kept = reg.dismiss_endpoint(rec.id)
+    assert kept.data["endpoint"]["url"] == "http://127.0.0.2:9/a2a"
+    assert kept.data.get("pendingEndpoint") is None
+    assert reg.dismiss_endpoint(rec.id).data.get("pendingEndpoint") is None  # dismissing nothing is fine
+
+    # A same-host refresh after a move was recorded clears the pending address.
+    fresh = reg.refresh_remote(rec.id, _card(back), back, card_url)
+    assert fresh.data["pendingEndpoint"]["url"] == "https://127.0.0.2:9/a2a"
+    same = _card_raw("http://127.0.0.2:9/a2a/v2")
+    fresh = reg.refresh_remote(rec.id, _card(same), same, card_url)
+    assert fresh.data["endpoint"]["url"] == "http://127.0.0.2:9/a2a/v2"
+    assert fresh.data.get("pendingEndpoint") is None
+    with pytest.raises(AgentInvalid):
+        reg.confirm_endpoint("assistant")
 
 
 def test_mark_context_notice_once(reg: AgentRegistry) -> None:

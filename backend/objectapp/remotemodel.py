@@ -123,6 +123,9 @@ class RemoteAgentFile(BaseModel):
     endpoint: RemoteEndpoint
     streaming: bool
     auth: RemoteAuth
+    # A refreshed card's endpoint on another host (or scheme), kept here until Gene confirms the
+    # move (then it becomes `endpoint`) or dismisses it (Gene, 2026-11-08).
+    pendingEndpoint: RemoteEndpoint | None = None
     contextNoticeAt: str | None = None
     cardFetchedAt: str
     createdAt: str
