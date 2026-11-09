@@ -298,13 +298,13 @@ def merge_objects(
         if not (space.root / rel).is_file():
             raise KeyError(rel)
     if src == dst:
-        raise InvalidValue("An object can't be merged into itself")
+        raise InvalidValue("An object can't be merged into itself.")
     s_sum = space.get(src)
     t_sum = space.get(dst)
     if (s_sum.type == "tag") != (t_sum.type == "tag"):
-        raise InvalidValue("A tag can only be merged into another tag")
+        raise InvalidValue("A tag can only be merged into another tag.")
     if space._is_whiteboard(src) or space._is_whiteboard(dst):
-        raise InvalidValue("Whiteboards can't be merged")
+        raise InvalidValue("Whiteboards can't be merged.")
 
     s_of, sfm, s_ver = space.read(src)
     _t_of, tfm, t_ver = space.read(dst)

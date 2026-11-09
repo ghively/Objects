@@ -212,14 +212,14 @@ def _check_layout_value(key: str, value: Any) -> None:
         return
     if key in _LAYOUT_BOOL_KEYS:
         if not isinstance(value, bool):
-            raise InvalidValue(f"{key} must be true, false or null")
+            raise InvalidValue(f'"{key}" must be true, false or null.')
         return
     if (
         isinstance(value, bool)
         or not isinstance(value, (int, float))
         or not 0 <= value <= 100  # NaN fails this too
     ):
-        raise InvalidValue(f"{key} must be a number from 0 to 100, or null")
+        raise InvalidValue(f'"{key}" must be a number from 0 to 100, or null.')
 
 
 def _creation_value(value: str, fm: dict) -> SingleQuotedScalarString:
@@ -229,9 +229,9 @@ def _creation_value(value: str, fm: dict) -> SingleQuotedScalarString:
     """
     var = creation_variable(value)
     if var not in _CREATION_VARIABLES:
-        raise InvalidValue(f"Unknown date variable {value.strip()!r}")
+        raise InvalidValue(f'Unknown date variable "{value.strip()}".')
     if not _str_or_none(fm.get("template")):
-        raise InvalidValue("Date variables can only be set on a template")
+        raise InvalidValue("Date variables can only be set on a template.")
     return SingleQuotedScalarString(f"{{creation:{var}}}")
 
 
@@ -894,11 +894,11 @@ def _json_scalar(key: str, value: Any) -> Any:
     items = value if isinstance(value, list) else [value]
     if any(isinstance(v, float) and not math.isfinite(v) for v in items):
         # `.nan`/`.inf` in the file would make the object unreadable as JSON.
-        raise InvalidValue(f"{key!r} must be a finite number")
+        raise InvalidValue(f'"{key}" must be a finite number.')
     if isinstance(value, list) and all(isinstance(v, scalar) and v is not None for v in value):
         return FlowList(value) if value else None
     if not isinstance(value, scalar):
-        raise InvalidValue(f"{key!r} has no definition, so its value must be a JSON scalar")
+        raise InvalidValue(f'"{key}" has no definition, so its value must be a JSON scalar.')
     return value
 
 
@@ -1246,7 +1246,7 @@ class Space:
             known = {t.id for t in self.types}
             for tid in type_ids:
                 if tid not in known:
-                    raise InvalidValue(f"Unknown object type {tid!r}.")
+                    raise InvalidValue(f'There is no object type "{tid}".')
             name = name.strip()
             if name:
                 self._check_collection_name(name, None)
@@ -1285,7 +1285,7 @@ class Space:
             known = {t.id for t in self.types} | set(before.typeIds)
             for tid in c.typeIds:
                 if tid not in known:
-                    raise InvalidValue(f"Unknown object type {tid!r}.")
+                    raise InvalidValue(f'There is no object type "{tid}".')
             c.readOnlyReason = None
             old_name = before.name.strip()
             renamed = bool(old_name) and c.name != before.name
@@ -1352,7 +1352,7 @@ class Space:
         if names is None:
             return []
         if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
-            raise InvalidValue("Expected a list of collection names")
+            raise InvalidValue("Expected a list of collection names.")
         had = {n.strip().casefold() for n in existing}
         out: list[str] = []
         seen_ids: set[str] = set()
@@ -1365,7 +1365,7 @@ class Space:
             c = self.collection_by_name(name)
             if c is None:
                 if key not in had:
-                    raise InvalidValue(f"There is no collection named {name!r}.")
+                    raise InvalidValue(f'There is no collection named "{name}".')
                 if key not in seen_loose:
                     seen_loose.add(key)
                     out.append(name)
@@ -1705,7 +1705,7 @@ class Space:
         known = {t.id for t in self.types} | stored_type_ids
         for tid in sorted(query_type_ids(definition)):
             if tid not in known:
-                raise InvalidValue(f"Unknown object type {tid!r}.")
+                raise InvalidValue(f'There is no object type "{tid}".')
         limit = definition.get("limit")
         if limit is not None:
             size = limit.get("size") if isinstance(limit, dict) else None
@@ -2510,7 +2510,7 @@ class Space:
             with self._lock:
                 summary = self._summaries.get(path) if path else None
             if summary is None or summary.id not in allowed:
-                raise InvalidValue(f"{pdef.name} only takes the objects of its fixed set")
+                raise InvalidValue(f'"{pdef.name}" only takes the objects of its fixed set.')
 
     def links_of(self, path: str, fm: dict) -> dict[str, list[str | None]]:
         """Each entity value of the object resolved from its own file (None when dangling)."""
@@ -2549,12 +2549,12 @@ class Space:
         remove = list(remove)
         for key in (*updates, *remove):
             if key in _LOCKED_KEYS:
-                raise InvalidValue(f"{key!r} can't be changed as a property")
+                raise InvalidValue(f'"{key}" can\'t be changed as a property.')
         t = self._type_of(rel)
         for key in (*updates, *remove):
             pdef = t.prop(key) if t is not None else None
             if pdef is not None and pdef.type in _READ_ONLY_VALUE_KINDS:
-                raise InvalidValue(f"{pdef.name} can't be edited")
+                raise InvalidValue(f'"{pdef.name}" can\'t be edited.')
             if pdef is not None and pdef.type in GATED_KINDS:
                 # M22: steps change only through the work service (`write_work`).
                 raise InvalidValue(STEPS_GATED)
@@ -2641,12 +2641,12 @@ class Space:
         remove = list(remove)
         for key in (*updates, *remove):
             if key in _LOCKED_KEYS:
-                raise InvalidValue(f"{key!r} can't be changed as a property")
+                raise InvalidValue(f'"{key}" can\'t be changed as a property.')
         t = self._type_of(rel)
         for key in (*updates, *remove):
             pdef = t.prop(key) if t is not None else None
             if pdef is not None and pdef.type in _READ_ONLY_VALUE_KINDS:
-                raise InvalidValue(f"{pdef.name} can't be edited")
+                raise InvalidValue(f'"{pdef.name}" can\'t be edited.')
         before: dict = {}
         task: list[TaskResult | None] = [None]
         requested: dict[str, Any] = {}
@@ -3118,7 +3118,7 @@ class Space:
         if not (self.root / rel).is_file():
             raise KeyError(rel)
         if not new_title:
-            raise InvalidValue("The title can't be empty")
+            raise InvalidValue("The title can't be empty.")
         if self._is_title_locked(rel):
             raise InvalidValue("A daily note's title is its date and can't be changed.")
         with self._lock:
@@ -3275,7 +3275,7 @@ class Space:
         """
         title = " ".join(str(name or "").split())
         if not title:
-            raise InvalidValue("A tag needs a name")
+            raise InvalidValue("A tag needs a name.")
         t = self.type_by_id("tag")
         if t is None:
             raise KeyError("tag")
@@ -3323,7 +3323,7 @@ class Space:
         if type_category(dst) not in CHANGE_TO_ALLOWED:
             raise InvalidValue(f"An object can't be changed to a {dst.name}.")
         if src.id == dst.id:
-            raise InvalidValue(f"The object already is a {dst.name}")
+            raise InvalidValue(f"The object already is a {dst.name}.")
         return src, dst
 
     def suggest_change_type(self, path: str, type_id: str) -> list[MappingRow]:
@@ -3347,20 +3347,20 @@ class Space:
         out: dict[str, str | None] = {}
         for frm, to in (mapping or {}).items():
             if not isinstance(frm, str) or frm in CARRIED_KEYS:
-                raise InvalidValue(f"{frm!r} can't be mapped: it carries over as it is")
+                raise InvalidValue(f'"{frm}" can\'t be mapped: it carries over as it is.')
             if to is None:
                 out[frm] = None
                 continue
             p = src.prop(frm)
             q = targets.get(to) if isinstance(to, str) else None
             if p is None:
-                raise InvalidValue(f"{src.name} has no property {frm!r}")
+                raise InvalidValue(f'The object type {src.name} has no property "{frm}".')
             if q is None:
-                raise InvalidValue(f"{dst.name} has no property {to!r} to map to")
+                raise InvalidValue(f'The object type {dst.name} has no property "{to}" to map to.')
             if q.key in used:
-                raise InvalidValue(f"{q.name} can only take one value")
+                raise InvalidValue(f'"{q.name}" can only take one value.')
             if not compatible(p, q):
-                raise InvalidValue(f"{p.name} can't become {q.name}")
+                raise InvalidValue(f'"{p.name}" can\'t become "{q.name}".')
             used.add(q.key)
             out[frm] = q.key
         return out
@@ -3570,7 +3570,7 @@ class Space:
                     tmpl = None  # a default that no longer exists is ignored
         elif template_id != "none":
             if not self._templates_allowed(t):
-                raise TemplateError(f"{t.name} objects have no templates")
+                raise TemplateError(f"The object type {t.name} has no templates.")
             tmpl = self._find_template(t, template_id)
         instant = self.clock()
         created = to_local(reference or instant, self.tz)
@@ -3598,7 +3598,7 @@ class Space:
         if values:
             for key in values:
                 if key in _LOCKED_KEYS:
-                    raise InvalidValue(f"{key!r} can't be changed as a property")
+                    raise InvalidValue(f'"{key}" can\'t be changed as a property.')
             src = of.frontmatter_src or ""
             of = replace(
                 of,
@@ -3761,7 +3761,7 @@ class Space:
             if p is None:
                 raise KeyError(pid)
             if p.type != "uniqueId":
-                raise InvalidValue(f"{p.name} is not an ID property")
+                raise InvalidValue(f'"{p.name}" is not an ID property.')
             key = p.key
             members = self._type_members(t.id, templates=False)
 
@@ -3889,7 +3889,7 @@ class Space:
         """
         parsed = parse_day(day) if isinstance(day, str) else None
         if parsed is None or parsed != day.strip():
-            raise InvalidValue(f"Not a day (YYYY-MM-DD): {day!r}")
+            raise InvalidValue(f'"{day}" is not a day (YYYY-MM-DD).')
         day = parsed
         ids: dict[str, Any] = {}
         pre = self.daily_note_type()
@@ -4109,7 +4109,7 @@ class Space:
                     with self._lock:
                         raw = self._raw[path]
                 return raw
-        raise TemplateError(f"No template {template_id!r} for {t.name}")
+        raise TemplateError(f'There is no template "{template_id}" for {t.name}.')
 
     def _save_templates_field(self, t: TypeDefinition, templates: dict[str, Any]) -> bool:
         """Write the type with a new ``templates`` value; False when it can't be saved."""
@@ -4191,7 +4191,7 @@ class Space:
         if t is None:
             raise KeyError(type_id)
         if not self._templates_allowed(t):
-            raise InvalidValue(f"{t.name} objects have no templates")
+            raise InvalidValue(f"The object type {t.name} has no templates.")
         if t.readOnlyReason:
             raise TypeReadOnly(t.readOnlyReason)
         name = " ".join(str(name or "").split()) or "New template"
@@ -4243,7 +4243,7 @@ class Space:
                 var = creation_variable(raw)
                 if var is not None:
                     if pdef is None or pdef.type != "datetime":
-                        raise TemplateError(f"{{creation:{var}}} needs a date property")
+                        raise TemplateError(f'"{{creation:{var}}}" needs a date property.')
                     start, _, end = resolve_date_variable(var, when).partition(" -> ")
                     value: Any = {"start": start, "resolution": "day"}
                     if end:
@@ -4297,11 +4297,11 @@ class Space:
         if t is None:
             raise KeyError(rel)
         if not self._templates_allowed(t):
-            raise TemplateError(f"{t.name} objects have no templates")
+            raise TemplateError(f"The object type {t.name} has no templates.")
         with self._lock:
             summary = self._summaries.get(rel)
         if summary is not None and summary.template:
-            raise TemplateError("A template can't be applied to a template")
+            raise TemplateError("A template can't be applied to a template.")
         tmpl = self._find_template(t, template_id)
         return self._write(rel, base_version, self._template_edit(t, tmpl))
 
@@ -4768,7 +4768,7 @@ class Space:
 
             tpl = get_template(template)
             if tpl is None:
-                raise InvalidValue(f"Unknown object type template {template!r}")
+                raise InvalidValue(f'Unknown object type template "{template}".')
             name = name or tpl.name
             plural_name = plural_name or tpl.pluralName
             icon = icon if icon is not None else tpl.icon
@@ -4776,16 +4776,16 @@ class Space:
         name = " ".join(str(name or "").split())
         plural = " ".join(str(plural_name or "").split())
         if not name or not plural:
-            raise InvalidValue("An object type needs a name and a plural name")
+            raise InvalidValue("An object type needs a name and a plural name.")
         color = color or "gray"
         if color not in THEME_COLORS:
-            raise InvalidValue(f"Unknown colour {color!r}")
+            raise InvalidValue(f'Unknown color "{color}".')
         parsed = Icon("iconify", _DEFAULT_TYPE_ICON) if icon is None else Icon.parse(icon)
         if parsed is None:
-            raise InvalidValue("Unknown icon")
+            raise InvalidValue("Unknown icon.")
         with self._lock:
             if self._name_taken(name):
-                raise InvalidValue(f"An object type named {name!r} already exists")
+                raise InvalidValue(f'An object type named "{name}" already exists.')
             types_dir = self.root / ".object" / "types"
             taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
             if types_dir.is_dir():
@@ -5037,9 +5037,9 @@ class Space:
         Returns (ops, whether a property is deleted).
         """
         if not new.name or not new.pluralName:
-            raise InvalidValue("An object type needs a name and a plural name")
+            raise InvalidValue("An object type needs a name and a plural name.")
         if new.color != old.color and new.color not in THEME_COLORS:
-            raise InvalidValue(f"Unknown colour {new.color!r}")
+            raise InvalidValue(f'Unknown color "{new.color}".')
         ops: list[_TypeOp] = []
 
         renamed = new.name != old.name
@@ -5047,7 +5047,7 @@ class Space:
             if old.basic:
                 raise InvalidValue(BASIC_LOCKED)
             if self._name_taken(new.name, except_id=old.id):
-                raise InvalidValue(f"An object type named {new.name!r} already exists")
+                raise InvalidValue(f'An object type named "{new.name}" already exists.')
             former = [f for f in old.formerNames if f.lower() != new.name.lower()]
             if old.name.lower() != new.name.lower() and old.name.lower() not in (
                 f.lower() for f in former
@@ -5059,9 +5059,9 @@ class Space:
         ids = [p.id for p in new.propertyDefinitions]
         keys = [p.key for p in new.propertyDefinitions]
         if len(set(ids)) != len(ids):
-            raise InvalidValue("Two properties have the same id")
+            raise InvalidValue("Two properties have the same id.")
         if len(set(keys)) != len(keys):
-            raise InvalidValue("Two properties have the same key")
+            raise InvalidValue("Two properties have the same key.")
         old_by_id = {p.id: p for p in old.propertyDefinitions}
         new_by_id = {p.id: p for p in new.propertyDefinitions}
         lookup = {x.id: x for x in self.types}
@@ -5073,7 +5073,7 @@ class Space:
                 continue
             if _is_system_def(p):
                 if p.key in _CORE_SYSTEM_KEYS:
-                    raise InvalidValue(f"{p.name} can't be removed")
+                    raise InvalidValue(f'"{p.name}" can\'t be removed.')
                 continue  # an optional system property: display only, nothing to strip
             if old.basic:
                 raise InvalidValue(BASIC_LOCKED)
@@ -5088,9 +5088,9 @@ class Space:
                 self._check_new_property(old, new, p)
             else:
                 if p.key != before.key:
-                    raise InvalidValue("The key of a property never changes")
+                    raise InvalidValue("The key of a property never changes.")
                 if p.type != before.type:
-                    raise InvalidValue("Change the kind of a property with change-kind")
+                    raise InvalidValue("Change the kind of a property with change-kind.")
                 if old.basic and _is_multi(p) != _is_multi(before):
                     raise InvalidValue(BASIC_LOCKED)
             if p.type == "label":
@@ -5121,27 +5121,27 @@ class Space:
         if old.basic:
             raise InvalidValue(BASIC_LOCKED)
         if not isinstance(p.key, str) or not p.key.strip():
-            raise InvalidValue("A property needs a key")
+            raise InvalidValue("A property needs a key.")
         if p.key in SYSTEM_KEYS:
-            raise InvalidValue(f"{p.key!r} is a reserved key")
+            raise InvalidValue(f'"{p.key}" is a reserved key.')
         if p.type.startswith("entity_") or p.type in ("coverImage", "color"):
-            raise InvalidValue(f"{p.type!r} is a system property kind")
+            raise InvalidValue(f'"{p.type}" is a system property kind.')
 
     @staticmethod
     def _check_label(p: PropertyDefinition, before: PropertyDefinition | None) -> None:
         seen: set[str] = set()
         for o in p.options.get("set") or []:
             if not isinstance(o, dict) or not isinstance(o.get("id"), str) or not o["id"]:
-                raise InvalidValue("A label option needs an id")
+                raise InvalidValue("A label option needs an id.")
             text = o.get("text")
             if not isinstance(text, str) or not text.strip() or len(text) > 100:
-                raise InvalidValue("A label option's text is 1 to 100 characters")
+                raise InvalidValue("A label option's text is 1 to 100 characters.")
             if o["id"] in seen:
-                raise InvalidValue("Two label options have the same id")
+                raise InvalidValue("Two label options have the same id.")
             seen.add(o["id"])
         was_status = before is not None and before.options.get("isStatus")
         if p.options.get("isStatus") and not was_status:
-            raise InvalidValue("Only the basic Task status is a status label")
+            raise InvalidValue("Only the basic Task status is a status label.")
 
     def _check_fixed_set_ids(self, p: PropertyDefinition, before: PropertyDefinition | None) -> None:
         old_ids = set(before.options.get("fixedSet") or []) if before is not None else set()
@@ -5152,7 +5152,7 @@ class Space:
             known = {s.id for s in self._summaries.values() if s.id}
         for object_id in fresh:
             if object_id not in known:
-                raise InvalidValue(f"No object has the id {object_id!r}")
+                raise InvalidValue(f'No object has the id "{object_id}".')
 
     @staticmethod
     def _type_line_op(old_name: str, new_name: str) -> _TypeOp:
@@ -5590,7 +5590,7 @@ class Space:
         """
         spec = RELATION_PAIRS.get(kind)
         if spec is None:
-            raise InvalidValue(f"Unknown relation pair {kind!r}")
+            raise InvalidValue(f'Unknown relation pair "{kind}".')
         with self._lock:
             t, current = self._editable_type(type_id)
             if current != (base_revision or ""):

@@ -181,6 +181,30 @@ def test_add_folder_routes(api, tmp_path: Path) -> None:
     assert _snapshot(folder) == before  # add writes nothing in the folder
 
 
+def test_relative_agent_locations_and_paths_are_refused(api, tmp_path: Path, monkeypatch) -> None:
+    """Sweep 2026-11-08 review (LOW 1): a relative `location` or `path` resolved against the
+    server's working folder (`location: "."` made the agent inside the checkout)."""
+    client = api["client"]
+    cwd = tmp_path / "cwd"
+    (cwd / "inner").mkdir(parents=True)
+    monkeypatch.chdir(cwd)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))  # `~` expands to a full path; keep it here
+    for rel in (".", "..", "./", "inner", "inner/", "cwd"):
+        resp = client.post("/api/agents", json={"agent": {"name": "Probe"}, "instructions": "",
+                                                "location": rel})
+        assert resp.status_code == 404, (rel, resp.text)
+        assert resp.json()["detail"] == "Choose a folder by its full path."
+        resp = client.post("/api/agents/add-folder", json={"path": rel})
+        assert resp.status_code == 404, (rel, resp.text)
+        assert resp.json()["detail"] == "Choose a folder by its full path."
+    assert sorted(p.name for p in cwd.iterdir()) == ["inner"]
+    assert not (cwd / "inner" / "Probe").exists()
+    assert [a["name"] for a in client.get("/api/agents").json()["agents"] if a["name"] == "Probe"] == []
+    # The same folder by its full path is fine.
+    made = _create(client, "Probe", location=str(cwd / "inner"))
+    assert Path(made["folder"]) == (cwd / "inner" / "Probe").resolve()
+
+
 # -- save ---------------------------------------------------------------------------------------
 
 

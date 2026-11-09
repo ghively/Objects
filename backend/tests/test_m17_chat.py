@@ -359,7 +359,7 @@ def test_unknown_or_missing_agent(api, fake, tmp_path: Path) -> None:
 
     shutil.rmtree(folder)
     assert _chat(client, "Hi", agentId=made["id"]) == [
-        {"type": "error", "message": f"This agent's folder is missing: {folder}"}]
+        {"type": "error", "message": f'This agent\'s folder "{folder}" is missing.'}]
     locked = _create(client, "Locked")
     (Path(locked["folder"]) / ".object-agent" / "agent.json").write_text("{", encoding="utf-8")
     assert _chat(client, "Hi", agentId=locked["id"]) == [

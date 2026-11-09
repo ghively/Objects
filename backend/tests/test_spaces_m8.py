@@ -76,6 +76,11 @@ def test_delete_space_refuses_unregistered_or_plain_folder_404(
                                 (tmp_path / "nope", False), ("", False)):
             r = client.post("/api/spaces/delete", json={"path": str(path), "permanent": permanent})
             assert r.status_code == 404, (path, r.text)
+            if path:
+                assert r.json()["detail"] == f'"{Path(path).resolve()}" is not a space folder.'
+        # A path that cannot be a folder at all (an embedded NUL) is the same sentence.
+        r = client.post("/api/spaces/delete", json={"path": "/tmp/no\x00pe"})
+        assert r.status_code == 404 and r.json()["detail"] == '"/tmp/no\x00pe" is not a space folder.'
     assert (unregistered / "Pages" / "Note.md").is_file()
     assert (plain / "keep.txt").is_file()
     assert not fake_trash.exists()
@@ -118,6 +123,7 @@ def test_permanent_delete_needs_428_then_rechecks_folder(
     with _client(current) as client:
         r = client.post("/api/spaces/delete", json={"path": str(other)})
         assert r.status_code == 428, r.text
+        assert r.json()["detail"] == "The Trash is not available."  # the reason once, not doubled
         assert other.is_dir() and (other / "Pages" / "Note.md").is_file()
         assert str(other.resolve()) in _registered(state)
 
@@ -236,6 +242,7 @@ def test_real_trash_failure_maps_to_unavailable(tmp_path: Path, state: Path, mon
     with _client(current) as client:
         r = client.post("/api/spaces/delete", json={"path": str(other)})
         assert r.status_code == 428
+        assert r.json()["detail"] == "The Trash is not available: Permission denied."
     assert (other / "Pages" / "Note.md").is_file()
 
 

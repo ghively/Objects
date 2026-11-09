@@ -83,7 +83,7 @@ def _name(record: Any) -> str:
 
 def _length(value: str, field: str, low: int, high: int) -> None:
     if not low <= len(value) <= high:
-        raise Denied(422, f"{field} must be {low:,} to {high:,} characters.")  # our string
+        raise Denied(422, f'"{field}" must be {low:,} to {high:,} characters.')  # our string
 
 
 def _timeout(value: float | None) -> float:

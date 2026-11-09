@@ -86,7 +86,7 @@ class ScheduleUpdateV1(BaseModel):
 
 
 def _not_found(rule_id: str) -> Denied:
-    return Denied(404, f"No schedule {rule_id[:60]!r}.")  # our string
+    return Denied(404, f'There is no schedule "{rule_id[:60]}".')  # our string
 
 
 def router(ctx: ApiContext, engine: AutomationEngine) -> APIRouter:

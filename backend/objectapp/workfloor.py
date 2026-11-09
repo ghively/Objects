@@ -64,7 +64,7 @@ def general_floor_op(space: Space, op: FloorOp, *, item_id: str | None = None,
         raise InvalidValue("Unknown floor item change.")
     place_t, what_t = _floor_text(place, "the place"), _floor_text(what, "what to collect")
     if found is not None and not isinstance(found, str):
-        raise InvalidValue("Expected text for found")
+        raise InvalidValue('Expected text for "found".')
     found_t = found.strip() if isinstance(found, str) and found.strip() else None
     if found_t is not None and len(found_t) > MAX_NOTE:
         raise InvalidValue(NOTE_TOO_LONG)

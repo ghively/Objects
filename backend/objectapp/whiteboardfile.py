@@ -169,7 +169,7 @@ def _boolean(owner: str, field: str, value: Any) -> None:
 
 def _enum(owner: str, field: str, value: Any, allowed: frozenset[str]) -> None:
     if not isinstance(value, str) or value not in allowed:
-        raise BoardInvalid(f"{owner} has an unknown {field}: {value!r}.")
+        raise BoardInvalid(f'{owner} has an unknown {field}: "{value}".')
 
 
 def _record(value: Any, what: str) -> dict[str, Any]:
@@ -241,7 +241,7 @@ def _validate_block(key: str, block: Any) -> None:
             raise BoardInvalid(f"{owner} {problem}.")
         _optional(block, "title", lambda v: _string(owner, "title", v))
     else:
-        raise BoardInvalid(f"{owner} has an unknown type: {kind!r}.")
+        raise BoardInvalid(f'{owner} has an unknown type: "{kind}".')
 
 
 def _validate_node(key: str, node: Any, blocks: dict[str, Any]) -> None:

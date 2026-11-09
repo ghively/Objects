@@ -114,7 +114,7 @@ def work_agent(registry: AgentRegistry, settings_: dict[str, Any]) -> tuple[Agen
     if record.kind == "remote":
         return None, REMOTE_REFUSED
     if record.missing:
-        return None, f"This agent's folder is missing: {record.folder}"
+        return None, f'This agent\'s folder "{record.folder}" is missing.'
     if record.read_only_reason:
         return None, record.read_only_reason
     return record, None

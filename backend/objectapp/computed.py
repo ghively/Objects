@@ -138,7 +138,7 @@ class _Env:
     def prop(self, name: str) -> Any:
         p = self.c.find(self.obj.t, name)
         if p is None:
-            raise FormulaError(f'Unknown property "{name}"')
+            raise FormulaError(f'Unknown property "{name}".')
         return self.c.internal(self.obj, p)
 
 
@@ -236,7 +236,7 @@ class Computer:
         if p is None:
             return None
         if p.type == "rollup":
-            raise FormulaError("A rollup can't use another rollup")
+            raise FormulaError("A rollup can't use another rollup.")
         return self.internal(obj, p)
 
     # -- values ----------------------------------------------------------------------------
@@ -280,7 +280,7 @@ class Computer:
                 raise FormulaError(hit.message)
             return hit
         if key in self._active:
-            raise FormulaError(f'"{p.name}" refers to itself')
+            raise FormulaError(f'"{p.name}" refers to itself.')
         self._active.add(key)
         try:
             if p.type == "formula":
@@ -298,8 +298,8 @@ class Computer:
             raise
         except (OverflowError, ValueError, ArithmeticError) as exc:
             # Rollup arithmetic runs outside `evaluate`'s guard: a huge number is an error value.
-            self._memo[key] = _Failed("Number too large")
-            raise FormulaError("Number too large") from exc
+            self._memo[key] = _Failed("The number is too large.")
+            raise FormulaError("The number is too large.") from exc
         finally:
             self._active.discard(key)
         self._memo[key] = value
@@ -462,34 +462,34 @@ def check_type(
             if expression is None:
                 expression = p.options["expression"] = ""
             if not isinstance(expression, str):
-                raise InvalidValue(f"{p.name}: the formula must be text")
+                raise InvalidValue(f'"{p.name}": the formula must be text.')
             if len(expression) > MAX_EXPRESSION:
-                raise InvalidValue(f"{p.name}: the formula is longer than {MAX_EXPRESSION} characters")
+                raise InvalidValue(f'"{p.name}": the formula is longer than {MAX_EXPRESSION} characters.')
             if expression.strip():
                 try:
                     parse_cached(expression)
                 except FormulaError as exc:
-                    raise InvalidValue(f"{p.name}: {exc}") from exc
+                    raise InvalidValue(f'"{p.name}": {str(exc).rstrip(".")}.') from exc
         elif p.type == "rollup":
             rel_id = p.options.get("relationId", "")
             target_id = p.options.get("targetId", "")
             calc = p.options.get("calc", "showOriginal")
             if not isinstance(rel_id, str) or not isinstance(target_id, str):
-                raise InvalidValue(f"{p.name}: the relation and the property are ids")
+                raise InvalidValue(f'"{p.name}": the relation and the property are ids.')
             if calc not in ROLLUP_CALCS:
-                raise InvalidValue(f"{p.name}: unknown calculation {calc!r}")
+                raise InvalidValue(f'"{p.name}": unknown calculation "{calc}".')
             if rel_id and not _is_relation(new, rel_id) and not _kept_broken(old, p, rel_id):
-                raise InvalidValue(f"{p.name}: the rollup's relation must be a relation property of this type")
+                raise InvalidValue(f'"{p.name}": the rollup\'s relation must be a relation property of this type.')
             for _c, q in _rollup_targets(new, p, types):
                 if q.type == "rollup":
-                    raise InvalidValue(f"{p.name}: a rollup can't use another rollup")
+                    raise InvalidValue(f'"{p.name}": a rollup can\'t use another rollup.')
         elif p.type == "uniqueId":
             prefix = p.options.get("prefix", "")
             if prefix is None:
                 prefix = ""
             if not isinstance(prefix, str) or not PREFIX_RE.match(prefix):
                 raise InvalidValue(
-                    f"{p.name}: the prefix is at most 20 letters, digits, '-' or '_'"
+                    f'"{p.name}": the prefix is at most 20 letters, digits, "-" or "_".'
                 )
             p.options["prefix"] = prefix
             sent = p.options.get("nextNumber")
@@ -524,7 +524,7 @@ def _check_cycles(new: TypeDefinition, types: dict[str, TypeDefinition]) -> None
             node = (t.id, q.id)
             if node == goal:
                 raise InvalidValue(
-                    f"{start.name} refers to itself (directly or through other formulas or rollups)"
+                    f'"{start.name}" refers to itself (directly or through other formulas or rollups).'
                 )
             if node in seen:
                 continue

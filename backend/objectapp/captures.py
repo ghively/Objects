@@ -442,7 +442,7 @@ def apply_outcome(space: Space, service: WorkService, capture_path: str, outcome
             new = base + (nl if base else "") + f"## {heading}" + nl + nl + body_text.replace("\n", nl) + nl
         written.append((filed_rel, space.save_body(filed_rel, new, version)))
     else:
-        raise InvalidValue(f"Unknown outcome {outcome!r}.")
+        raise InvalidValue(f'Unknown outcome "{outcome}".')
     if outcome == "needsYou":
         assert question is not None
         done = _write_props(space, cap_rel, {K_STATUS: [STATUS_TEXT["needsYou"]], K_QUESTION: question.strip()})

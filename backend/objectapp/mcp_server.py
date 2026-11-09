@@ -113,7 +113,7 @@ class ObjectClient:
         try:
             res = self.http.get(self._url(route), params=clean, headers=self.headers)
         except httpx.TransportError as exc:
-            raise ApiError(f"Object isn't reachable at {self.base}: is the app running? ({exc})") from exc
+            raise ApiError(f"Object isn't reachable at {self.base} ({exc}). Is the app running?") from exc
         return self._answer(res, plain)
 
     def post(self, route: str, body: dict[str, Any], plain: bool = False) -> Any:
@@ -121,7 +121,7 @@ class ObjectClient:
         try:
             res = self.http.post(self._url(route), json=clean, headers=self.headers)
         except httpx.TransportError as exc:
-            raise ApiError(f"Object isn't reachable at {self.base}: is the app running? ({exc})") from exc
+            raise ApiError(f"Object isn't reachable at {self.base} ({exc}). Is the app running?") from exc
         return self._answer(res, plain)
 
     def put(self, route: str, body: dict[str, Any]) -> Any:
@@ -129,7 +129,7 @@ class ObjectClient:
         try:
             res = self.http.put(self._url(route), json=clean, headers=self.headers)
         except httpx.TransportError as exc:
-            raise ApiError(f"Object isn't reachable at {self.base}: is the app running? ({exc})") from exc
+            raise ApiError(f"Object isn't reachable at {self.base} ({exc}). Is the app running?") from exc
         return self._answer(res)
 
     def delete(self, route: str, **params: Any) -> Any:
@@ -137,7 +137,7 @@ class ObjectClient:
         try:
             res = self.http.delete(self._url(route), params=clean, headers=self.headers)
         except httpx.TransportError as exc:
-            raise ApiError(f"Object isn't reachable at {self.base}: is the app running? ({exc})") from exc
+            raise ApiError(f"Object isn't reachable at {self.base} ({exc}). Is the app running?") from exc
         return self._answer(res)
 
 

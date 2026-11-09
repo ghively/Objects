@@ -72,7 +72,7 @@ class FlowList(list):
 
 
 _MERGE_TAG = "tag:yaml.org,2002:merge"
-_MERGE_MESSAGE = "Frontmatter uses a merge key (<<), which can't be edited in place"
+_MERGE_MESSAGE = "Frontmatter uses a merge key (<<), which can't be edited in place."
 
 
 def _has_top_level_merge(node: Any) -> bool:
@@ -134,7 +134,7 @@ def _plain_key(key: Any) -> Any:
     # A sequence key (`? [a, b]`) loads as a tuple. No property can have it as a
     # name and it isn't JSON, so the file is refused (read-only), never crashed on.
     if isinstance(key, (list, tuple, dict)):
-        raise FrontmatterError("Frontmatter has a key that is a list or mapping")
+        raise FrontmatterError("Frontmatter has a key that is a list or mapping.")
     return _plain(key)
 
 
@@ -171,7 +171,7 @@ def parse_fm(src: str) -> dict:
         # ruamel's composer recurses per nesting level: `[[[[…` 500 deep is a bad file,
         # not a crash of the whole space.
         _discard_yaml("plain")
-        raise FrontmatterError("Frontmatter is nested too deeply") from exc
+        raise FrontmatterError("Frontmatter is nested too deeply.") from exc
     except (TypeError, ValueError) as exc:
         # The constructor's own failures: an integer over Python's 4300-digit limit,
         # an unhashable key inside a value (bug audit 2026-11-07, 1).
@@ -180,7 +180,7 @@ def parse_fm(src: str) -> dict:
     if data is None:
         return {}
     if not isinstance(data, dict):
-        raise FrontmatterError(f"Frontmatter is a {type(data).__name__}, not a mapping")
+        raise FrontmatterError(f"Frontmatter is a {type(data).__name__}, not a mapping.")
     return _plain(data)
 
 
@@ -192,14 +192,14 @@ def _load_rt(src: str) -> CommentedMap | None:
         raise FrontmatterError(str(exc)) from exc
     except RecursionError as exc:
         _discard_yaml("rt")
-        raise FrontmatterError("Frontmatter is nested too deeply") from exc
+        raise FrontmatterError("Frontmatter is nested too deeply.") from exc
     except (TypeError, ValueError) as exc:
         _discard_yaml("rt")
         raise FrontmatterError(str(exc)) from exc
     if data is None:
         return None
     if not isinstance(data, CommentedMap):
-        raise FrontmatterError(f"Frontmatter is a {type(data).__name__}, not a mapping")
+        raise FrontmatterError(f"Frontmatter is a {type(data).__name__}, not a mapping.")
     if data.merge:
         raise FrontmatterError(_MERGE_MESSAGE)
     return data
@@ -672,7 +672,7 @@ def replace_in_value(
     else:
         out = set_keys(src, {key: new_value})
     if not reads_back(out):
-        raise FrontmatterError(f"Rewriting {key!r} broke its value")
+        raise FrontmatterError(f'Rewriting "{key}" broke its value.')
     return out
 
 

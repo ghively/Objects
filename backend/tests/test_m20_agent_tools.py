@@ -233,7 +233,7 @@ def test_remote_agent_call_cant_run_is_409(env: Env) -> None:
     remotesecrets.remove(no_token.id)
     _rec, secret = env.token()
     server = env.server(secret)
-    with pytest.raises(ApiError, match=r"Conflict: Gone Planner can't run: This agent's folder is missing"):
+    with pytest.raises(ApiError, match=r"Conflict: Gone Planner can't run: This agent's folder .* is missing"):
         _call(server, "remote_agent_call", agent="Gone Planner", message="Hi")
     with pytest.raises(ApiError, match=r"Conflict: Fake Planner can't run: This remote agent needs its token again"):
         _call(server, "remote_agent_call", agent="Fake Planner", message="Hi")

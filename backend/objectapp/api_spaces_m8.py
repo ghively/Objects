@@ -55,7 +55,7 @@ def router(ctx: ApiContext) -> APIRouter:
         except TrashUnavailable as exc:
             return JSONResponse(
                 {
-                    "detail": f"The Trash is not available: {str(exc).rstrip('.')}.",
+                    "detail": str(exc),  # `_move_to_trash`'s one sentence, with the OS reason once
                     "affected": 0,
                     "folder": exc.folder,
                 },

@@ -230,12 +230,12 @@ def _floor_text(value: Any, what: str) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
-        raise InvalidValue(f"Expected text for {what}")
+        raise InvalidValue(f"Expected text for {what}.")
     text = value.strip()
     if "\n" in text or "\r" in text:
         raise InvalidValue(f"Keep {what} to one line.")
     if len(text) > MAX_LIST_TEXT:
-        raise InvalidValue(f"{what.capitalize()} is at most {MAX_LIST_TEXT} characters.")
+        raise InvalidValue(f"Keep {what} to at most {MAX_LIST_TEXT} characters.")
     return text or None
 
 
@@ -738,7 +738,7 @@ class WorkService:
             raise InvalidValue("Unknown floor item change.")
         place_t, what_t = _floor_text(place, "the place"), _floor_text(what, "what to collect")
         if found is not None and not isinstance(found, str):
-            raise InvalidValue("Expected text for found")
+            raise InvalidValue('Expected text for "found".')
         found_t = found.strip() if isinstance(found, str) and found.strip() else None
         if found_t is not None and len(found_t) > MAX_NOTE:
             raise InvalidValue(NOTE_TOO_LONG)

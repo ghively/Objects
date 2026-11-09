@@ -190,7 +190,7 @@ def can_run(target: AgentRecord, name: str) -> None:
     """`DelegationError` (409 "{name} can't run: {reason}") for a missing folder or a read-only
     agent, local or remote."""
     if target.missing:
-        raise DelegationError(409, CANT_RUN.format(name=name, reason=f"This agent's folder is missing: {target.folder}"))
+        raise DelegationError(409, CANT_RUN.format(name=name, reason=f'This agent\'s folder "{target.folder}" is missing.'))
     if target.read_only_reason:
         raise DelegationError(409, CANT_RUN.format(name=name, reason=target.read_only_reason))
 

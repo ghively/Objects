@@ -131,7 +131,7 @@ class SaveChatRequest(BaseModel):
 
 PROPOSAL_MODES = ("askBlock", "tagBlock", "tagObject", "autofill", "rephrase")
 """Modes that run read-only, so their Accept step stays meaningful (M17)."""
-MISSING_FOLDER = "This agent's folder is missing: {path}"
+MISSING_FOLDER = 'This agent\'s folder "{path}" is missing.'
 CHAT_BUSY = "This chat is still answering."  # our string
 _RUNNING: set[tuple[str, str]] = set()
 """The ``(agent id, chat id)`` of every local turn this process is running. A second turn on a

@@ -183,10 +183,10 @@ def test_formula_errors_and_now(m12_dir: Path):
     (m12_dir / ".object/types/member.json").write_text(json.dumps(t), "utf-8")
     space = _space(m12_dir)
     v = _row(space, "Members/Ann.md")
-    assert v["bad"] == {"type": "error", "value": None, "error": "Division by zero"}
+    assert v["bad"] == {"type": "error", "value": None, "error": "Division by zero."}
     assert v["day"] == {"type": "date", "value": "2026-11-05"}
     assert v["self"]["type"] == "error" and "refers to itself" in v["self"]["error"]
-    assert v["unk"]["error"] == 'Unknown property "Nope"'
+    assert v["unk"]["error"] == 'Unknown property "Nope".'
     assert v["syn"]["type"] == "error"
     assert _row(space, "Members/Cy.md")["bad"] == E  # empty / 0 stays quietly empty
 
@@ -559,7 +559,7 @@ def test_formula_preview(m12_dir: Path):
         assert preview(expression='prop("Budget") + 1', path="Projects/Apollo.md") == {
             "value": {"type": "number", "value": 101}, "error": None}
         out = preview(expression='prop("Nope")', path="Projects/Apollo.md")
-        assert out["value"]["type"] == "error" and out["error"] == 'Unknown property "Nope"'
+        assert out["value"]["type"] == "error" and out["error"] == 'Unknown property "Nope".'
         # Unsaved definitions: Budget renamed to Cost and an unsaved formula.
         props = space.type_by_id("project").to_api("")["propertyDefinitions"]
         for p in props:
@@ -597,7 +597,7 @@ def test_huge_numbers_in_rollups_are_errors(m12_dir: Path):
     _write(m12_dir / "Members" / "Ann.md",
            "---\ntype: 'Member'\ntitle: Ann\nhours: " + "1" + "0" * 320 + "\n---\n")
     space = _space(m12_dir)
-    too_large = {"type": "error", "value": None, "error": "Number too large"}
+    too_large = {"type": "error", "value": None, "error": "The number is too large."}
     v = _row(space, "Projects/Apollo.md")
     assert v["teamHours"] == too_large  # sum: float() overflows
     assert v["ref"] == too_large  # a formula over it says the same
