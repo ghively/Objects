@@ -537,6 +537,7 @@ const RESYNC_EVENTS: readonly ChangeEvent[] = [
   { kind: 'work', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'workQueue', path: RESYNC_PATH, version: null, origin: null },
   { kind: 'mcpServers', path: RESYNC_PATH, version: null, origin: null },
+  { kind: 'settings', path: RESYNC_PATH, version: null, origin: null },
 ]
 
 /**
@@ -1274,7 +1275,7 @@ export const api = {
 
   /** Patch device settings. Rejects with `ConflictError` (409) on a stale `baseRevision`. */
   patchSettings(patch: Partial<DeviceSettings>, opts: { baseRevision: string }): Promise<SettingsResponse> {
-    return request<SettingsResponse>('/settings', json('PUT', { patch, baseRevision: opts.baseRevision }))
+    return request<SettingsResponse>('/settings', json('PUT', { patch, baseRevision: opts.baseRevision, clientId: CLIENT_ID }))
   },
 
   /** The spaces registry (unwrapped from `{spaces}`), in registry order. */

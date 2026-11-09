@@ -91,6 +91,7 @@ class ChangeEvent:
         "mcpServers",
         "work",
         "workQueue",
+        "settings",
     ]
     path: str
     """Space-relative POSIX path of the object file (for ``types``: the type id; for
@@ -101,7 +102,8 @@ class ChangeEvent:
     ``agentLearning`` the agent id, with the ledger entry, review or curator run id as
     ``version``; M19: for ``mcpServers`` the server id, or ``secrets``; M23: for ``work``
     ``floor`` (the general floor list, with its revision as ``version``); for ``workQueue``,
-    announced by M24 on every agent queue change, the queue entry id)."""
+    announced by M24 on every agent queue change, the queue entry id; for ``settings`` (fix pass H)
+    ``settings.json``, the device settings, with their revision as ``version``)."""
     version: str | None
     """The new file version (sha256 of its bytes); ``None`` when deleted."""
     origin: str | None = None

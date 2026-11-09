@@ -575,6 +575,7 @@ class PatchSpaceRequest(BaseModel):
 class PatchSettingsRequest(BaseModel):
     patch: dict[str, Any]
     baseRevision: str = ""
+    clientId: str | None = None
 
 
 class CreateSpaceRequest(BaseModel):
@@ -1101,6 +1102,8 @@ def create_app(
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         settings_changed(data)
+        # Fix pass H: other windows reload their settings (and the Work page its Alerts).
+        announce(ChangeEvent("settings", "settings.json", revision, origin=req.clientId))
         return {"settings": data, "revision": revision}
 
     # -- spaces (M7): the registry in the state dir; folders are never deleted --

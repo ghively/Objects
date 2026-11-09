@@ -651,6 +651,8 @@ export type ChangeKind =
   | 'work'
   /** M23 (announced by M24): the work agent's queue changed. */
   | 'workQueue'
+  /** Fix pass H: the device settings changed (`path` `settings.json`, `version` their revision). */
+  | 'settings'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {

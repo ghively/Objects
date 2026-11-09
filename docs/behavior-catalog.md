@@ -191,7 +191,8 @@ Each starter template pre-fills the new type's properties.
   Today, Your queues, Agent queue, Captures), and **More views** folds **Plan** (Scheduled, Flow, Projects
   map, On the floor), **Manage** (Status, Open, Deadline, Recurring, Reminders, Context, Tags, All) and
   **Review** (Stuck, Wins, Alerts, Tickets, Everything, Completed); a folded view that is open stays on the
-  row. The task sections are list views of the dashboard, each with the quick add on top (a new task gets
+  row. Wins (and its count) follows every object change once loaded, and Alerts follows a settings change (the
+  monitoring folder), so neither needs a reload. The task sections are list views of the dashboard, each with the quick add on top (a new task gets
   the values the section's filter implies). **Today** is one view: the day timeline (meetings, focus lines,
   the now-line, deadline countdowns) with **Today's tasks** under it — the Calendar Day view's Tasks section for
   today (decision T1, one list in both places): tasks whose date covers today, whose deadline is today, and the
