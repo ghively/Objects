@@ -2,7 +2,7 @@
 
 Generated from `results.json` (lane C1b scratch). Gene's `mN-acceptance.md` boxes are NOT ticked; this file records what an agent could verify.
 
-**Counts:** MANUAL 59, NOT-RUN 8, PARTIAL 18, PASS 29, SUPERSEDED 1 (total 115)
+**Counts:** MANUAL 59, NOT-RUN 5, PARTIAL 19, PASS 31, SUPERSEDED 1 (total 115)
 
 ## How this was run
 
@@ -134,13 +134,13 @@ Generated from `results.json` (lane C1b scratch). Gene's `mN-acceptance.md` boxe
 | M9#8 | Text property: `[[` opens the picker, links show as chips, and renaming the target updates the link. | ? | **NOT-RUN** | not reached |
 | M9#9 | Template date variables: "Day/Week/Month/Year of creation" on a template's date property; a new object from it gets the right date or range. | ? | **NOT-RUN** | not reached |
 | M9#10 | An embedded collection and an embedded query: change the layout, filter, sort and group, close and reopen, and they are kept. The note's ... | ? | **NOT-RUN** | not reached |
-| M9#11 | Alignment in the block menu and in the table bar. | ? | **NOT-RUN** | not reached |
+| M9#11 | Alignment in the block menu and in the table bar. | AUTO | **PASS** | Table bar (Blocks M8): cell > Alignment = Align text left \| Text align center \| Text align right; center -> `\| --- \| --- \|` -> `\| :---: \| --- \|` (one line). Block menu > Alignment > Text align center -> `<!-- block: align=center ... -->` (M7#5) |
 | M9#12 | The row menu on a type page, a type dashboard section and a query page; Select multiple; bulk change type, open in side panel and delete. | AUTO | **PARTIAL** | Pages type page: row right-click = Select multiple \| Open in side panel \| Open in new tab \| Change type \| Copy object reference \| Duplicate \| Delete object; Select multiple + Shift-click -> "6 selected" bar. Not driven: type dashboard section and query page rows, bulk change type / side panel / delete |
-| M9#13 | Import CSV into a type (with and without a header row, and a new collection); the warning shows. | ? | **NOT-RUN** | not reached |
+| M9#13 | Import CSV into a type (with and without a header row, and a new collection); the warning shows. | AUTO | **PARTIAL** | Pages > More > Import CSV: "Bulk import from CSV", "Has a header row" (on), warning "Use this with caution / Each row becomes its own object...", file set -> "Add 2 new Pages to / Pages / New collection \"people\"" (blank line skipped) + Property Mappings; Import created 2 files. The harness mis-mapped the columns (title went to Description -> "Untitled.md" with description "CSV one"), so title mapping is unconfirmed; no-header and new-collection runs not driven |
 | M9#14 | A single-type query tab: the type is locked and the release button works. | ? | **NOT-RUN** | not reached |
 | M9#15 | Sidebar sections: drag to reorder, restart, and the order is kept. | AUTO | **PASS** | Sidebar grips "Reorder Pinned", "Reorder Object Types": keyboard Space, ArrowDown, Space -> order Object Types, Pinned; `.object/ui.json` workspaceOrder ["objects","pinned"]; page reload keeps it (m9_acceptance check 7 round-trips workspaceOrder). Pointer drag under CDP did not move it |
 | M9#16 | "Rebuild search index" (Settings > Offline & Sync) runs and the indexing state shows. | AUTO | **PASS** | Settings > Offline & Sync > "Rebuild search index": button disabled while running, "Rebuilding the index" state shown; requests POST /api/search/reindex then polling /api/search?q=&limit=1; space unchanged |
-| M9#17 | Draw on a whiteboard: its "Last updated" moves, at most once a minute. The board's Notes still save. | ? | **NOT-RUN** | not reached |
+| M9#17 | Draw on a whiteboard: its "Last updated" moves, at most once a minute. The board's Notes still save. | AUTO | **PASS** | Media board, Pen stroke: `.ink.svg` changed and the `.md` changed only its lastUpdated line; a second stroke ~20 s later changed only the `.ink.svg` (throttle); then the Notes bar edit saved (`Notes for the media board.` + text, lastUpdated) with no error. m9_acceptance check 6 likewise |
 | M9#18 | Every rule in "Rules the build chose", against the behaviour catalog. | MANUAL | **MANUAL** | Rules for Gene to confirm against the catalog |
 | M9#19 | The look of every M9 screen against the spec and catalog, in Light and Dark. | MANUAL | **MANUAL** | Visual look in Light/Dark |
 
