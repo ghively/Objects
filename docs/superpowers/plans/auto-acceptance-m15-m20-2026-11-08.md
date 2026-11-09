@@ -33,7 +33,7 @@ The boxes in those files are **not** ticked; this report is the evidence.
 
 ## Counts
 
-67 boxes: DEFERRED-live-CLI 1, MANUAL 1, NOT-RUN 21, PARTIAL 3, PASS 40, SUPERSEDED 1
+67 boxes: DEFERRED-live-CLI 1, MANUAL 1, NOT-RUN 11, PARTIAL 3, PASS 50, SUPERSEDED 1
 
 
 ## M15 (m15-acceptance.md)
@@ -104,16 +104,16 @@ The boxes in those files are **not** ticked; this report is the evidence.
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M19.1 | Settings > Integrations shows "MCP servers" after API tokens. "Add MCP server" by Command adds a real stdio server you use (for example o… | **NOT-RUN** | not reached |
-| M19.2 | Add a URL server with a bearer token or an API-key header. "Test" lists its tools. Editing it shows "•••••• saved", never the value. A wr… | **NOT-RUN** | not reached |
-| M19.3 | `%LOCALAPPDATA%\object\secrets.json` holds the values and `mcp-servers.json` doesn't. Neither file is in any space folder or agent folder. | **NOT-RUN** | not reached |
-| M19.4 | In a chat, Assistant uses one of the server's tools without an Accept step, and the step shows in the chat. | **NOT-RUN** | not reached |
-| M19.5 | Researcher's Tools tab lists the server as its own group with its tools ("Listing tools…" first). Switching one tool off stops Researcher… | **NOT-RUN** | not reached |
-| M19.6 | Turning the server off in Settings removes it from every agent's chats. The Tools tab says "Turned off in Settings > Integrations". | **NOT-RUN** | not reached |
-| M19.7 | Your own Claude Code MCP servers (from your `~/.claude.json` or project files) don't appear in an agent chat. Ask the agent to list its t… | **NOT-RUN** | not reached |
-| M19.8 | Put a `.mcp.json` with a `${VAR}` reference into an agent folder (or "Add agent folder…" for a copy from elsewhere). The Profile tab show… | **NOT-RUN** | not reached |
-| M19.9 | Delete a server: "Confirm delete" first. Its secrets are gone from `secrets.json`. | **NOT-RUN** | not reached |
-| M19.10 | "Hide AI features" hides the MCP servers group. | **NOT-RUN** | not reached |
+| M19.1 | Settings > Integrations shows "MCP servers" after API tokens. "Add MCP server" by Command adds a real stdio server you use (for example o… | **PASS** | Settings > Integrations: 'MCP servers' section after 'API tokens' (and 'Connect an AI assistant'); 'Add MCP server' by Command (name fake-stdio, command .venv/bin/python, argument backend/tests/fake_mcp_server.py) saved; 'Test' -> '3 tools' and 'Tools (3): add, echo, whoami' with descriptions. (A real npx server was not used: fake stdio server instead.) |
+| M19.2 | Add a URL server with a bearer token or an API-key header. "Test" lists its tools. Editing it shows "•••••• saved", never the value. A wr… | **PASS** | URL server fake-http (http://127.0.0.1:8814/mcp, HTTP, Bearer token) -> Test '3 tools'; Edit shows 'Bearer token •••••• saved / Replace / Remove' and no value in any input; replacing it with a wrong token -> 'Test failed: The server refused the credentials (401). If it needs an OAuth sign-in, Object can't do that yet; use a token or a header.' (the fake server's log never saw the token text echoed); setting it back -> 3 tools. |
+| M19.3 | `%LOCALAPPDATA%\object\secrets.json` holds the values and `mcp-servers.json` doesn't. Neither file is in any space folder or agent folder. | **PASS** | OBJECT_STATE_DIR/secrets.json holds key 'mcp:<id>:bearer'; mcp-servers.json has 'bearer': true and no value; grep -rl for the token over the whole scratch tree (spaces + agent folders + state) finds only state/secrets.json (and this report's own setup line). |
+| M19.4 | In a chat, Assistant uses one of the server's tools without an Accept step, and the step shows in the chat. | **PASS** | Assistant chat (fake) calling fake-http add and fake-stdio echo: steps 'Used add (fake-http)' Result 5 and 'Used echo (fake-stdio)' Result 'hi stdio', no Accept button; run's --mcp-config servers [fake-http, fake-stdio, object, object-agent]. |
+| M19.5 | Researcher's Tools tab lists the server as its own group with its tools ("Listing tools…" first). Switching one tool off stops Researcher… | **PASS** | Researcher Tools tab showed 'Listing tools…' first, then groups 'fake-stdio' and 'fake-http' with add/echo/whoami switches. fake-stdio/echo off + 'All of fake-http' off -> Researcher run: 'Used echo (fake-stdio) (failed)', 'Used add (fake-stdio)' ok, 'Used add (fake-http) (failed)', run servers [fake-stdio, object, object-agent] (fake-http left out); Assistant same message: all three ok, servers include fake-http. |
+| M19.6 | Turning the server off in Settings removes it from every agent's chats. The Tools tab says "Turned off in Settings > Integrations". | **PASS** | Settings switch 'Turned on fake-stdio' off -> Assistant's next run servers [fake-http, object, object-agent] (fake-stdio gone); tools API status 'disabled'; Researcher Tools tab group reads 'Turned off in Settings > Integrations' (an already-open agent page only showed it after a reload). |
+| M19.7 | Your own Claude Code MCP servers (from your `~/.claude.json` or project files) don't appear in an agent chat. Ask the agent to list its t… | **PASS** | Every run has --strict-mcp-config and an --mcp-config listing only Object's servers plus the gateway's ([fake-http, fake-stdio, object, object-agent]); --setting-sources project,local, no CLAUDE_CONFIG_DIR. Live: lane A check 2 / test_user_setup_never_reaches_a_run (no user MCP, skills, hooks or plugins in a run). Gene's ~/.claude.json was not read. |
+| M19.8 | Put a `.mcp.json` with a `${VAR}` reference into an agent folder (or "Add agent folder…" for a copy from elsewhere). The Profile tab show… | **PASS** | Researcher folder .mcp.json server 'folder-fake' with env FAKE_TOKEN=${FAKE_TOKEN}: Profile 'Folder MCP servers: folder-fake Needs secrets: FAKE_TOKEN  Set…'; Set… dialog 'Set FAKE_TOKEN' (password field) -> saved to state/secrets.json only; Tools tab then lists 'folder-fake · this agent's folder: add, echo, whoami' (the server starts only with the var set: --require-env). |
+| M19.9 | Delete a server: "Confirm delete" first. Its secrets are gone from `secrets.json`. | **PASS** | fake-http row Delete -> row shows 'Agents lose this server at once. Its secrets are deleted.' + 'Confirm delete' (mcp-servers.json unchanged until then); Confirm delete -> servers [fake-stdio], secrets.json keys [] (its bearer gone). Observation: a Secret variables row's Delete (FAKE_TOKEN) removed the value at once with no confirm step. |
+| M19.10 | "Hide AI features" hides the MCP servers group. | **PASS** | aiHidden=true -> Settings > Integrations shows API tokens but no 'MCP servers' section; set back to false. |
 | M19.11 | Unlinked mentions still show on the object page. | **PASS** | Page 'Mention probe' with plain text 'Yesterday Ada Lovelace reviewed the plan.' -> Ada Lovelace page tab 'Mentions 1' lists it with a 'Link' button (checked once on this build, after M17-M20 are all in). |
 
 ## M20 (m20-acceptance.md)
