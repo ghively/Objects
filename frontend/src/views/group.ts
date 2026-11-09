@@ -23,7 +23,6 @@ import {
   computedText,
 } from '@/properties/computed'
 import { formatDate, formatNumber } from '@/properties/format'
-import { useSettings } from '@/settings/useSettings'
 import { STATUS_CATEGORIES, optionCategory } from '@/tasks/statusCategory'
 import { wallClock } from '@/lib/zonedTime'
 import { wallStart, weekStartOf, type WeekStart } from './dates'
@@ -111,6 +110,8 @@ export interface GroupCtx extends FilterCtx {
   entityTitles?: Record<string, string>
   /** Object path → created-at ISO string, for the "Created oldest/newest first" order. */
   entityCreated?: Record<string, string>
+  /** The Time format setting ("24-hour time"): the "By Hour" labels read "14:00" or "2 PM". 12-hour when absent. */
+  twentyFourHourTime?: boolean
 }
 
 type Config = DataViewDefinition['groupByConfig']
@@ -192,13 +193,13 @@ interface Bucket {
   sort: number | string
 }
 
-function dateBucket(at: Date, option: string, now: Date, weekStart: WeekStart): Bucket {
+function dateBucket(at: Date, option: string, now: Date, weekStart: WeekStart, twentyFourHour: boolean): Bucket {
   switch (option) {
     case 'hour': {
       const id = `${dayId(at)}T${pad(at.getHours())}`
       const h = at.getHours()
-      // The hour reads as the Time format setting has it (`properties/format.ts`): "14:00" or "2 PM".
-      const period = useSettings.getState().settings.twentyFourHourTime ? `${pad(h)}:00` : `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}`
+      // The hour reads as the Time format setting has it (`ctx.twentyFourHourTime`): "14:00" or "2 PM".
+      const period = twentyFourHour ? `${pad(h)}:00` : `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}`
       return { id, label: `${SHORT_MONTHS[at.getMonth()]} ${at.getDate()}, ${at.getFullYear()}, ${period}`, sort: id }
     }
     case 'week': {
@@ -274,6 +275,8 @@ interface Scratch {
   nowWall: Date
   /** The "Start of the week" setting (`ctx.weekStart`; Monday when not given): the week, relative and scheduled buckets. */
   weekStart: WeekStart
+  /** The Time format setting (`ctx.twentyFourHourTime`; 12-hour when not given): the "By Hour" labels. */
+  twentyFourHour: boolean
   /** A date value's start as a carrier, remembered per start text (`wallStart` reads the zone once per instant). */
   wallOf(v: DateValue | null): Date | null
 }
@@ -292,7 +295,7 @@ function scratchFor(ctx: GroupCtx): Scratch {
     }
     return at
   }
-  return { tagsByTitle, nowWall: wallClock(ctx.now), weekStart: ctx.weekStart ?? 'monday', wallOf }
+  return { tagsByTitle, nowWall: wallClock(ctx.now), weekStart: ctx.weekStart ?? 'monday', twentyFourHour: ctx.twentyFourHourTime === true, wallOf }
 }
 
 /** The groups a row belongs to for one entry; none means "Other". */
@@ -375,7 +378,7 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
     case 'entity_createdAt':
     case 'entity_lastUpdated': {
       const at = scratch.wallOf(dateOf(row, entry.propertyId))
-      return at ? [dateBucket(at, entry.option, scratch.nowWall, scratch.weekStart)] : []
+      return at ? [dateBucket(at, entry.option, scratch.nowWall, scratch.weekStart, scratch.twentyFourHour)] : []
     }
     case 'entity_title':
       return textBucket(displayTitle(row))
