@@ -591,64 +591,6 @@
       }
     }
   },
-  "day": {
-    "properties": [
-      {
-        "key": "title",
-        "name": "Title",
-        "type": "entity_title",
-        "options": {}
-      },
-      {
-        "key": "day",
-        "name": "Date",
-        "type": "datetime",
-        "options": {
-          "constraints": {
-            "resolutionPreference": "day"
-          }
-        }
-      }
-    ],
-    "query": {
-      "name": "This week's days",
-      "definition": {
-        "types": [
-          {
-            "id": "day"
-          }
-        ],
-        "filterGroup": {
-          "type": "filterGroup",
-          "operator": "and",
-          "elements": [
-            {
-              "type": "filter",
-              "propertyId": "day",
-              "option": "is",
-              "referenceValue": {
-                "relative": "thisWeek"
-              },
-              "typeId": "day"
-            }
-          ]
-        },
-        "sorts": [
-          {
-            "propertyId": "day",
-            "option": "ascending",
-            "typeId": "day"
-          }
-        ],
-        "groupBy": null
-      },
-      "view": {
-        "viewDefinition": {
-          "dataViewLayout": "list"
-        }
-      }
-    }
-  },
   "week": {
     "properties": [
       {

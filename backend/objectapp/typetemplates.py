@@ -14,9 +14,9 @@ those are **our choice**:
 - TV series: Cover image, Director and Actors (relations to Person), Genre (multi label),
   Rating, Watched on (date), Notes.
 - Podcast: URL, People (relation to Person), Listened on (date), Notes.
-- Day: Date (day), Energy and Mood (labels, options in rising order), Highlight
-  and Gratitude (text), Content.
-- Week, Month: Date (a day range), Notes.
+- Week, Month: Date (a day range), Notes; for periodic reviews. There is no Day template:
+  the built-in daily note is the one note per day (fix pass 2026-11-09). A type made from
+  the earlier Day template keeps working from its own file; its key is just not offered.
 - Organization: Category (label), People (relation to Person), Projects (relation to
   Project), Cover image, Notes.
 
@@ -155,20 +155,6 @@ def _podcast():
     ]
 
 
-def _day():
-    b = _b()
-    return [
-        _date("day", "Date"),
-        _label("energy", "Energy", ("Very low", "Low", "Medium", "High", "Very high"),
-               description="Your energy level that day"),
-        _label("mood", "Mood", ("Rough", "Low", "Okay", "Good", "Great"),
-               description="Your overall mood that day"),
-        b._prop("highlight", "Highlight", "text", description="The best moment of the day"),
-        b._prop("gratefulFor", "Gratitude", "text", description="Things you were thankful for"),
-        b._prop("content", "Content", "blocks"),
-    ]  # fmt: skip
-
-
 def _period():
     return [_date("period", "Date", rng=True), _b()._notes()]
 
@@ -218,14 +204,12 @@ _TEMPLATES: tuple[TypeTemplate, ...] = (
     TypeTemplate("podcast", "media", "Podcast", "Podcasts",
                  "Episodes you have heard, with a link and the people in them.",
                  "ph-microphone", "fuchsia", _podcast),
-    TypeTemplate("day", "planningAndReflection", "Day", "Days",
-                 "One entry per day: energy, mood and a highlight.",
-                 "ph-sun", "yellow", _day),
+    # No Day template: the built-in daily note is the one note per day (fix pass 2026-11-09).
     TypeTemplate("week", "planningAndReflection", "Week", "Weeks",
-                 "One entry per week, for plans and look-backs.",
+                 "One entry per week, for weekly reviews and plans. Daily notes already cover each day.",
                  "ph-calendar", "sky", _period),
     TypeTemplate("month", "planningAndReflection", "Month", "Months",
-                 "One entry per month, for plans and look-backs.",
+                 "One entry per month, for monthly reviews and plans.",
                  "ph-calendar-dots", "cyan", _period),
     TypeTemplate("organization", None, "Organization", "Organizations",
                  "Companies, schools and other groups, with their people.",
@@ -298,8 +282,6 @@ TEMPLATE_QUERIES: dict[str, TemplateQuery] = {
                               (("watchedOn", "descending"),), "grid"),
     "podcast": TemplateQuery("Listened this month", (("listenedOn", "is", _rel("thisMonth")),),
                              (("listenedOn", "descending"),)),
-    "day": TemplateQuery("This week's days", (("day", "is", _rel("thisWeek")),),
-                         (("day", "ascending"),)),
     "week": TemplateQuery("This month's weeks", (("period", "is", _rel("thisMonth")),),
                           (("period", "ascending"),)),
     "month": TemplateQuery("This year's months", (("period", "is", _rel("thisYear")),),

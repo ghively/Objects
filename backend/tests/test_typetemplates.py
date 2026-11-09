@@ -20,7 +20,7 @@ from objectapp.typetemplates import (
 
 GALLERY = (
     "meeting", "person", "project", "atomicNote", "definition", "book", "film", "tvSeries",
-    "podcast", "day", "week", "month", "organization", "area",
+    "podcast", "week", "month", "organization", "area",
 )  # fmt: skip
 
 
@@ -32,13 +32,37 @@ def test_the_gallery_has_the_starter_templates_in_order():
     assert TEMPLATE_KEYS == GALLERY
     cat = template_catalog([])
     assert [c["name"] for c in cat][:3] == ["Meeting", "Person", "Project"]
-    day = next(c for c in cat if c["key"] == "day")
-    assert day["pluralName"] == "Days"
-    assert day["description"] == "One entry per day: energy, mood and a highlight."
-    assert [p["name"] for p in day["properties"]] == [
-        "Date", "Energy", "Mood", "Highlight", "Gratitude", "Content",
-    ]  # fmt: skip
+    # Fix pass 2026-11-09: no Day template (the built-in daily note is the one note per day);
+    # Week and Month are for periodic reviews.
+    assert all(c["name"] != "Day" for c in cat)
+    week = next(c for c in cat if c["key"] == "week")
+    assert week["pluralName"] == "Weeks" and week["section"] == "planningAndReflection"
+    assert week["description"] == "One entry per week, for weekly reviews and plans. Daily notes already cover each day."
+    assert [p["name"] for p in week["properties"]] == ["Date", "Notes"]
+    month = next(c for c in cat if c["key"] == "month")
+    assert month["description"] == "One entry per month, for monthly reviews and plans."
+    assert [p["name"] for p in month["properties"]] == ["Date", "Notes"]
     assert {c["section"] for c in cat} == {"useCases", "research", "media", "planningAndReflection", None}
+
+
+def test_a_day_type_made_from_the_old_template_keeps_working(tmp_path: Path):
+    """A space whose Day type was made from the gallery's Day template (its file carries
+    ``templateKey: day`` and its own definitions) opens and lists as before; the gallery just no
+    longer offers it, so nothing new is made from the key."""
+    space_dir = tmp_path / "s"
+    space_dir.mkdir()
+    sp = Space(space_dir)
+    t = sp.create_type("Day", "Days")
+    file = space_dir / ".object" / "types" / f"{t.id}.json"
+    data = _stored(space_dir, t.id)
+    data["templateKey"] = "day"
+    file.write_text(json.dumps(data), "utf-8")
+    reopened = Space(space_dir)
+    day = reopened.type_by_id(t.id)
+    assert day is not None and day.extra["templateKey"] == "day"
+    assert [p["name"] for p in template_catalog(list(reopened.types)) if p["added"]] == []
+    with pytest.raises(InvalidValue, match='Unknown object type template "day"'):
+        reopened.create_type("", "", template="day")
 
 
 @pytest.mark.parametrize("key", GALLERY)
@@ -69,8 +93,8 @@ def test_template_relations_point_at_the_type_named_like_their_target(space_dir:
     assert _allowed(meeting, "attendees") == ["person"]
     film = sp.create_type("", "", template="film")
     assert _allowed(film, "director") == ["person"]
-    day = sp.create_type("", "", template="day")
-    assert all(p.type != "entity" for p in day.propertyDefinitions)
+    week = sp.create_type("", "", template="week")
+    assert all(p.type != "entity" for p in week.propertyDefinitions)
 
 
 def test_template_relations_find_types_made_from_a_template(space_dir: Path):
