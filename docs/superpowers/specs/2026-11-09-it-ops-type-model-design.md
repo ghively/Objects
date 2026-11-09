@@ -67,6 +67,7 @@ This applies to the wiki and to any other source. Every decision below was made 
 | **Command** | Shell (label: PowerShell, Bash, cmd, macOS); Covers (relation) |
 | **Runbook** | Kind (label: Runbook, SOP); Covers (relation); Last reviewed (date) |
 | **Prompt** | Model (text); Purpose (text); Used on (relation) |
+| **Source** | Category (label: Wiki page, Document, Spreadsheet, Presentation, PDF, Diagram, Email, Ticket, Chat, Web page, Image, Note); System (label); Distilled into (counterpart). Read-only; filled by imports (section 5a). |
 
 **Work**
 
@@ -137,9 +138,36 @@ This extends the import design's schema proposal (section 8) and AI filing pass 
   - **relations**: subject, relation name (from section 2's set), object, with the quote that supports it.
 - **Entity resolution** (the app, after all batches): candidates are merged by normalised name and aliases within a type, and the agent's suggested merges are added ("SQL 2019" = "SQL Server 2019"). Each merged entity keeps every name as an alias and every source page in its provenance.
 - **Gene's review** (a new "Entities" step in the import wizard, after the schema step): entities grouped by type, each with its count of mentioning pages, its aliases, the suggested merges and splits. Each can be accepted, renamed, merged, split or turned down. Links are written without a further review; links from low-confidence candidates go to the Import inbox.
-- **Writing**: the app creates the accepted entities, sets the stored side of each relation, and turns each mention in page text into a link (as `link_mention` does today). A page whose main entity was found becomes that entity's notes. Writing such as a runbook stays its own object and links to what it covers.
+- **Writing**: the app creates the accepted entities, sets the stored side of each relation, fills each entity's distilled section (section 5a), and turns each mention in a Source's text into a link (as `link_mention` does today). No imported page is turned into an entity: every page stays a Source (Gene, 2026-11-09, replacing the earlier "a page's own text becomes its main entity's notes").
 - **The entity rule** (in the skill and checked by the app): a candidate becomes an object when it exists on its own, or more than one page mentions it, or it has properties of its own. Otherwise it stays text or a tag. Categories (Server, VM, Production) become property values or tags, never entities.
 - The trial pass (50 pages), confidence levels, quotes and the scan run as in the import design. Nothing is written before Gene's approval of the schema and the entity list.
+
+### 5a. Sources and distillation (Gene, 2026-11-09)
+
+The import keeps the source data and distils what is relevant into the right objects, as an LLM-maintained wiki keeps its raw sources and builds its pages from them.
+
+- **Every imported page is a Source object**: a **Source** type (created by the first import that needs it, in any space) holds the page's text exactly as it was, its kept original file and its `importSource` provenance. Sources are **read-only in the app** ("Imported source"); only a re-run of the same source updates one, and the previous text stays in version history.
+- **The Source type** (Gene, 2026-11-09) is part of the IT ops starter as well (section 1, under Knowledge), and an import creates it in any other space that lacks it. Its own properties:
+  - **Category** (label; our options): Wiki page, Document, Spreadsheet, Presentation, PDF, Diagram, Email, Ticket, Chat, Web page, Image, Note. The import sets it from the file format and the source system.
+  - **System** (label, from `importSource.system`): SharePoint, Wiki, Notion, Obsidian, Anytype, Files, Markdown.
+  - **Distilled into** (the counterpart of the entities' "Sources" relation).
+
+  The provenance fields (link, author, dates, batch) show on its Source line, as for any imported object.
+- **Entities are distilled from all their sources.** A Host mentioned by 12 pages gets the relevant facts from all 12, not just from its own page. Each entity has:
+  - its **properties**, each value carrying the Source (or Sources) and the quote it came from;
+  - a **distilled section** at the top of its body ("From sources"; our string): a short summary written by the filing pass, every line citing its Sources as links. The import owns this section: a re-run rewrites it when a cited Source changed, and nothing else in the body;
+  - **Gene's own notes** below it, which the import never touches.
+- **Links both ways**: every entity links to the Sources it was distilled from ("Sources", counterpart "Distilled into" on the Source), so a Source shows what was built from it.
+- **When sources disagree** (two IPs for APP01), the value from the most recently modified Source wins; the conflict is listed in the import report and on the entity, with both values and their Sources, for Gene to settle.
+
+### 5b. Conventions are rules in an IT ops space (Gene, 2026-11-09)
+
+When the target space has the IT ops types, the schema proposal and the entity review enforce the conventions; a proposal that breaks one can't be applied:
+
+- **Existing types first**: a group of documents maps onto an existing type when one fits; a new type is proposed only when none does (and the import design's 10-document and own-properties rules hold).
+- **No look-alike types**: a proposed type whose properties match an existing type's is refused, with "Use <type>, with a category" offered instead.
+- **Categories are never types or entities**: a grouping like Server, Workstation, VM or Production becomes a property value or a tag.
+- **The entity rule** and **named relations** (section 2) as above; a relation outside the named set is written as a plain link.
 
 ### 6. Existing spaces
 
@@ -163,7 +191,7 @@ This extends the import design's schema proposal (section 8) and AI filing pass 
 - Fast-changing Host facts are synced, read-only fields with a refreshed time.
 - Creating an object suggests the type, and the type's template fills it.
 - Named two-way relations: runs on / runs, installed on / uses, applies to / covers, located at / owned by.
-- A page's own text becomes its main entity's notes. Gene reviews the entity list and merges; links are written without asking.
+- (Superseded the same day, see 5a) ~~A page's own text becomes its main entity's notes.~~ Every imported page is kept as a read-only Source; entities are distilled from all their Sources with citations, a summary section the import owns and Gene's own notes kept apart; the newest Source wins a conflict, which is listed. In an IT ops space the conventions are hard rules (5b). Gene reviews the entity list and merges; links are written without asking.
 - New spaces get an IT ops starter. Its vocabulary comes from his older export, names only.
 
 ## Our calls (for Gene to check while reading)

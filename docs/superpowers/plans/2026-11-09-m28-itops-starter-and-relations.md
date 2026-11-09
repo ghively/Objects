@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal.** "Pick a starting point" and "Create new space" gain a third choice, **IT operations**, that writes the IT ops types (Host, Software, Application, Container, Configuration, Location, Network, Person, Vendor, Script, Command, Runbook, Prompt, Project, Incident, Meeting), one default template per type and the seed vocabulary. A relation property may name a **counterpart**: the other side is computed from the link index and shown as an editable property row on the target, filterable, sortable and groupable like any relation, and the graph labels edges with the relation name. The type gallery gains the IT ops types.
+**Goal.** "Pick a starting point" and "Create new space" gain a third choice, **IT operations**, that writes the IT ops types (Host, Software, Application, Container, Configuration, Location, Network, Person, Vendor, Script, Command, Runbook, Prompt, Source, Project, Incident, Meeting), one default template per type (Source has none: its body is the imported text) and the seed vocabulary. The nine entity types carry a **Sources** relation to Source, whose computed other side is **Distilled into** (design section 5a; M30 fills both). A relation property may name a **counterpart**: the other side is computed from the link index and shown as an editable property row on the target, filterable, sortable and groupable like any relation, and the graph labels edges with the relation name. The type gallery gains the IT ops types.
 
 **Architecture.** The starter lives in `basicsetup.py` next to the basic setup (`itops_types()`, `write_itops_types(root)`), built from the same `_prop`/`_label`/`_relation` helpers. A counterpart is one option on the stored side's `entity` definition (`options.counterpart = {name, key}`); nothing is ever written on the target. A new pure module `counterparts.py` turns the space's types into counterpart specs and virtual property definitions; `LinkIndex.counterparts(path)` answers the rows from the existing incoming-link map and `link_keys`; `rows.py` puts counterpart values into every row, so the client's view engine (filter, sort, group, calculate), saved queries and `/api/v1` reads get them with no other change. Editing a counterpart row is `Space.edit_counterpart`, which runs one ordinary `update_properties` per other object on its stored side. The graph gets one label per link pair from the same specs.
 
 **Tech Stack.** Python 3 (FastAPI, pydantic, ruamel.yaml via `frontmatter.py`), `uv`; React, TypeScript, zustand, shadcn/ui, Tailwind, sigma (the graph), vitest. No new dependencies.
 
-**Spec.** `docs/superpowers/specs/2026-11-09-it-ops-type-model-design.md`, sections **1** (the IT ops starter), **2** (named two-way relations) and **6** (existing spaces: the gallery), plus the Phases line for M28 ("the starter choice and its types, templates and vocabulary; relation counterparts (stored side, computed side, editing from either side, graph edge labels); the gallery entries"). Sections 3-4 are M29's, section 5 is M30's; this plan only provides what they consume (Contract, "Consumed by M29/M30"). Remodelling an existing space (section 6, second bullet) is M30's extraction run.
+**Spec.** `docs/superpowers/specs/2026-11-09-it-ops-type-model-design.md`, sections **1** (the IT ops starter, including the Source type under Knowledge), **2** (named two-way relations), **5a** (only the Source type's definition and the Sources / Distilled into pair; everything else in 5a is M30's) and **6** (existing spaces: the gallery), plus the Phases line for M28 ("the starter choice and its types, templates and vocabulary; relation counterparts (stored side, computed side, editing from either side, graph edge labels); the gallery entries"). Sections 3-4 are M29's, section 5 is M30's; this plan only provides what they consume (Contract, "Consumed by M29/M30"). Remodelling an existing space (section 6, second bullet) is M30's extraction run.
 
 Built on `master` (M1-M27). Everything here is new schema ("Beyond the catalog"); names, options and relation labels the design gives are verbatim, everything else is "our string" or "our choice" and listed in "Our calls".
 
@@ -56,7 +56,7 @@ The five failure modes no task's ordinary tests would catch, most likely first. 
 
 ### The starter types (`basicsetup.itops_types()`)
 
-`ITOPS_TYPE_IDS = ("host", "software", "application", "container", "configuration", "location", "network", "person", "vendor", "script", "command", "runbook", "prompt", "project", "incident", "meeting")`. Each type: `system_property_defs()`, then the properties below in order, then `notes` (Notes, `blocks`). Name / plural / folder (= plural) / icon / colour / description are our choice except the names. Relation targets are type ids (as `basic_types` does). Kinds: `label` single unless "multi"; relation = `entity` multi unless "single"; date = `datetime` with `resolutionPreference: "day"`; date and time = `datetime` with `resolutionPreference: "time"`.
+`ITOPS_TYPE_IDS = ("host", "software", "application", "container", "configuration", "location", "network", "person", "vendor", "script", "command", "runbook", "prompt", "source", "project", "incident", "meeting")` (17). Each type: `system_property_defs()`, then the properties below in order, then `notes` (Notes, `blocks`). Name / plural / folder (= plural) / icon / colour / description are our choice except the names. Relation targets are type ids (as `basic_types` does). Kinds: `label` single unless "multi"; relation = `entity` multi unless "single"; date = `datetime` with `resolutionPreference: "day"`; date and time = `datetime` with `resolutionPreference: "time"`.
 
 | id | Name / plural | Icon, colour | Own properties: key Name (kind: options) |
 |---|---|---|---|
@@ -73,9 +73,12 @@ The five failure modes no task's ordinary tests would catch, most likely first. 
 | command | Command / Commands | `ph-terminal-window`, gray | `shell` Shell (PowerShell, Bash, cmd, macOS); `covers` Covers (→ any, counterpart Documented in) |
 | runbook | Runbook / Runbooks | `ph-book-open-text`, lime | `kind` Kind (Runbook, SOP); `covers` Covers (→ any, counterpart Documented in); `lastReviewed` Last reviewed (date) |
 | prompt | Prompt / Prompts | `ph-chat-text`, fuchsia | `model` Model (text); `purpose` Purpose (text); `usedOn` Used on (→ any, no counterpart) |
+| source | Source / Sources | `ph-file-text`, slate | `category` Category (Wiki page, Document, Spreadsheet, Presentation, PDF, Diagram, Email, Ticket, Chat, Web page, Image, Note); `system` System (SharePoint, Wiki, Notion, Obsidian, Anytype, Files, Markdown). No stored relation: its "Distilled into" row is the computed other side of the entities' `sources`. Built by `source_type()`; no template. Making Source objects read-only, and writing them, is M30's |
 | project | Project / Projects | basic | the basic Project exactly (M22 work fields included), with `status` options Back log, In progress, On hold, Complete (statusCategory not-started, in-progress, blocked, done; **guess G2**), `priority` Priority (Low, Medium, High; **guess G2**) after Type, and `affects` Affects (→ host, application, software, counterpart Affected by) after Meetings |
 | incident | Incident / Incidents | `ph-warning-octagon`, red | `status` Status (Open, Mitigated, Resolved; statusCategory in-progress, in-progress, done); `severity` Severity (SEV1, SEV2, SEV3, SEV4); `impact` Impact (text); `cause` Cause (text); `affects` Affects (→ host, application, counterpart Affected by); `started` Started (date and time); `resolved` Resolved (date and time); then Notes; then `workfields.field_defs(task=False, project_type_ids=["project"])` with `deskResolved` named **Desk resolved** on this type (**guess G3**), then Task's hidden `completed` |
 | meeting | Meeting / Meetings | basic | the basic Meeting, `meetingType` options with Operations and Helpdesk appended |
+
+**The Sources relation** (`sources_property()`): on each of the nine entity types (host, software, application, container, configuration, location, network, person, vendor), after their own properties and before Notes: `sources` Sources (→ source, counterpart Distilled into), visibility `hideWhenEmpty` (the one exception to `alwaysShow`: a hand-made object has no Sources). M30 adds the same definition to any other type it distils an entity into.
 
 Option colours (our choice): Environment Production red, Test amber, Development green; Application Status Live green, Planned yellow, Retired gray; Incident Status Open red, Mitigated amber, Resolved green; Severity SEV1 red, SEV2 orange, SEV3 amber, SEV4 gray; Department IT blue, Finance green, All gray; every other list takes `blue, green, amber, violet, sky, rose, teal, orange, indigo` in order (cycling). Option ids are `label_options`' slugs. Visibility: every own property `alwaysShow` (the design's "its properties shown").
 
@@ -93,6 +96,7 @@ Option colours (our choice): Environment Production red, Test amber, Development
 | host.`locatedAt`, network.`locatedAt`, location.`partOf` | location | `{"name": "Contains", "key": "contains"}` |
 | host.`ownedBy`, application.`ownedBy` | person, vendor (Host); person (Application) | `{"name": "Owns", "key": "owns"}` |
 | container.`partOf` | application | `{"name": "Containers", "key": "containers"}` |
+| `sources` on host, software, application, container, configuration, location, network, person, vendor | source | `{"name": "Distilled into", "key": "distilledInto"}` |
 | project.`affects`, incident.`affects` | host, application, software (Project); host, application (Incident) | `{"name": "Affected by", "key": "affectedBy"}` |
 
 Rules (`counterparts.py`):
@@ -133,7 +137,7 @@ Tags get `color: bg-<THEME_COLORS[i % 18]>` by index (deterministic, our choice)
 
 ### Default templates (our strings; `ITOPS_TEMPLATE_SECTIONS: dict[str, tuple[str, ...]]`)
 
-Body is one `## <section>` line per section, a blank line between: host Purpose, Access, Known issues; software Install notes, Licensing, Known issues; application Purpose, How it's built, Support; container Purpose, Configuration; configuration What it does, Settings, Why; location Access, Notes; network Addressing, Notes; person Role, Contact; vendor Contacts, Contract, Support; script Purpose, Usage; command Usage, Example; runbook When to use, Steps, Rollback; prompt Prompt, Notes; project Goal, Plan, Notes; incident Timeline, Impact, Cause, Follow-up; meeting Agenda, Notes, Action items. Front matter: `id`, `type: '<Name>'`, `template: <Name>` (as `Space.create_template` writes it).
+Body is one `## <section>` line per section, a blank line between: host Purpose, Access, Known issues; software Install notes, Licensing, Known issues; application Purpose, How it's built, Support; container Purpose, Configuration; configuration What it does, Settings, Why; location Access, Notes; network Addressing, Notes; person Role, Contact; vendor Contacts, Contract, Support; script Purpose, Usage; command Usage, Example; runbook When to use, Steps, Rollback; prompt Prompt, Notes; project Goal, Plan, Notes; incident Timeline, Impact, Cause, Follow-up; meeting Agenda, Notes, Action items. Source has no entry and no template. Front matter: `id`, `type: '<Name>'`, `template: <Name>` (as `Space.create_template` writes it).
 
 ### Schemas
 
@@ -195,7 +199,9 @@ Events: each written object announces `ChangeEvent("changed", path, version, ori
 # basicsetup.py
 ITOPS_TYPE_IDS: tuple[str, ...]
 def itops_types() -> list[TypeDefinition]                         # fresh ids each call
-def itops_template(type_id: str) -> tuple[str, str]              # (template name, body) for one IT ops type
+def source_type() -> TypeDefinition                               # the Source type alone (fresh property ids); itops_types() uses it; M30 creates it in spaces without one
+def sources_property() -> PropertyDefinition                      # the entity types' `sources` relation (fresh id); M30 adds it to other types
+def itops_template(type_id: str) -> tuple[str, str]              # (template name, body) for one IT ops type; KeyError for "source"
 def write_itops_types(root: Path, skip: Iterable[str] = ()) -> list[Path]   # types + templates; never replaces
 def write_itops_tags(root: Path) -> list[Path]                   # seed Tags not already present (by folded title)
 # typemodel.py (here, not in counterparts.py: counterparts imports typemodel, so this avoids a cycle)
@@ -224,7 +230,7 @@ api.editCounterpart(req: CounterpartEditRequest): Promise<CounterpartEditResult>
 ### Consumed by M29 and M30
 
 - M29 adds synced properties and `namePatterns` to Host, Network and Software: it edits `basicsetup.itops_types()` after this milestone (its plan owns that edit).
-- M30 writes relations on the stored side with `Space.update_properties`, finds the stored side with `counterparts.find_relation`, and creates entities of the `ITOPS_TYPE_IDS` types.
+- M30 writes relations on the stored side with `Space.update_properties`, finds the stored side with `counterparts.find_relation`, and creates entities of the `ITOPS_TYPE_IDS` types. It creates the Source type from `basicsetup.source_type()` in a space without one, adds `basicsetup.sources_property()` to a type it distils into that lacks `sources`, and makes Source objects read-only; none of that is built here.
 
 ## Tasks
 
@@ -270,14 +276,15 @@ Fixture `space-itops/` (synthetic): `.object/space.json` (`{"name": "IT ops test
 - `Templates/Hosts/Host.md` (the Host template, plus `locatedAt: '[[Rack A]]'` so a template links to a Host's target)
 
 - [ ] **Step 1: Write the failing tests** in `test_m28_itops.py`:
-  - `test_itops_type_ids`: `[t.id for t in itops_types()] == list(ITOPS_TYPE_IDS)`; names and plurals as the Contract table.
-  - `test_host_properties`: Host's own keys in order `category, roles, ipAddress, fqdn, department, environment, operatingSystem, locatedAt, network, ownedBy, notes`; Category options exactly `["Server", "Workstation", "Network device", "Printer", "NAS", "Firewall", "VPN"]`; Roles multi with `["DNS", "DHCP", "Active Directory", "File server", "Print server", "RDS", "Hypervisor", "Firewall/VPN"]`; Environment `["Production", "Test", "Development"]`; `operatingSystem.options == {isArray: False, allowedTypes: ["software"], …, "counterpart": {"name": "Installed on", "key": "installedOn"}}`; `ownedBy.allowedTypes == ["person", "vendor"]`.
+  - `test_itops_type_ids`: `[t.id for t in itops_types()] == list(ITOPS_TYPE_IDS)` (17); names and plurals as the Contract table.
+  - `test_host_properties`: Host's own keys in order `category, roles, ipAddress, fqdn, department, environment, operatingSystem, locatedAt, network, ownedBy, sources, notes`; Category options exactly `["Server", "Workstation", "Network device", "Printer", "NAS", "Firewall", "VPN"]`; Roles multi with `["DNS", "DHCP", "Active Directory", "File server", "Print server", "RDS", "Hypervisor", "Firewall/VPN"]`; Environment `["Production", "Test", "Development"]`; `operatingSystem.options == {isArray: False, allowedTypes: ["software"], …, "counterpart": {"name": "Installed on", "key": "installedOn"}}`; `ownedBy.allowedTypes == ["person", "vendor"]`.
   - `test_every_counterpart_pair` (parametrised over the Contract's counterpart table): source key, `allowedTypes`, `{name, key}` exact.
+  - `test_source_type`: `source_type().id == "source"`, name Source / Sources; own keys `category, system, notes`; Category options exactly `["Wiki page", "Document", "Spreadsheet", "Presentation", "PDF", "Diagram", "Email", "Ticket", "Chat", "Web page", "Image", "Note"]`; System `["SharePoint", "Wiki", "Notion", "Obsidian", "Anytype", "Files", "Markdown"]`; no `entity` property; `sources_property()` is `entity`, multi, `allowedTypes == ["source"]`, counterpart `{"name": "Distilled into", "key": "distilledInto"}`, visibility `hideWhenEmpty`; the nine entity types have it just before `notes` and the other eight IT ops types don't.
   - `test_option_lists` (parametrised): Software, Application, Container, Configuration, Location, Network, Vendor, Script, Command, Runbook, Prompt, Incident property names and options exactly as the Contract (e.g. Severity `["SEV1", "SEV2", "SEV3", "SEV4"]`, Shell `["PowerShell", "Bash", "cmd", "macOS"]`, Language `["PowerShell", "Bash", "Python", "AWS CLI"]`).
   - `test_basic_variants`: Person = basic Person's keys + `department` before `notes`; Meeting's `meetingType` options end with `["Operations", "Helpdesk"]`; Project has `affects`, `priority` and the four statuses with statusCategory `["not-started", "in-progress", "blocked", "done"]`, and `workrules.done_option(status) == "Complete"`; Incident `is_work_type`, has no work-field `cause` label (its `cause` is `text`), `deskResolved.name == "Desk resolved"`, `done_option == "Resolved"`.
   - `test_no_credential_property`: no property name or key in any IT ops type matches `(?i)password|secret|credential|api key|token`.
-  - `test_write_itops_types_never_replaces`: in a temp root with `.object/types/host.json` = `b"{}"` and `Templates/Hosts/Host.md` present, `write_itops_types(root)` keeps both bytes, writes the other 15 types and 15 templates, and every written type's `templates.defaultTemplateId` is its template's id; `skip=["person"]` writes no person type or template.
-  - `test_templates`: `itops_template("host") == ("Host", "## Purpose\n\n## Access\n\n## Known issues\n")`; every id in `ITOPS_TYPE_IDS` has sections.
+  - `test_write_itops_types_never_replaces`: in a temp root with `.object/types/host.json` = `b"{}"` and `Templates/Hosts/Host.md` present, `write_itops_types(root)` keeps both bytes, writes the other 16 types and 15 templates (Source has none), and every written type's `templates.defaultTemplateId` is its template's id; `skip=["person"]` writes no person type or template.
+  - `test_templates`: `itops_template("host") == ("Host", "## Purpose\n\n## Access\n\n## Known issues\n")`; every id in `ITOPS_TYPE_IDS` but `source` has sections.
   - `test_write_itops_tags`: writes 30 files `Tags/<name>.md` with `type: 'Tag'`; with `Tags/windows.md` titled `Windows` already present, writes 29 and keeps it; a second call writes none.
   - `test_fixture_types_match`: the fixture's type JSON, loaded, equals `itops_types()` up to property ids and template ids (guards the committed fixture).
 - [ ] **Step 2: Run** `uv run pytest backend/tests/test_m28_itops.py -q`. Expected: FAIL (names missing).
@@ -297,7 +304,7 @@ Fixture `space-itops/` (synthetic): `.object/space.json` (`{"name": "IT ops test
 - Produces: `Space.apply_setup("itops")`; `create_space(name, location, setup="itops")`.
 
 - [ ] **Step 1: Write the failing tests:**
-  - `test_create_space_itops`: `create_space("Ops", tmp, "itops")` → `.object/space.json` has `setup: "itops"`, 16 type files, 16 templates, 30 tags; opening it as a `Space` lists the types and `needs_setup` is False.
+  - `test_create_space_itops`: `create_space("Ops", tmp, "itops")` → `.object/space.json` has `setup: "itops"`, 17 type files, 16 templates, 30 tags; opening it as a `Space` lists the types and `needs_setup` is False.
   - `test_apply_setup_itops`: an empty space; `space.apply_setup("itops")` → `space.type_by_id("host")` exists, `space.list_templates("host")[0].title == "Host"`, `space.create_object("host", "SRV-TEST-02")` has body `## Purpose\n\n## Access\n\n## Known issues\n`, a Tag `Windows` resolves.
   - `test_itops_setup_keeps_what_exists` (Review Focus 5): a space with a hand-made `.object/types/host.json`, `Templates/Hosts/Host.md` and `Tags/Windows.md`; after `apply_setup("itops")` those three are byte-identical, the other types are written, no second Windows tag; through `create_app`, a second `POST /api/space/setup {"setup": "itops"}` → 409 `"This space already has a starting point."`; `POST /api/space/setup {"setup": "x"}` → 422 `Pick "basic", "itops" or "blank" as the starting point.`
   - `test_needs_setup_with_itops_types`: a space with only `.object/types/host.json` and no `setup` key → `needs_setup` False.
@@ -324,7 +331,7 @@ Fixture `space-itops/` (synthetic): `.object/space.json` (`{"name": "IT ops test
   - `test_only_resolved_relation_values_count` (Review Focus 4): `Pages/Rack notes.md`'s body link and its `runsOn` front matter key (a Page) add nothing to `DB-TEST-01`'s or `APP-TEST-01`'s rows; `Old app`'s unresolved `[[Missing host]]` adds nothing anywhere; a self link (an Application whose `runsOn` names itself, written in the test) adds nothing; a path-form link `[[Hosts/DB-TEST-01]]` counts.
   - `test_rename_keeps_rows`: rename `APP-TEST-01` to `APP-TEST-09` (`space.rename`, which relinks) → its `runs` row still lists Inventory app.
   - `test_bad_counterparts_are_dropped_and_stored_keys_win` (Review Focus 3): edit `application.json` on disk so `runsOn.options.counterpart` is `"Runs"` → after a reload, no `runs` row from application and no exception; give Host a stored property `runs` (text) and a front matter line `runs: hand typed` on APP-TEST-01 → no `runs` rows on Host, and the row value under `runs` is the stored text.
-  - `test_counterpart_defs`: `counterpart_defs("host", types)` keys `["runs", "configuredBy", "documentedIn", "affectedBy"]` (first-seen order over types, then properties), `runs.options.allowedTypes == ["application", "container"]`, `counterpartOf == [{"typeId": "application", "key": "runsOn"}, {"typeId": "container", "key": "runsOn"}]`, `documentedIn.counterpartOf` lists script, command and runbook, visibility `hideWhenEmpty`, id `counterpart:runs`.
+  - `test_counterpart_defs`: `counterpart_defs("host", types)` keys `["runs", "configuredBy", "documentedIn", "affectedBy"]` (first-seen order over types, then properties), `runs.options.allowedTypes == ["application", "container"]`, `counterpartOf == [{"typeId": "application", "key": "runsOn"}, {"typeId": "container", "key": "runsOn"}]`, `documentedIn.counterpartOf` lists script, command and runbook, visibility `hideWhenEmpty`, id `counterpart:runs`; `counterpart_defs("source", types)` keys `["distilledInto"]`, its `counterpartOf` the nine entity types' `sources`.
   - `test_rows_carry_counterparts`: `space.rows(["host"], None, None, None, False)` row for APP-TEST-01 has `values["runs"] == [{"target": "Inventory app", "path": "Applications/Inventory app.md"}, {"target": "inventory-web", "path": "Containers/inventory-web.md"}]` (by title) and `links["runs"]` the two paths.
   - `test_check_type`: `check_type` answers `COUNTERPART_KIND` for a `label` with a counterpart, `COUNTERPART_SYNCED` for an entity with both `propertySyncing` and `counterpart`, `COUNTERPART_TAKEN.format(type="Host", key="category")` for Application `runsOn` with key `category`, `None` for every starter type.
   - `test_find_relation`: `find_relation(types, "application", "host", "runs on") == RelationMatch("application", "runsOn", False)`; `find_relation(types, "host", "application", "Runs") == RelationMatch("application", "runsOn", True)`; `find_relation(types, "host", "location", "Contains")` is None (wrong way round: Location contains the Host); `find_relation(types, "location", "host", "Contains") == RelationMatch("host", "locatedAt", True)`.
@@ -455,7 +462,7 @@ Queries (our choice): host "Production hosts" (`environment` contains Production
 
 - [ ] **Step 1: Write `scripts/m28_acceptance.py [SPACE] [--keep]`** (default SPACE `backend/tests/fixtures/space-itops`). It copies SPACE to a temp folder (SPACE is never touched), commits the copy to a throw-away git repo, sets `OBJECT_STATE_DIR` and `OBJECT_CACHE_DIR` to temp paths outside it, serves `create_app` on a free `127.0.0.1` port and checks over HTTP, printing `[ok]`/`[FAIL]` per check and `RESULT: PASS` at the end (non-zero exit on any failure). No agent runs, so the fake `claude` is not needed.
   1. reads write nothing: `GET /api/space`, `GET /api/object` of every object, `POST /api/rows`, `GET /api/graph`, `GET /api/type-gallery` → `git status` clean;
-  2. `POST /api/spaces {"name": "Ops", "location": <temp>, "setup": "itops"}` → the new folder has 16 types, 16 templates and 30 tags; a new empty folder opened with `POST /api/space/setup {"setup": "itops"}` gets the same; a second call → 409;
+  2. `POST /api/spaces {"name": "Ops", "location": <temp>, "setup": "itops"}` → the new folder has 17 types, 16 templates and 30 tags; a new empty folder opened with `POST /api/space/setup {"setup": "itops"}` gets the same; a second call → 409;
   3. APP-TEST-01's counterparts: Runs (Inventory app, inventory-web), Documented in (Restart the inventory app); Rack A's Contains lists APP-TEST-01; Windows Server 2022's Installed on lists both hosts;
   4. `POST /api/object/counterpart` adds Inventory app to DB-TEST-01's Runs → only `Applications/Inventory app.md` changed, keys `runsOn` and `lastUpdated` (`hunk_keys`); DB-TEST-01's file unchanged;
   5. remove it again from APP-TEST-01 (CRLF+BOM) → APP-TEST-01's bytes unchanged;
@@ -465,7 +472,7 @@ Queries (our choice): host "Production hosts" (`environment` contains Production
   9. `GET /api/v1/object` with a read token made through `/api/integrations/tokens` → `counterparts` present;
   10. `git status` lists only the files the checks changed (Inventory app) and nothing in `.object/`.
 - [ ] **Step 2: Write `docs/superpowers/plans/m28-acceptance.md`**: how to run the script, then hand checks for Gene (`- [ ]`) on a copy of his space:
-  - [ ] "Create new space" offers Start with basic setup, IT operations and Empty space; IT operations makes a space whose sidebar lists Host, Software, Application, … Incident, Meeting.
+  - [ ] "Create new space" offers Start with basic setup, IT operations and Empty space; IT operations makes a space whose sidebar lists Host, Software, Application, … Source, Incident, Meeting.
   - [ ] An empty folder opened with `--space` asks "Pick a starting point" with the same three choices.
   - [ ] A new Host opens with Purpose, Access and Known issues, and its properties (Category, Roles, IP address, FQDN, …) shown.
   - [ ] Tags lists the 30 seed tags; none is tied to a past employer or is personal.
@@ -529,11 +536,12 @@ T11 integrates after all tracks. Then one whole-milestone review (correctness, f
 11. **Counterparts are not exported**: the stored side is in the export, as backlinks aren't. (ours)
 12. **No `/api/v1` counterpart write**: agents (and M30) write the stored side with the property routes; v1 reads carry counterparts. (ours)
 13. **Edge labels** are the stored relation names (both directions joined by " · "), shown on the edges of the hovered or highlighted node only. (ours)
-14. **The gallery's IT ops entries** are the 13 types that aren't already in the gallery (Person, Meeting and Project stay the basic ones); an IT ops type added from the gallery also gets its default template, unlike the older entries. Each has one saved query (Contract list). (ours)
+14. **The gallery's IT ops entries** are the 13 types that aren't already in the gallery (Person, Meeting and Project stay the basic ones; Source is not offered, since imports make it and its objects); an IT ops type added from the gallery also gets its default template, unlike the older entries. Each has one saved query (Contract list). (ours)
 15. **Template sections** and template names (= the type name), as the Contract. (design: left to the builder)
 16. **Seed tags** get deterministic colours by index; the Task statuses and priorities of the vocabulary are already the built-in Task's. (ours)
 17. **Incident is a work type** (the M22 work fields and hidden `completed`, as Project), so incidents with a ticket appear in Tickets and Work; its own Cause (text) replaces the work-field Cause label on this type. (ours; the design says "plus the ticket fields")
 18. **Incident Status categories**: Open and Mitigated are in progress, Resolved is done. (ours)
+19. **Source in the starter** (Gene, 2026-11-09, design 5a): built by `source_type()` so M30 creates the same type in other spaces; icon `ph-file-text`, slate, no template (its body is the imported text). The **Sources** relation sits on the nine entity types only, hidden while empty; M30 adds it elsewhere when it distils into another type. (placement, icon, visibility ours)
 
 ### Guesses (points the design leaves open that this plan had to settle; for Gene)
 
