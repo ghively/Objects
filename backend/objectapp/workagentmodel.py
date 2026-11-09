@@ -14,6 +14,8 @@ from .workseams import SeamRefused
 
 __all__ = [
     "ALREADY_FILED",
+    "AUTO_RUN_CAP",
+    "AUTO_RUN_HELD",
     "CRASHED",
     "EMPTY_CAPTURE",
     "ENTRY_KINDS",
@@ -54,6 +56,9 @@ ENTRY_STATES: tuple[str, ...] = WorkEntryState.__args__  # type: ignore[attr-def
 KEEP_FINISHED = 500
 """`done` and `withdrawn` entries kept in the queue file (our cap)."""
 KEEP_AUTO_RUNS = 2000
+AUTO_RUN_CAP = 3
+"""Auto-runs of one work item in a row since Gene last acted on it (decision S3, 2026-11-08); the
+next Agent step stays Open and waits for Run now."""
 READ_TOOLS_MAX = 500
 
 WORK_ENTRY_LABELS = {
@@ -75,6 +80,9 @@ GONE = "Withdrawn: the item is gone or isn't a work item any more."
 ALREADY_FILED = "This brain dump is already filed."
 NOT_RETRYABLE = "Only a failed entry can be retried."
 EMPTY_CAPTURE = "A brain dump needs text."
+AUTO_RUN_HELD = (
+    f"The agent ran {AUTO_RUN_CAP} steps of this item in a row by itself. Press Run now to let it go on."
+)
 
 
 class QueueRefused(SeamRefused):

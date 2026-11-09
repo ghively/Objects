@@ -1,8 +1,10 @@
 // M23 Task 13: Stuck. Blocked and quiet for 7+ days (`{n} days quiet` and Blocked on), Waiting on
 // someone (the people Blocked on links, as links to their pages) and Failed agent runs (M24's
-// queue rows; the section is hidden while the agent is unavailable). Empty: `Nothing is stuck`.
+// queue rows; the section is hidden while the agent is unavailable). Decision S3: Waiting for Run
+// now lists the Agent steps the auto-run cap held back (shown only when there are any). Empty:
+// `Nothing is stuck`.
 import type { JSX } from 'react'
-import type { AgentQueueRow, WorkBoardItem } from '@/api/types'
+import type { AgentHeldRow, AgentQueueRow, WorkBoardItem } from '@/api/types'
 import { useTabs } from '@/nav/tabs'
 import { quietDays } from '../logic/scoring'
 import { stuck } from '../logic/stuck'
@@ -80,17 +82,31 @@ function FailedRow({ row }: { row: AgentQueueRow }): JSX.Element {
   )
 }
 
+function HeldRow({ row }: { row: AgentHeldRow }): JSX.Element {
+  return (
+    <li data-held-step={row.stepId ?? ''} data-stuck={row.path} className={ROW}>
+      <Title path={row.path} title={row.title} />
+      {row.stepText && <span className="min-w-0 truncate text-[12px] text-fg-muted">{row.stepText}</span>}
+      <span className="min-w-0 flex-1 truncate text-[12px] text-fg-muted">{row.reason}</span>
+    </li>
+  )
+}
+
 export function StuckView({ data, now }: { data: WorkDataState; now: Date }): JSX.Element {
   const agent = useWorkData((s) => s.agent) ?? data.agent
   const { blocked, waitingOn } = stuck(data.board?.items ?? [], now)
   const failed = agent?.available ? agent.rows.filter((r) => r.state === 'failed') : null
-  const nothing = !blocked.length && !waitingOn.length && !failed?.length
+  const held = agent?.available ? (agent.held ?? []) : []
+  const nothing = !blocked.length && !waitingOn.length && !failed?.length && !held.length
 
   return (
     <div data-work-view="stuck" className="flex min-w-0 flex-col gap-4">
       {nothing && <p className="text-[13px] text-fg-muted">{WORK_TEXT.nothingStuck}</p>}
       <Section title={WORK_TEXT.blockedQuiet}>{blocked.map((i) => <BlockedRow key={i.path} item={i} now={now} />)}</Section>
       <Section title={WORK_TEXT.waitingOnSomeone}>{waitingOn.map((i) => <WaitingRow key={i.path} item={i} />)}</Section>
+      {held.length > 0 && (
+        <Section title={WORK_TEXT.heldRuns}>{held.map((h) => <HeldRow key={h.path} row={h} />)}</Section>
+      )}
       {failed && <Section title={WORK_TEXT.failedRuns}>{failed.map((r) => <FailedRow key={r.id} row={r} />)}</Section>}
     </div>
   )

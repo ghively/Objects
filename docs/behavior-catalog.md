@@ -336,7 +336,10 @@ Each starter template pre-fills the new type's properties.
   agent** + **Send**; **Mark filed**; empty text "Nothing waiting to be filed.".
 - **Agent acts on my approvals** (switch; Agent queue and Settings > Work): off = approvals, answers, notes and
   requests only wait in the Agent queue; on = Object runs due entries one at a time. **Agent runs by itself**
-  (Settings > Work): an Agent step that becomes current runs once, read-only.
+  (Settings > Work): an Agent step that becomes current runs once, read-only. At most 3 auto-runs of one item in a
+  row since Gene last acted on it (decision S3): the 4th Agent step stays Open and is listed in Stuck under
+  **Waiting for Run now** ("The agent ran 3 steps of this item in a row by itself. Press Run now to let it go on.");
+  any action of Gene's on the item (Run now included) starts the count again. The count survives a restart.
 - **Settings > Work**: **Create the Work agent** (shell warning; offers to copy your `change-reviewer`),
   **Read tools** (mark a server's read-only tools; no more than 500), **Set up Desk sync** (an off schedule at
   07:00 every weekday that updates ticket fields only; never writes to Jira or ServiceNow).
