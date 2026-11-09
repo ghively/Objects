@@ -126,6 +126,11 @@ class LinkIndex:
         self._token_sources: dict[str, dict[str, int]] = {}
         self.revision = 0
         """Bumped on every change that alters a link, a backlink or a tag membership."""
+        self._linked: set[str] | None = set()
+        """The targets whose backlinks may have changed since `take_linked` last ran: for every
+        source re-resolved by a read, its targets before and after when the source itself changed
+        or resolves differently. None: unknown (the index was built, or rebuilt from nothing,
+        since; what the sources linked to before is lost)."""
 
     # -- change tracking ------------------------------------------------------
 
@@ -164,7 +169,11 @@ class LinkIndex:
             full = not self._built or overflow or any(
                 c.kind == "types" and c.type_id is None for c in pending
             )
-            dirty: set[str] = set()
+            # A build from nothing loses what the pending changes' sources linked to before
+            # (nothing pending: nothing is lost; the scan that made the space records no change).
+            if (not self._built and pending) or overflow:
+                self._linked = None
+            dirty = {c.path for c in pending if c.path}
             if full:
                 self._sources = {}
                 self._targets = {}
@@ -176,7 +185,6 @@ class LinkIndex:
                     self._set_mentions(path, self._written_targets(path, ex))
                 self._built = True
             else:
-                dirty = {c.path for c in pending if c.path}
                 type_ids = {c.type_id for c in pending if c.kind == "types" and c.type_id}
                 if type_ids:
                     dirty.update(p for p, s in space._summaries.items() if s.type in type_ids)
@@ -193,18 +201,49 @@ class LinkIndex:
                 changed_names = space._names_since(self._names_rev)
                 self._names_rev = names_rev
             if full or changed_names is None:
+                before = {p: self._out_of(p) for p in (*self._resolved, *dirty)}
                 self._resolve_all()
+                self._note_linked(before, dirty)
             else:
                 # Only a link written to a changed name can resolve differently now.
                 affected = set(dirty)
                 for name in changed_names:
                     affected.update(self._mentions.get(name, ()))
+                before = {p: self._out_of(p) for p in affected}
                 changed = False
                 tag_paths = self._tag_paths() if affected else {}
                 for path in affected:
                     changed |= self._resolve_source(path, tag_paths)
                 if changed:
                     self._bump()
+                self._note_linked(before, dirty)
+
+    def _out_of(self, path: str) -> frozenset[str]:
+        r = self._resolved.get(path)
+        return frozenset(r.out) if r is not None else frozenset()
+
+    def _note_linked(self, before: dict[str, frozenset[str]], dirty: set[str]) -> None:
+        """Add to `_linked` what each re-resolved source in ``before`` (path -> its targets
+        before the read) may have changed the backlinks of: every old and new target of a
+        changed source (``dirty``: its link text may differ even where it resolves the same),
+        the targets an unchanged source gained or lost (a name it links by changed)."""
+        linked = self._linked
+        if linked is None:
+            return
+        for path, old in before.items():
+            new = self._out_of(path)
+            linked.update((old | new) if path in dirty else (old ^ new))
+
+    def take_linked(self) -> tuple[str, ...] | None:
+        """The paths whose backlinks may have changed since the last call, sorted; None when
+        unknown (`ChangeEvent.linked`). An index not built yet knows nothing of the links before
+        the change and isn't built here (the first read does that, where its cost belongs)."""
+        with self._space._lock:
+            if not self._built or self._overflow:
+                return None
+            self._ensure()
+            out, self._linked = self._linked, set()
+        return tuple(sorted(out)) if out is not None else None
 
     def _bump(self) -> None:
         self.revision += 1

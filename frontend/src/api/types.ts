@@ -674,6 +674,12 @@ export interface ChangeEvent {
   origin?: string | null
   /** `renamed` only: the path before the move. */
   oldPath?: string | null
+  /**
+   * Object events (`created`, `changed`, `deleted`, `renamed`): the paths whose backlinks this
+   * change may have altered (the object's link targets before and after it). Absent when the
+   * server can't say (or is older): then anything may have changed.
+   */
+  linked?: string[] | null
 }
 
 // ---------------------------------------------------------------------------------------------

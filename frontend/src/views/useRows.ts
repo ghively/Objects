@@ -3,7 +3,8 @@
 // collection-name resolution may have changed); otherwise the changed paths are fetched in ONE
 // call and merged in. Other kinds (queries, views, ui) are ignored. M12: when the scope holds a
 // type with a rollup, a change to an object that isn't a row of such a type (a related Member of
-// a Project, say) reloads everything too, since any rollup may read it.
+// a Project, say) reloads everything too, since any rollup may read it. With `backlinks`, a change
+// outside the rows refetches the rows its `linked` names (see `UseRowsOptions`).
 //
 // Rows load without previews (`preview: false`; audit 2026-11-01 P2): the pipeline runs over
 // every row, but only a card layout's visible page shows a preview, and `DataView` fetches those
@@ -40,8 +41,10 @@ export function rollupsMayChange(scope: RowsScope, rows: Row[], changed: string[
 export interface UseRowsOptions {
   /**
    * The rows' backlinks matter (the Tasks dashboard's Context grouping; fix pass H, M5#5): a
-   * change to an object that isn't one of the rows may have added or removed a link to one, so
-   * it reloads everything instead of fetching that path in the scope (which finds nothing).
+   * change to an object that isn't one of the rows may have added or removed a link to one. The
+   * event's `linked` names the paths whose backlinks it may have changed, so those rows are
+   * refetched with the changed ones; a change without it reloads everything instead of fetching
+   * that path in the scope (which finds nothing).
    */
   backlinks?: boolean
 }
@@ -79,21 +82,33 @@ export function useRows(scope: RowsScope, options: UseRowsOptions = {}): UseRows
     let timer: ReturnType<typeof setTimeout> | null = null
     let full = false
     const paths = new Set<string>()
+    /** Changed path -> the paths whose backlinks it may have changed (null: unknown). */
+    const linked = new Map<string, Set<string> | null>()
     const flush = async () => {
       timer = null
       const everything = full
       const changed = [...paths]
+      const links = new Map(linked)
       full = false
       paths.clear()
+      linked.clear()
       if (everything) return reload()
       if (changed.length === 0) return
       if (rollupsMayChange(scopeRef.current, rowsRef.current, changed)) return reload()
+      let wanted = changed
       if (backlinks) {
         const have = new Set(rowsRef.current.map((r) => r.summary.path))
-        if (changed.some((p) => !have.has(p))) return reload()
+        const rows = new Set(changed.filter((p) => have.has(p)))
+        for (const p of changed) {
+          if (have.has(p)) continue
+          const l = links.get(p)
+          if (!l) return reload()
+          for (const t of l) if (have.has(t)) rows.add(t)
+        }
+        wanted = [...rows]
       }
       const inScope = scopeRef.current.paths
-      const wanted = inScope ? changed.filter((p) => inScope.includes(p)) : changed
+      if (inScope) wanted = wanted.filter((p) => inScope.includes(p))
       if (wanted.length === 0) return
       const n = seq.current
       try {
@@ -116,8 +131,13 @@ export function useRows(scope: RowsScope, options: UseRowsOptions = {}): UseRows
     }
     const off = api.onChange((e: ChangeEvent) => {
       if (RELOAD_KINDS.has(e.kind)) full = true
-      else if (e.kind === 'changed') paths.add(e.path)
-      else return
+      else if (e.kind === 'changed') {
+        paths.add(e.path)
+        // Several changes to one path in the window: the union of their `linked`, unknown if any is.
+        const known = linked.get(e.path)
+        if (e.linked == null || known === null) linked.set(e.path, null)
+        else linked.set(e.path, new Set([...(known ?? []), ...e.linked]))
+      } else return
       timer ??= setTimeout(() => void flush(), WINDOW_MS)
     })
     return () => {
