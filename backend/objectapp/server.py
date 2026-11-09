@@ -161,7 +161,7 @@ import subprocess
 import sys
 import threading
 from collections.abc import AsyncIterator, Callable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
@@ -282,7 +282,7 @@ from .typemodel import (
     type_revision,
 )
 from .uistate import patch_ui, read_ui, ui_read_only_reason, ui_with_defaults
-from .watcher import ChangeEvent, SpaceWatcher
+from .watcher import LINKED_KINDS, ChangeEvent, SpaceWatcher
 from .whiteboardapi import whiteboard_router
 from .whiteboardfile import sidecar_owner
 from .whiteboardstore import whiteboard_ui_problem
@@ -306,6 +306,16 @@ RESYNC_EVENTS = tuple(
 )
 """What replaces a dropped backlog: the resync the client itself announces after a
 reconnect (``api/client.ts`` ``RESYNC_EVENTS``), on which every consumer reloads."""
+
+
+def event_payload(event: ChangeEvent) -> dict[str, Any]:
+    """The SSE ``data`` of `event`: its fields, ``linked`` only when known (`ChangeEvent.linked`)."""
+    out = asdict(event)
+    if out["linked"] is None:
+        del out["linked"]
+    else:
+        out["linked"] = list(out["linked"])
+    return out
 
 
 def _offer(q: asyncio.Queue[ChangeEvent | None], event: ChangeEvent | None) -> None:
@@ -1242,7 +1252,14 @@ def create_app(
         return Computer(space).values(Obj(summary.path, fm, summary, t))
 
     def announce(event: ChangeEvent) -> None:
-        """Publish `event` to the SSE clients from a worker thread."""
+        """Publish `event` to the SSE clients from a worker thread.
+
+        An object event gets `ChangeEvent.linked` here, the paths whose backlinks the change may
+        have altered, read from the link index after the write (every write of one request is
+        done by its first announce, so that event carries the lot; the later ones get ``()``).
+        """
+        if event.kind in LINKED_KINDS and event.linked is None:
+            event = replace(event, linked=space.links.take_linked())
         loop = hub.loop
         if loop is not None and loop.is_running() and not hub.closed:
             loop.call_soon_threadsafe(hub.publish, event)
@@ -2239,7 +2256,7 @@ def create_app(
     async def events():
         async def stream():
             async for event in hub.subscribe():
-                yield ServerSentEvent(event="change", data=json.dumps(asdict(event)))
+                yield ServerSentEvent(event="change", data=json.dumps(event_payload(event)))
 
         return EventSourceResponse(stream(), ping=15)
 

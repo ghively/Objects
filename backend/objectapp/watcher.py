@@ -36,7 +36,7 @@ import asyncio
 import os
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 from typing import Literal
 
@@ -50,6 +50,7 @@ from .whiteboardfile import sidecar_owner
 __all__ = [
     "DEBOUNCE_SECONDS",
     "FLUSH_SLICE",
+    "LINKED_KINDS",
     "RESYNC_AFTER",
     "RESYNC_PATH",
     "SLICE_GAP",
@@ -67,6 +68,8 @@ RESYNC_AFTER = 100
 RESYNC_PATH = "*"
 """``types`` with this path: "everything may have changed" (the client's ``RESYNC_PATH``)."""
 _OBJECT_KINDS = frozenset({"created", "changed", "deleted", "renamed", "whiteboard"})
+LINKED_KINDS = frozenset({"created", "changed", "deleted", "renamed"})
+"""The kinds whose events carry `ChangeEvent.linked`."""
 _DEFINITION_FOLDERS = ("collections", "queries", "views", "automations")
 
 
@@ -110,6 +113,12 @@ class ChangeEvent:
     """For a write made through the API: the writing client's id (its ``clientId``)."""
     oldPath: str | None = None
     """For ``renamed``: the object's path before the move."""
+    linked: tuple[str, ...] | None = None
+    """For `LINKED_KINDS`: the object paths whose backlinks this change may have altered (the
+    changed file's resolved link targets before and after it, sorted; `LinkIndex.take_linked`),
+    so a view keyed on backlinks (the Tasks dashboard's Context grouping) refreshes those rows
+    only. ``None``: unknown, anything may have changed (the link index had not been built before
+    the change). Left out of the SSE payload when ``None`` (`server.event_payload`)."""
 
 
 def _collapsed(events: list[ChangeEvent]) -> list[ChangeEvent]:
@@ -352,12 +361,26 @@ class SpaceWatcher:
             # and re-taking it at once starved readers for up to 0.9 s on a 1,000-file change.
             if i < len(batch):
                 time.sleep(SLICE_GAP)
-        events = _collapsed(events)
+        events = _collapsed(self._with_linked(events))
         if events and not self._stopped:
             try:
                 self.loop.call_soon_threadsafe(self._emit, events)
             except RuntimeError:  # loop closed
                 pass
+
+    def _with_linked(self, events: list[ChangeEvent]) -> list[ChangeEvent]:
+        """Each object event with `ChangeEvent.linked`: the paths whose backlinks this batch may
+        have changed, read from the link index once per flush (not per path: the index does the
+        tag and name work per read) and so attributed to every object event of the batch."""
+        if self._stopped or not any(e.kind in LINKED_KINDS for e in events):
+            return events
+        try:
+            linked = self.space.links.take_linked()
+        except Exception:  # the events still go out, as "unknown"
+            linked = None
+        if linked is None:
+            return events
+        return [replace(e, linked=linked) if e.kind in LINKED_KINDS else e for e in events]
 
     def _emit(self, events: list[ChangeEvent]) -> None:
         for event in events:
