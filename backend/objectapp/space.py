@@ -1138,6 +1138,7 @@ class Space:
             self.own_writes,
             trash_ids=lambda: self.trash.definition_ids(folder),
             lock=self._lock,
+            before_write=self._call_before_write,
         )
 
     # -- collections ---------------------------------------------------------
@@ -1400,6 +1401,10 @@ class Space:
             except PermissionError as exc:
                 return Skip(rel, f"The file could not be written: {exc.strerror or exc}")
         raise AssertionError("unreachable")
+
+    def _write_type_json(self, t: TypeDefinition, base_revision: str) -> str:
+        """`write_type_json` with the version-history hook (the type file's bytes before the save)."""
+        return write_type_json(self.root, t, base_revision, before_write=self._call_before_write)
 
     def _call_before_write(self, rel: str, data: bytes, object_id: str | None = None) -> None:
         """Run the `before_write` hook (M8 history) for ``rel``'s current bytes; never raises.
@@ -3513,7 +3518,7 @@ class Space:
             return False
         try:
             self._check_type_free(t.id)
-            write_type_json(self.root, t, "")
+            self._write_type_json(t, "")
         except (RevisionConflict, TypeReadOnly):
             return False
         self._types_changed(t.id)
@@ -4119,7 +4124,7 @@ class Space:
         new.templates = templates
         try:
             self._check_type_free(t.id)
-            write_type_json(self.root, new, type_revision(self.root, t.id))
+            self._write_type_json(new, type_revision(self.root, t.id))
         except (RevisionConflict, TypeReadOnly):
             return False
         self.types = [new if x.id == t.id else x for x in self.types]
@@ -4308,7 +4313,7 @@ class Space:
     def _save_type(self, t: TypeDefinition) -> bool:
         try:
             self._check_type_free(t.id)
-            write_type_json(self.root, t, type_revision(self.root, t.id))
+            self._write_type_json(t, type_revision(self.root, t.id))
         except (RevisionConflict, TypeReadOnly):
             return False
         self._types_changed(t.id)
@@ -4824,7 +4829,7 @@ class Space:
                 # Built and checked before the type is written, so a query that can't be
                 # made never leaves a half-created type: the type is made without it.
                 query = self._template_query(tpl.key, t)
-            write_type_json(self.root, t, "")
+            self._write_type_json(t, "")
             self.types.append(t)
             self._sort_types()
             self._types_changed(t.id)
@@ -4985,7 +4990,7 @@ class Space:
         try:
             rewritten, skipped = self._apply_type_ops(to_write, run)
             with self._lock:
-                revision = write_type_json(self.root, new, current)
+                revision = self._write_type_json(new, current)
                 self._loaded_revisions[new.id] = revision  # else the next refresh reloads it
                 self._sort_types()
         except BaseException:
@@ -5359,7 +5364,7 @@ class Space:
     def _commit_type(self, t: TypeDefinition, base_revision: str) -> str:
         """Write a type's JSON and put it in memory; return the new revision."""
         self._check_type_free(t.id, base_revision)
-        revision = write_type_json(self.root, t, base_revision)
+        revision = self._write_type_json(t, base_revision)
         self._loaded_revisions[t.id] = revision
         if any(x.id == t.id for x in self.types):
             self.types = [t if x.id == t.id else x for x in self.types]
