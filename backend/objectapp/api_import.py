@@ -91,9 +91,11 @@ def _reuse(space, read) -> dict[str, str]:
     return out
 
 
-def _last_mapping(space, source_path: str) -> ImportMapping | None:
-    """The mapping the last finished import of this source used (design section 5)."""
-    prior = batches.load_prior(space.root, source_path)
+def _last_mapping(space, read) -> ImportMapping | None:
+    """The mapping the last finished import of this source used (design section 5), also when the
+    source folder or zip moved since (`provenance.moved_sources`)."""
+    moved = provenance.moved_sources(provenance.index_space(space), read)
+    prior = batches.load_prior(space.root, str(read.sourcePath), also=sorted(moved))
     if not prior.mapping:
         return None
     try:
@@ -173,7 +175,7 @@ def router(ctx: ApiContext) -> APIRouter:
         if req.target == "currentSpace":
             reuse = _reuse(ctx.space, c.read)
             if mapping is None:
-                mapping = _last_mapping(ctx.space, c.read.sourcePath)
+                mapping = _last_mapping(ctx.space, c.read)
         try:
             try:
                 planned = plan(c.read, mapping, target, reuse=reuse)
@@ -249,7 +251,7 @@ def router(ctx: ApiContext) -> APIRouter:
             planned = plan(read, req.mapping, target, reuse=reuse, lenient=read is not previewed)
         except MappingProblem as exc:
             return _error(422, str(exc))
-        if req.requireApproved and req.target.kind != "newSpace":
+        if req.requireApproved:  # an agent's import, into this space or a new one alike (Gene, 2026-11-08)
             names = agentwire.unapproved_types(planned, ctx.space.root, req.batch)
             if names:
                 return _error(422, "The mapping would create types no approved schema proposal creates: "

@@ -32,7 +32,7 @@ from objectapp.workagentmodel import (
     WITHDRAWN_CHANGED,
     WITHDRAWN_REDECIDED,
 )
-from objectapp.workloop import AgentSeam, WorkLoop, loop_for
+from objectapp.workloop import REAPPROVE, AgentSeam, WorkLoop, loop_for
 from objectapp.workservice import Actor
 
 FIXTURE = Path(__file__).parent / "fixtures" / "space-work"
@@ -221,25 +221,83 @@ def test_fail_with_question(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
     assert exc.value.status == 409 and exc.value.detail == "This step changed. Look again."
 
 
-def test_not_marked_and_timeout(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+def _step_now(env: Env, path: str = P, step_id: str = STEP) -> dict:
+    return next(s for s in env.service.item(path)["steps"] if s["id"] == step_id)
+
+
+def _activity(env: Env, path: str = P) -> list[str]:
+    return [a["text"] for a in env.service.item(path)["activity"]]
+
+
+def test_a_failed_approve_run_asks_for_approval_again(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Gene's decision (2026-11-08): an approval is spent by the run it started. When that run ends
+    # failed, the step goes back to Open and the entry is withdrawn with a reason; Retry says so.
     env.acts()
     env.step(P, STEP, "approve")
     env.idle()
     [e] = [x for x in env.entries() if x["kind"] == "approve"]
-    assert e["state"] == "failed" and e["reason"] == NOT_MARKED
+    assert e["state"] == "withdrawn" and e["reason"] == REAPPROVE and not e["retryable"]
+    step = _step_now(env)
+    assert step["state"] == "open" and step["approvedAt"] is None and step["result"] == REAPPROVE
+    assert any("Object reopened step 2" in a and NOT_MARKED.rstrip(".").lower() in a.lower() for a in _activity(env))
+    with pytest.raises(workloop.QueueRefused) as exc:
+        env.loop.retry(e["id"])
+    assert exc.value.status == 409 and exc.value.detail == REAPPROVE
+    assert [x["state"] for x in env.entries() if x["kind"] == "approve"] == ["withdrawn"]  # nothing queued
+    assert len(env.runs()) == 1
+    # A timed-out run: the same, and the Activity line keeps why the run ended.
     monkeypatch.setattr(workloop, "WORK_RUN_TIMEOUT", 2.0)
     env.acts(False)
-    new = env.loop.retry(e["id"])
-    assert new["attempt"] == 2 and new["retryOf"] == e["id"] and new["state"] == "pending"
-    env.step(P, STEP, "reopen")  # withdraws the retry
     wait_text(env, P, STEP, "Restart FAKE:wait")
     env.step(P, STEP, "approve")
     started = time.monotonic()
     env.acts()
     env.idle()
     last = [x for x in env.entries() if x["kind"] == "approve"][-1]
-    assert last["state"] == "failed" and last["reason"] == TIMED_OUT
+    assert last["state"] == "withdrawn" and last["reason"] == REAPPROVE
     assert 1.5 < time.monotonic() - started < 15
+    assert _step_now(env)["state"] == "open"
+    assert any("didn't finish within 30 minutes" in a for a in _activity(env))
+    # Approving again queues a fresh entry (the usual way), nothing else does.
+    env.acts(False)
+    wait_text(env, P, STEP, "Restart the print spooler on PRN-TEST-01")
+    env.step(P, STEP, "approve")
+    assert [x["state"] for x in env.entries() if x["kind"] == "approve"] == ["withdrawn", "withdrawn", "pending"]
+
+
+def test_a_crashed_approve_run_asks_for_approval_again(env: Env) -> None:
+    # Object closed during the run (another process's runner): once the agent acts again, the step
+    # goes back to Open and the crashed entry is withdrawn instead of being run under the old approval.
+    env.step(P, STEP, "approve")
+    [e] = env.entries()
+    env.loop.store.update(e["id"], state="running", runner="OTHER", claimedAt=e["createdAt"])
+    crashed = env.loop.store.get(e["id"])
+    assert crashed["state"] == "failed" and crashed["reason"] == CRASHED and crashed["retryable"]
+    assert _step_now(env)["state"] == "approved"
+    env.acts()
+    env.idle()
+    settled = env.loop.store.get(e["id"])
+    assert settled["state"] == "withdrawn" and settled["reason"] == REAPPROVE
+    assert _step_now(env)["state"] == "open" and _step_now(env)["result"] == REAPPROVE
+    assert any("Object closed during this run" in a for a in _activity(env))
+    assert env.runs() == []
+    with pytest.raises(workloop.QueueRefused) as exc:
+        env.loop.retry(e["id"])
+    assert exc.value.status == 409 and exc.value.detail == REAPPROVE
+
+
+def test_an_agent_step_failure_keeps_retry(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Steps of other kinds keep today's Retry: a failed Agent step run stays failed and retryable.
+    env.setting(workAutoRun=True)
+    env.acts()
+    env.step(P, STEP, "decline")  # the Agent step becomes current and runs by itself
+    env.idle()
+    [r] = [x for x in env.entries() if x["kind"] == "run"]
+    assert r["state"] == "failed" and r["reason"] == NOT_MARKED and r["retryable"]
+    assert _step_now(env, P, "t2n7vc")["state"] == "approved"
+    env.acts(False)
+    new = env.loop.retry(r["id"])
+    assert new["state"] == "pending" and new["retryOf"] == r["id"] and new["attempt"] == 2
 
 
 def test_run_limit_is_thirty_minutes_not_turn_timeout(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -260,7 +318,8 @@ def test_run_limit_is_thirty_minutes_not_turn_timeout(env: Env, monkeypatch: pyt
     env.idle()
     elapsed = time.monotonic() - started
     assert seen == [3.0] and 2.5 <= elapsed < 15
-    assert env.entries()[-1]["reason"] == TIMED_OUT
+    assert env.entries()[-1]["reason"] == REAPPROVE  # an Approve step: the approval is spent
+    assert any(TIMED_OUT.rstrip(".").lower() in a.lower() for a in _activity(env))
 
 
 def test_one_run_at_a_time_and_restart_safety(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -297,14 +356,16 @@ def test_one_run_at_a_time_and_restart_safety(env: Env, monkeypatch: pytest.Monk
     assert len(active["order"]) == 3
 
 
-def test_stop_fails_the_running_entry(env: Env) -> None:
+def test_stop_withdraws_the_running_approval(env: Env) -> None:
     wait_text(env, P, STEP, "Restart FAKE:wait")
     env.acts()
     env.step(P, STEP, "approve")
     env.wait_for(lambda: [x for x in env.entries() if x["state"] == "running" and x.get("chatId")])
     env.loop.stop()
     [e] = [x for x in env.entries() if x["kind"] == "approve"]
-    assert e["state"] == "failed" and e["reason"] == STOPPED
+    assert e["state"] == "withdrawn" and e["reason"] == REAPPROVE
+    assert _step_now(env)["state"] == "open"
+    assert any(STOPPED.rstrip(".").lower() in a.lower() for a in _activity(env))
 
 
 def test_withdraw_during_a_run_stops_it(env: Env) -> None:
@@ -342,8 +403,9 @@ def test_agent_status_for_m23(env: Env) -> None:
     env.idle()
     status = AgentSeam().status(env.service.space, [])
     assert status["carrying"] == 0
-    failed = [r for r in status["rows"] if r["state"] == "failed"]
-    assert failed and failed[0]["error"] == NOT_MARKED
+    assert not [r for r in status["rows"] if r["state"] == "failed"]  # the approval was spent, not failed
+    withdrawn = [r for r in status["rows"] if r["state"] == "withdrawn"]
+    assert withdrawn and withdrawn[0]["error"] == REAPPROVE
 
 
 def test_auto_run(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -102,6 +102,8 @@ class WriteState:
     batch: str = ""
     imported_at: str = ""
     prior: batches.Prior = field(default_factory=batches.Prior)
+    moved_from: list[str] = field(default_factory=list)
+    """Paths the source had before it moved, found on the objects this run matched (`_moved_sources`)."""
     items: list[dict[str, Any]] = field(default_factory=list)
     """The batch records' per-item entries."""
     updated: int = 0
@@ -156,6 +158,24 @@ def open_checked(planned: Planned) -> Source:
     return src
 
 
+def _moved_sources(planned: Planned, space: Space) -> list[str]:
+    """The sources recorded on the objects this run matched that are not the run's source: the
+    source folder or zip moved there from (Gene, 2026-11-08; `provenance.source_moved`), in the
+    order met. Their batches are this source's too, and the report says the source moved."""
+    here = planned.plan.sourcePath
+    out: list[str] = []
+    for w in planned.writes:
+        if not w.existing:
+            continue
+        with space._lock:
+            raw = space._raw.get(w.existing)
+        block = provenance.read_block(raw.fm) if raw is not None else None
+        there = block.get("source") if block is not None else None
+        if isinstance(there, str) and there not in out and provenance.source_moved(there, here):
+            out.append(there)
+    return out
+
+
 def write_import(planned: Planned, space: Space, state: WriteState, src: Source | None = None) -> ImportResult:
     """Write ``planned`` into ``space`` from ``src`` (`open_checked`; opened here when None,
     raising `SourceChanged` before writing anything) and close it; always writes the report
@@ -167,7 +187,8 @@ def write_import(planned: Planned, space: Space, state: WriteState, src: Source 
     state.batch = state.batch or new_ulid()
     state.imported_at = now_stamp()
     started = state.imported_at
-    state.prior = batches.load_prior(space.root, planned.plan.sourcePath)
+    state.moved_from = _moved_sources(planned, space)
+    state.prior = batches.load_prior(space.root, planned.plan.sourcePath, also=state.moved_from)
     try:
         try:
             _types(planned, space, state)
@@ -688,7 +709,12 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
     if ex_raw is not None and ex_block is not None and ex_block.get("contentHash") == chash:
         state.unchanged += 1
         state.written[sp] = w.existing
-        _record(state, w, system, ident_, "unchanged", path=w.existing, contentHash=chash)
+        extra: dict[str, Any] = {}
+        if ex_block.get("source") in state.moved_from:
+            version = _restamp_source(space, state, w.existing, ex_block, provenance.scope(planned.read, o))
+            if version is not None:
+                extra["version"] = version
+        _record(state, w, system, ident_, "unchanged", path=w.existing, contentHash=chash, **extra)
         return
 
     type_name = state.type_names.get(w.obj.typeKey, w.typeName)
@@ -764,6 +790,30 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
     state.written[sp] = rel
     state.objects += 1
     _record(state, w, system, ident_, "created", path=rel, contentHash=chash, version=version_of(out), original=orig_rel)
+
+
+def _restamp_source(space: Space, state: WriteState, rel: str, block: dict[str, Any], here: str | None) -> str | None:
+    """Write the run's source into the ``importSource`` block of an unchanged object the source moved
+    from, so later runs match it directly and another source with the same ids stays apart. Only an
+    object not edited in Object (the version this records must never hide an edit); the frontmatter
+    line alone changes. Answers the version written, or None when it was left as it is."""
+    from ..space import Conflict, version_of
+
+    if here is None or block.get("source") == here or _edited_since_import(space, rel, state, block):
+        return None
+    new_block = {**block, "source": here}
+
+    def edit(of: Any, _fm: Any) -> Any:
+        from dataclasses import replace
+
+        return replace(of, frontmatter_src=set_keys(of.frontmatter_src or "", {provenance.BLOCK_KEY: new_block}))
+
+    try:
+        cur = (space.root / rel).read_bytes()
+        space._write(rel, version_of(cur), edit, stamp=False, history=False)
+        return version_of((space.root / rel).read_bytes())
+    except (Conflict, OSError, KeyError):
+        return None
 
 
 def _removed_at_source(planned: Planned, space: Space, state: WriteState) -> None:
@@ -845,6 +895,7 @@ def _records(planned: Planned, space: Space, state: WriteState, started: str) ->
             "tags": state.tags,
             "leftOutFiles": sorted(state.left_out_files),
             "excludedFromAi": sorted(state.exclude_ai),
+            "movedFrom": list(state.moved_from),
         },
     )
     batches.write_json(d / "items.json", state.items)
@@ -921,6 +972,7 @@ def _report(planned: Planned, space: Space, state: WriteState) -> None:
             "conflicts": [(link_for_path(c["path"]), c["path"]) for c in state.conflicts],
             "removed": [(r["title"], r["path"]) for r in state.removed],
             "scan": {"leftOut": sorted(state.left_out_files), "excluded": sorted(state.exclude_ai)},
+            "movedFrom": list(state.moved_from),
         },
     )
     state.report_body = body
