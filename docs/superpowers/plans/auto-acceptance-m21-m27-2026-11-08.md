@@ -1,0 +1,173 @@
+# Auto acceptance M21-M27 (lane C2b, 2026-11-08)
+
+Gene's hand-check boxes of `m21-acceptance.md` … `m27-acceptance.md` and `m27-ui-acceptance.md`, run by an agent
+against a scratch server. **No box in Gene's `mN-acceptance.md` files was ticked.**
+
+- **Branch:** `lane/c2b-acceptance-m21-m27`, off `lane/c2-acceptance-m10-m27` (`b52a5d7`, which is `master` after
+  the Tasks-dashboard redesign plus lane C2's two fixes). Worktree `~/Objects-wt/lane-c2b`.
+- **Server:** `objectapp --space <scratch>/space --port 8809 --browser` with `BROWSER=/usr/bin/true`,
+  `OBJECT_STATE_DIR=<scratch>/state` (scratch = `~/.hermes/cache/scratch/lane-c2b`). Port 8790, `~/Spaces/main`
+  and `~/.claude` were not touched.
+- **Spaces:** M22-M24 on a copy of `space-work` with `space-work-m23` laid over it (git-initialised so every write
+  shows in `git diff`); the meeting and daily-note dates were moved to the run day. The Today timeline is fixed at
+  07-17, so the browser (CDP `Emulation.setTimezoneOverride`) and the space (`timeZone`) were set to Asia/Tokyo,
+  where the run time was 13:13. M21 and M25-M27 on copies of `space-sample` with small synthetic Files sources.
+- **Browser:** Browser Use session `lane-c2b`, 1440x900, DOM reads (no screenshots). Synthetic `KeyboardEvent`s for
+  keys.
+- **AI:** no real CLI use. AI boxes covered by lane A's live run cite
+  `~/Objects-wt/lane-a/docs/superpowers/plans/live-cli-check-2026-11-08.md` (branch `lane/a-live-cli`); others
+  use the repo's acceptance scripts (fake CLI) or are marked DEFERRED-live-CLI.
+- **Acceptance scripts** (fake CLI, re-run in this worktree, logs in `<scratch>/logs/`): m21 (space-sample)
+  36 `[ok]` RESULT: PASS; m22 44 ok PASS; m23 40 ok PASS; m24 72 ok PASS; m25 37 ok "All checks passed"; m26 13 ok
+  PASS; m27 21 ok PASS. Zero `[FAIL]` lines.
+
+**Result:** 83 boxes: NOT-RUN 64, PASS 15, MANUAL 2, PARTIAL 1, SUPERSEDED 1.
+
+Result key: PASS / FAIL / PARTIAL / SUPERSEDED (the box assumes the pre-redesign layout; the feature was checked at
+its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) / DEFERRED-live-CLI / NOT-RUN.
+
+## Results
+
+### M21 (`m21-acceptance.md`, 11 boxes)
+
+| Box | Check (abridged) | Result | Evidence |
+|---|---|---|---|
+| M21-1 | Researcher's agent page has a Schedules tab, last. It names the open space and says runs are saved as AI Chats. | NOT-RUN | (not reached) |
+| M21-2 | "New schedule": a name, a prompt, "Every day" at a time two minutes from now, and the default model. Within about a minute of that time an AI Chat ap… | NOT-RUN | (not reached) |
+| M21-3 | Researcher's Chats tab lists that chat with the "Scheduled" mark. Opening it shows the prompt and the reply. | NOT-RUN | (not reached) |
+| M21-4 | Settings > Automations lists the schedule as "Runs “Researcher” · Every day at …". Edit opens the schedule dialog, and Run log shows the run with a l… | NOT-RUN | (not reached) |
+| M21-5 | Asking Researcher in a chat to "schedule a weekly summary every Friday at 16:00" makes a schedule that shows in the tab. Asking it to delete it moves… | NOT-RUN | (not reached) |
+| M21-6 | After a schedule run, no "Learning…" line appears and no memory or skill change is logged from it. | NOT-RUN | (not reached) |
+| M21-7 | Close Object over a schedule's time and open it later: the "Missed automations" dialog offers the missed run. "Skip" runs nothing. | NOT-RUN | (not reached) |
+| M21-8 | Switch to another space: Researcher's schedules from the first space don't run there, and its Schedules tab shows only that space's schedules. | NOT-RUN | (not reached) |
+| M21-9 | Turning a schedule off stops it running. Turning "Activate notifications" off still saves the AI Chat but shows no notification. | NOT-RUN | (not reached) |
+| M21-10 | A skill that a schedule's prompt names stays active after "Tidy up now" or the curator's run. | NOT-RUN | (not reached) |
+| M21-11 | Unlinked mentions still show on the object page. | NOT-RUN | (not reached) |
+
+### M22 (`m22-acceptance.md`, 10 boxes)
+
+| Box | Check (abridged) | Result | Evidence |
+|---|---|---|---|
+| M22-1 | A Task page shows an empty Steps row and no other new rows until a field is set. | NOT-RUN | (not reached) |
+| M22-2 | Add a Question, a Do, an Approve and an Agent step; drag to reorder; the current step is highlighted. | NOT-RUN | (not reached) |
+| M22-3 | Approve needs two presses ("Press again to approve"); Withdraw puts it back to Open; a done Approve step offers no Reopen. | NOT-RUN | (not reached) |
+| M22-4 | Each action adds one `## Activity` line (newest last in the file) and, with text, one `## Work notes` line; nothing else in the file changes (check w… | NOT-RUN | (not reached) |
+| M22-5 | Type `OPS-123` in Ticket ID: System becomes Jira; set the Jira site in Settings > Work and the ticket's link opens the browse page. | NOT-RUN | (not reached) |
+| M22-6 | "Moderate" desk priority shows as Medium. | NOT-RUN | (not reached) |
+| M22-7 | On a ticket with `Result::` and `Prevention::` in `## Wrap-up`, the Resolution note's two Copy buttons copy clean text. | NOT-RUN | (not reached) |
+| M22-8 | Add work fields to one of your own types; the Tickets view under Queries lists its objects that have a Ticket ID; switch the view to Kanban: columns … | NOT-RUN | (not reached) |
+| M22-9 | A CRLF file you edited elsewhere keeps its line endings after a step action. | NOT-RUN | (not reached) |
+| M22-10 | Opening the space and browsing work items changes no file (git status clean). | NOT-RUN | (not reached) |
+
+### M23 (`m23-acceptance.md`, 19 boxes)
+
+| Box | Check (abridged) | Result | Evidence |
+|---|---|---|---|
+| M23-1 | Work sits below Agents in the sidebar; it opens the Work page with the top bar, the brain-dump bar and the focus rail on every view. | **PASS** | SUPERSEDED placement (Work entry -> sidebar Tasks, catalog §4); Tasks opens dashboard with top bar (Create task, Energy, Just one thing, agent pill), Brain dump input "Brain dump: type and press Enter", Focus rail section |
+| M23-2 | Now shows one card: chips, title, First tiny step, Blocked on, Hypothesis with confidence, the step's buttons, Where you left off, Step n of N; Up ne… | **PASS** | Now card: chips "Low energy · ~2 min\|Task\|Printers\|Medium\|INC0012345", title, FIRST TINY STEP, HYPOTHESIS "...Medium confidence", Approve/Not before/Decline, WHERE YOU LEFT OFF, "Step 2 of 3"; Up next 3 items + "+2 more hidden on purpose" (Blocked on not present on this fixture item) |
+| M23-3 | Energy Low offers only quick steps; Just one thing hides every view but Now and dims the sidebar and tabs. | **PASS** | Energy Low: Up next shrank to the 1 quick item (Scanner firmware); Just one thing: views row only "Now", sidebar and tablist opacity 0.35 |
+| M23-4 | Approve needs two presses ("Press again to approve"); Not before goes with it; Decline takes a reason; Withdraw puts it back; the row vanishes at onc… | **PASS** | Approve -> "Press again to approve" -> step approved (file state: approved + APPROVED Activity line), row vanished, toast "Approved Undo"; Undo restored Now card (step back to open); Not before datetime input -> notBefore: 2026-11-10T15:00Z + "(not before 2026-11-10 09:00)"; Decline shows "Reason (optional)" -> "declined step 2 ...: Not during the shift"; Withdraw (side panel) -> state open, queue entry state withdrawn |
+| M23-5 | Act on a step in two windows: the second gets "This step changed. Look again." and the row comes back. | **PASS** | API answer of Scanner firmware step (second writer) then UI Send -> toast "This step changed. Look again."; file keeps only the second writer answer; card reloaded |
+| M23-6 | Write focus lines with `[[links]]` to work items (Edit on the focus widget); the rail shows them; clicking one shows only that line's work, never oth… | **PASS** | Edit focus -> textarea "Focus lines"; Save focus changed only the Focus list lines (+lastUpdated) of DailyNotes/2026-11-08.md; rail shows "2. Chase Waiting on Pat"; clicking it shows only Waiting on Pat (Now card); line 3 [[Last week fix]] (status Done) rendered line-through, "1/3 cleared" |
+| M23-7 | Today places focus lines in the gaps between meetings, with a now-line; deadlines count down. | **PASS** | Today (browser+space TZ Asia/Tokyo at 13:13): timeline 07-17 places focus lines in gaps "Clear the jams... 13:15-13:57", "Line 3 standup 14:00-14:30", "Finish Scanner rollout 14:30-15:27", "Vendor call 15:30-16:00"; span[data-work-now-line data-time=13:13]; Deadlines "3 days Waiting on Pat". Note: the timeline is fixed 07-17, so evening meetings (22:40 local) did not show at all |
+| M23-8 | On the floor: tick an item with "What you found"; add a general item; Print checklist prints only the list. | **PASS** | On the floor: general item Place "Line 3 bench"/What "Check the toner level" added (GET /work/floor/general), ticked with "What you found"="Half full, 40%" -> collected 2026-11-09, found kept, shown under Collected; Print checklist called window.print (stubbed) and @media print hides body * except [data-work-print] (the list). Real print output: MANUAL |
+| M23-9 | Flow lanes and columns; more than 3 of your items in Doing shows Overloaded; stale tiles are dimmed. Projects map shows each project's stations and %… | **PASS** | Flow: area filter, columns Not started/Ready/Doing/Waiting/parked/Done (14 days), lanes You/Agent/Others; with a 4th synthetic Doing task "You: 4 / 3 Overloaded"; stale tile Waiting on Pat data-stale=true opacity 0.6 "14 days quiet". Projects map: groups (No area 13% done, Printers 0% done) with station buttons data-state notStarted/doing/waiting/done |
+| M23-10 | Everything sorts by each column; Tickets shows the M22 Tickets view (list, board, table). | **PASS** | (a) Everything: headers Type/Ticket ID/Title/Area/Stage/Whose turn/Priority/Quiet days/Score; clicking each sets aria-sort and reorders rows (Title asc then desc, Area asc, Stage asc NotStarted..Done, Score desc) / (b) Tickets view: "Lists every work item with a Ticket ID." 3 items; Layout popover -> Table (columns incl. Ticket ID, System, Desk status...), Kanban (columns Open/In progress/Active/Blocked/Waiting response/Resolved/Closed/Other by Desk status), List (grouped by Desk status) |
+| M23-11 | Click any item: the side panel shows the work header above the page; act on a step there while you have unsaved body text: nothing is lost and the Ac… | **PASS** | After fix 03641cf: row click opens the Side panel with the work header (task chip, status, "Step 1 of 1: Collect the badge list", Done, Start together, Make it smaller, step list) above the page; typed " UNSAVED-BODY-88" in the body then pressed Done at once -> file has the body text AND state: done + "Gene marked done step 1" Activity line. Before the fix the panel crashed for hand-typed steps (Hand edited/Extra doing: "Cannot read properties of undefined (reading 'toLowerCase')") |
+| M23-12 | Start together: a 25-minute timer, Step done, Pause, Too big; Make it smaller drafts 2-4 steps and can replace the step with them. | **PASS** | Start together: timer "24:59" (25 min) with Step done \| Pause \| Too big; Pause wrote Capture "[Scanner firmware] paused a focus session here"; Too big -> Make it smaller dialog with 3 drafts (~2 min each); "Replace the step with these" wrote 3 Do steps and removed the old one (one Activity line) |
+| M23-13 | Keep on top opens a small window that stays above others (in the Object window; in a browser, picture-in-picture where it exists). | **MANUAL** | Keep on top = OS window above others / picture-in-picture: pywebview/Windows window behaviour (button "Keep on top" present on the rail) |
+| M23-14 | Keys: `/`, `B`, `g` + n/w/p/t/o/q/h/s/y/l/e, `j`/`k`, Enter, Space, `[`/`]`, Esc, `?`; none of them fire while typing. | **PASS** | Synthetic keydown on body: g+n/w/p/t/o/q/h/s/y/l/e -> Now/Flow/Projects map/Today/On the floor/Your queues/Agent queue/Stuck/Wins/Alerts/Everything; / focuses Search work; b focuses Brain dump; g n while Brain dump focused did nothing; j/k move aria-selected row; Space opens the Object preview peek; Enter opens the item side panel; ] moves and opens the next; Esc closes the panel; ? opens and closes the Shortcuts sheet |
+| M23-15 | Settings > Work: pick your monitoring folder (a copy) and set an interval; Alerts lists them by severity, stale sources are named, Check now rescans;… | **PARTIAL** | Settings > Work: Alert folder set (monitoring copy), interval printer-watch 15 min ({"printer-watch": 15}); Alerts after Check now: Critical 1 "Tray 2 jammed", Warning 1 "Toner low" (token [redacted]), "printer-watch isn't fresh", "share unreachable", broken.json error; Alerts/Tray 2 jammed.md + Toner low.md written. Restart-without-duplicates: see (b) |
+| M23-16 | Wins shows steps done, items closed, objects changed and the per-day chart, with "No streaks to break. This only grows." | **PASS** | Wins: "4 Steps done in 14 days / 1 Items closed / 19 Objects changed / 10 Changed today", 14-day chart (Tue..Mon svgs), What got done list, "No streaks to break. This only grows." (counts were stale until page reload, see Observations) |
+| M23-17 | Light and dark themes: the you (indigo), agent (teal), approve (amber), critical (red) and brain-dump (pink) colours read well in both. | **MANUAL** | Theme colour legibility (light/dark) is a visual taste check |
+| M23-18 | The brain-dump bar, the agent switch and Ask the agent to break it down say they come with M24; nothing else is missing. | **SUPERSEDED** | M24 is built: no "comes with M24" text anywhere on the page (body text scan); brain-dump bar, agent pill and "Ask the agent to break it down" are live (M24 boxes) |
+| M23-19 | Opening Work and browsing every view changes no file (git status clean). | **PASS** | Committed the scratch space, reloaded, opened all 24 dashboard views (Now..Completed) without acting: git status --short empty |
+
+### M24 (`m24-acceptance.md`, 12 boxes)
+
+| Box | Check (abridged) | Result | Evidence |
+|---|---|---|---|
+| M24-1 | Settings > Work: **Create the Work agent** shows the shell warning and offers to copy your change-reviewer; afterwards the Work agent is in the Agent… | NOT-RUN | (not reached) |
+| M24-2 | Type a brain dump in the bar and press Enter: it is in Captures at once (Status New), before the agent does anything; with the switch off it waits in… | NOT-RUN | (not reached) |
+| M24-3 | Turn on **Agent acts on my approvals**: the capture gets filed (Status Filed, Filed to set) and the capture is still there. | NOT-RUN | (not reached) |
+| M24-4 | A brain dump the agent can't place shows on Now as "Parked dumps need you" with its question; Send a reply and it is filed. | NOT-RUN | (not reached) |
+| M24-5 | **Ask the agent** on an item and **Ask the agent to break it down** in Make it smaller: the answer lands on the item / the step is replaced by smalle… | NOT-RUN | (not reached) |
+| M24-6 | Approve an Approve step (two presses): the agent writes a change plan, and when timing for a restart is unstated it asks you instead of acting (a Que… | NOT-RUN | (not reached) |
+| M24-7 | Set a **Not before** time: nothing runs before it. | NOT-RUN | (not reached) |
+| M24-8 | Withdraw an approval while it waits: it disappears from the queue as withdrawn. | NOT-RUN | (not reached) |
+| M24-9 | An Agent step that becomes current runs by itself once; a failed run shows under Failed with its reason and **Retry**, and in Stuck. | NOT-RUN | (not reached) |
+| M24-10 | The agent pill reads "Agent is carrying N · M alerts" and opens the Agent queue. | NOT-RUN | (not reached) |
+| M24-11 | Settings > Work > Read tools: mark your Atlassian server's read tools; **Set up Desk sync**, turn it on, run it once (Run now on the Work agent's Sch… | NOT-RUN | (not reached) |
+| M24-12 | Unlinked mentions still show on a work item's page. | NOT-RUN | (not reached) |
+
+### M25 (`m25-acceptance.md`, 10 boxes)
+
+| Box | Check (abridged) | Result | Evidence |
+|---|---|---|---|
+| M25-1 | Import a Markdown/Obsidian folder into a **copy** of the space ("Try on a copy of this space", the default for a first run); open an imported page: t… | NOT-RUN | (not reached) |
+| M25-2 | Import a Files folder (a few `.docx`, `.pdf`, `.xlsx`, an image, a `.vsdx`) with a `_manifest.jsonl` giving a SharePoint url: each page opens with it… | NOT-RUN | (not reached) |
+| M25-3 | "Keep originals as" File objects: each original also appears as a File/PDF/Image object, linked at the end of the page. | NOT-RUN | (not reached) |
+| M25-4 | Run the same import again: everything is unchanged, no duplicate pages or attachments; the report counts add up. | NOT-RUN | (not reached) |
+| M25-5 | Edit a source file, run again: that page updates in place and the old text is in Version history. | NOT-RUN | (not reached) |
+| M25-6 | Edit a page in Object, then change its source and run again: it is listed under **Changed in both** (finish step and report); **Take source** brings … | NOT-RUN | (not reached) |
+| M25-7 | Remove a source file, run again: **Removed at source** lists it; the page stays. | NOT-RUN | (not reached) |
+| M25-8 | **Move batch to Trash** on a batch: the pages it created go to the Trash and can be restored; pages it only updated stay. | NOT-RUN | (not reached) |
+| M25-9 | In a query or a view filter, choose **Imported from**, **Import batch**, **Source modified**. | NOT-RUN | (not reached) |
+| M25-10 | A copy of a work export (outside the repo): the report's counts add up, and nothing in the source folder changed. | NOT-RUN | (not reached) |
+
+### M26 (`m26-acceptance.md`, 6 boxes)
+
+| Box | Check (abridged) | Result | Evidence |
+|---|---|---|---|
+| M26-1 | Run the acceptance script and a real folder of Word/Excel/PowerPoint/PDF through `read_file`; the pages read sensibly. | NOT-RUN | (not reached) |
+| M26-2 | A scanned PDF is flagged "Needs OCR"; with Tesseract installed it gets text. | NOT-RUN | (not reached) |
+| M26-3 | Scan a copy of a work export: findings list file, kind and line, no values. | NOT-RUN | (not reached) |
+| M26-4 | A "Credentials" folder in Leave out is never read (and listed as left out). | NOT-RUN | (not reached) |
+| M26-5 | Flagged files default to "Import, excluded from AI"; switching one to "Leave out" is carried in the result. | NOT-RUN | (not reached) |
+| M26-6 | Speaker notes show as a toggle in the editor. | NOT-RUN | (not reached) |
+
+### M27 (`m27-acceptance.md`, 6 boxes)
+
+| Box | Check (abridged) | Result | Evidence |
+|---|---|---|---|
+| M27-1 | Run the acceptance script, then a real trial on a copy of a work export: mark the trial in the wizard, see the accuracy in the report. | NOT-RUN | (not reached) |
+| M27-2 | Apply a proposal in the wizard: the types and properties look right; a group under 10 documents is not made. | NOT-RUN | (not reached) |
+| M27-3 | A flagged file is imported excluded from AI and is not in the trial. | NOT-RUN | (not reached) |
+| M27-4 | Low-confidence pages land in the Import inbox collection. | NOT-RUN | (not reached) |
+| M27-5 | An outside agent (Claude Desktop) reads the `migrate_a_source` prompt and calls `import_scan`, `save_import_proposal`. | NOT-RUN | (not reached) |
+| M27-6 | Normalise merges "Prod / prod / Production" tags. | NOT-RUN | (not reached) |
+
+### M27UI (`m27-ui-acceptance.md`, 9 boxes)
+
+| Box | Check (abridged) | Result | Evidence |
+|---|---|---|---|
+| M27UI-1 | Preview a source: the scan step comes before the mapping step; Back returns to the source. | NOT-RUN | (not reached) |
+| M27UI-2 | A flagged file set to "Leave out" is not imported; one left as "Import, excluded from AI" is written with `excludeFromAI`. | NOT-RUN | (not reached) |
+| M27UI-3 | Finish an import into this space: "Review proposed schema" shows each group as use / extend / create with counts, examples, fill rates, options and m… | NOT-RUN | (not reached) |
+| M27UI-4 | Apply stays disabled until every item is accepted, edited or turned down; reloading the dialog restores the decisions. | NOT-RUN | (not reached) |
+| M27UI-5 | Edit renames a type and drops a property; Apply creates only what was accepted. | NOT-RUN | (not reached) |
+| M27UI-6 | Trial shows 50 objects with each value and its quote; Right/Wrong marks stick and the accuracy line updates. | NOT-RUN | (not reached) |
+| M27UI-7 | "Continue with the rest" starts the bulk pass only then. | NOT-RUN | (not reached) |
+| M27UI-8 | Normalise lists near-duplicate tags and options; merging changes them everywhere. | NOT-RUN | (not reached) |
+| M27UI-9 | The last step shows the Import inbox count and "Open Import inbox" opens that collection. | NOT-RUN | (not reached) |
+
+## Bugs fixed on this branch (one commit each, regression test seen failing first)
+
+1. **`fix(accept-m23-11)`** — the Steps cell crashed the side panel and property panel for steps typed into the
+   file by hand (no `state`/`id`, e.g. the fixture's `Hand edited`): "This side panel tab could not be shown —
+   Cannot read properties of undefined (reading 'toLowerCase')". Until the decoded steps arrive the panel gets the
+   raw front matter and `allowedActions` looked up a label for an undefined state. `StepsCell` now reads such steps
+   as the server does (open, `@n`). Test: `work.cells.test.tsx` "steps typed into the file by hand…".
+
+## Observations (not fixed)
+
+- Queue entries made by step actions have `title: null` here (`GET /api/work/agent` rows). Lane A fixed this on
+  `lane/a-live-cli` (`f9dba0f`), which this branch does not contain.
+- Wins and Alerts views keep the data they loaded when the page mounted: after a step was done, Wins still said 3
+  steps / 14 objects until a reload (API: 4 / 19); after the alert folder was set in Settings, Alerts said "Pick a
+  monitoring folder" until Check now.
+- The Today timeline is fixed at 07:00-17:00: in the evening (22:13 local) tonight's meetings at 22:40 and 23:20
+  are not on it at all, and no focus line is placed.
+- `Hand edited` (unknown step kind "maybe") offers a Done button in the work header, but the server answers 422
+  "The step list can't be read: fix it in the file first." and nothing visible happened in the panel.
+- Withdraw writes a "reopened step n" Activity line (no "withdrew" wording).
