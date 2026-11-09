@@ -15,6 +15,7 @@ import { createAndOpen } from '@/create/createAndOpen'
 import { showToast } from '@/editor/media/upload'
 import { useLinkIndex } from '@/links/linkIndex'
 import { M7_SHORTCUTS, registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'
+import { openTodaysNote } from '@/calendar/openTodaysNote'
 import { currentTarget, useTabs } from '@/nav/tabs'
 import { useTabMenu } from '@/shell/TabMenu'
 
@@ -97,4 +98,5 @@ export function usePanelShortcuts({ toggleLeftSidebar }: { toggleLeftSidebar: ()
   useGlobalShortcut('toggleSidepanel', () => useTabs.getState().toggleSidepanel())
   useGlobalShortcut('toggleLeftSidebar', toggleLeftSidebar)
   useGlobalShortcut('toggleCalendarSidebar', () => void toggleCalendarSidebar())
+  useGlobalShortcut('openTodaysNote', () => void openTodaysNote())
 }

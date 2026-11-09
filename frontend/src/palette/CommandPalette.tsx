@@ -30,6 +30,7 @@ import { SearchView } from './SearchView'
 import { usePalette, type PaletteMode } from './usePalette'
 import { useSettingsModal } from '@/settings/useSettingsModal'
 import { switchSpace } from '@/spaces/switchSpace'
+import { openTodaysNote } from '@/calendar/openTodaysNote'
 
 interface FocusStore {
   getState(): { toggle(): void }
@@ -131,6 +132,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
         onOpenTarget({ kind: 'calendar' })
       },
       openAllNotes: () => onOpenTarget({ kind: 'allNotes' }),
+      openTodaysNote: () => void openTodaysNote(),
       openGlobalGraph: () => onOpenTarget({ kind: 'graph' }),
       openGraphView: onShowRightPanel,
       toggleSidebar: onToggleSidebar,

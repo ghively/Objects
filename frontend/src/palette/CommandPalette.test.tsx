@@ -536,6 +536,12 @@ describe('actions in the list', () => {
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'allNotes' })
   })
 
+  test('"Pop out today\'s daily note" opens today\'s note in the peek (2026-11-09)', async () => {
+    const { user } = setup()
+    await user.click(await findAction(user, 'pop out today', 'openTodaysNote'))
+    await waitFor(() => expect(usePeek.getState().path).toMatch(/^DailyNotes\/\d{4}-\d{2}-\d{2}\.md$/))
+  })
+
   test('open graph view only offered with an object open', async () => {
     const { user, p } = setup()
     const input = await openSearch(user)

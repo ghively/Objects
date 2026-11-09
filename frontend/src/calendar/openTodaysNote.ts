@@ -1,0 +1,30 @@
+/**
+ * Pop out today's daily note (2026-11-09, Gene): the note opens in the peek, the floating panel
+ * over the app (the same pop-up an object gets from the Calendar's timeline), so it can be read
+ * and written without leaving the page underneath. The note is created first when today has
+ * none (the same call as the Calendar's "+ Daily Note"). Reached from the top bar's "Today's
+ * note" button, the palette's "Pop out today's daily note" and Ctrl+Shift+D.
+ */
+import { showToast } from '@/editor/media/upload'
+import { invalidateLinkIndex } from '@/links/linkIndex'
+import { usePeek } from '@/nav/tabs'
+import { ensureDailyNote } from '@/palette/paste'
+import { todayYmd } from './dates'
+
+export const TODAYS_NOTE_TEXT = {
+  button: "Today's note", // our string
+  action: "Pop out today's daily note", // our string
+  failed: "Couldn't open today's daily note.", // our string
+} as const
+
+export async function openTodaysNote(day: string = todayYmd()): Promise<string | null> {
+  try {
+    const path = await ensureDailyNote(day)
+    void invalidateLinkIndex()
+    usePeek.getState().peek(path)
+    return path
+  } catch {
+    showToast(TODAYS_NOTE_TEXT.failed)
+    return null
+  }
+}

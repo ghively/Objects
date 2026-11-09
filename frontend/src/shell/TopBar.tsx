@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { SpacesMenu } from '@/spaces/SpacesMenu'
+import { openTodaysNote, TODAYS_NOTE_TEXT } from '@/calendar/openTodaysNote'
 
 export const TOP_BAR_TEXT = {
   changeSpace: 'Change space',
@@ -98,6 +99,7 @@ export function TopBar({
         {tabs}
         <BarButton label={TOP_BAR_TEXT.createNewTab} icon="ph-plus" onClick={onNewTab} />
       </div>
+      <BarButton label={TODAYS_NOTE_TEXT.button} icon="ph-notebook" onClick={() => void openTodaysNote()} />
       <BarButton
         label={sidepanelLabel}
         icon="ph-square-split-horizontal"

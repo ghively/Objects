@@ -383,6 +383,7 @@ export const M7_SHORTCUTS: ShortcutDef[] = [
   def('toggleSidepanel', 'global', 'Toggle right side panel', ['Mod-Shift-ArrowRight'], 'global', V),
   def('toggleLeftSidebar', 'global', 'Toggle left sidebar', ['Mod-Shift-ArrowLeft'], 'global', V),
   def('toggleCalendarSidebar', 'global', 'Toggle calendar sidebar', ['Mod-Alt-s'], 'global', V),
+  def('openTodaysNote', 'global', "Pop out today's daily note", ['Mod-Shift-d'], 'global', OURS),
   def('toggleDarkMode', 'global', 'Toggle dark mode', ['Mod-Shift-l'], 'global', V),
   def('openSettings', 'global', 'Open settings', ['Mod-,'], 'global', V),
   def('toggleShortcutsMenu', 'global', 'Show or hide the shortcuts list', ['Mod-Shift-b'], 'global', V),

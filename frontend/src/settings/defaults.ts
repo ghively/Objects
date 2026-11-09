@@ -15,6 +15,7 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   alwaysOpenAsFullPage: false,
   hideEntityIconsOnInlineLinks: false,
   hideOutlinerLines: false,
+  showSidebarOnStart: true,
   twentyFourHourTime: false,
   dateFormatting: 'localized',
   openOnStart: {},

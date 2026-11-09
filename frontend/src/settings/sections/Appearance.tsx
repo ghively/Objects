@@ -44,6 +44,10 @@ export const APPEARANCE_TEXT = {
   zoomIn: 'Zoom in',
   zoomOut: 'Zoom out',
   resetZoom: 'Reset zoom',
+  layout: 'Layout', // our string
+  layoutDescription: 'How the window looks when Object opens.', // our string
+  sidebarOnStart: 'Show the sidebar when Object opens', // our string
+  sidebarOnStartDescription: 'Off: Object opens with the sidebar collapsed. Ctrl+Shift+Left shows it.', // our string
 } as const
 
 const T = APPEARANCE_TEXT
@@ -149,6 +153,13 @@ export function AppearanceSection() {
         help={T.monoTagsDescription}
         checked={settings.monochromeTags}
         onChange={(monochromeTags) => set({ monochromeTags })}
+      />
+      <SettingGroup title={T.layout} help={T.layoutDescription} className="pb-0" />
+      <SwitchRow
+        title={T.sidebarOnStart}
+        help={T.sidebarOnStartDescription}
+        checked={settings.showSidebarOnStart !== false}
+        onChange={(showSidebarOnStart) => set({ showSidebarOnStart })}
       />
       <SettingGroup title={T.textSize} help={T.textSizeDescription}>
         <TextSize zoom={validZoom(settings.zoom) ? settings.zoom : 1} onChange={(zoom) => set({ zoom })} />

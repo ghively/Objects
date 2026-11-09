@@ -214,6 +214,8 @@ export default function App() {
         if (!live) return
         // "When this space opens" (per space, on this device).
         applyOpenOnStart(useSettings.getState().settings.openOnStart?.[s.root])
+        // "Show the sidebar when Object opens" (Appearance); off starts with it collapsed.
+        if (useSettings.getState().settings.showSidebarOnStart === false) setSidebarOpen(false)
         setSpace(s)
         setTabsReady(true)
         document.title = `${s.name} · Object`

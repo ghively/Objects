@@ -52,6 +52,8 @@ DEFAULTS: dict[str, Any] = {
     "alwaysOpenAsFullPage": False,
     "hideEntityIconsOnInlineLinks": False,
     "hideOutlinerLines": False,
+    # 2026-11-09 (Gene): whether the left sidebar is shown when Object opens.
+    "showSidebarOnStart": True,
     "twentyFourHourTime": False,
     "dateFormatting": "localized",
     "openOnStart": {},

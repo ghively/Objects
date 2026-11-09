@@ -48,7 +48,8 @@ Object has no accounts.
 
 **General**
 - Appearance: Light theme (Light, Light Dimmed), Dark theme (Dark, Dark Dimmed), App icon (colored icon per
-  device).
+  device). Layout (ours, 2026-11-09): "Show the sidebar when Object opens" (on by default; off opens Object with
+  the left sidebar collapsed, "Toggle sidebar" or Ctrl+Shift+Left shows it; device setting `showSidebarOnStart`).
 - AI Assistant: "Hide AI features" switch.
 - Editor: Disable spellcheck; Spellcheck language (Experimental); Open objects as a full page (Alt+Shift click
   opens the preview instead); Insert links inline by default; Type icons on inline links;
@@ -144,7 +145,7 @@ page up/down.
 side panel (Shift+Click; inline `[[links]]` too) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y (not in Object).
 
 **Calendar**: Go to monthly view M | Go to weekly view W | Show the day before and after R (decision C9) | Go to daily view D | Jump to today T | Back / forward one day, week or month
-Left/Right | Toggle calendar sidebar Ctrl+Alt+S.
+Left/Right | Toggle calendar sidebar Ctrl+Alt+S | Pop out today's daily note Ctrl+Shift+D (ours, 2026-11-09).
 
 **AI Assistant**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; send a message to the daily
 note; retry Ctrl+Alt+R; close chat Ctrl+Alt+X; rephrase Ctrl+Alt+U.
@@ -175,6 +176,11 @@ A popover: "Add new object type", "Create your own", then template groups with a
 Each starter template pre-fills the new type's properties.
 
 ## 4. Sidebar details
+
+- **Today's note** (ours, 2026-11-09, Gene): the top bar's notebook button "Today's note", the palette's "Pop out
+  today's daily note" and Ctrl+Shift+D open today's daily note in the peek, the floating panel over the page (as an
+  object clicked on the Calendar's timeline opens), creating the note first when today has none (the same call as
+  "+ Daily Note"). The page underneath stays as it was; Escape closes the peek.
 
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".

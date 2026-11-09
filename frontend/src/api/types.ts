@@ -420,6 +420,8 @@ export interface DeviceSettings {
   alwaysOpenAsFullPage: boolean
   hideEntityIconsOnInlineLinks: boolean
   hideOutlinerLines: boolean
+  /** Whether the left sidebar is shown when Object opens (2026-11-09). */
+  showSidebarOnStart: boolean
   twentyFourHourTime: boolean
   dateFormatting: 'localized' | 'DMY' | 'MDY' | 'YMD'
   /** Keyed by space root; a missing entry means `lastOpenedPage`. */

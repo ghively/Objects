@@ -29,6 +29,7 @@ CONTRACT_DEFAULTS = {
     "alwaysOpenAsFullPage": False,
     "hideEntityIconsOnInlineLinks": False,
     "hideOutlinerLines": False,
+    "showSidebarOnStart": True,
     "twentyFourHourTime": False,
     "dateFormatting": "localized",
     "openOnStart": {},
