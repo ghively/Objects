@@ -233,8 +233,7 @@ export function Sidebar({
   workActive,
   activeCollectionId,
 }: SidebarProps) {
-  // "Tasks" is hidden while the space hides task management (`space.json` `hideTaskManagement`).
-  const hideTasks = useSpaceInfo((s) => s.space?.hideTaskManagement ?? false)
+  // `useSpaceInfo` also tells the Tasks dashboard whether the space hides task management.
   useEffect(() => {
     void useSpaceInfo.getState().ensure()
   }, [])
@@ -444,14 +443,14 @@ export function Sidebar({
           active={calendarActive}
           onClick={(e) => onOpenTarget?.({ kind: 'calendar' }, { newTab: e.ctrlKey || e.metaKey })}
         />
-        {!hideTasks && (
-          <MainNavButton
-            icon="ph-check-circle"
-            label="Tasks"
-            active={tasksActive || workActive}
-            onClick={(e) => onOpenTarget?.({ kind: 'work' }, { newTab: e.ctrlKey || e.metaKey })}
-          />
-        )}
+        {/* Always shown: it is the work dashboard too. While the space hides task management
+            (`space.json` `hideTaskManagement`) the dashboard leaves out the task lists instead. */}
+        <MainNavButton
+          icon="ph-check-circle"
+          label="Tasks"
+          active={tasksActive || workActive}
+          onClick={(e) => onOpenTarget?.({ kind: 'work' }, { newTab: e.ctrlKey || e.metaKey })}
+        />
         <MainNavButton
           icon="ph-graph"
           label="Graph"
