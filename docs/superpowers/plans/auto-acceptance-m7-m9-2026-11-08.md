@@ -2,7 +2,7 @@
 
 Generated from `results.json` (lane C1b scratch). Gene's `mN-acceptance.md` boxes are NOT ticked; this file records what an agent could verify.
 
-**Counts:** MANUAL 59, NOT-RUN 31, PARTIAL 8, PASS 16, SUPERSEDED 1 (total 115)
+**Counts:** MANUAL 59, NOT-RUN 24, PARTIAL 9, PASS 22, SUPERSEDED 1 (total 115)
 
 ## How this was run
 
@@ -79,13 +79,13 @@ Generated from `results.json` (lane C1b scratch). Gene's `mN-acceptance.md` boxe
 
 | Box | Check | Class | Result | Evidence |
 |---|---|---|---|---|
-| M8#1 | Opening the space changes nothing (`git status` clean after opening and scrolling every note). | ? | **NOT-RUN** | not reached |
-| M8#2 | Notes with `<span>`, `<mark>`, `<time>`, `^ids` or `![[…#^…]]` keep their bytes. | ? | **NOT-RUN** | not reached |
-| M8#3 | Copying a block reference changes one line (the block's last line gains ` ^id`). | ? | **NOT-RUN** | not reached |
-| M8#4 | A merge does what the plan says and nothing more: target values, appended body, relinked referrers, source in the trash and restorable. | ? | **NOT-RUN** | not reached |
-| M8#5 | A history restore does what the plan says and nothing more: the bytes come back, and `id`, `title` and the file name are kept. | ? | **NOT-RUN** | not reached |
-| M8#6 | A space delete does what the plan says and nothing more. It refuses the current space, and the folder goes to the Recycle Bin. | ? | **NOT-RUN** | not reached |
-| M8#7 | History stays outside the space: nothing new under the space folder; versions are in the state dir. | ? | **NOT-RUN** | not reached |
+| M8#1 | Opening the space changes nothing (`git status` clean after opening and scrolling every note). | AUTO | **PASS** | space-m8 copy: all 22 .md objects opened from the palette (tasks open in the peek) and scrolled -> git status empty; m8_acceptance checks 0-1 (two starts, every M8 read route) also 0 files changed |
+| M8#2 | Notes with `<span>`, `<mark>`, `<time>`, `^ids` or `![[…#^…]]` keep their bytes. | AUTO | **PASS** | Blocks M8, CRLF M8, Malformed M8, Source note hold <span>/<mark>/<time>/^ids/![[...#^...]]; opened and scrolled -> bytes unchanged (git status empty); roundtrip.space.test.ts 0 differences in m8_acceptance check 8 |
+| M8#3 | Copying a block reference changes one line (the block's last line gains ` ^id`). | AUTO | **PASS** | Caret in "Target body paragraph." + Ctrl+Alt+L -> one body line `Target body paragraph.` -> `Target body paragraph. ^uao07c` (+lastUpdated); clipboard `![[Merge target#^uao07c]]` |
+| M8#4 | A merge does what the plan says and nothing more: target values, appended body, relinked referrers, source in the trash and restorable. | AUTO | **PASS** | UI: Merge source > More > Merge into object > "Merge target" > confirm text > Merge. Target: tags [Old tag, New tag], aliases +Source alias, related +[[Source note]] (re-quoted single), blank `when` filled, body "Source body paragraph." appended; single values (description) kept; "Refers to source": related and body link -> [[Merge target]] (nothing else); source -> .object/trash/<id>.md + Trash page; Trash > Restore brought `Pages/Merge source.md` back byte-identical (same git blob). m8_acceptance check 5 too |
+| M8#5 | A history restore does what the plan says and nothing more: the bytes come back, and `id`, `title` and the file name are kept. | AUTO | **PASS** | Edit (copy block ref) on Merge target -> More > Version history lists "Version 1 · 1 block · 4 properties"; preview shows body + properties; Restore asks "Restore this version? ... What you have now is kept as its own version first." -> file byte-identical to the original (git diff empty, same path, id/title unchanged); history index grew to 3 files |
+| M8#6 | A space delete does what the plan says and nothing more. It refuses the current space, and the folder goes to the Recycle Bin. | AUTO | **PARTIAL** | UI: the current space's More menu offers only "Rename" (no Remove/Delete); a non-current space offers "Remove \| Delete space" (seen in M7#33). m8_acceptance check 6: deleting the current space 409; another -> 200 {"trashed": true}, folder gone, left the registry; trash unavailable 428 then permanent 200. Not run in the UI here: a real delete would send a folder to the Linux desktop trash. Recycle Bin itself is Windows-only (M8#32, MANUAL) |
+| M8#7 | History stays outside the space: nothing new under the space folder; versions are in the state dir. | AUTO | **PASS** | Versions written to <state>/history/<space-hash>/<object-id>/*.md.gz + index.json; under the space only the edited note changed (git status --ignored: just `.object-cache/`, the search/frontmatter cache that exists from first open, not history) |
 | M8#8 | Still ours, for Gene: Tab/Shift-Tab indent in any block, extended search Ctrl/Cmd+Shift+Enter. | MANUAL | **MANUAL** | Key choice is Gene's call (ours: Tab/Shift-Tab indent, Ctrl/Cmd+Shift+Enter extended search) |
 | M8#9 | The storage forms: the occurrence log, the `reminders` map, inline HTML styles, date tokens, `indent`, item comments, `collection:`/`quer... | MANUAL | **MANUAL** | "Our choice" rule for Gene to confirm against the catalog (design decision) |
 | M8#10 | The overdue threshold (two or more) and the catch-up readings. | MANUAL | **MANUAL** | "Our choice" rule for Gene to confirm against the catalog (design decision) |
