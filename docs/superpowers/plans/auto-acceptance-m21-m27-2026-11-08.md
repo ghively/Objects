@@ -21,7 +21,7 @@ against a scratch server. **No box in Gene's `mN-acceptance.md` files was ticked
   36 `[ok]` RESULT: PASS; m22 44 ok PASS; m23 40 ok PASS; m24 72 ok PASS; m25 37 ok "All checks passed"; m26 13 ok
   PASS; m27 21 ok PASS. Zero `[FAIL]` lines.
 
-**Result:** 83 boxes: NOT-RUN 64, PASS 15, MANUAL 2, PARTIAL 1, SUPERSEDED 1.
+**Result:** 83 boxes: NOT-RUN 41, PASS 37, MANUAL 2, SUPERSEDED 1, DEFERRED-live-CLI 1, FAIL 1.
 
 Result key: PASS / FAIL / PARTIAL / SUPERSEDED (the box assumes the pre-redesign layout; the feature was checked at
 its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) / DEFERRED-live-CLI / NOT-RUN.
@@ -42,22 +42,22 @@ its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) 
 | M21-8 | Switch to another space: Researcher's schedules from the first space don't run there, and its Schedules tab shows only that space's schedules. | NOT-RUN | (not reached) |
 | M21-9 | Turning a schedule off stops it running. Turning "Activate notifications" off still saves the AI Chat but shows no notification. | NOT-RUN | (not reached) |
 | M21-10 | A skill that a schedule's prompt names stays active after "Tidy up now" or the curator's run. | NOT-RUN | (not reached) |
-| M21-11 | Unlinked mentions still show on the object page. | NOT-RUN | (not reached) |
+| M21-11 | Unlinked mentions still show on the object page. | **PASS** | Unlinked mentions still show on the object page: Printer jams on line 3 Mentions tab lists the plain-text mention in "Shift notes" with Link (work space; M24-12) |
 
 ### M22 (`m22-acceptance.md`, 10 boxes)
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M22-1 | A Task page shows an empty Steps row and no other new rows until a field is set. | NOT-RUN | (not reached) |
-| M22-2 | Add a Question, a Do, an Approve and an Agent step; drag to reorder; the current step is highlighted. | NOT-RUN | (not reached) |
-| M22-3 | Approve needs two presses ("Press again to approve"); Withdraw puts it back to Open; a done Approve step offers no Reopen. | NOT-RUN | (not reached) |
-| M22-4 | Each action adds one `## Activity` line (newest last in the file) and, with text, one `## Work notes` line; nothing else in the file changes (check w… | NOT-RUN | (not reached) |
-| M22-5 | Type `OPS-123` in Ticket ID: System becomes Jira; set the Jira site in Settings > Work and the ticket's link opens the browse page. | NOT-RUN | (not reached) |
-| M22-6 | "Moderate" desk priority shows as Medium. | NOT-RUN | (not reached) |
-| M22-7 | On a ticket with `Result::` and `Prevention::` in `## Wrap-up`, the Resolution note's two Copy buttons copy clean text. | NOT-RUN | (not reached) |
-| M22-8 | Add work fields to one of your own types; the Tickets view under Queries lists its objects that have a Ticket ID; switch the view to Kanban: columns … | NOT-RUN | (not reached) |
-| M22-9 | A CRLF file you edited elsewhere keeps its line endings after a step action. | NOT-RUN | (not reached) |
-| M22-10 | Opening the space and browsing work items changes no file (git status clean). | NOT-RUN | (not reached) |
+| M22-1 | A Task page shows an empty Steps row and no other new rows until a field is set. | **PASS** | New task (Create task) page rows: Collections, Description, Created at, Last updated, Tags, Icon, Aliases, Status, Priority, Date, Deadline, Steps "+ Add step", Hidden (4); no ticket/work rows |
+| M22-2 | Add a Question, a Do, an Approve and an Agent step; drag to reorder; the current step is highlighted. | **PASS** | "+ Add step" with Kind select: added Question/Do/Approve/Agent (file: 4 steps with ids, 4 "Gene added step n [Kind]" Activity lines); native drag of "Do two" onto step 1 -> file order Do two, Q one?, Approve three, Agent four + "Gene moved step \"Do two\" to 1"; li[aria-current=step] on the current step with its own background |
+| M22-3 | Approve needs two presses ("Press again to approve"); Withdraw puts it back to Open; a done Approve step offers no Reopen. | **PASS** | Two-press Approve and Withdraw->Open: see M23-4 (file state approved -> open). A done Approve step: its "State: Done" chip is disabled (no Reopen), a done Do step chip stays enabled; server refusal "A done Approve step never reopens." in m22_acceptance check 5 |
+| M22-4 | Each action adds one `## Activity` line (newest last in the file) and, with text, one `## Work notes` line; nothing else in the file changes (check w… | **PASS** | git diff after Approve: only lastUpdated, steps (state/approvedAt) and one "## Activity" line + one "## Work notes" line; answers/declines the same (M23-4/M23-5 diffs); m22_acceptance check 3 diff keys steps,lastUpdated,body |
+| M22-5 | Type `OPS-123` in Ticket ID: System becomes Jira; set the Jira site in Settings > Work and the ticket's link opens the browse page. | **PASS** | Typed OPS-124 in Badge reader audit Ticket ID -> file system: Jira, System row "Jira" appears; Jira site https://example.atlassian.net set in Settings > Work; side panel link "Open ticket" -> https://example.atlassian.net/browse/OPS-124 |
+| M22-6 | "Moderate" desk priority shows as Medium. | **PASS** | Printer jams on line 3 has deskPriority: Moderate in the file; the Now card / side panel chip reads "Medium" |
+| M22-7 | On a ticket with `Result::` and `Prevention::` in `## Wrap-up`, the Resolution note's two Copy buttons copy clean text. | **PASS** | Printer (## Wrap-up has Result:: / Prevention::): Resolution note's 2 Copy buttons (navigator.clipboard.writeText stubbed) copied "Work notes: INC0012345 …" and "Close notes: … Verification: Spooler restarted, 20 test prints clean / Prevention: none needed" — no :: markup. Real OS clipboard paste: not checked |
+| M22-8 | Add work fields to one of your own types; the Tickets view under Queries lists its objects that have a Ticket ID; switch the view to Kanban: columns … | **PASS** | Settings > Object Types > People > "Add work fields": person.json gains 27 work/ticket fields (ticketId…completed); Pat Example with ticketId OPS-200 then shows in the Tickets view (4 items, "Other 2"); Kanban layout columns are the Desk statuses (M23-10b) |
+| M22-9 | A CRLF file you edited elsewhere keeps its line endings after a step action. | **PASS** | Tasks/Badge reader audit.md (BOM + CRLF fixture) after a steps write (Make it smaller replace): BOM kept, 32 CRLF line ends, 0 bare LF |
+| M22-10 | Opening the space and browsing work items changes no file (git status clean). | **PASS** | See M23-19: committed scratch space, reload + all 24 views browsed -> git status clean; m22_acceptance check 1 (reads write nothing, state dir unchanged) |
 
 ### M23 (`m23-acceptance.md`, 19 boxes)
 
@@ -77,7 +77,7 @@ its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) 
 | M23-12 | Start together: a 25-minute timer, Step done, Pause, Too big; Make it smaller drafts 2-4 steps and can replace the step with them. | **PASS** | Start together: timer "24:59" (25 min) with Step done \| Pause \| Too big; Pause wrote Capture "[Scanner firmware] paused a focus session here"; Too big -> Make it smaller dialog with 3 drafts (~2 min each); "Replace the step with these" wrote 3 Do steps and removed the old one (one Activity line) |
 | M23-13 | Keep on top opens a small window that stays above others (in the Object window; in a browser, picture-in-picture where it exists). | **MANUAL** | Keep on top = OS window above others / picture-in-picture: pywebview/Windows window behaviour (button "Keep on top" present on the rail) |
 | M23-14 | Keys: `/`, `B`, `g` + n/w/p/t/o/q/h/s/y/l/e, `j`/`k`, Enter, Space, `[`/`]`, Esc, `?`; none of them fire while typing. | **PASS** | Synthetic keydown on body: g+n/w/p/t/o/q/h/s/y/l/e -> Now/Flow/Projects map/Today/On the floor/Your queues/Agent queue/Stuck/Wins/Alerts/Everything; / focuses Search work; b focuses Brain dump; g n while Brain dump focused did nothing; j/k move aria-selected row; Space opens the Object preview peek; Enter opens the item side panel; ] moves and opens the next; Esc closes the panel; ? opens and closes the Shortcuts sheet |
-| M23-15 | Settings > Work: pick your monitoring folder (a copy) and set an interval; Alerts lists them by severity, stale sources are named, Check now rescans;… | **PARTIAL** | Settings > Work: Alert folder set (monitoring copy), interval printer-watch 15 min ({"printer-watch": 15}); Alerts after Check now: Critical 1 "Tray 2 jammed", Warning 1 "Toner low" (token [redacted]), "printer-watch isn't fresh", "share unreachable", broken.json error; Alerts/Tray 2 jammed.md + Toner low.md written. Restart-without-duplicates: see (b) |
+| M23-15 | Settings > Work: pick your monitoring folder (a copy) and set an interval; Alerts lists them by severity, stale sources are named, Check now rescans;… | **PASS** | (a) Settings > Work: Alert folder set (monitoring copy), interval printer-watch 15 min ({"printer-watch": 15}); Alerts after Check now: Critical 1 "Tray 2 jammed", Warning 1 "Toner low" (token [redacted]), "printer-watch isn't fresh", "share unreachable", broken.json error; Alerts/Tray 2 jammed.md + Toner low.md written.  / (b) Restarted the server (kill pid, same port/state) then Check now: Alerts/ still holds exactly "Toner low.md" and "Tray 2 jammed.md" (no duplicates) |
 | M23-16 | Wins shows steps done, items closed, objects changed and the per-day chart, with "No streaks to break. This only grows." | **PASS** | Wins: "4 Steps done in 14 days / 1 Items closed / 19 Objects changed / 10 Changed today", 14-day chart (Tue..Mon svgs), What got done list, "No streaks to break. This only grows." (counts were stale until page reload, see Observations) |
 | M23-17 | Light and dark themes: the you (indigo), agent (teal), approve (amber), critical (red) and brain-dump (pink) colours read well in both. | **MANUAL** | Theme colour legibility (light/dark) is a visual taste check |
 | M23-18 | The brain-dump bar, the agent switch and Ask the agent to break it down say they come with M24; nothing else is missing. | **SUPERSEDED** | M24 is built: no "comes with M24" text anywhere on the page (body text scan); brain-dump bar, agent pill and "Ask the agent to break it down" are live (M24 boxes) |
@@ -87,18 +87,18 @@ its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) 
 
 | Box | Check (abridged) | Result | Evidence |
 |---|---|---|---|
-| M24-1 | Settings > Work: **Create the Work agent** shows the shell warning and offers to copy your change-reviewer; afterwards the Work agent is in the Agent… | NOT-RUN | (not reached) |
-| M24-2 | Type a brain dump in the bar and press Enter: it is in Captures at once (Status New), before the agent does anything; with the switch off it waits in… | NOT-RUN | (not reached) |
-| M24-3 | Turn on **Agent acts on my approvals**: the capture gets filed (Status Filed, Filed to set) and the capture is still there. | NOT-RUN | (not reached) |
-| M24-4 | A brain dump the agent can't place shows on Now as "Parked dumps need you" with its question; Send a reply and it is filed. | NOT-RUN | (not reached) |
-| M24-5 | **Ask the agent** on an item and **Ask the agent to break it down** in Make it smaller: the answer lands on the item / the step is replaced by smalle… | NOT-RUN | (not reached) |
-| M24-6 | Approve an Approve step (two presses): the agent writes a change plan, and when timing for a restart is unstated it asks you instead of acting (a Que… | NOT-RUN | (not reached) |
-| M24-7 | Set a **Not before** time: nothing runs before it. | NOT-RUN | (not reached) |
-| M24-8 | Withdraw an approval while it waits: it disappears from the queue as withdrawn. | NOT-RUN | (not reached) |
-| M24-9 | An Agent step that becomes current runs by itself once; a failed run shows under Failed with its reason and **Retry**, and in Stuck. | NOT-RUN | (not reached) |
-| M24-10 | The agent pill reads "Agent is carrying N · M alerts" and opens the Agent queue. | NOT-RUN | (not reached) |
-| M24-11 | Settings > Work > Read tools: mark your Atlassian server's read tools; **Set up Desk sync**, turn it on, run it once (Run now on the Work agent's Sch… | NOT-RUN | (not reached) |
-| M24-12 | Unlinked mentions still show on a work item's page. | NOT-RUN | (not reached) |
+| M24-1 | Settings > Work: **Create the Work agent** shows the shell warning and offers to copy your change-reviewer; afterwards the Work agent is in the Agent… | **PASS** | Settings > Work > Create the Work agent: dialog "…Its shell is on, so approved changes can run. With the shell on, this agent can read every file on this computer, including pages excluded from AI." -> Create: agent "Work" in the sidebar Agents section, toolsOff [] (shell on), Skills tab lists work-follow-through. change-reviewer copy offer: create-info changeReviewer None here (no ~/.claude/agents/change-reviewer.md; ~/.claude not read) — offer+copy verified by m24_acceptance check 1 with a fake home |
+| M24-2 | Type a brain dump in the bar and press Enter: it is in Captures at once (Status New), before the agent does anything; with the switch off it waits in… | **PASS** | Brain dump "Order more labels for line 3" + Enter with acts off: Captures/Order more labels for line 3.md at once, captureStatus New, Captures view lists it; Agent queue "Queued 6" incl. the Brain dump entries (pending); no CLI run |
+| M24-3 | Turn on **Agent acts on my approvals**: the capture gets filed (Status Filed, Filed to set) and the capture is still there. | **PASS** | (fake CLI) acts on via the Agent queue switch -> queue drained; reply-driven file_capture -> captureStatus Filed, filedTo [[Order labels for line 2]], new Task created, capture file kept; m24_acceptance check 3 (fake): "the capture is Filed to Tasks/Order more toner.md … the capture file still exists". Real-model filing: lane A ran the Work loop live (step run), not a brain-dump filing |
+| M24-4 | A brain dump the agent can't place shows on Now as "Parked dumps need you" with its question; Send a reply and it is filed. | **PASS** | (fake CLI, FAKE_CLAUDE_WORK_ACTIONS needsYou) Now side section "Parked dumps need you": "Need more labels / Which line are the labels for?"; Send in Captures view (Reply to the agent) -> filed to a new Task. Note: the Now row opens the capture page in the side panel, which has no reply box; the reply lives in the Captures view |
+| M24-5 | **Ask the agent** on an item and **Ask the agent to break it down** in Make it smaller: the answer lands on the item / the step is replaced by smalle… | **PASS** | (fake CLI) "Ask the agent" (item side panel) and "Ask the agent to break it down" (Make it smaller dialog) are present; m24_acceptance check 7: question entry ran read-only on Printer and "the answer landed as a work note"; breakDown entry "the step became three smaller steps". Real-model answer quality: not run (DEFERRED-live-CLI) |
+| M24-6 | Approve an Approve step (two presses): the agent writes a change plan, and when timing for a restart is unstated it asks you instead of acting (a Que… | **DEFERRED-live-CLI** | Whether the agent writes a change plan and asks (inserts a Question) when restart timing is unstated is model behaviour; the fake only scripts it (m24 check 4: approve run with Bash allowed, step done "Change review: PASS"). Lane A ran one live Work step (Agent step), not an Approve/change-plan run |
+| M24-7 | Set a **Not before** time: nothing runs before it. | **PASS** | Approve with Not before 2026-11-10T00:00Z while "acts" on: entry stays pending, claimedAt null after 8 s, no fake CLI run for it |
+| M24-8 | Withdraw an approval while it waits: it disappears from the queue as withdrawn. | **PASS** | Withdraw while waiting (M23-4): queue entry state "withdrawn", error "Withdrawn: the step was decided again."; the Agent queue drops it |
+| M24-9 | An Agent step that becomes current runs by itself once; a failed run shows under Failed with its reason and **Retry**, and in Stuck. | **PASS** | Failed brain-dump runs show in Agent queue "Failed 3" with reason "The agent didn't file this brain dump." and a Retry button each, and in Stuck "Failed agent runs 3"; auto-run-once + Retry re-run: m24_acceptance checks 5 and 9 (fake) |
+| M24-10 | The agent pill reads "Agent is carrying N · M alerts" and opens the Agent queue. | **PASS** | Pill "Agent is carrying 6 · 2 alerts" (counts follow the queue and Alerts); clicking it switches to the Agent queue view |
+| M24-11 | Settings > Work > Read tools: mark your Atlassian server's read tools; **Set up Desk sync**, turn it on, run it once (Run now on the Work agent's Sch… | **FAIL** | Settings > Work: Read tools "No tool servers yet."; "Set up Desk sync" made the rule (Work agent Schedules tab: "Desk sync · Every weekday at 7:00 AM · Never ran", Settings: "Last run: Not run yet, No read tools marked yet"). But there is no "Run now": the Schedule menu offers only Edit / Run log / Delete, and the frontend has no run-now for schedules (only button rules have POST /automations/{id}/run). The sync itself (fields updated, status unchanged, nothing written to the desk) passes in m24_acceptance check 10 via the clock. Real Atlassian MCP: MANUAL |
+| M24-12 | Unlinked mentions still show on a work item's page. | **PASS** | Printer jams on line 3 page: Mentions tab (1) lists "Shift notes — The night shift said Printer jams on line 3 is still open." with a Link button (a synthetic page with the plain-text title) |
 
 ### M25 (`m25-acceptance.md`, 10 boxes)
 
@@ -170,4 +170,12 @@ its new place) / MANUAL (taste, Windows-only window or OS behaviour, real data) 
   are not on it at all, and no focus line is placed.
 - `Hand edited` (unknown step kind "maybe") offers a Done button in the work header, but the server answers 422
   "The step list can't be read: fix it in the file first." and nothing visible happened in the panel.
+- There is no "Run now" for a schedule (M24-11): the Schedule menu has Edit / Run log / Delete only. M24's hand
+  check and M21's flow both lean on it; adding it needs a back-end route and UI, so it was left as a FAIL.
+- Brain-dump queue entries (and their Failed rows) carry no title, so a failed row shows only its reason, not which
+  capture failed.
+- After a restart the three captures that had failed were queued again by the unqueued-capture scan (the restart
+  quirk m24-acceptance.md already notes).
+- Parked dumps on Now open the capture's page in the side panel, which has no reply box; Send lives in the Captures
+  view ("Reply to the agent").
 - Withdraw writes a "reopened step n" Activity line (no "withdrew" wording).
