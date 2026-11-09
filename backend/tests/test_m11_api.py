@@ -303,7 +303,9 @@ def test_query_filters_and_sorts(api) -> None:
     assert res["total"] == 1 and res["unsupported"] == []
     every = client.post("/api/v1/query", headers=hdr, json={"typeIds": ["Task"], "limit": 1}).json()
     assert len(every["rows"]) == 1 and every["total"] >= 2
-    assert client.post("/api/v1/query", headers=hdr, json={"typeIds": ["Nope"]}).status_code == 422
+    nope = client.post("/api/v1/query", headers=hdr, json={"typeIds": ["Nope"]})
+    assert nope.status_code == 422
+    assert nope.json()["detail"] == 'There is no object type "Nope".'
 
 
 def test_excluded_objects_are_invisible(api, space_dir: Path) -> None:

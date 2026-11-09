@@ -347,7 +347,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             for name in type_ids:
                 t = resolve_type(name)
                 if t is None:
-                    raise InvalidValue(f"No object type {name!r}")
+                    raise InvalidValue(f'There is no object type "{name}".')
                 ids.append(t.id)
         rows = space.rows(ids, collection_ids or None, None, None, False)
         hidden = hidden_paths()
