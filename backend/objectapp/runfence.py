@@ -32,6 +32,10 @@ What this does not stop (for the acceptance notes):
   process on Linux): let through, since it can't be a run of this user's Object.
 - Requests that don't come over TCP at all (none today: the server listens on 127.0.0.1 only).
 
+Decision S6 (2026-11-08) puts the launch key (`uikey`) in front of this fence: a detached
+process has no key, so it is refused there; this fence stays as the second layer, for a run
+that somehow holds the key.
+
 It is a fence for the app's own routes, not the token-protected API: a run can still call
 ``/api/v1`` with its own token, by design, and that token's scope and budget are the limit there.
 """

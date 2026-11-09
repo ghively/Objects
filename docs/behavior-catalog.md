@@ -402,6 +402,13 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **Deleting a collection over the API** (S5): `delete_collection` (MCP and `DELETE /api/v1/collections/{id}`) is
   refused (409, "This collection holds pages excluded from AI; delete it in Object.") when any member is excluded
   from AI, with or without confirm; nothing changes. Deleting it in Object is unchanged.
+- **Only Object's own window uses `/api`** (S6): each launch makes a random key; the window (and the keep-on-top
+  window) opens at a one-time `/_open` link that hands it over as a session cookie, so every request the UI makes
+  carries it. Without it `/api` answers 401 "Only Object's own window can use this." and the page shows "This page
+  isn't connected to Object" ("Only the window Object opened can use this space. Open Object again from its
+  launcher."). With `--browser` the launcher also prints the link (it works once, for 5 minutes) and Enter in its
+  terminal prints and opens a new one. `/api/v1` with a token keeps its own auth; the run fence stays as a second
+  layer.
 
 ## 11. Unlinked mentions
 
