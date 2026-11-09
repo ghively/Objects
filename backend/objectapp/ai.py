@@ -47,7 +47,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .agentrun import RunCommand, RunRefused, run_base_env
+from .agentrun import RunCommand, RunRefused, register_run_pid, run_base_env, unregister_run_pid
 from .apiquery import EXCLUDE_TAG, is_excluded
 
 __all__ = [
@@ -783,6 +783,7 @@ class _Attempt:
             **_hidden_window(),
         )
         proc = self.proc
+        register_run_pid(proc.pid)  # the run fence (`runfence`) knows the run by this process
 
         def put(item: tuple[str, Any]) -> None:
             with contextlib.suppress(RuntimeError):  # the loop closed
@@ -811,6 +812,7 @@ class _Attempt:
 
     def stop(self) -> None:
         if self.proc is not None:
+            unregister_run_pid(self.proc.pid)
             _kill_tree(self.proc)
         if self.command is not None:
             shutil.rmtree(self.command.tmp, ignore_errors=True)

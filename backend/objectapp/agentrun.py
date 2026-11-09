@@ -44,6 +44,7 @@ import re
 import shutil
 import sys
 import tempfile
+import threading
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -82,8 +83,11 @@ __all__ = [
     "fence_rules",
     "fill_refs",
     "nesting_problem",
+    "register_run_pid",
     "rule_path",
     "run_base_env",
+    "running_run_pids",
+    "unregister_run_pid",
 ]
 
 CLI_FLAGS = (
@@ -678,3 +682,26 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
         run_settings=settings,
         append=append,
     )
+
+
+# -- the running runs (the run fence, `runfence`) -----------------------------------------------
+
+_RUN_PIDS: set[int] = set()
+_RUN_PIDS_LOCK = threading.Lock()
+
+
+def register_run_pid(pid: int) -> None:
+    """Note a started run's root process (the CLI) until `unregister_run_pid`."""
+    with _RUN_PIDS_LOCK:
+        _RUN_PIDS.add(pid)
+
+
+def unregister_run_pid(pid: int) -> None:
+    with _RUN_PIDS_LOCK:
+        _RUN_PIDS.discard(pid)
+
+
+def running_run_pids() -> frozenset[int]:
+    """The root process ids of the runs going on right now."""
+    with _RUN_PIDS_LOCK:
+        return frozenset(_RUN_PIDS)
