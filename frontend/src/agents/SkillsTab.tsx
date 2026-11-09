@@ -121,7 +121,8 @@ export function SkillsTab({ agent }: { agent: Agent }) {
   }
 
   const rows = useMemo(() => {
-    const all = [...(skills ?? []), ...(showArchived ? archivedSkills : [])]
+    // The archived=true answer holds the active and stale skills too: add only the archived ones.
+    const all = [...(skills ?? []), ...(showArchived ? archivedSkills.filter((s) => s.state === 'archived') : [])]
     const q = filter.trim().toLowerCase()
     return q ? all.filter((s) => s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q)) : all
   }, [skills, archivedSkills, showArchived, filter])
