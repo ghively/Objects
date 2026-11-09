@@ -73,6 +73,38 @@ describe('DailyNoteSlot: an empty day', () => {
     expect(onChanged).toHaveBeenCalled()
   })
 
+  // Fix pass H2 (M4#3): a DailyNote default template ('## Yesterday / ## Today / ## Blockers').
+  const TEMPLATE = '## Yesterday\n\n## Today\n\n## Blockers\n'
+  const templated = () =>
+    mocked.object.mockImplementation(async (path: string) =>
+      objectDetail({ summary: objectSummary({ path, type: 'dailynote' }), body: TEMPLATE, version: 'v1' }),
+    )
+
+  test('typing into a templated note puts the text in its own paragraph after the template', async () => {
+    templated()
+    const user = userEvent.setup()
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    screen.getByRole('textbox', { name: DAILY_NOTE_TEXT.heading }).focus()
+    await user.keyboard('templ line')
+    const editor = await waitFor(() => pmEditor(container))
+    await waitFor(() => expect(serializeBody(editor)).toContain('templ line'))
+    await user.keyboard(' more')
+    await waitFor(() => expect(serializeBody(editor).trim()).toBe('## Yesterday\n\n## Today\n\n## Blockers\n\ntempl line more'))
+  })
+
+  test('clicking a templated note then typing never glues the text to the last heading', async () => {
+    templated()
+    const user = userEvent.setup()
+    const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)
+    await user.click(screen.getByRole('textbox', { name: DAILY_NOTE_TEXT.heading }))
+    await waitFor(() => expect(document.activeElement?.classList.contains('ProseMirror')).toBe(true))
+    const editor = pmEditor(container)
+    await user.keyboard('templ line')
+    await waitFor(() => expect(serializeBody(editor)).toContain('templ line'))
+    expect(serializeBody(editor)).not.toContain('## Blockerstempl')
+    expect(serializeBody(editor)).not.toMatch(/## \w*templ line/)
+  })
+
   test('clicking the body creates the note and focuses its editor', async () => {
     const user = userEvent.setup()
     const { container } = render(<DailyNoteSlot day={TODAY} note={null} heading />)

@@ -342,6 +342,9 @@ Each starter template pre-fills the new type's properties.
 - **Week view**: a single column of days. Each day: the weekday name colored by weekday (Sunday red, Monday amber
   with a red "Today" pill, Tuesday pink, Wednesday green, Thursday orange, Friday blue), the date as a large
   title, "Week 45", then the note or a "+ Daily Note" button. No month sidebar.
+- **Daily note from a template**: clicking or typing in an empty day's inline note creates the note (from the
+  DailyNote default template, if any) and the typing goes into its own paragraph after the template content (or
+  into the template's first empty paragraph) — never onto the end of the template's last heading.
 - **Day view** on today: the header's right side has a "Tasks dashboard" link to Tasks › Today, which lists the
   same tasks as the Day view's Tasks section (decision T1); other days have no link.
 - **Backlinks** (bottom of an object, a "Backlinks" pill with a count and a collapse toggle): each backlink is an
