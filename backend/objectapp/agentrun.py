@@ -54,6 +54,7 @@ from typing import TYPE_CHECKING, Any
 from . import toolcatalog
 from .agentmodel import AGENTS_DIR, PROTECTED, SELF_LOADED, TRASH_DIR
 from .jsonstore import dump_json
+from .tokens import TokenStore
 
 if TYPE_CHECKING:  # agents (T2) imports toolcatalog; this module only needs the type
     from .agents import AgentRecord
@@ -653,6 +654,9 @@ def build_run(scope: RunScope, *, claude: str, model: str | None, resume: str | 
     parts = RunParts()
     for _order, _name, fn in contributors():
         fn(scope, parts)
+    # Decisions memo S2: the run's token may call only the agent tools its CLI lists allow, so the
+    # server refuses the rest ("This run can't use {tool}.") whatever the CLI does.
+    TokenStore.narrow_ephemeral(scope.token, toolcatalog.agent_tools_in(parts.allowed))
     own = Path(scope.agent.folder).resolve()
     mcp = {"mcpServers": {n: _without_sign_in(n, s) for n, s in parts.mcp_servers.items()}}
     append = "\n\n".join(p for p in parts.append_prompt if p)

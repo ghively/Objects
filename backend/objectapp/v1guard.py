@@ -19,7 +19,8 @@ holds for every tool an agent has.
 - M18: `V1Guard.auth` spends one of the token's tool steps per call (`TokenStore.spend`) and
   answers 429 "This run has used its {budget} tool steps." past its budget; every Object tool
   makes exactly one ``/api/v1`` call, so the budget counts tool steps. `agent_tool_allowed`
-  answers 403 "This run can't use {tool}." for an agent tool outside the token's `tools`.
+  answers 403 "This run can't use {tool}." for an agent tool outside the token's `tools`, and for
+  a memory or skill write from a read-only purpose (`NO_LEARNING_WRITES`, decisions memo S2).
 """
 
 from __future__ import annotations
@@ -41,7 +42,9 @@ if TYPE_CHECKING:
     from .trash import TrashItem
 
 __all__ = [
+    "LEARNING_WRITE_TOOLS",
     "NOT_AN_AGENT",
+    "NO_LEARNING_WRITES",
     "WRITE_GUARDS",
     "Denied",
     "V1Guard",
@@ -200,8 +203,19 @@ def agent_auth(guard: V1Guard, registry: Any, request: Request) -> tuple[TokenRe
     return token, agent
 
 
+NO_LEARNING_WRITES = frozenset({"work-read", "work-file", "work-sync", "import-filing"})
+"""Run purposes that only read (decisions memo S2): `worktools.READ_ONLY_PURPOSES` and
+`importfiling.PURPOSE` (named here, not imported: both modules import this one). Their tokens never
+write memory or skills, whatever their `tools` say."""
+
+LEARNING_WRITE_TOOLS = ("memory", "skill_manage")
+"""The agent tools that write the agent's memory or skills."""
+
+
 def agent_tool_allowed(record: TokenRecord, tool: str) -> None:
     """M18: raises `Denied` 403 "This run can't use {tool}." when the token's `tools` is set and
-    lacks `tool` (a short agent tool name)."""
-    if record.tools is not None and tool not in record.tools:
+    lacks `tool` (a short agent tool name), or (decisions memo S2) when `tool` writes memory or
+    skills and the token's purpose is one of `NO_LEARNING_WRITES`."""
+    refused = record.tools is not None and tool not in record.tools
+    if refused or (tool in LEARNING_WRITE_TOOLS and record.purpose in NO_LEARNING_WRITES):
         raise Denied(403, f"This run can't use {tool}.")  # our string

@@ -37,6 +37,7 @@ __all__ = [
     "ToolLists",
     "WORK_STEP_TOOLS",
     "CLI_ALWAYS",
+    "agent_tools_in",
     "catalogue",
     "cli_tools",
     "default_off",
@@ -250,6 +251,13 @@ def cli_tools(allowed: Iterable[str], disallowed: Iterable[str]) -> list[str]:
         _add(out, [c for c in entry.cli if c in allowed_set and c not in disallowed_set])
     _add(out, [n for n in CLI_ALWAYS if n not in disallowed_set])
     return out
+
+
+def agent_tools_in(allowed: Iterable[str]) -> tuple[str, ...]:
+    """The ``object-agent`` tools (short names, `AGENT_TOOLS` order) that `allowed` (a run's
+    ``--allowedTools``) names: what the run's token may call (decisions memo S2)."""
+    allowed_set = set(allowed)
+    return tuple(n for n in AGENT_TOOLS if _mcp(AGENT_SERVER, n) in allowed_set)
 
 
 def run_tool_lists(off: Iterable[str], *, write: bool, folder_servers: Iterable[str]) -> ToolLists:

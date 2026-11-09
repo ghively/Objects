@@ -399,6 +399,11 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   `--tools` list, never `--tools default`. A built-in the CLI adds later (on 2.1.319: CronCreate, RemoteTrigger,
   SendMessage, ScheduleWakeup, Workflow, Monitor...) stays off until it gets a Tools-tab row. Read-only work runs
   get only Web fetch and the skill tool; an import filing run gets none.
+- **What a run's token may call** (decisions memo S2): every run (chats, Work, filing, schedules, delegation,
+  reviews) carries, on its token, the Object agent tools its tool lists allow, so Object itself refuses the
+  others with "This run can't use {tool}." even if the CLI let a call through; an agent's Tools-tab switch-off of
+  Memory, Change skills, Delegate or Call a remote agent is enforced by Object, not only by Claude Code. Read-only
+  runs (Work read, filing a brain dump, Desk sync, import filing) can never write the agent's memory or skills.
 
 ## 11. Unlinked mentions
 
