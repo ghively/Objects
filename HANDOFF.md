@@ -37,6 +37,8 @@ BROWSER=/usr/bin/true uv run objectapp --space <folder> --port 88xx --browser --
 
 ## What to do next, in order
 
+0. **M28-M30** (approved 2026-11-09): the IT ops type model (`specs/2026-11-09-it-ops-type-model-design.md`), built in order M28 (IT ops starter, two-way relations), M29 (synced facts, type suggestion), M30 (entity extraction, Sources). Plans in `docs/superpowers/plans/2026-11-09-m2{8,9}-*.md` and `2026-11-09-m30-*.md`; status in `remaining-work.md`.
+
 1. **Set up** (fresh clone): install `uv` and Node 22+; `uv sync`; `cd frontend && npm ci` (not `npm install`).
 2. **Gene's hands-on checks**, M1-M27 (435 boxes, none ticked: 255 for M1-M9, 37 for M10-M15, 134 for M16-M27 and 9 in `m27-ui-acceptance.md`). The automated run covered what a headless harness can; what is left for him is listed by reason in `auto-acceptance-2026-11-08.md`. Run them on a copy of his space (never his real data first), and fix what they find, one finding per commit with a regression test.
 3. **Gene's inputs** (`remaining-work.md`, "Needs Gene"): his extra custom object types, an Anytype export, a git remote address, the Windows checks (the S6 launch key in a real pywebview window first), the four H2 items.

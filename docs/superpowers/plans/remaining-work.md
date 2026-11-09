@@ -93,6 +93,10 @@ The history below is in the order it was written: the per-milestone sections new
   and a 20 s import wait, failed only with the front-end suite running beside them and pass alone); front end 4095
   passed, 1 skipped (one 100 ms budget test likewise); `tsc`, lint and build clean; headless launch smoke run clean.
 
+- **Next: M28-M30**, the IT ops type model (design approved by Gene 2026-11-09, `specs/2026-11-09-it-ops-type-model-design.md`;
+  plans `2026-11-09-m28-itops-starter-and-relations.md`, `2026-11-09-m29-synced-facts-and-type-suggestion.md`,
+  `2026-11-09-m30-entity-extraction.md`), built in that order.
+
 ### Needs Gene
 
 1. **Hand-checks:** the list in `auto-acceptance-2026-11-08.md`, "What needs Gene by hand" (Windows and pywebview,
