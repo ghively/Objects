@@ -11,8 +11,9 @@
  *   after a growing delay (`SAVE_RETRY_MS`, doubling up to `SAVE_RETRY_MAX_MS`), at most
  *   `SAVE_RETRY_LIMIT` times; the next edit tries again.
  * - An external `whiteboard` change for this board reloads it (clearing the history) when
- *   nothing is pending here; so does a save by another view of it in this window (a page and a
- *   peek), which the server's echo filter would hide.
+ *   nothing is pending here, with the toast "Changed elsewhere. Reloaded." (M6 acceptance #17); so
+ *   does a save by another view of it in this window (a page and a peek), which the server's echo
+ *   filter would hide (silently: that is no outside change).
  * - Pending changes are flushed on unmount and on `pagehide`.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -247,7 +248,8 @@ export function useBoard(
       wasDragging = s.dragging
     })
 
-    const changedElsewhere = (version: string | null) => {
+    /** `outside`: the file changed outside this window (a server event): the reload says so. */
+    const changedElsewhere = (version: string | null, outside: boolean) => {
       if (version && version === saver.revision) return
       if (saver.pending) return // our next save will meet the change (409) and merge
       void client
@@ -256,16 +258,18 @@ export function useBoard(
           if (!alive || saver.pending) return
           if (res.revision === saver.revision) return
           saver.reload(res.board, res.revision, res.readOnlyReason ?? null)
+          // M6 acceptance #17: an outside edit reloads the board with the notice.
+          if (outside) saver.onToast(WB.changedElsewhere.text)
         })
         .catch(() => undefined)
     }
     const offChange = api.onChange((e) => {
-      if ((e.kind as string) === 'whiteboard' && e.path === path) changedElsewhere(e.version)
+      if ((e.kind as string) === 'whiteboard' && e.path === path) changedElsewhere(e.version, true)
       // The stream reconnected: the board may have changed meanwhile; the revision check decides.
-      else if (isResync(e, 'types')) changedElsewhere(null)
+      else if (isResync(e, 'types')) changedElsewhere(null, true)
     })
     const offLocal = onLocalSave((e) => {
-      if (e.source !== saver && e.path === path) changedElsewhere(e.version)
+      if (e.source !== saver && e.path === path) changedElsewhere(e.version, false)
     })
 
     const onPageHide = () => void saver.flush()

@@ -221,16 +221,19 @@ describe('useBoard', () => {
   test('external whiteboard event reloads, keeping the undo history, when nothing is pending', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const client = mockWhiteboardApi(board([node({ id: 'a' })]), 'rev-1')
-    const { store } = await setup(client)
+    const { store, hook } = await setup(client)
     act(() => store.getState().actions.nudge(30, 0, ['a']))
     await advance(SAVE_DELAY_MS + 10)
     await waitFor(() => expect(client.saveBoard).toHaveBeenCalledTimes(1))
     expect(store.getState().canUndo).toBe(true)
+    expect(hook.result.current.toast).toBeNull()
 
     const remote = board([node({ id: 'a' }), node({ id: 'n2', blockId: 'b' })], [], { b: textBlock('from disk') })
     client.board.mockResolvedValue({ path: PATH, board: remote, revision: 'rev-ext' })
     await act(async () => emit({ kind: 'whiteboard' as ChangeEvent['kind'], version: 'rev-ext' }))
     await waitFor(() => expect(store.getState().doc.board.nodes.n2).toBeDefined())
+    // M6 acceptance #17: an outside edit reloads the board with the notice.
+    await waitFor(() => expect(hook.result.current.toast).toBe('Changed elsewhere. Reloaded.'))
     // The nudge made before the reload is still undoable, rebased onto the reloaded board.
     expect(store.getState().canUndo).toBe(true)
     act(() => store.getState().actions.undo())
@@ -283,6 +286,8 @@ describe('useBoard', () => {
     await act(async () => page.result.current.flush())
     await advance(10)
     await waitFor(() => expect(peek.result.current.store.getState().doc.board.nodes.a.position.x).toBe(30))
+    // Another view of the board in this window is no outside change: no notice.
+    expect(peek.result.current.toast).toBeNull()
     page.unmount()
     peek.unmount()
   })

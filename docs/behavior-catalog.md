@@ -238,6 +238,9 @@ Each starter template pre-fills the new type's properties.
   names it; "Add description" puts the caret in the description it reveals. Renaming an object (its title, a
   table's title cell, a whiteboard's name) rewrites the links to it in other objects and then says so with a short
   notice, "Updated links in 3 objects" ("1 object"); nothing is shown when no other object linked to it.
+- **Whiteboard changed outside** (its `.whiteboard.json` edited in another program while the board is open): the
+  board reloads and says "Changed elsewhere. Reloaded."; another view of the same board in this window (a page
+  and a peek) follows silently.
 - **Property value editors**:
   - Date: a chip; click opens a picker: an input with an info icon, presets (Yesterday, Today, Tomorrow, In 1
     week, In 2 weeks), month and year dropdowns, a month grid with the chosen day as a pill, toggles
