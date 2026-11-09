@@ -22,7 +22,7 @@ vi.mock('@/properties/cellFor', async (orig) => {
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { editorObjectTitle } from '@/editor/nodes/blockRef'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { cellValue, decodeDate, PropertyPanel } from './PropertyPanel'
+import { cellValue, decodeDate, externalKeys, PropertyPanel } from './PropertyPanel'
 
 const SCORE = propertyDef({ id: 'p-score', key: 'score', name: 'Score', type: 'number', visibility: 'hideWhenEmpty' })
 const SECRET = propertyDef({ id: 'p-secret', key: 'secret', name: 'Secret', type: 'text', visibility: 'hidden' })
@@ -239,5 +239,13 @@ describe('M5 backlinks', () => {
       return els.map((el) => el.editor!)
     })
     for (const editor of editors) expect(editorObjectTitle(editor)).toBe('Apollo')
+  })
+})
+
+describe('externalKeys', () => {
+  test('the importSource system block is not an External property (fix pass H)', () => {
+    const t = typeDef({ id: 'page', name: 'Page', propertyDefinitions: [propertyDef({ id: 'status', key: 'status' })] })
+    const fm = { title: 'Dune', status: 'x', importSource: { system: 'files', id: 'a.docx' }, legacy: 1 }
+    expect(externalKeys(t, fm)).toEqual(['legacy'])
   })
 })

@@ -1575,6 +1575,8 @@ export interface ImportResult {
   removed?: number
   leftOut?: number
   failed?: number
+  /** Of `failed`, the objects not written because the import stopped. */
+  notWritten?: number
   originals?: number
   sourceItems?: number
 }
@@ -2840,6 +2842,10 @@ export interface ProposalGroup {
   documentCount: number
   examples: string[]
   properties: ProposalProperty[]
+  /** Why Apply will skip this item (the app's rules, e.g. too few documents); empty when it can be applied. */
+  problems?: string[]
+  /** Properties the app's rules left out of the item, each with the reason. */
+  dropped?: { key: string; name: string; reason: string }[]
 }
 
 export interface SchemaProposal {
@@ -2881,12 +2887,21 @@ export interface FilingValue {
   ok: boolean
 }
 
+/** A tag or collection a filing result adds, with the words it was read from. */
+export interface FilingLabel {
+  value: string
+  quote: string
+  ok: boolean
+}
+
 export interface FilingTrialItem {
   path: string
   title: string
   type: string
   confidence: FilingConfidence
   values: FilingValue[]
+  tags?: FilingLabel[]
+  collections?: FilingLabel[]
   verdict: FilingVerdict | null
 }
 

@@ -40,7 +40,7 @@ from ..media import (
     kind_of,
 )
 from ..objfile import ObjectFile, join_object, split_object
-from ..space import now_stamp, safe_filename, unique_path, yaml_single_quoted
+from ..space import InvalidValue, now_stamp, safe_filename, unique_path, yaml_single_quoted
 from ..textfile import atomic_write, create_new
 from ..whiteboardfile import BOARD_SUFFIX, INK_SUFFIX
 from . import batches, markdown, provenance
@@ -235,6 +235,7 @@ def write_import(planned: Planned, space: Space, state: WriteState, src: Source 
         removed=len(state.removed),
         leftOut=c.get("leftOut", 0),
         failed=c.get("failed", 0),
+        notWritten=c.get("notWritten", 0) if state.stopped else 0,
         originals=state.originals_kept,
         sourceItems=c.get("sourceItems", 0),
     )
@@ -452,14 +453,15 @@ def _place_unique(space: Space, rel: str, title: str, data: bytes) -> str | None
 
 
 def _media_type(space: Space, state: WriteState, type_name: str) -> Any:
-    """The space's media type ``type_name`` (Image, PDF, ...), made when it has none. Image is
-    made as the basic media type (AC-2: its media fields are system fields); the others as
-    before (a custom type of that name)."""
+    """The space's media type ``type_name`` (Image, PDF, Audio, Video, File), made when it has none,
+    as the basic media type (AC-2 for Image; fix pass H for the others): its media fields are
+    read-only system fields, not loose External properties. A name with no basic media type
+    (none today) falls back to a custom type."""
     t = space.type_by_id(space._type_id(type_name))
     if t is None:
-        if type_name == "Image":
+        try:
             t = space.create_media_type(type_name)
-        else:
+        except InvalidValue:
             t = space.create_type(type_name, _MEDIA_PLURALS[type_name])
         state.types += 1
     return t

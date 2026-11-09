@@ -313,7 +313,8 @@ Each starter template pre-fills the new type's properties.
   - Tab strip: Overview | All | custom tabs (including Query-backed ones) | `+` to add a tab.
 - **Query builder search mode**: Auto | Title. Exact and Semantic are hidden until real full-text search exists
   (Gene's decision Q-1: they matched exactly like Auto). A saved query that uses one still runs as Auto (the
-  server keeps accepting both) and shows Auto; the next edit of its search saves it as Auto.
+  server keeps accepting both) and shows Auto; the next edit of its search saves it as Auto. The Search page's **Save as
+  Query** saves Auto too, with or without **Text matches only** (that toggle filters the Search page only).
   - Type page header: type icon + plural name; search icon; `...` (New collection, Pin to sidebar, Pin to…,
     Object type settings, Import CSV, Save as query, Delete object type; "New from template" is in the sidebar's
     type menu); a split "New" button.
@@ -419,14 +420,23 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **Import dialog** ("Import from another app"): **Zip file or folder** path; **Exported from** Detect automatically
   | Notion | Obsidian | Anytype | Files (a folder, with an optional `_manifest.jsonl`); **Preview** writes nothing.
   Steps in order: source, **Check for sensitive content** (scan), **Review mappings** (types, properties, options),
-  progress with **Stop import**, finish. **Import into**: A new space | This space; the review step also offers
+  progress with **Stop import**, finish. A folder's type name is its singular (Books -> Book, Stories -> Story,
+  People -> Person, Children -> Child); into this space a folder joins an existing type with that name, or one whose
+  plural is the folder's name (so a "People" folder joins Person instead of making "People (2)").
+  **Import into**: A new space | This space; the review step also offers
   **Keep originals as** Attachments (default) | File objects, and **Try on a copy of this space** (imports into a copy
-  named "<space> (trial)" next to the open space; on by default for a first run into this space).
+  named "<space> (trial)" next to the open space; on by default for a first run into this space). A finished import into
+  the copy offers **Switch and review proposed schema** (the batch lives in the copy): it switches to the copy and opens
+  that batch's Proposed schema there.
 - **Source line** (object page, under the properties; hidden when the object was not imported): **Source**
   "Imported from <system> (author, modified <date>, version <v>)", **Open original** (the web url, else the kept
   file) and **Show file** (shows the kept original in the file manager). Every imported object carries the system
   frontmatter block `importSource` (system, url, id, version, author, created, modified, original, contentHash, batch,
-  importedAt).
+  importedAt); it is a system field, so the property panel never lists it under External properties.
+- **Links between imported pages**: a source link names a page by path or by name; when several pages share the name
+  (Books/Dune and Movies/Dune) the one nearest the linking page wins (its own folder, then the deepest shared folder,
+  then the shortest path), and the written link is the title only when the space resolves it to that object, else its
+  path.
 - **Queryable import fields**: filters, sorts and columns offer **Imported from**, **Import batch** and **Source modified**
   (the last is a text filter on the ISO date).
 - **Files source**: every non-Markdown file is one page (text and images where they appeared) with the untouched
@@ -438,7 +448,8 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   in its body (the design's call, approved by Gene as AC-2 on 2026-11-08; not a Page holding the image). Only images
   the Page row would take: a mapping that puts them in a folder or key type, or the Page row into another type, wins.
   The report's Originals section says "1 image became an Image object."; File objects mode makes no second object for
-  an image. An image an earlier import made into a Page stays that Page on a re-run (matched by source id, updated in
+  an image; the File, PDF, Audio and Video objects it makes belong to the basic media types (made when the space has
+  none, like Image), so their MIME type, file size and source are read-only system fields, not External properties. An image an earlier import made into a Page stays that Page on a re-run (matched by source id, updated in
   place, never duplicated or migrated) and the report notes "Kept as a Page: an earlier import made it before images
   became Image objects".
 - **Scanned PDF pages (OCR)**: a page with no text layer (or one under 32 characters) that holds an image is read with
@@ -454,16 +465,22 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   and can be switched to **Leave out**.
 - **Re-runs**: the same source updates its objects in place (the old text goes to version history), reuses identical
   attachments and never overwrites Gene's edits. Finish step and Import report: counts that add up (source items =
-  imported + updated + unchanged + changed in both + left out + failed), **Changed in both** (**Take source** /
+  imported + updated + unchanged + changed in both + left out + failed; after **Stop import** both say how many of the
+  failed were "not written because the import stopped"), **Changed in both** (**Take source** /
   **Keep mine**, and **Take source for all** / **Keep mine for all**), **Removed at source** (listed, never trashed).
   **Move batch to Trash** moves the objects the batch created (not the ones it only updated) to the Trash.
-- **Proposed schema** (finish step offers **Review proposed schema**): each group is **Use existing type**, **Extend
+- **Proposed schema** (finish step offers **Review proposed schema**; so does each row of **Settings > Import Content >
+  Import history**, the open space's import batches newest first (source, date, objects; trashed batches left out), which
+  reopens the same Proposed schema, Trial, Normalise and Import inbox steps after the dialog was closed or the app
+  reloaded): each group is **Use existing type**, **Extend
   existing type** or **Create type**, with document counts, examples, "N% have a value" fill rates, options and merges;
   **Accept**, **Edit** (Name, Plural name, Keep <property>) or **Turn down**; **Apply** stays disabled until every
   item is decided and creates only what was accepted. A new type needs 10 documents; a property needs 30% of its
-  group. Only the app applies a proposal; no MCP tool can.
+  group. An item the rules will skip says so before Apply ("Apply will skip this: <reason>"), properties the rules left
+  out are listed under **Left out** with their reason, and the Apply summary names each skipped item and why
+  ("Skipped: Memo (…)"; items the user turned down are not repeated). Only the app applies a proposal; no MCP tool can.
 - **Trial on the first 50 objects**: **Start trial**; each result shows a confidence (High, Medium, Low), the value
-  and its **Quote**, and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
+  and its **Quote**, the **Tags** and **Collections** it adds (each with its quote), and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
   failed the app's check says **Did not pass the check**. **Continue with the rest** starts the bulk pass (40 objects
   per agent turn). Flagged files are not in the trial.
 - **Normalise tags and options**: near-duplicate tags and option values (for example Prod / prod / Production) with
@@ -497,6 +514,14 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   settings. Known limit, accepted (decisions memo A-2): a folder whose name contains a backslash (`\`, legal in a
   Linux folder name) can't be fenced — no rule form Claude Code accepts matches it (three forms tried live on
   2.1.319, Linux). Rename such a folder if an agent should not read it with its file tools.
+
+- **Refused steps** (our wording): a tool step the run was not allowed to make reads "Not allowed to create 'X'
+  (this agent has the tool switched off)" (or "(the file is outside what this agent may read)", or the refusal's own
+  first line), never a past-tense "Created 'X' (failed)"; an ordinary tool error keeps the "(failed)" suffix.
+- **Add agent folder…** says what is wrong: "This folder isn't an Object agent." only when there is no readable
+  `agent.json`; a missing or malformed id says so and shows the id (an agent id is a 26-character ULID).
+- **Settings > Integrations > Secret variables**: **Delete** asks first, as a server's Delete does (**Confirm delete**
+  with "Agents that use this variable lose its value at once. This cannot be undone.").
 
 ## 10e. Agent and API guards (Object's own; decisions memo 2026-11-08)
 

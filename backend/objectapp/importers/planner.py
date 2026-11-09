@@ -238,11 +238,14 @@ _SINGULAR_KEEP = frozenset({"series", "species", "news", "status", "bus", "analy
 _IE_WORDS = frozenset({"movies", "cookies", "pies", "ties", "lies", "zombies", "selfies", "calories", "rookies", "hippies", "goalies", "smoothies", "brownies", "pixies", "aunties", "genies"})
 # -ches words whose singular keeps the "e" (Caches -> Cache).
 _CHES_WORDS = frozenset({"caches", "niches", "aches", "headaches", "avalanches", "moustaches", "mustaches", "cliches", "quiches"})
+# Common irregular plurals (our choice): People -> Person, so a "People" folder joins the Person type.
+_IRREGULAR = {"people": "person", "children": "child", "men": "man", "women": "woman", "mice": "mouse",
+              "geese": "goose", "teeth": "tooth", "feet": "foot", "persons": "person"}
 
 
 def _singular(name: str) -> str:
     """A folder name made singular by a plain English rule (our choice), applied to its last
-    word: ``-ies`` -> ``-y`` (``Stories``; ``Movies`` -> ``Movie``), ``-sses``, ``-xes``,
+    word: a few irregular plurals (``People`` -> ``Person``, ``Children`` -> ``Child``), ``-ies`` -> ``-y`` (``Stories``; ``Movies`` -> ``Movie``), ``-sses``, ``-xes``,
     ``-ches``, ``-shes`` drop ``es`` (``Classes``, ``Boxes``, ``Watches``,
     ``Wishes``), a final ``s`` is dropped unless the word ends ``ss``, ``us`` or ``is``; a few
     words (``Series``, ``Status``, ``News``…) stay as they are. Never answers an empty name."""
@@ -254,6 +257,10 @@ def _singular(name: str) -> str:
         out = stem + (add.upper() if upper else add)
         return f"{head} {out}" if head else out
 
+    if low in _IRREGULAR:
+        stem = _IRREGULAR[low]
+        stem = stem.upper() if upper else (stem.capitalize() if word[:1].isupper() else stem)
+        return f"{head} {stem}" if head else stem
     if len(low) <= 1 or not low.endswith("s") or low in _SINGULAR_KEEP:
         return name
     if low in _IE_WORDS or low in _CHES_WORDS:
@@ -387,6 +394,9 @@ def plan(
                 raise MappingProblem(f"Imported pages can't become {ex.name} objects; choose another type.")
         elif target.kind == "currentSpace" and not force_new:
             match = next((t for t in existing_types if t.name.casefold() == name.casefold() and importable_type(t)), None)
+            if match is None and origin == "folder":
+                # A folder named like an existing type's plural (its folder name) is that type.
+                match = next((t for t in existing_types if t.pluralName.casefold() == plural.casefold() and importable_type(t)), None)
             if key == PAGE_KEY and page_type is not None:
                 match = page_type
             existing_id = match.id if match is not None else None

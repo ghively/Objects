@@ -50,6 +50,7 @@ function trialStatus(over: Partial<FilingStatus> = {}): FilingStatus {
           confidence: 'high',
           verdict: null,
           values: [{ key: 'status', value: 'Prod', quote: 'We shipped to prod', ok: true }],
+          tags: [{ value: 'Release', quote: 'release notes', ok: true }],
         },
         {
           path: 'b.md',
@@ -107,6 +108,39 @@ describe('ProposalStep', () => {
     expect(onApplied).toHaveBeenCalled()
   })
 
+  test('says why an item will be skipped and which properties were left out; the summary names the skipped (fix pass H)', async () => {
+    const memo = {
+      id: 'g3',
+      action: 'create' as const,
+      name: 'Memo',
+      documentCount: 3,
+      examples: ['Memo 1'],
+      properties: [],
+      problems: ['A new type needs at least 10 documents (3 here); use or extend an existing type instead.'],
+      dropped: [{ key: 'mood', name: 'Mood', reason: 'It has a value in 10% of the group; a property needs at least 30%.' }],
+    }
+    m.importProposal.mockResolvedValue({ proposal: { groups: [memo, PROPOSAL.groups[1]] }, review: null })
+    m.applyProposal.mockResolvedValue({
+      created: [],
+      extended: [],
+      skipped: [
+        { id: 'g3', reason: memo.problems[0] },
+        { id: 'g2', reason: 'Turned down.' },
+      ],
+    })
+    const user = userEvent.setup()
+    render(<ProposalStep batch="b1" onApplied={vi.fn()} />)
+    const card = await screen.findByRole('group', { name: T.itemLabel('Memo') })
+    expect(within(card).getByText(T.willSkip(memo.problems[0]))).toBeInTheDocument()
+    expect(within(card).getByText(T.droppedLine('Mood', memo.dropped[0].reason))).toBeInTheDocument()
+    await user.click(within(card).getByRole('button', { name: T.accept }))
+    await user.click(within(screen.getByRole('group', { name: T.itemLabel('Book') })).getByRole('button', { name: T.reject }))
+    await user.click(screen.getByRole('button', { name: T.apply }))
+    const status = await screen.findByRole('status')
+    expect(status).toHaveTextContent('Skipped: Memo (A new type needs at least 10 documents (3 here); use or extend an existing type instead).')
+    expect(status).not.toHaveTextContent('Book')
+  })
+
   test('edit saves the new name and the dropped properties', async () => {
     m.importProposal.mockResolvedValue({ proposal: PROPOSAL, review: null })
     const user = userEvent.setup()
@@ -145,6 +179,10 @@ describe('TrialStep', () => {
     const alpha = await screen.findByRole('group', { name: 'Alpha' })
     expect(within(alpha).getByText('We shipped to prod')).toBeInTheDocument()
     expect(within(alpha).getByText(T.confidence.high)).toBeInTheDocument()
+    // the tags a result adds, with their quote (fix pass H)
+    expect(within(alpha).getByText(T.tagsLabel)).toBeInTheDocument()
+    expect(within(alpha).getByText(/Release/)).toBeInTheDocument()
+    expect(within(alpha).getByText('release notes')).toBeInTheDocument()
     expect(within(screen.getByRole('group', { name: 'Beta' })).getByText(`(${T.valueRejected})`)).toBeInTheDocument()
     expect(screen.getByText(T.noMarks)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: T.markLabel(T.right, 'Alpha') }))

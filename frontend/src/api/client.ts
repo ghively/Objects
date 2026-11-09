@@ -1487,8 +1487,10 @@ export const api = {
   },
 
   /** "Apply": creates and extends the accepted types. App only, never an MCP tool. */
-  async applyProposal(batchId: string): Promise<{ created: string[]; extended: string[] }> {
-    const res = await request<{ created: string[]; extended: string[] }>(
+  async applyProposal(
+    batchId: string,
+  ): Promise<{ created: string[]; extended: string[]; skipped?: { id: string; reason: string }[] }> {
+    const res = await request<{ created: string[]; extended: string[]; skipped?: { id: string; reason: string }[] }>(
       `/import/batches/${seg(batchId)}/proposal/apply`,
       json('POST', {}),
     )

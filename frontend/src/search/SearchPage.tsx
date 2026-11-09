@@ -64,13 +64,15 @@ function snippetOf(r: SearchResult): string | null {
 /** The query definition a search is saved as (`definition.search`, types, tags). */
 export function searchDefinition(
   q: string,
-  textOnly: boolean,
+  _textOnly: boolean,
   filters: SearchFilters,
   tagIdOf: (name: string) => string | null,
 ): Partial<QueryDefinition> & Pick<QueryDefinition, 'types'> {
   const def: Partial<QueryDefinition> & Pick<QueryDefinition, 'types'> = {
     types: filters.types.map((id) => ({ id })),
-    search: { searchTerms: [{ text: q.trim() }], searchMode: textOnly ? 'fullText' : 'auto' },
+    // Always Auto: the query builder offers Auto | Title only (Gene's Q-1 hid Exact, which a saved query ran as
+    // Auto anyway), and Title would drop the body matches "Text matches only" asked for.
+    search: { searchTerms: [{ text: q.trim() }], searchMode: 'auto' },
   }
   if (filters.excludeTypes.length > 0) def.excludeTypeIds = [...filters.excludeTypes]
   const tagId = filters.tag !== null ? tagIdOf(filters.tag) : null

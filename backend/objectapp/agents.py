@@ -88,6 +88,13 @@ __all__ = [
 NESTED = "An agent folder can't be inside a space folder or hold one."
 ID_LISTED = "An agent with this id is already listed."
 NOT_AN_AGENT = "This folder isn't an Object agent."
+# our strings: an agent.json that is there but names its agent wrongly says what's wrong
+NO_AGENT_ID = "This agent folder's agent.json has no id."
+BAD_AGENT_ID = (
+    "This agent folder's id \"{id}\" isn't valid: an agent id is 26 characters of digits and capital letters "
+    "(no I, L, O or U), as a copied agent's agent.json had it."
+)
+REMOTE_DEFAULT_ID = "A remote agent can't use the Assistant's id \"assistant\"; give it its own id in agent.json."
 DEFAULT_UNDELETABLE = "The default agent can't be deleted."
 NOT_LISTED = "That agent isn't listed any more."  # our string (also the chat route's)
 CHANGED = "This agent was changed elsewhere."  # our string
@@ -710,11 +717,13 @@ class AgentRegistry:
         except ValueError:
             raise AgentInvalid(NOT_AN_AGENT) from None
         agent_id = data.get("id")
-        if not isinstance(agent_id, str) or not _AGENT_ID.match(agent_id):
-            raise AgentInvalid(NOT_AN_AGENT)
+        if not isinstance(agent_id, str) or not agent_id.strip():
+            raise AgentInvalid(NO_AGENT_ID)
+        if not _AGENT_ID.match(agent_id):
+            raise AgentInvalid(BAD_AGENT_ID.format(id=agent_id[:40]))
         kind: Literal["local", "remote"] = "remote" if data.get("kind") == REMOTE_KIND else "local"
         if kind == REMOTE_KIND and agent_id == DEFAULT_AGENT_ID:
-            raise AgentInvalid(NOT_AN_AGENT)
+            raise AgentInvalid(REMOTE_DEFAULT_ID)
         self._check_nesting(folder)
         with _lock:
             listed = (*self.local_folders(), *self.remote_folders())

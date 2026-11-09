@@ -62,11 +62,14 @@ describe('SecretVariables', () => {
     expect(within(row).queryByRole('button', { name: `${T.replaceVar} HOME` })).toBeNull()
   })
 
-  test('test Delete removes a set variable', async () => {
+  test('test Delete removes a set variable after Confirm delete (fix pass H)', async () => {
     const user = userEvent.setup()
     mocked.mcpSecrets.mockResolvedValue([secretVar({ name: 'GH_TOKEN', set: true })])
     render(<SecretVariables />)
     await user.click(await screen.findByRole('button', { name: `${T.deleteVar} GH_TOKEN` }))
+    expect(mocked.deleteMcpSecret).not.toHaveBeenCalled()
+    expect(screen.getByText(T.deleteVarHelp)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: `${T.confirmDelete} GH_TOKEN` }))
     await waitFor(() => expect(mocked.deleteMcpSecret).toHaveBeenCalledWith('GH_TOKEN'))
   })
 

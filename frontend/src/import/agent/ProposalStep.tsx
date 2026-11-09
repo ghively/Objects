@@ -17,7 +17,7 @@ export function ProposalStep({ batch, onApplied, onSkip }: { batch: string; onAp
   const [decisions, setDecisions] = useState<Record<string, ProposalReviewItem>>({})
   const [applying, setApplying] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<{ created: number; extended: number } | null>(null)
+  const [done, setDone] = useState<{ created: number; extended: number; skipped: { name: string; reason: string }[] } | null>(null)
 
   const load = useCallback(() => {
     setLoaded(false)
@@ -48,7 +48,12 @@ export function ProposalStep({ batch, onApplied, onSkip }: { batch: string; onAp
     setError(null)
     try {
       const r = await api.applyProposal(batch)
-      setDone({ created: r.created.length, extended: r.extended.length })
+      // What Apply left out, by group name; a turned-down item is skipped by the user's own say, not worth repeating.
+      const names = new Map(groups.map((g) => [g.id, decisions[g.id]?.edited?.name || g.name]))
+      const skipped = (r.skipped ?? [])
+        .filter((s) => decisions[s.id]?.status !== 'rejected')
+        .map((s) => ({ name: names.get(s.id) ?? s.id, reason: s.reason }))
+      setDone({ created: r.created.length, extended: r.extended.length, skipped })
     } catch (e) {
       setError(msg(e))
     } finally {
@@ -94,6 +99,7 @@ export function ProposalStep({ batch, onApplied, onSkip }: { batch: string; onAp
       {done && (
         <p role="status" className="text-[13px]">
           {T.applied(done.created, done.extended)}
+          {done.skipped.length > 0 && ` ${T.skippedSummary(done.skipped)}`}
         </p>
       )}
       <div className="flex items-center justify-end gap-2">
@@ -149,6 +155,11 @@ function GroupCard({
           {T.examples}: {g.examples.join(', ')}
         </p>
       )}
+      {(g.problems ?? []).map((p) => (
+        <p key={p} className="text-[12px] text-danger">
+          {T.willSkip(p)}
+        </p>
+      ))}
       {g.properties.length > 0 && (
         <div>
           <h4 className="text-[12px] font-semibold">{T.propertiesHeading}</h4>
@@ -191,6 +202,16 @@ function GroupCard({
                     </span>
                   ))}
               </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {(g.dropped ?? []).length > 0 && (
+        <div>
+          <h4 className="text-[12px] font-semibold">{T.droppedHeading}</h4>
+          <ul className="flex flex-col gap-1 text-[12px] text-fg-muted">
+            {(g.dropped ?? []).map((d) => (
+              <li key={d.key}>{T.droppedLine(d.name, d.reason)}</li>
             ))}
           </ul>
         </div>
