@@ -1,7 +1,7 @@
 """API tokens for the local API (M11).
 
 A token lets a program outside Object's window (an MCP server, a script) use
-``/api/v1``. Tokens are per space folder, named, either ``read`` or ``read-write``,
+``/api/v1``. Tokens are per space folder, named, ``read``, ``read-write`` or (M29) ``sync``,
 and revocable. They live in the per-user state dir (``api-tokens.json``), never in
 the space: the space folder may be synced or committed, a token must not travel with it.
 
@@ -42,13 +42,16 @@ from .appstate import state_dir
 from .textfile import atomic_write
 
 __all__ = [
+    "SCOPE_MESSAGE",
     "SCOPES",
     "ActivityLog",
     "TokenRecord",
     "TokenStore",
 ]
 
-SCOPES = ("read", "read-write")
+# M29: a `sync` token reads like `read` and writes only synced facts (`POST /api/v1/synced/...`).
+SCOPES = ("read", "read-write", "sync")
+SCOPE_MESSAGE = "scope must be read, read-write or sync."
 PREFIX = "obj_"
 MAX_NAME = 60
 MAX_TOKENS = 50
@@ -185,7 +188,7 @@ class TokenStore:
         if len(name) > MAX_NAME:
             raise ValueError(f"A token name can be at most {MAX_NAME} characters.")
         if scope not in SCOPES:
-            raise ValueError("scope must be read or read-write.")
+            raise ValueError(SCOPE_MESSAGE)
         secret = PREFIX + secrets.token_urlsafe(32)
         with self._lock:
             tokens = self._load()
@@ -234,7 +237,7 @@ class TokenStore:
         M18: `purpose`, `run`, `budget` and `tools` describe a review or curator run.
         """
         if scope not in SCOPES:
-            raise ValueError("scope must be read or read-write.")
+            raise ValueError(SCOPE_MESSAGE)
         secret = PREFIX + secrets.token_urlsafe(32)
         record = TokenRecord(
             id="ephemeral-" + secrets.token_hex(6),

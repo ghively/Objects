@@ -14,6 +14,7 @@ import type {
   Agent,
   AgentInput,
   AgentTranscript,
+  ApiTokenScope,
   Attachment,
   AutomationRule,
   AutomationRun,
@@ -170,7 +171,7 @@ export function objectSummary(partial: Partial<ObjectSummary> & Pick<ObjectSumma
   }
 }
 
-/** An object as `GET /api/object` returns it. */
+/** An object as `GET /api/object` returns it (M29: `synced` passes through from `partial`). */
 export function objectDetail(partial: Partial<ObjectDetail> & { summary: ObjectSummary }): ObjectDetail {
   return {
     frontmatter: {},
@@ -226,7 +227,11 @@ export function defaultViews(): Views {
   return { activeTab: 'all', all: viewState(), dashboard: { sections: [], removedSections: [] } }
 }
 
-/** A row with every contract field; `partial` overrides (`path` is shorthand for a default summary). */
+/**
+ * A row with every contract field; `partial` overrides (`path` is shorthand for a default summary).
+ * M29: `syncedAt` passes through from `partial` (absent unless given, as for a type without synced
+ * properties).
+ */
 export function row(partial: Partial<Row> & { path?: string } = {}): Row {
   const { path, ...rest } = partial
   const summary = rest.summary ?? objectSummary({ path: path ?? 'Pages/Untitled.md' })
@@ -939,7 +944,7 @@ function defaults(): Api {
     }),
     saveAiChat: async (req: { path?: string | null }) => ({ path: req.path ?? 'AI Chats/Chat.md', version: 'v1' }),
     apiTokens: async () => ({ tokens: [], mcp: mcpConfig('<token>') }),
-    createApiToken: async (name: string, scope: 'read' | 'read-write') => ({
+    createApiToken: async (name: string, scope: ApiTokenScope) => ({
       token: { id: 'tok1', name, scope, createdAt: '2026-11-05T12:00:00.000Z', lastUsedAt: null },
       secret: 'obj_secret',
       mcpConfig: mcpConfig('obj_secret'),

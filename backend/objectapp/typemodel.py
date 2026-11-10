@@ -38,13 +38,19 @@ __all__ = [
     "Icon",
     "LabelOption",
     "PropertyDefinition",
+    "MAX_STALE_DAYS",
+    "MAX_SYNC_SOURCE",
     "RevisionConflict",
+    "SYNCABLE_KINDS",
+    "SYNCED_STALE_DEFAULT",
+    "SyncedSpec",
     "TypeDefinition",
     "TypeReadOnly",
     "UnreadableType",
     "is_task_type",
     "load_types",
     "status_category",
+    "synced_problems",
     "system_property_defs",
     "topup_task_type",
     "type_revision",
@@ -231,8 +237,9 @@ _STATUS_COLORS = {
 
 _ICONIFY_RE = re.compile(r"^[a-z0-9]+(?:[-:][a-z0-9]+)+$")
 _V1_PROP_KEYS = frozenset({"id", "key", "name", "type", "isArray"})
+# `synced` (M29): the synced mark, a top-level field (`SyncedSpec`), not an option.
 _V2_PROP_KEYS = frozenset(
-    {"id", "key", "name", "type", "description", "icon", "visibility", "options"}
+    {"id", "key", "name", "type", "description", "icon", "visibility", "options", "synced"}
 )
 # `counterparts` (M28): the computed other sides `GET /api/space` serves per type; never saved.
 _API_ONLY_KEYS = frozenset({"revision", "readOnlyReason", "counterparts"})
@@ -390,6 +397,82 @@ def valid_counterpart(value: Any) -> bool:
     return key not in _COUNTERPART_RESERVED
 
 
+# M29: synced facts (plan 2026-11-09-m29, Contract). A synced property's values are filled only by
+# a script or agent through `/api/v1` (`Space.sync_facts`) and live in `.object/synced/`.
+SYNCABLE_KINDS = frozenset(
+    {"text", "url", "number", "boolean", "datetime", "datetimeSimple", "label"}
+)
+SYNCED_STALE_DEFAULT = 7
+MAX_SYNC_SOURCE = 60
+MAX_STALE_DAYS = 365
+
+_SYNCED_KIND = (
+    '"{name}" can\'t be synced: only text, URL, number, checkbox, date and label properties can.'
+)
+_SYNCED_SOURCE = 'The source of "{name}" must be 1-60 characters on one line.'
+_SYNCED_STALE = '"Stale after" of "{name}" must be a whole number of days from 1 to 365.'
+
+
+def _valid_source(v: Any) -> bool:
+    return (
+        isinstance(v, str)
+        and bool(v.strip())
+        and len(v) <= MAX_SYNC_SOURCE
+        and v.splitlines() == [v]
+    )
+
+
+def _valid_stale_days(v: Any) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= MAX_STALE_DAYS
+
+
+@dataclass(frozen=True)
+class SyncedSpec:
+    """A property's synced mark: who fills it (``source``) and after how many days it is stale."""
+
+    source: str
+    staleAfterDays: int = SYNCED_STALE_DEFAULT
+
+    @classmethod
+    def parse(cls, data: Any) -> SyncedSpec | None:
+        """The mark `data` describes, or None for anything malformed (the caller keeps it in
+        ``extra``): ``source`` 1-60 characters on one line, ``staleAfterDays`` (default 7) a
+        whole number from 1 to 365."""
+        if not isinstance(data, dict) or not _valid_source(data.get("source")):
+            return None
+        days = data.get("staleAfterDays", SYNCED_STALE_DEFAULT)
+        if not _valid_stale_days(days):
+            return None
+        return cls(source=data["source"], staleAfterDays=days)
+
+    def to_json(self) -> dict[str, Any]:
+        return {"source": self.source, "staleAfterDays": self.staleAfterDays}
+
+
+def synced_problems(entry: dict[str, Any]) -> list[str]:
+    """For one property JSON entry of a type save: [] when it has no `synced` or a valid one.
+
+    Otherwise the problems, in this order: a kind that can't be synced, a bad source, a bad
+    "Stale after". ``synced: null`` means not synced.
+    """
+    if not isinstance(entry, dict) or entry.get("synced") is None:
+        return []
+    mark = entry["synced"]
+    name = entry.get("name")
+    if not isinstance(name, str) or not name:
+        name = str(entry.get("key", ""))
+    problems: list[str] = []
+    if entry.get("type") not in SYNCABLE_KINDS:
+        problems.append(_SYNCED_KIND.format(name=name))
+    if not isinstance(mark, dict) or not _valid_source(mark.get("source")):
+        problems.append(_SYNCED_SOURCE.format(name=name))
+    if isinstance(mark, dict) and not _valid_stale_days(
+        mark.get("staleAfterDays", SYNCED_STALE_DEFAULT)
+    ):
+        problems.append(_SYNCED_STALE.format(name=name))
+    return problems
+
+
 def option_shape_problems(options: Any) -> list[str]:
     """The option keys whose value has the wrong shape (see `normalize_options`)."""
     if not isinstance(options, dict):
@@ -483,6 +566,9 @@ class PropertyDefinition:
     options: dict[str, Any] = field(default_factory=dict)
     extra: dict[str, Any] = field(default_factory=dict)
     """Unknown fields (and ``isNotSearchable``), written back as they were."""
+    synced: SyncedSpec | None = None
+    """M29: the synced mark (top-level ``synced``); None when not synced. A malformed mark read
+    from disk stays None and its raw value is kept in ``extra``."""
 
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> PropertyDefinition:
@@ -511,6 +597,10 @@ class PropertyDefinition:
         if visibility not in ("alwaysShow", "hideWhenEmpty", "hidden"):
             visibility = "alwaysShow"
         known = _V1_PROP_KEYS | _V2_PROP_KEYS
+        extra = {k: copy.deepcopy(v) for k, v in data.items() if k not in known}
+        synced = SyncedSpec.parse(data.get("synced"))
+        if synced is None and data.get("synced") is not None:
+            extra["synced"] = copy.deepcopy(data["synced"])
         return cls(
             id=pid,
             key=key,
@@ -520,7 +610,8 @@ class PropertyDefinition:
             icon=icon,
             visibility=visibility,
             options=options,
-            extra={k: copy.deepcopy(v) for k, v in data.items() if k not in known},
+            extra=extra,
+            synced=synced,
         )
 
     def to_json(self) -> dict[str, Any]:
@@ -534,6 +625,8 @@ class PropertyDefinition:
             "visibility": self.visibility,
             "options": copy.deepcopy(self.options),
         }
+        if self.synced is not None:
+            out["synced"] = self.synced.to_json()
         for k, v in self.extra.items():
             out.setdefault(k, copy.deepcopy(v))
         return out
@@ -590,6 +683,7 @@ _TYPE_KEYS = (
     "wideCoverImage",
     "cropCoverImage",
     "templates",
+    "namePatterns",  # M29
 )
 
 
@@ -630,6 +724,10 @@ class TypeDefinition:
     """Property entries that couldn't be read: (position, entry), written back verbatim."""
     readOnlyReason: str | None = None
     """API only: why the type can't be saved (its file isn't readable)."""
+    namePatterns: list[str] = field(default_factory=list)
+    """M29: the name patterns that suggest this type in a create row (`typesuggest`). Each entry
+    as read: a hand-edited file's non-string entry is kept (and ignored by `typesuggest.matches`);
+    a value that isn't a list stays in ``extra``. Written only when non-empty."""
 
     def prop(self, key: str) -> PropertyDefinition | None:
         return next((p for p in self.propertyDefinitions if p.key == key), None)
@@ -677,6 +775,10 @@ class TypeDefinition:
         view = data.get("viewDesign")
         font = data.get("font")
         position = data.get("collectionsPropertyPosition")
+        patterns = data.get("namePatterns")
+        extra = {k: v for k, v in data.items() if k not in _TYPE_KEYS and k not in _API_ONLY_KEYS}
+        if "namePatterns" in data and not isinstance(patterns, list):
+            extra["namePatterns"] = patterns
         return cls(
             id=tid,
             name=name,
@@ -695,10 +797,9 @@ class TypeDefinition:
             wideCoverImage=bool(data.get("wideCoverImage", False)),
             cropCoverImage=bool(data.get("cropCoverImage", True)),
             templates=templates,
-            extra={
-                k: v for k, v in data.items() if k not in _TYPE_KEYS and k not in _API_ONLY_KEYS
-            },
+            extra=extra,
             invalid_property_entries=invalid,
+            namePatterns=list(patterns) if isinstance(patterns, list) else [],
         )
 
     @staticmethod
@@ -761,6 +862,8 @@ class TypeDefinition:
             "cropCoverImage": self.cropCoverImage,
             "templates": copy.deepcopy(self.templates),
         }
+        if self.namePatterns:
+            out["namePatterns"] = copy.deepcopy(self.namePatterns)
         for k, v in self.extra.items():
             out.setdefault(k, copy.deepcopy(v))
         return out

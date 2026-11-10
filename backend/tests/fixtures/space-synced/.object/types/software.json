@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 2,
+  "id": "software",
+  "name": "Software",
+  "pluralName": "Software",
+  "folder": "Software",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-package"
+  },
+  "color": "violet",
+  "description": "An operating system, product or tool, and its version.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The name of the object, shown wherever it appears",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "The collections this object belongs to",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "A short summary of what the object is about",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "When the object was made",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "When the object last changed",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "Tags attached to the object",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "An emoji or icon shown beside the title",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Other names the object goes by",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [],
+    "defaultTemplateId": null
+  },
+  "namePatterns": [
+    "{version}"
+  ]
+}

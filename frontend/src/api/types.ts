@@ -300,8 +300,31 @@ export interface PropertyDef {
   visibility: Visibility
   isNotSearchable?: boolean
   options: PropertyOptions
+  /** M29: the synced mark: the property is filled only by a script or agent through the API
+   *  (`POST /api/v1/synced/{typeId}`) and is read-only in the app. Absent or `null`: not synced. */
+  synced?: SyncedSpec | null
   [extra: string]: unknown
 }
+
+/** M29: a property's synced mark: who fills it and after how many days its values are stale. */
+export interface SyncedSpec {
+  source: string
+  staleAfterDays: number
+}
+
+/** M29: `staleAfterDays` when a synced mark doesn't give one. */
+export const SYNCED_STALE_DEFAULT = 7
+
+/** M29: the kinds a property can be synced as: text, URL, number, checkbox, date (both) and label. */
+export const SYNCABLE_KINDS: ReadonlySet<PropertyType> = new Set<PropertyType>([
+  'text',
+  'url',
+  'number',
+  'boolean',
+  'datetime',
+  'datetimeSimple',
+  'label',
+])
 
 export type ViewDesign = 'indexCard' | 'profile' | 'encyclopedia'
 export type TypeFont = 'sans-serif' | 'serif' | 'monospace'
@@ -346,6 +369,9 @@ export interface TypeDef {
   revision: string
   /** M28, API only (never saved): the virtual definitions of this type's computed other sides. */
   counterparts?: PropertyDef[]
+  /** M29: the name patterns that suggest this type in a create row (`create/typeSuggest.ts`).
+   *  Absent when empty. A hand-edited file can hold a non-string entry: it is ignored. */
+  namePatterns?: string[]
   [extra: string]: unknown
 }
 
@@ -571,6 +597,15 @@ export interface ObjectDetail {
   computed?: Record<string, ComputedValue>
   /** M28: the computed other sides of relations pointing here, one per source type and key. */
   counterparts?: CounterpartRow[]
+  /** M29: the object's synced values (decoded) and when they were refreshed; present only when
+   *  its type has synced properties. `frontmatter` stays the file's own. */
+  synced?: ObjectSynced
+}
+
+/** M29: `ObjectDetail.synced`. `refreshedAt` null: not refreshed yet. */
+export interface ObjectSynced {
+  refreshedAt: string | null
+  values: Record<string, unknown>
 }
 
 /** PUT /api/object/body → 200 */
@@ -713,6 +748,8 @@ export type ChangeKind =
   | 'workQueue'
   /** Fix pass H: the device settings changed (`path` `settings.json`, `version` their revision). */
   | 'settings'
+  /** M29: a type's synced facts changed (`path` the type id, `version` the store revision). */
+  | 'synced'
 
 /** SSE event `change` on GET /api/events */
 export interface ChangeEvent {
@@ -748,6 +785,9 @@ export interface Row {
   preview: string
   /** Words in the body (the table's "Content" column); absent from an older server. */
   words?: number
+  /** M29: when the row's synced values were refreshed (`null`: not yet); present only when its
+   *  type has synced properties (whose values are in `values`). */
+  syncedAt?: string | null
 }
 
 export type Layout =
@@ -1910,8 +1950,9 @@ export interface AutomationCatchUpItem {
 }
 
 export type AutomationCatchUpChoice = 'all' | 'latest' | 'skip'
-/** M11: a local API token (Settings > Integrations). The secret is shown only when made. */
-export type ApiTokenScope = 'read' | 'read-write'
+/** M11: a local API token (Settings > Integrations). The secret is shown only when made.
+ *  M29: a `sync` token reads like `read` and writes only synced facts. */
+export type ApiTokenScope = 'read' | 'read-write' | 'sync'
 
 export interface ApiToken {
   id: string
