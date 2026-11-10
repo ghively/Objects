@@ -40,7 +40,7 @@ import os
 import shutil
 import threading
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -162,24 +162,68 @@ class FullExportResult:
 # -- reading a space without writing to it -----------------------------------------------
 
 
+def _scan_objects(root: Path) -> Iterator[tuple[str, RawObject]]:
+    """A space's objects, one read at a time (an unreadable file and the templates left out),
+    from the files only: the frontmatter cache is bypassed."""
+    for rel in iter_object_paths(root):
+        try:
+            raw = read_raw(root, rel, cache=False)
+        except OSError:
+            continue
+        if not raw.readOnly and _str_or_none(raw.fm.get("template")):
+            continue  # a template is no object (our call: left out)
+        yield rel, raw
+
+
+def _media_paths(root: Path, objects: Iterable[tuple[str, RawObject]]) -> list[str]:
+    """The space paths of the files "Include media" copies: every attachment, every file one of
+    ``objects`` references and every whiteboard sidecar of one of them."""
+    found: dict[str, None] = {a["path"]: None for a in list_attachments(root)}
+    names: set[str] = set()
+    for rel, raw in objects:
+        names.add(rel)
+        for item in referenced_media(root, rel, raw.fm, raw.of.body):
+            found.setdefault(item, None)
+    for folder, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        base = Path(folder).relative_to(root).as_posix()
+        for name in files:
+            rel = name if base == "." else f"{base}/{name}"
+            owner = sidecar_owner(rel)
+            if owner is not None and owner in names and not os.path.islink(os.path.join(folder, name)):
+                found.setdefault(rel, None)
+    return sorted(found)
+
+
+def _count_files(root: Path, media: bool) -> int:
+    """How many files a space's export writes (its objects, and its media with ``media``),
+    counted reading one object at a time, so no space is held in memory to count it."""
+    seen = 0
+
+    def each() -> Iterator[tuple[str, RawObject]]:
+        nonlocal seen
+        for item in _scan_objects(root):
+            seen += 1
+            yield item
+
+    if media:
+        return len(_media_paths(root, each())) + seen
+    for _item in each():
+        pass
+    return seen
+
+
 class _SpaceView:
     """What the Markdown export reads of a space (``root``, ``types``, ``synced``, ``resolve``),
     read from its files only: no `Space` is opened (that writes the frontmatter cache and purges
-    the trash), no type file is migrated and the frontmatter cache is bypassed."""
+    the trash), no type file is migrated and the frontmatter cache is bypassed. It holds every
+    object's bytes, so a run builds one space's view at a time and releases it before the next."""
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root).resolve()
         self.types = _read_types(self.root)
         self.synced = SyncedStore(JsonStore(self.root, SYNCED_FOLDER, {}))
-        self.objects: dict[str, RawObject] = {}
-        for rel in iter_object_paths(self.root):
-            try:
-                raw = read_raw(self.root, rel, cache=False)
-            except OSError:
-                continue
-            if not raw.readOnly and _str_or_none(raw.fm.get("template")):
-                continue  # a template is no object (our call: left out)
-            self.objects[rel] = raw
+        self.objects: dict[str, RawObject] = dict(_scan_objects(self.root))
         summaries = [
             SimpleNamespace(
                 path=rel,
@@ -196,21 +240,8 @@ class _SpaceView:
         return self._resolver.resolve(link, from_path)
 
     def media(self) -> list[str]:
-        """The space paths of the files "Include media" copies: every attachment, every file an
-        object references and every whiteboard sidecar."""
-        found: dict[str, None] = {a["path"]: None for a in list_attachments(self.root)}
-        for rel, raw in self.objects.items():
-            for item in referenced_media(self.root, rel, raw.fm, raw.of.body):
-                found.setdefault(item, None)
-        for folder, dirs, files in os.walk(self.root):
-            dirs[:] = [d for d in dirs if not d.startswith(".")]
-            base = Path(folder).relative_to(self.root).as_posix()
-            for name in files:
-                rel = name if base == "." else f"{base}/{name}"
-                owner = sidecar_owner(rel)
-                if owner is not None and owner in self.objects and not os.path.islink(os.path.join(folder, name)):
-                    found.setdefault(rel, None)
-        return sorted(found)
+        """The space paths of the files "Include media" copies (`_media_paths`)."""
+        return _media_paths(self.root, self.objects.items())
 
 
 def _read_types(root: Path) -> list[TypeDefinition]:
@@ -359,9 +390,10 @@ def _run(spaces, destination, options, now, label, all_spaces, progress) -> Full
     roots = [Path(root) for _name, root in spaces]
     dest = check_destination(destination, [*roots, *map(Path, all_spaces)])
     opts = ExportOptions(media=options.media, wikilinks=options.wikilinks, title_h1=options.title_heading)
-    views = [(name, _SpaceView(root)) for name, root in spaces]
-    plans = [(name, view, view.media() if options.media else []) for name, view in views]
-    total = sum(len(view.objects) + len(media) for _n, view, media in plans)
+    # Count first, one object at a time; then read, export and release one space at a time, so
+    # All Spaces never holds every space's notes in memory at once.
+    counts = [_count_files(Path(root), options.media) for _name, root in spaces]
+    total = sum(counts)
     done = 0
     if progress:
         progress(0, total)
@@ -373,7 +405,14 @@ def _run(spaces, destination, options, now, label, all_spaces, progress) -> Full
     result = FullExportResult(folder=str(dest / final))
     try:
         taken: set[str] = set()
-        for name, view, media in plans:
+        for (name, root), counted in zip(spaces, counts, strict=True):
+            view = _SpaceView(Path(root))
+            media = view.media() if options.media else []
+            files = len(view.objects) + len(media)
+            if files != counted:  # the space changed since it was counted: the total follows
+                total += files - counted
+                if progress:
+                    progress(done, total)
             folder = _unique(partial, safe_filename(name), taken)
             taken.add(folder.casefold())
             out = partial / folder
@@ -401,6 +440,7 @@ def _run(spaces, destination, options, now, label, all_spaces, progress) -> Full
                 if progress:
                     progress(done, total)
             result.spaces.append(entry)
+            del view, media  # released before the next space is read
         os.rename(partial, dest / final)
     except BaseException:
         shutil.rmtree(partial, ignore_errors=True)

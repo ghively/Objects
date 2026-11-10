@@ -305,6 +305,52 @@ def test_progress_counts_every_file(links_space: Path, tmp_path: Path):
     assert seen[0] == (0, 4) and seen[-1] == (4, 4)
 
 
+def test_all_spaces_reads_one_space_at_a_time(links_space: Path, tmp_path: Path, monkeypatch):
+    """With All Spaces only one space's objects are held in memory at a time (finding 9): the
+    total is counted first, then each space is read, exported and released before the next."""
+    import gc
+    import weakref
+
+    other = _copy("space-sample", tmp_path, "Sample")
+    twin = _copy("space-whiteboard", tmp_path, "Twin")
+    dest = tmp_path / "out"
+    dest.mkdir()
+    views: list[weakref.ref] = []
+    real_init = fullexport._SpaceView.__init__
+
+    def init(self, root):
+        real_init(self, root)
+        views.append(weakref.ref(self))
+
+    alive: list[int] = []
+    real_markdown = fullexport._object_markdown
+
+    def markdown(view, rel, raw, opts):
+        gc.collect()
+        alive.append(sum(1 for v in views if v() is not None))
+        return real_markdown(view, rel, raw, opts)
+
+    monkeypatch.setattr(fullexport._SpaceView, "__init__", init)
+    monkeypatch.setattr(fullexport, "_object_markdown", markdown)
+    seen: list[tuple[int, int]] = []
+    spaces = [("Linky", links_space), ("Sample", other), ("Linky", twin)]
+    res = run_full_export(spaces, dest, FullExportOptions(media=True), NOW, progress=lambda d, t: seen.append((d, t)))
+    assert alive and max(alive) == 1
+    total = res.objects + res.media
+    assert seen[0] == (0, total) and seen[-1] == (total, total)
+    assert {t for _d, t in seen} == {total}  # the total is right from the start
+    assert [d for d, _t in seen] == list(range(total + 1))
+
+
+def test_the_total_follows_a_space_that_changed_since_it_was_counted(links_space: Path, tmp_path: Path, monkeypatch):
+    dest = tmp_path / "out"
+    dest.mkdir()
+    monkeypatch.setattr(fullexport, "_count_files", lambda root, media: 1)  # counted before two notes came
+    seen: list[tuple[int, int]] = []
+    run_full_export([("Linky", links_space)], dest, FullExportOptions(media=True), NOW, progress=lambda d, t: seen.append((d, t)))
+    assert seen[0] == (0, 1) and seen[-1] == (4, 4)
+
+
 def test_folder_name():
     assert export_folder_name("Work", datetime(2026, 1, 2, 3, 4)) == "Object export Work 2026-01-02 0304"
     assert export_folder_name("a/b: c", NOW) == "Object export a"
