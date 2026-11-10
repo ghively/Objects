@@ -32,6 +32,7 @@ Design: `specs/2026-11-06-import-migration-design.md` sections 1, 2, 4, 5, 7, 10
 7. A re-run that updates a Files object keeps the old original in `Attachments/Originals` and writes the new one beside it as `name (2).ext`.
 8. **Try on a copy** copies the open space folder next to it (without `.object-cache` and `.git`); its name is asked in the wizard, its location is the open space's folder.
 9. Images and the wizard's scan step belong to M26; the Files kind calls `objectapp.readers.read_file` only (tolerates its absence).
+10. **"A first import only adds files"** (the acceptance script, fixed in the M30 fix pass, 2026-11-10) allows one kind of changed file: the type file of an existing type a planned type maps onto (`existingTypeId`, by default the type of the same name). M15's plan ("Types"; acceptance item 9) has such a type gain the properties it lacks through `save_type`, its existing properties never changed or removed; with `space-sample`, the Obsidian vault's People folder maps onto Person, which gains "Born". The check passes only when each changed file is such a type file, it kept every property's key, name and kind, and nothing else in it changed. Before the fix the check failed on `.object/types/person.json` (already at 2f50af02 and 96e2ae4d, before M28); the product was right and the check was wrong.
 
 ## For M27 (agent workflow)
 
