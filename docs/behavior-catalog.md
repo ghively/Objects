@@ -34,6 +34,7 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 | PDF, Weblink, image and file objects | specified (section 10) |
 | Version control and backup (git) | specified (section 12) |
 | Graph, Trash, Explore panel, shortcuts | specified (section 7); export dialog (PDF, Markdown, Word, LaTeX) in section 10; the import dialog is described in section 10c |
+| Synced facts, the suggested type and name patterns | beyond the catalog, Object's own (section 10f, M29) |
 
 ## 1. Settings
 
@@ -93,6 +94,8 @@ Object has no accounts.
 - Calendar Integrations; Task actions.
 - API: scoped API tokens per space (name, masked token, space, last used, Delete) and "New API token";
   Developer settings: "Show developer information" (IDs and developer details in the UI).
+  A token's scope is "Read only", "Read and write" or "Synced facts only" (Object's own, M29: reads, and fills synced
+  properties; section 10f).
 - Web Extension: Chrome, Edge, Safari, Firefox capture extension; Web Highlights.
 - Email: send to a capture address from a verified account; subject becomes the heading, `#tags` in the
   subject become tags; per-account "Default space"; Add email account; Remove.
@@ -760,6 +763,49 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   sorted paths whose backlinks the change may have altered (absent when the link index can't say). Views keyed on
   backlinks (the Tasks dashboard's Context grouping) refresh only those rows; without the field they reload as
   before. A window's own saves carry the same list in the save response (fix pass 2026-11-09).
+
+## 10f. Synced facts and the suggested type (beyond the catalog; Object's own, M29)
+
+- **Synced facts**: a text, URL, number, checkbox, date or label property can be marked synced (Property settings,
+  "Synced": "Synced from a script or agent", Source (placeholder "Inventory script"), "Stale after" N days, default
+  7; "Values typed into the file for this property stop showing."). Its values are filled only by a script or
+  agent: `POST /api/v1/synced/{type}` with a `read-write` token or a "Synced facts only" (`sync`) token, or the
+  `objectapp-mcp` tool `sync_facts` (registered for read-write and sync tokens; a sync token gets it and the read
+  tools only). Items match an object of that type by title, alias or a key property (exact after trimming,
+  collapsing spaces and case folding; never a template or an object excluded from AI); each item answers updated,
+  notFound, ambiguous (two or more matches; nothing written) or invalid. The values live in
+  `.object/synced/<typeId>.json`, never in the `.md` (an object with no `id` gets its `id` line on its first
+  sync, once); a value typed into the file under a synced key is ignored and never removed. A sync token reads
+  like a read token and any other write answers "This token can only write synced facts."; `GET /api/v1/whoami`
+  says `scope: "sync"`.
+- **Shown read-only**: the property row (page and peek) shows the value with "<source> · Refreshed <time ago>"
+  (or "<source> · Not refreshed yet") under it, muted with "Stale" once older than its stale-after days. No
+  editor opens; a table cell is read-only; a Kanban drag between, say, Patch state columns is refused; the
+  refusal reads `"<name>" is filled by <source> and can't be edited.` and the same refusal answers
+  `PUT /api/object/properties`, `/api/v1/object/properties`, automations' Set and Clear property, a create with
+  values and the work routes. Filters, sorts, groups, formulas and exports use the synced values; v1 rows, peeks
+  and object reads carry `syncedAt`.
+- **The IT ops starter's Host** has five synced facts, always shown, from "Inventory script", stale after 7 days:
+  Last boot, Disk free (GB), Patch state (Current, Pending, Failed, Unknown), Reboot pending, Last seen. Host,
+  Network and Software (the starter's and the gallery's) carry name patterns. A type written before M29 is not
+  changed.
+- **Suggested type**: every create row offers a suggested type first, marked "Suggested": the context's type (a
+  relation's allowed types, else the open collection's or query's types), then a type whose name patterns match
+  the name, else the type used last in this space (per viewer and space, localStorage `object.lastType:<root>`);
+  no suggestion keeps the old default (Page). `[[` / `@` with a query lists, after the matching objects, "New
+  '<q>'" (the suggested type's chip and "Suggested"), then "Other types" (every other writable type); a relation
+  picker lists "Create '<q>'" once per allowed type (all writable types when any type is allowed), the suggested
+  one first, when no candidate matches exactly (the Tag picker's own "Create 'x'" stays); "+ New object" without
+  a type lists the suggested type first; the palette's single create row ("Create new {type} with title "{q}"")
+  uses it unless a type filter is set; Turn into object lists it first and `I` uses it. Picking a type applies
+  its default template. Nothing is sent anywhere: no AI, no server round trip per keystroke.
+- **Name patterns** (Object type settings, "Name patterns", one per line): `*` any characters but spaces, `?` one
+  character, `#` a digit, `@` a letter, `\` makes the next character literal, or exactly one of `{ip}`, `{cidr}`,
+  `{fqdn}` (three or more labels), `{version}` (a name, a space, a version number); the whole name must match,
+  case-insensitive. At most 20 patterns of at most 100 characters; a bad one is flagged (`"{foo}" isn't a name
+  pattern.`) and refused on save, and ignored when suggesting. Globs are matched by a linear state-set matcher,
+  never a backtracking regex. The starter: Host `{ip}`, `{fqdn}`, `SRV-*`, `@@##`, `@@@##`, `@@@@##`, `@*-##`;
+  Network `{cidr}`; Software `{version}`.
 
 ## 11. Unlinked mentions
 
