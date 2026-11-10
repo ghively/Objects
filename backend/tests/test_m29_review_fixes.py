@@ -160,6 +160,68 @@ def test_a_synced_property_cant_start_an_automation(root: Path) -> None:
     check_rule(space, ordinary)  # an ordinary property of the type still can
 
 
+# -- finding 6: change type and merge never write a synced key -------------------------------
+
+
+def _add_page_disk_free(root: Path) -> None:
+    """Give Page an ordinary number property "Disk free" (key ``freeSpace``) and APP01 the page
+    a value for it, so a change to Host would map it onto Host's synced Disk free."""
+    page_json = root / ".object" / "types" / "page.json"
+    data = json.loads(page_json.read_text("utf-8"))
+    data["propertyDefinitions"].append(
+        {
+            "id": "freeSpace",
+            "key": "freeSpace",
+            "name": "Disk free",
+            "type": "number",
+            "description": "",
+            "icon": {"type": "iconify", "val": "ph-hash"},
+            "visibility": "alwaysShow",
+            "options": {},
+        }
+    )
+    page_json.write_text(json.dumps(data, indent=2), "utf-8")
+    _hand_type(root, "Pages/APP01.md", "freeSpace: 40")
+
+
+def test_change_type_never_maps_into_or_from_a_synced_key(root: Path) -> None:
+    from objectapp.changetype import mapping_sources, mapping_targets
+    from objectapp.propvalues import InvalidValue
+
+    _add_page_disk_free(root)
+    _hand_type(root, APP01, "diskFree: 99")
+    space = _space(root)
+    host = space.type_by_id("host")
+    synced_keys = {"lastBoot", "diskFree", "patchState", "rebootPending", "lastSeen"}
+    assert not synced_keys & {q.key for q in mapping_targets(host)}
+    assert "fqdn" in {q.key for q in mapping_targets(host)}
+    _of, fm, _v = space.read(APP01)
+    assert "diskFree" not in {p.key for p in mapping_sources(host, fm)}
+
+    rows = space.suggest_change_type("Pages/APP01.md", "host")
+    assert [(r.fromKey, r.toKey) for r in rows] == [("freeSpace", None)]
+    before = (root / "Pages/APP01.md").read_bytes()
+    _of, _fm, version = space.read("Pages/APP01.md")
+    with pytest.raises(InvalidValue):
+        space.change_type("Pages/APP01.md", "host", {"freeSpace": "diskFree"}, version)
+    assert (root / "Pages/APP01.md").read_bytes() == before
+
+
+def test_merge_never_copies_a_synced_key(root: Path) -> None:
+    from objectapp.merge import merge_objects
+
+    _hand_type(root, APP01, "diskFree: 99")
+    _hand_type(root, APP01, "patchState: Failed")
+    space = _space(root)
+    _of, _fm, sv = space.read(APP01)
+    _of, _fm, tv = space.read("Hosts/WEB01.md")
+    result = merge_objects(space, APP01, "Hosts/WEB01.md", sv, tv, now=NOW)
+    text = (root / "Hosts/WEB01.md").read_text("utf-8")
+    assert "diskFree" not in text and "patchState" not in text
+    assert "ipAddress: 10.20.0.11" in text  # an ordinary blank property is still filled
+    assert "diskFree" not in result.dropped and "patchState" not in result.dropped
+
+
 # -- finding 3: a hand-typed value under a synced key never shows ---------------------------
 
 

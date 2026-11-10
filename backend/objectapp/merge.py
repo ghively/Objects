@@ -13,7 +13,8 @@
    values (relations, multi labels, tags, aliases, collections) are unioned, target first;
    values of properties the target's type lacks are dropped and listed in ``dropped`` (our
    choice), and so are the source's steps (M22: steps are never merged, the target keeps its
-   own); the source body is appended after the target body with one blank line;
+   own); a synced property (M29) is never copied, a sync alone fills it; the source body is
+   appended after the target body with one blank line;
 3. relinks every link to the source (bodies, frontmatter values, board entity blocks and text
    links, and for a tag every ``tags:`` list) to the target with M2/M6's rename relinking;
 4. adds ``[[Target]]`` to the synced property of each object newly related to the target
@@ -36,6 +37,7 @@ from .objfile import ObjectFile
 from .propvalues import GATED_KINDS, InvalidValue, _is_array, decode_value, label_lookup
 from .relink import rewrite_tag_lists
 from .space import Conflict, Skip
+from .synced import is_synced
 
 if TYPE_CHECKING:
     from .space import Space
@@ -124,8 +126,8 @@ def _merged_updates(
             if key not in tfm:
                 dropped.append(key)
             continue
-        if pdef.type in _NOT_MERGED_KINDS:
-            continue
+        if pdef.type in _NOT_MERGED_KINDS or is_synced(pdef):
+            continue  # M29: a synced key is filled only by a sync (a value in the file is ignored)
         if pdef.type in GATED_KINDS:
             dropped.append(key)  # M22: the target keeps its own steps
             continue
