@@ -1,10 +1,11 @@
 /**
  * M30 "Entities" step (a batch kept as Sources; design 5 and 5a): the things the pages talk about,
  * resolved into one entity per thing. Each is accepted, renamed, merged, split or turned down; every
- * change saves the whole review and shows the view the server answers. Write is enabled only when
+ * change saves the whole review and shows the view the server answers (saves run one at a time, each built on
+ * the review the server last returned, so quick clicks never drop a decision). Write is enabled only when
  * nothing is undecided; it runs in the filing worker, so its state is polled until it is done or failed.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import type { EntitiesReview, EntitiesView, EntityDecision, EntityLeftOut, EntityValue, FilingStatus, ImportEntity } from '@/api/types'
 import { Icon } from '@/components/Icon'
@@ -14,6 +15,7 @@ import { agentTiming } from './TrialStep'
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 const show = (v: unknown): string => (Array.isArray(v) ? v.map(show).join(', ') : v != null && typeof v === 'object' ? JSON.stringify(v) : String(v))
+const EMPTY: EntitiesReview = { decisions: {}, merges: [], splits: [] }
 const titles = (sources: { title: string }[]) => `(${sources.map((s) => s.title).join(', ')})`
 
 /** Entities (and left-out names) in the order shown, grouped by their type's name. */
@@ -33,10 +35,15 @@ export function EntitiesStep({ batch, onDone }: { batch: string; onDone: (status
   const [polling, setPolling] = useState(false)
   const [failed, setFailed] = useState(false)
   const [finished, setFinished] = useState<FilingStatus | null>(null)
+  /** The latest view the server returned (read or saved): each queued save builds on it, not on the one last rendered. */
+  const latest = useRef<EntitiesView | null>(null)
+  /** The saves waiting their turn: one runs at a time. */
+  const saving = useRef<Promise<void>>(Promise.resolve())
 
   const load = useCallback(async () => {
     try {
       const v = await api.importEntities(batch)
+      latest.current = v
       setView(v)
       setError(null)
       // Opened (or read again) while Write runs: follow it until it ends.
@@ -99,7 +106,6 @@ export function EntitiesStep({ batch, onDone }: { batch: string; onDone: (status
     }
   }, [polling, batch, load])
 
-  const review: EntitiesReview = view?.review ?? { decisions: {}, merges: [], splits: [] }
   const entities = view?.entities ?? []
   const leftOut = view?.leftOut ?? []
   // The server resolves each entity's decision (a merge or split may move or drop one), so its answer is shown as it is.
@@ -107,25 +113,30 @@ export function EntitiesStep({ batch, onDone }: { batch: string; onDone: (status
   const done = !!finished || view?.state === 'written'
   const locked = writing || done
 
-  const save = async (next: EntitiesReview) => {
-    setError(null)
-    try {
-      const r = await api.saveEntitiesReview(batch, next)
-      setView(r.view)
-    } catch (e) {
-      setError(msg(e))
-    }
+  /** Queue a change: once the saves before it have answered, it is applied to the latest review and saved. */
+  const save = (change: (review: EntitiesReview, current: EntitiesView | null) => EntitiesReview) => {
+    saving.current = saving.current.then(async () => {
+      setError(null)
+      try {
+        const r = await api.saveEntitiesReview(batch, change(latest.current?.review ?? EMPTY, latest.current))
+        latest.current = r.view
+        setView(r.view)
+      } catch (e) {
+        setError(msg(e))
+      }
+    })
   }
-  const decide = (id: string, d: EntityDecision) => void save({ ...review, decisions: { ...review.decisions, [id]: d } })
+  const decide = (id: string, d: EntityDecision) => save((r) => ({ ...r, decisions: { ...r.decisions, [id]: d } }))
   const merge = (ids: string[]) => {
     setSelected((s) => s.filter((id) => !ids.includes(id)))
-    void save({ ...review, merges: [...review.merges, ids] })
+    save((r) => ({ ...r, merges: [...r.merges, ids] }))
   }
-  const split = (id: string, names: string[]) => void save({ ...review, splits: [...review.splits, { id, names }] })
-  const acceptRest = () => {
-    const rest = entities.filter((e) => !decisionOf(e))
-    void save({ ...review, decisions: { ...review.decisions, ...Object.fromEntries(rest.map((e) => [e.id, { status: 'accepted' as const }])) } })
-  }
+  const split = (id: string, names: string[]) => save((r) => ({ ...r, splits: [...r.splits, { id, names }] }))
+  const acceptRest = () =>
+    save((r, current) => {
+      const rest = (current?.entities ?? []).filter((e) => !decisionOf(e))
+      return { ...r, decisions: { ...r.decisions, ...Object.fromEntries(rest.map((e) => [e.id, { status: 'accepted' as const }])) } }
+    })
   const toggle = (id: string, on: boolean) => setSelected((s) => (on ? [...s, id] : s.filter((x) => x !== id)))
 
   const write = async () => {

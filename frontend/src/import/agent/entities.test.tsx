@@ -237,6 +237,30 @@ describe('EntitiesStep', () => {
     })
   })
 
+  test('two quick decisions both end up in the saved review', async () => {
+    const base = view()
+    m.importEntities.mockResolvedValue(base)
+    const reply = answer(base)
+    const pending: (() => void)[] = []
+    m.saveEntitiesReview.mockImplementation(
+      (b: string, r: EntitiesReview) => new Promise((ok) => pending.push(() => void reply(b, r).then(ok))),
+    )
+    const user = userEvent.setup()
+    render(<EntitiesStep batch="b1" onDone={vi.fn()} />)
+    const host = await screen.findByRole('group', { name: 'APP01' })
+    const low = screen.getByRole('group', { name: 'SQLServer 2019' })
+    // Two clicks before the first answer: the second waits for it, then builds on the review it returned.
+    await user.click(within(host).getByRole('button', { name: T.accept }))
+    await user.click(within(low).getByRole('button', { name: T.reject }))
+    expect(m.saveEntitiesReview).toHaveBeenCalledTimes(1)
+    pending.shift()!()
+    await waitFor(() => expect(m.saveEntitiesReview).toHaveBeenCalledTimes(2))
+    expect(lastReview()?.decisions).toEqual({ 'host:app01': { status: 'accepted' }, 'software:sqlserver 2019': { status: 'rejected' } })
+    pending.shift()!()
+    expect(await within(low).findByText(T.entityStatus.rejected)).toBeInTheDocument()
+    expect(within(host).getByText(T.entityStatus.accepted)).toBeInTheDocument()
+  })
+
   test('write waits for every decision', async () => {
     const base = view({
       entities: [{ ...HOST, decision: { status: 'accepted' } }, { ...SQL, decision: { status: 'renamed', name: 'SQL Server 2019 Std' } }, SQLX],
