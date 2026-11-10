@@ -3038,9 +3038,8 @@ export interface FilingStatus {
   state: FilingState
   trial: { items: FilingTrialItem[]; rightShare: number | null }
   normalise: FilingMergeSuggestion[]
-  /** M30: the batch kept its pages as Sources (its pass ends in `entities`). The server always sends it;
-   *  optional here so M27's status fixtures (no field: not kept as Sources) still type-check. */
-  keepAsSources?: boolean
+  /** M30: the batch kept its pages as Sources (its pass ends in `entities`). */
+  keepAsSources: boolean
 }
 
 // ---- M30 entity extraction and distillation (plan 2026-11-09-m30-entity-extraction.md) ----

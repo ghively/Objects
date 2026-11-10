@@ -1,4 +1,5 @@
 // M27 UI: Proposed schema, Trial, Normalise and the inbox finish, against the mock API.
+// M30: the Entities step between Trial and Normalise, the trial's entity lines and the proposal's offer.
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -8,6 +9,23 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
   announceResync: vi.fn(),
 }))
+
+// M30: the Entities step itself is tested in entities.test.tsx; here a stand-in with its heading and a
+// Continue that hands on the filing status, as the step's Continue does after Write.
+vi.mock('./EntitiesStep', async () => {
+  const { api } = await import('@/api/client')
+  const { AGENT_TEXT } = await import('./text')
+  return {
+    EntitiesStep: ({ batch, onDone }: { batch: string; onDone: (status: FilingStatus) => void }) => (
+      <section>
+        <h3>{AGENT_TEXT.entitiesHeading}</h3>
+        <button type="button" onClick={() => void api.filingStatus(batch).then(onDone)}>
+          {AGENT_TEXT.next}
+        </button>
+      </section>
+    ),
+  }
+})
 
 import { api } from '@/api/client'
 import type { FilingStatus, SchemaProposal } from '@/api/types'
@@ -64,6 +82,7 @@ function trialStatus(over: Partial<FilingStatus> = {}): FilingStatus {
       rightShare: null,
     },
     normalise: [],
+    keepAsSources: false,
     ...over,
   }
 }
@@ -317,5 +336,142 @@ describe('AgentFlow finish', () => {
     await screen.findByRole('heading', { name: T.normaliseHeading })
     await user.click(screen.getByRole('button', { name: T.next }))
     expect(await screen.findByText(T.inboxEmpty)).toBeInTheDocument()
+  })
+})
+
+describe('M30 the Entities step in the agent flow', () => {
+  const merge = { kind: 'tag' as const, values: ['Prod', 'PRD'], suggested: 'Prod' }
+
+  test('trial status entities goes to the Entities step', async () => {
+    m.importProposal.mockResolvedValue({ proposal: null, review: null })
+    m.filingStatus.mockResolvedValue(trialStatus({ keepAsSources: true }))
+    const user = userEvent.setup()
+    render(<AgentFlow batch="b1" onClose={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: T.skip }))
+    await screen.findByRole('group', { name: 'Alpha' })
+    m.filingStatus.mockResolvedValue(trialStatus({ state: 'entities', keepAsSources: true }))
+    await user.click(screen.getByRole('button', { name: T.continueRest }))
+    expect(await screen.findByRole('heading', { name: T.entitiesHeading })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: T.trialHeading })).toBeNull()
+
+    m.filingStatus.mockResolvedValue(trialStatus({ state: 'done', keepAsSources: true, normalise: [merge] }))
+    await user.click(screen.getByRole('button', { name: T.next }))
+    await screen.findByRole('heading', { name: T.normaliseHeading })
+    expect(screen.getByRole('checkbox', { name: T.mergeLabel(['Prod', 'PRD']) })).toBeInTheDocument()
+  })
+
+  test('done without Sources skips the step', async () => {
+    m.importProposal.mockResolvedValue({ proposal: null, review: null })
+    m.filingStatus.mockResolvedValue(trialStatus())
+    const user = userEvent.setup()
+    render(<AgentFlow batch="b1" onClose={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: T.skip }))
+    await screen.findByRole('group', { name: 'Alpha' })
+    m.filingStatus.mockResolvedValue(trialStatus({ state: 'done', keepAsSources: false, normalise: [merge] }))
+    await user.click(screen.getByRole('button', { name: T.continueRest }))
+    await screen.findByRole('heading', { name: T.normaliseHeading })
+    expect(screen.getByRole('checkbox', { name: T.mergeLabel(['Prod', 'PRD']) })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: T.entitiesHeading })).toBeNull()
+  })
+
+  test('a reopened dialog in entities state resumes there', async () => {
+    m.filingStatus.mockResolvedValue(trialStatus({ state: 'entities', keepAsSources: true }))
+    const onDone = vi.fn()
+    const step = render(<TrialStep batch="b1" onDone={onDone} />)
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
+    expect(onDone.mock.calls[0][0].state).toBe('entities')
+    step.unmount()
+
+    m.importProposal.mockResolvedValue({ proposal: null, review: null })
+    const user = userEvent.setup()
+    render(<AgentFlow batch="b1" onClose={vi.fn()} />)
+    await user.click(await screen.findByRole('button', { name: T.skip }))
+    expect(await screen.findByRole('heading', { name: T.entitiesHeading })).toBeInTheDocument()
+  })
+
+  test('trial items show main entity and mentions', async () => {
+    const [alphaItem, betaItem] = trialStatus().trial.items
+    m.filingStatus.mockResolvedValue(
+      trialStatus({
+        keepAsSources: true,
+        trial: {
+          items: [
+            {
+              ...alphaItem,
+              mainEntity: { type: 'Host', name: 'APP01' },
+              entities: [
+                { type: 'Software', name: 'SQL Server 2019', ok: true },
+                { type: 'Location', name: 'HQ', ok: true },
+                { type: 'Host', name: 'Rack 4', ok: false },
+              ],
+            },
+            { ...betaItem, mainEntity: null, entities: [] },
+          ],
+          rightShare: null,
+        },
+      }),
+    )
+    render(<TrialStep batch="b1" onDone={vi.fn()} />)
+    const alpha = await screen.findByRole('group', { name: 'Alpha' })
+    expect(within(alpha).getByText(T.mainEntity('Host', 'APP01'))).toBeInTheDocument()
+    expect(within(alpha).getByText(T.mentions(['SQL Server 2019', 'HQ']))).toBeInTheDocument()
+    const beta = screen.getByRole('group', { name: 'Beta' })
+    expect(within(beta).queryByText(/^About:/)).toBeNull()
+    expect(within(beta).queryByText(/^Mentions:/)).toBeNull()
+  })
+
+  test('polling stops in entities and writing', async () => {
+    const onDone = vi.fn()
+    m.filingStatus.mockResolvedValue(trialStatus({ state: 'running', keepAsSources: true, trial: { items: [], rightShare: null } }))
+    const step = render(<TrialStep batch="b1" onDone={onDone} />)
+    await waitFor(() => expect(m.filingStatus.mock.calls.length).toBeGreaterThan(2))
+    m.filingStatus.mockResolvedValue(trialStatus({ state: 'entities', keepAsSources: true }))
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
+    const settled = m.filingStatus.mock.calls.length
+    await new Promise((r) => setTimeout(r, agentTiming.pollMs * 8))
+    expect(m.filingStatus).toHaveBeenCalledTimes(settled)
+    step.unmount()
+
+    // Continue with the rest into a Write already running: no poll either (EntitiesStep owns it), handed over once.
+    vi.clearAllMocks()
+    const later = vi.fn()
+    m.filingStatus.mockResolvedValue(trialStatus({ keepAsSources: true }))
+    const user = userEvent.setup()
+    render(<TrialStep batch="b2" onDone={later} />)
+    await screen.findByRole('group', { name: 'Alpha' })
+    m.filingStatus.mockResolvedValue(trialStatus({ state: 'writing', keepAsSources: true }))
+    await user.click(screen.getByRole('button', { name: T.continueRest }))
+    await waitFor(() => expect(later).toHaveBeenCalledTimes(1))
+    const calls = m.filingStatus.mock.calls.length
+    await new Promise((r) => setTimeout(r, agentTiming.pollMs * 8))
+    expect(m.filingStatus).toHaveBeenCalledTimes(calls)
+    expect(later).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('M30 the proposal offer', () => {
+  test('the proposal offers the existing type', async () => {
+    const server = {
+      id: 'g9',
+      action: 'create' as const,
+      name: 'Server',
+      documentCount: 14,
+      examples: ['APP01'],
+      properties: [],
+      problems: ['Host has the same properties.'],
+      offer: { label: 'Use Host, with a category', typeId: 'host', category: 'Server' },
+    }
+    m.importProposal.mockResolvedValue({ proposal: { groups: [server, PROPOSAL.groups[1]] }, review: null })
+    const user = userEvent.setup()
+    render(<ProposalStep batch="b1" onApplied={vi.fn()} />)
+    const card = await screen.findByRole('group', { name: T.itemLabel('Server') })
+    expect(within(card).getByText(T.willSkip(server.problems[0]))).toBeInTheDocument()
+    const offer = within(card).getByRole('button', { name: 'Use Host, with a category' })
+    await user.click(offer)
+    expect(m.saveProposalReview).toHaveBeenLastCalledWith('b1', [{ id: 'g9', status: 'edited', edited: { useType: 'host', category: 'Server' } }])
+    expect(offer).toHaveAttribute('aria-pressed', 'true')
+    expect(within(card).getByText(T.status.edited)).toBeInTheDocument()
+    const book = screen.getByRole('group', { name: T.itemLabel('Book') })
+    expect(within(book).queryByRole('button', { name: /with a category/ })).toBeNull()
   })
 })
