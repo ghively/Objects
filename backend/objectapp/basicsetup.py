@@ -411,7 +411,7 @@ def source_type() -> TypeDefinition:
     return _type(
         "source", "Source", "Sources",
         "A page kept as it was imported, and what was distilled from it.",
-        "ph-file-text", "slate",
+        "ph-file-text", "gray",
         [
             _ops_label(
                 "category", "Category",

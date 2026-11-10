@@ -9,7 +9,7 @@
     "type": "iconify",
     "val": "ph-file-text"
   },
-  "color": "slate",
+  "color": "gray",
   "description": "A page kept as it was imported, and what was distilled from it.",
   "basic": false,
   "propertyDefinitions": [
