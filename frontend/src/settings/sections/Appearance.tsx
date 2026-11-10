@@ -1,9 +1,11 @@
-// "Appearance": theme mode, the light and the dark theme, the app font and the monochrome colour
-// switches, and the text size (`zoom.ts`). Every change is a device
+// "Appearance": theme mode, the light and the dark theme, the app icon's colour (M31), the app font
+// and the monochrome colour switches, and the text size (`zoom.ts`). Every change is a device
 // setting (`useSettings().patch`).
 import { useState } from 'react'
-import type { DeviceSettings } from '@/api/types'
+import type { AppIconColor, DeviceSettings } from '@/api/types'
 import { Icon } from '@/components/Icon'
+import { cn } from '@/lib/utils'
+import { APP_ICON_CHOICES, appIconHref } from '@/settings/appIcon'
 import { useSettings } from '@/settings/useSettings'
 import { nextZoom, validZoom, zoomPercent } from '@/settings/zoom'
 import { OptionCards, SaveError, SecondaryButton, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
@@ -25,6 +27,19 @@ export const APPEARANCE_TEXT = {
     dark: { name: 'Dark', description: 'The standard dark theme.' },
     darkDimmed: { name: 'Dark Dimmed', description: 'Dark, with softer contrast.' },
   },
+  // M31 (catalog: "App icon (colored icon per device)"); the help and the colour names are ours.
+  appIcon: 'App icon',
+  appIconDescription: "The color of Object's icon on this device: the browser tab at once, the app window from the next start.",
+  appIconColors: {
+    default: 'Default',
+    red: 'Red',
+    orange: 'Orange',
+    green: 'Green',
+    blue: 'Blue',
+    purple: 'Purple',
+    pink: 'Pink',
+    gray: 'Gray',
+  } satisfies Record<AppIconColor, string>,
   font: 'Font',
   fontDescription: 'Pick a global font for the app.', // our string
   fonts: {
@@ -59,6 +74,7 @@ export const APPEARANCE_SEARCH: string[] = [
   T.lightTheme,
   T.darkTheme,
   ...Object.values(T.themes).map((t) => t.name),
+  T.appIcon,
   T.font,
   ...Object.values(T.fonts).map((f) => f.name),
   T.colors,
@@ -89,6 +105,38 @@ function TextSize({ zoom, onChange }: { zoom: number; onChange(next: number): vo
       <SecondaryButton disabled={zoom === 1} onClick={() => onChange(1)}>
         {T.resetZoom}
       </SecondaryButton>
+    </div>
+  )
+}
+
+/** "App icon": one swatch per colour, each showing the icon in that colour. */
+function AppIconPicker({ value, onChange }: { value: AppIconColor; onChange(next: AppIconColor): void }) {
+  return (
+    <div role="radiogroup" aria-label={T.appIcon} className="flex flex-wrap gap-2">
+      {APP_ICON_CHOICES.map((c) => {
+        const checked = c === value
+        const label = T.appIconColors[c]
+        return (
+          <button
+            key={c}
+            type="button"
+            role="radio"
+            aria-checked={checked}
+            aria-label={label}
+            title={label}
+            data-value={c}
+            onClick={() => {
+              if (!checked) onChange(c)
+            }}
+            className={cn(
+              'flex size-11 items-center justify-center rounded-lg border bg-raised hover:bg-hover',
+              checked ? 'border-fg-muted ring-1 ring-fg-muted' : 'border-line',
+            )}
+          >
+            <img src={appIconHref(c)} alt="" className="size-6" draggable={false} />
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -132,6 +180,9 @@ export function AppearanceSection() {
           options={(['dark', 'darkDimmed'] as const).map((v) => ({ value: v, label: T.themes[v].name, description: T.themes[v].description }))}
           onChange={(darkTheme) => set({ darkTheme })}
         />
+      </SettingGroup>
+      <SettingGroup title={T.appIcon} help={T.appIconDescription}>
+        <AppIconPicker value={settings.appIcon ?? 'default'} onChange={(appIcon) => set({ appIcon })} />
       </SettingGroup>
       <SettingGroup title={T.font} help={T.fontDescription}>
         <OptionCards

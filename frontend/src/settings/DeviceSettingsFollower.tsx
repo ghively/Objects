@@ -7,10 +7,12 @@
  *   hides every `[data-type-setting]` entry point while it is set);
  * - the highlight style (`data-highlight-style`; Object has no highlight blocks yet, so nothing
  *   reads it so far).
+ * - M31 "App icon": the tab icon in the chosen colour (`appIcon.ts`).
  * Mounted once by `shell/GlobalOverlays.tsx`.
  */
 import { useEffect } from 'react'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { useAppIcon } from './appIcon'
 import { documentLang } from './spellcheck'
 import { applyZoom } from './zoom'
 
@@ -19,6 +21,7 @@ export function DeviceSettingsFollower() {
   const loaded = useSettings((s) => s.loaded)
   const ready = loaded || settings !== settingsDefaults
   const { zoom, spellCheckLang, hideTypeSettings, highlightStyle } = settings
+  useAppIcon()
   useEffect(() => {
     if (ready) applyZoom(zoom)
   }, [ready, zoom])

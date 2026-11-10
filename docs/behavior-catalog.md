@@ -51,6 +51,9 @@ Object has no accounts.
 - Appearance: Light theme (Light, Light Dimmed), Dark theme (Dark, Dark Dimmed), App icon (colored icon per
   device). Layout (ours, 2026-11-09): "Show the sidebar when Object opens" (on by default; off opens Object with
   the left sidebar collapsed, "Toggle sidebar" or Ctrl+Shift+Left shows it; device setting `showSidebarOnStart`).
+  App icon (M31): a row of swatches (Default, Red, Orange, Green, Blue, Purple, Pink, Gray; device setting
+  `appIcon`), each showing the bolt in its colour; the choice recolours the browser tab's icon at once and the
+  app window's from the next start (the window takes an icon only when it opens).
 - AI Assistant: "Hide AI features" switch.
 - Editor: Disable spellcheck; Spellcheck language (Experimental); Open objects as a full page (Alt+Shift click
   opens the preview instead); Show properties by default (ours, 2026-11-09; on by default; off: objects open with

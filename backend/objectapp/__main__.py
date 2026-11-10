@@ -215,6 +215,15 @@ def _webview_start_options(platform: str) -> dict:
     return {}
 
 
+def _window_icon_options(platform: str) -> dict:
+    """``webview.start``'s ``icon`` for the device setting "App icon" (M31), or nothing for the
+    default icon. pywebview reads it only when it starts, so a new colour shows from the next start."""
+    from .appicon import startup_icon
+
+    icon = startup_icon(platform)
+    return {"icon": str(icon)} if icon is not None else {}
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="objectapp", description=__doc__)
     parser.add_argument("--space", type=Path, help="space folder to open")
@@ -262,7 +271,7 @@ def main(argv: list[str] | None = None) -> None:
                     "Object focus", host.ui_key.open_url(u), width=360, height=470, on_top=True
                 )
             )
-            webview.start(**_webview_start_options(sys.platform))
+            webview.start(**_webview_start_options(sys.platform), **_window_icon_options(sys.platform))
     except KeyboardInterrupt:
         pass
     finally:
