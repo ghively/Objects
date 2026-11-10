@@ -592,7 +592,7 @@ export const hasLaterParagraphs = (v: unknown) =>
 
 /**
  * The update that moves a row into `group`, or null where a drag can't (created, updated, type,
- * backlinks, number ranges, date periods, long text past its first paragraph; M12 formulas, rollups, IDs and files). With `move`, a
+ * backlinks, number ranges, date periods, long text past its first paragraph; M12 formulas, rollups, IDs and files; M28 counterparts). With `move`, a
  * multi-value property keeps its other values: the source column's value is removed and the
  * target's added.
  */
@@ -604,6 +604,9 @@ export function valueForGroup(
 ): { key: string; value: unknown } | null {
   const entry: GroupByEntry | undefined = 'groups' in groupBy ? groupBy.groups[0] : groupBy
   if (!entry) return null
+  // M28: a computed other side (`counterpartOf`) is never written on a row, so a column takes no
+  // drop and its "+" creates without it.
+  if (def.options?.counterpartOf) return null
   const key = entry.propertyId
   const current = move ? rowValue(move.row, key) : undefined
   const from = move?.from && !move.from.isOther ? move.from : null
