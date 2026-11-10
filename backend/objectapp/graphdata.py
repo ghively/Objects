@@ -5,8 +5,10 @@ see `roles.NO_GRAPH_SUPPORT`), in path order. ``links`` holds the distinct
 undirected pairs of the link index as node indexes (flat ``[a0, b0, …]``,
 ``a < b``); ``linkDirs`` gives each pair's direction (1: a links to b, 2: b
 links to a, 3: both), which the graph rules need to tell a node's own
-links from its backlinks; ``tagged`` holds ``(object, tag)`` pairs the same
-way. Each node
+links from its backlinks; ``linkLabels`` gives each pair's label (M28): the
+names of the relation properties that make the link, a's then b's, joined by
+" · ", or None for a pair linked only by body text; ``tagged`` holds
+``(object, tag)`` pairs the same way. Each node
 carries its ``degree`` (distinct linked neighbours) and the flags the client's
 filters need: ``tag`` (role ``tag``), ``daily`` (role ``dailyNote``) and
 ``done`` (a Task whose status is in the ``done`` category). Everything is
@@ -17,6 +19,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from .counterparts import edge_label
 from .propvalues import decode_value, label_lookup
 from .roles import NO_GRAPH_SUPPORT, role_of
 from .taskhook import status_key_of
@@ -52,6 +55,20 @@ def _done(t: TypeDefinition, fm: dict[str, Any]) -> bool:
     return (opt.statusCategory or status_category(opt.text)) == "done"
 
 
+def _pair_label(
+    space: Space, types: dict[str, TypeDefinition], a: Any, b: Any
+) -> str | None:
+    """The label of the pair ``(a, b)`` (summaries): a's relation names to b, then b's to a."""
+    names: list[str] = []
+    for src, dst in ((a, b), (b, a)):
+        label = edge_label(
+            types.get(src.type), space.links.link_keys(src.path, dst.path)[1]
+        )
+        if label is not None:
+            names.append(label)
+    return " · ".join(names) if names else None
+
+
 def graph_data(space: Space) -> dict[str, Any]:
     """The `GraphData` of ``space`` (see the M5 API contract)."""
     links = space.links
@@ -68,12 +85,14 @@ def graph_data(space: Space) -> dict[str, Any]:
 
     nodes: list[dict[str, Any]] = []
     index: dict[str, int] = {}
+    shown: list[Any] = []  # the summary of each node
     for s in summaries:
         t = types.get(s.type)
         role = role_of(t)
         if role in NO_GRAPH_SUPPORT:
             continue
         index[s.path] = len(nodes)
+        shown.append(s)
         nodes.append(
             {
                 "path": s.path,
@@ -89,6 +108,7 @@ def graph_data(space: Space) -> dict[str, Any]:
 
     flat: list[int] = []
     dirs: list[int] = []
+    labels: list[str | None] = []
     outgoing: dict[str, set[str]] = {}
     for a, b in edges:
         ia = index.get(a)
@@ -106,6 +126,7 @@ def graph_data(space: Space) -> dict[str, Any]:
         flat.append(ia)
         flat.append(ib)
         dirs.append(d)
+        labels.append(_pair_label(space, types, shown[ia], shown[ib]))
         nodes[ia]["degree"] += 1
         nodes[ib]["degree"] += 1
 
@@ -117,4 +138,10 @@ def graph_data(space: Space) -> dict[str, Any]:
                 tagged.append(i)
                 tagged.append(j)
 
-    return {"nodes": nodes, "links": flat, "linkDirs": dirs, "tagged": tagged}
+    return {
+        "nodes": nodes,
+        "links": flat,
+        "linkDirs": dirs,
+        "linkLabels": labels,
+        "tagged": tagged,
+    }

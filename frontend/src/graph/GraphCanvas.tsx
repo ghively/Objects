@@ -1,7 +1,9 @@
 // colour-literals: content palette
 // The WebGL graph: one sigma instance per mount (killed on unmount) over a graphology graph that
 // is rebuilt from the visible nodes and edges, laid out by ForceAtlas2 in a worker. Hovering a
-// node keeps it and its neighbours bright and dims the rest; `showMinimalNodes` hides labels.
+// node keeps it and its neighbours bright and dims the rest; `showMinimalNodes` hides labels. A
+// relation edge carries its name (`linkLabels`, M28), shown only on the edges of the hovered or
+// highlighted node.
 // sigma is loaded on first use: it touches WebGL at import, and it stays out of the main bundle.
 // A rebuild fills a new graph, positioned from the start, away from the renderer (in slices with
 // a yield between them when it is big), then hands it to sigma in one `setGraph`: no per-node
@@ -76,6 +78,8 @@ interface EdgeAttrs {
   kind: EdgeKind
   color: string
   size: number
+  /** The relation names of a link edge (`GraphData.linkLabels`); absent for a body link or a tag edge. */
+  label?: string
 }
 
 type SigmaClick = { node: string; event?: { original?: MouseEvent | TouchEvent } }
@@ -189,9 +193,13 @@ export function GraphCanvas({
       sigma = new SigmaClass<NodeAttrs, EdgeAttrs>(initial, el, {
         allowInvalidContainer: true,
         renderLabels: true,
+        renderEdgeLabels: true,
         labelColor: { color: colors.label },
         labelSize: 12,
         labelFont: 'Inter, system-ui, sans-serif',
+        edgeLabelColor: { color: colors.label },
+        edgeLabelSize: 11,
+        edgeLabelFont: 'Inter, system-ui, sans-serif',
         defaultEdgeColor: colors.edge,
         zIndex: true,
         nodeReducer: (node, attrs) => {
@@ -217,10 +225,21 @@ export function GraphCanvas({
         },
         edgeReducer: (edge, attrs) => {
           const h = hovered.current
-          if (!h) return attrs
+          if (!h && !attrs.label) return attrs
           const [a, b] = shown().extremities(edge)
-          if (a === h || b === h) return { ...attrs, size: attrs.size + 0.5 }
-          return { ...attrs, color: 'rgba(0,0,0,0)' }
+          const res: EdgeAttrs = { ...attrs }
+          const nearHover = !!h && (a === h || b === h)
+          if (h) {
+            if (nearHover) res.size = attrs.size + 0.5
+            else res.color = 'rgba(0,0,0,0)'
+          }
+          // A label shows on the hovered node's edges, and on the highlighted node's while no
+          // hover elsewhere dims them.
+          if (res.label && !nearHover) {
+            const c = highlight.current ? keyByPath.current.get(highlight.current) : undefined
+            if (h || !c || (a !== c && b !== c)) res.label = ''
+          }
+          return res
         },
       })
     } catch (e) {
@@ -228,6 +247,7 @@ export function GraphCanvas({
       return null
     }
     sigma.setSetting('renderLabels', !minimalRef.current)
+    sigma.setSetting('renderEdgeLabels', !minimalRef.current)
     sigma.on('enterNode', ({ node }: { node: string }) => {
       hovered.current = node
       sigma.refresh()
@@ -295,6 +315,14 @@ export function GraphCanvas({
           }
         }
       }
+      // Each link pair's label, by `"<a>-<b>"` (a < b, as `links` holds them).
+      const labels = new Map<string, string>()
+      if (data.linkLabels) {
+        for (let k = 0; 2 * k + 1 < data.links.length; k++) {
+          const label = data.linkLabels[k]
+          if (label) labels.set(`${data.links[2 * k]}-${data.links[2 * k + 1]}`, label)
+        }
+      }
       const seen = new Set<string>()
       const edges: { source: string; target: string; attributes: EdgeAttrs }[] = []
       const add = async (pairs: [number, number][], kind: EdgeKind) => {
@@ -305,7 +333,10 @@ export function GraphCanvas({
           const pair = a < b ? `${a}-${b}` : `${b}-${a}`
           if (ka !== kb && next.hasNode(ka) && next.hasNode(kb) && !seen.has(pair)) {
             seen.add(pair)
-            edges.push({ source: ka, target: kb, attributes: { kind, color: style.color, size: style.size } })
+            const attributes: EdgeAttrs = { kind, color: style.color, size: style.size }
+            const label = kind === 'link' ? labels.get(pair) : undefined
+            if (label) attributes.label = label
+            edges.push({ source: ka, target: kb, attributes })
           }
           if (edges.length >= EDGE_SLICE) {
             next.import({ edges: edges.splice(0) })
@@ -354,6 +385,7 @@ export function GraphCanvas({
   minimalRef.current = !!custom.showMinimalNodes
   useEffect(() => {
     sigmaRef.current?.setSetting('renderLabels', !custom.showMinimalNodes)
+    sigmaRef.current?.setSetting('renderEdgeLabels', !custom.showMinimalNodes)
   }, [custom.showMinimalNodes, sigmaReady])
 
   useEffect(() => {
@@ -371,6 +403,7 @@ export function GraphCanvas({
     const sigma = sigmaRef.current
     if (!sigma) return
     sigma.setSetting('labelColor', { color: colors.label })
+    sigma.setSetting('edgeLabelColor', { color: colors.label })
     sigma.setSetting('defaultEdgeColor', colors.edge)
     sigma.refresh()
   }, [themeName])
