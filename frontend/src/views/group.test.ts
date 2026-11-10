@@ -247,6 +247,16 @@ describe('valueForGroup', () => {
     expect(canDropRow(rows[1], by('status').groups[0], def, c.types)).toBe(false)
   })
 
+  test("a synced key can't be dropped (M29 review #7)", () => {
+    const patch = propertyDef({ id: 'patchState', type: 'label', synced: { source: 'Inventory script', staleAfterDays: 7 }, options: { isArray: false, set: opts('Current', 'Failed') } })
+    const host = typeDef({ id: 'host', propertyDefinitions: [patch] })
+    const r = R('Hosts/APP01.md', { patchState: ['Current'] }, { type: 'host' })
+    expect(canDropRow(r, by('patchState').groups[0], patch, [host])).toBe(false)
+    // The same key, not synced, still drops.
+    const open = typeDef({ id: 'host', propertyDefinitions: [{ ...patch, synced: null }] })
+    expect(canDropRow(r, by('patchState').groups[0], { ...patch, synced: null }, [open])).toBe(true)
+  })
+
   test('a drag of a multi-value card swaps only the source column value (audit #13)', () => {
     const labels = propertyDef({ id: 'labels', type: 'label', options: { isArray: true, set: opts('A', 'B', 'C') } })
     const owners = propertyDef({ id: 'owner', type: 'entity', options: { isArray: true } })

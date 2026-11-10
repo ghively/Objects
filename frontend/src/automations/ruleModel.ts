@@ -20,6 +20,7 @@ import type {
   TypeDef,
 } from '@/api/types'
 import { OBJECT_ACTION_KINDS } from '@/api/types'
+import { isSynced } from '@/properties/synced'
 import { onLabel } from '@/tasks/CustomRepeatDialog'
 import { localDayOf, parseRepeat, stepAfter, weekdayName, weekdayOf, type RepeatRule } from '@/tasks/repeat'
 import { filterOptionsFor } from '@/views/filter'
@@ -127,18 +128,18 @@ export function scopeChoices(scope: AutomationScope | null, types: readonly Type
   )
 }
 
-/** The properties a "property changes" trigger can watch. */
+/** The properties a "property changes" trigger can watch. M29: not a synced one (a sync fires no trigger). */
 export function watchableChoices(choices: readonly PropChoice[]): PropChoice[] {
-  return choices.filter((c) => !UNWATCHABLE.has(c.key) && !UNWATCHABLE_KINDS.has(c.kind))
+  return choices.filter((c) => !UNWATCHABLE.has(c.key) && !UNWATCHABLE_KINDS.has(c.kind) && !isSynced(c.def))
 }
 
-/** The properties "Set a property" and "Clear a property" can write. */
+/** The properties "Set a property" and "Clear a property" can write. M29: not a synced one (only its source fills it). */
 export function writableDefs(scopeTypeList: readonly TypeDef[]): PropertyDef[] {
   const seen = new Set<string>()
   const out: PropertyDef[] = []
   for (const t of scopeTypeList)
     for (const d of t.propertyDefinitions) {
-      if (seen.has(d.key) || READ_ONLY_KINDS.has(d.type)) continue
+      if (seen.has(d.key) || READ_ONLY_KINDS.has(d.type) || isSynced(d)) continue
       seen.add(d.key)
       out.push(d)
     }

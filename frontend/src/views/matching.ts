@@ -2,6 +2,7 @@
 // filtered view it was created from.
 import type { Collection, DateValue, EntityRef, Filter, FilterGroup, TypeDef } from '@/api/types'
 import { useLinkIndex } from '@/links/linkIndex'
+import { isSynced } from '@/properties/synced'
 import { wallClock } from '@/lib/zonedTime'
 import { parseDay } from './dates'
 
@@ -35,7 +36,8 @@ function dayValue(f: Filter): DateValue | null {
  * top-level filters under `and` (or a single-element `or`); text `is`/`contains`/`startsWith` sets
  * the text, boolean `isChecked` sets true, label and entity `contains` add the first reference,
  * `collections` contains adds the names, number `equal` sets it and date `is` sets the day.
- * Any other filter contributes nothing.
+ * Any other filter contributes nothing; M29: nor does a filter on a synced property (filled only
+ * by its source, so a new object can't be given it).
  */
 export function matchingValues(
   filterGroup: FilterGroup | null | undefined,
@@ -51,6 +53,7 @@ export function matchingValues(
     if (f.typeId && f.typeId !== typeId) continue
     const key = keyOf(f)
     const def = type.propertyDefinitions.find((d) => d.key === key)
+    if (isSynced(def)) continue
     const kind = def?.type ?? (key === 'collections' ? 'entity_collections' : null)
     if (!kind) continue
     const ref = f.referenceValue

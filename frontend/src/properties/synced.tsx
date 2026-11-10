@@ -2,8 +2,9 @@
 // API (`POST /api/v1/synced/{typeId}`); its values live in `.object/synced/<typeId>.json`, never
 // in the file, and the app shows them read-only with their source, when they were refreshed and
 // "Stale" once they are older than the property's stale-after days.
+import { useEffect, useState } from 'react'
 import type { PropertyDef } from '@/api/types'
-import { SYNCED_STALE_DEFAULT } from '@/api/types'
+import { SYNCABLE_KINDS, SYNCED_STALE_DEFAULT } from '@/api/types'
 import { ago } from '@/automations/ruleModel'
 
 /** Our strings. */
@@ -15,10 +16,15 @@ export const SYNCED_TEXT = {
 }
 
 const DAY_MS = 86_400_000
+/** How often a synced line reads the clock again ("Refreshed ... ago", "Stale"). */
+const TICK_MS = 60_000
 
-/** Whether the property is synced (its definition carries the synced mark). */
-export function isSynced(def: PropertyDef | undefined | null): boolean {
-  return !!def?.synced
+/** Whether the property is synced: a syncable kind carrying a synced mark with a source (as the
+ *  backend's `synced.is_synced` reads it; a hand-edited `synced: "yes"` or a mark on a relation is not). */
+export function isSynced(def: Pick<PropertyDef, 'type' | 'synced'> | undefined | null): boolean {
+  if (!def || !SYNCABLE_KINDS.has(def.type)) return false
+  const source = (def.synced as { source?: unknown } | null | undefined)?.source
+  return typeof source === 'string' && source.trim() !== ''
 }
 
 /** The stale-after days of a synced mark (7 when it gives none). */
@@ -42,6 +48,13 @@ export function syncedStale(def: PropertyDef, refreshedAt: string | null | undef
 
 /** The line under a synced value: "{source} · Refreshed {time ago}" (or "Not refreshed yet"), then "Stale". */
 export function SyncedLine({ def, refreshedAt, now }: { def: PropertyDef; refreshedAt: string | null; now?: Date }) {
+  // Re-render once a minute so the time ago and Stale move on while the page stays open.
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (now) return
+    const id = setInterval(() => setTick((n) => n + 1), TICK_MS)
+    return () => clearInterval(id)
+  }, [now])
   const at = now ?? new Date()
   const source = def.synced?.source ?? ''
   const stale = syncedStale(def, refreshedAt, at)

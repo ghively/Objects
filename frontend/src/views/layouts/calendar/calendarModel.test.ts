@@ -93,10 +93,25 @@ describe('calendarModel', () => {
     expect(canDragRow(r('a', {}), 'lastUpdated', types)).toBe(false)
   })
 
+  test("a synced date can't be dragged (M29 review #7)", () => {
+    const host = typeDef({ id: 'host', propertyDefinitions: [propertyDef({ id: 'when', type: 'datetime', synced: { source: 'Inventory script', staleAfterDays: 7 } })] })
+    expect(canDragRow(r('a', {}, 'host'), 'when', { host })).toBe(false)
+  })
+
   test('the type a day click creates', () => {
     expect(createType([NOTE, EVENT], 'when')?.id).toBe('event')
     expect(createType([NOTE, EVENT], 'nothing')?.id).toBe('note')
     expect(createType([], 'when')).toBeUndefined()
+  })
+
+  test('a day click never creates with a synced date (M29 review #2)', () => {
+    const synced = (id: string) =>
+      typeDef({ id, propertyDefinitions: [propertyDef({ id: 'when', type: 'datetime', synced: { source: 'Inventory script', staleAfterDays: 7 } })] })
+    // The first view type with the date as its own (not synced) is the one created.
+    expect(createType([synced('host'), EVENT], 'when')?.id).toBe('event')
+    // Only a synced date: nothing can be created from a day.
+    expect(createType([synced('host')], 'when')).toBeUndefined()
+    expect(createType([synced('host'), NOTE], 'when')?.id).toBe('note')
   })
 
   test('month weeks follow the week start and hold only the month\'s weeks', () => {

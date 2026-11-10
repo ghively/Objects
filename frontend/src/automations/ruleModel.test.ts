@@ -263,3 +263,21 @@ describe('M28 counterparts', () => {
     expect(watchableChoices(scopeChoices(null, [host], [])).map((c) => c.key)).not.toContain('runs')
   })
 })
+
+describe('M29 synced facts', () => {
+  test('a synced property is neither watched nor written by a rule (review #5)', () => {
+    // A sync fires no trigger, and the server refuses a write to a synced key.
+    const host = typeDef({
+      id: 'host',
+      name: 'Host',
+      propertyDefinitions: [
+        propertyDef({ id: 'fqdn', key: 'fqdn', type: 'text' }),
+        propertyDef({ id: 'diskFree', key: 'diskFree', type: 'number', synced: { source: 'Inventory script', staleAfterDays: 7 } }),
+      ],
+    })
+    const watched = watchableChoices(scopeChoices({ kind: 'type', id: 'host' }, [host], [])).map((c) => c.key)
+    expect(watched).toContain('fqdn')
+    expect(watched).not.toContain('diskFree')
+    expect(writableDefs([host]).map((d) => d.key)).toEqual(['fqdn'])
+  })
+})

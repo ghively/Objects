@@ -6,6 +6,8 @@
  *
  * - Whitespace is JavaScript's `\s` set; a character is a code point (`for...of`).
  * - The name is normalised once: `trim()`, then `toLowerCase()`; inner spaces are kept.
+ * - A name over `NAME_MAX` (300) code points, counted before the trim, matches no pattern (so a
+ *   pasted page of text never runs one).
  * - A pattern is valid when it is a string of 1-100 characters and either exactly one token
  *   (`{ip}`, `{cidr}`, `{fqdn}`, `{version}`; case-sensitive) or a glob with no `{` or `}` anywhere
  *   and no trailing unpaired `\`.
@@ -19,6 +21,8 @@ import type { TypeDef } from '@/api/types'
 
 export const MAX_PATTERNS = 20
 export const MAX_PATTERN = 100
+/** The longest name (code points, untrimmed) that patterns are tried on (`typesuggest.NAME_MAX`). */
+export const NAME_MAX = 300
 export const TOKENS = ['{ip}', '{cidr}', '{fqdn}', '{version}'] as const
 
 export const SUGGEST_TEXT = { suggested: 'Suggested' } // our string
@@ -182,9 +186,13 @@ export function compilePattern(pattern: string): CompiledPattern | null {
   return compileEntry(pattern)?.pattern ?? null
 }
 
-/** Whether `name` matches any valid pattern; invalid and non-string entries are ignored. */
+/**
+ * Whether `name` matches any valid pattern; invalid and non-string entries are ignored. A name
+ * over `NAME_MAX` code points (untrimmed) matches none.
+ */
 export function matches(name: string, patterns: readonly unknown[]): boolean {
   if (!Array.isArray(patterns) || typeof name !== 'string') return false
+  if (name.length > NAME_MAX && Array.from(name).length > NAME_MAX) return false
   const norm = normalizeName(name)
   for (const p of patterns) {
     if (typeof p !== 'string') continue

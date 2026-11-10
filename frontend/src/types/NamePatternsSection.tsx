@@ -1,7 +1,8 @@
 // M29: a type's name patterns ("Name patterns" in type settings). A new object whose name matches
 // one suggests this type in every create row (`create/typeSuggest.ts`). One pattern per line,
 // saved on blur as the type's `namePatterns`; a line that isn't a pattern is flagged and nothing
-// is saved; the server's own check (422) shows its detail here.
+// is saved; the server's own check (422) shows its detail here, unless the page around it already
+// shows the editor's error (`showError={false}`, type settings). Disabled for a read-only type.
 import { useState } from 'react'
 import type { TypeDef } from '@/api/types'
 import { compilePattern } from '@/create/typeSuggest'
@@ -29,7 +30,19 @@ function sameList(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((x, i) => x === b[i])
 }
 
-export function NamePatternsSection({ type, editor }: { type: TypeDef; editor: TypeEditor }) {
+export function NamePatternsSection({
+  type,
+  editor,
+  disabled = false,
+  showError = true,
+}: {
+  type: TypeDef
+  editor: TypeEditor
+  /** A read-only type: the box can't be edited and nothing is saved. */
+  disabled?: boolean
+  /** Whether a failed save's error shows here (false where the page shows `editor.error` itself). */
+  showError?: boolean
+}) {
   const saved = type.namePatterns ?? []
   const savedText = saved.join('\n')
   const [draft, setDraft] = useState(savedText)
@@ -45,6 +58,7 @@ export function NamePatternsSection({ type, editor }: { type: TypeDef; editor: T
 
   const commit = async () => {
     setEditing(false)
+    if (disabled) return
     const lines = linesOf(draft)
     const wrong = [...new Set(lines.filter((l) => compilePattern(l) === null))]
     setBad(wrong)
@@ -61,6 +75,7 @@ export function NamePatternsSection({ type, editor }: { type: TypeDef; editor: T
         aria-label={T.title}
         aria-invalid={bad.length > 0}
         value={draft}
+        disabled={disabled}
         rows={Math.min(8, Math.max(3, draft.split('\n').length + 1))}
         spellCheck={false}
         onChange={(e) => {
@@ -75,7 +90,7 @@ export function NamePatternsSection({ type, editor }: { type: TypeDef; editor: T
           {T.invalid(line)}
         </p>
       ))}
-      {failed && editor.error && (
+      {showError && failed && editor.error && (
         <p role="alert" className="text-[13px] text-red-400">
           {editor.error}
         </p>

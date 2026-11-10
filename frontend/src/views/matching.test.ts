@@ -66,4 +66,25 @@ describe('matchingValues', () => {
     )
     expect(matchingValues(group, [task], 'task')).toEqual({})
   })
+
+  test('a filter on a synced property gives no value (M29 review #2)', () => {
+    const SOURCE = { source: 'Inventory script', staleAfterDays: 7 }
+    const host = typeDef({
+      id: 'host',
+      propertyDefinitions: [
+        propertyDef({ id: 'fqdn', type: 'text' }),
+        propertyDef({ id: 'diskFree', type: 'number', synced: SOURCE }),
+        propertyDef({ id: 'patched', type: 'boolean', synced: SOURCE }),
+        propertyDef({ id: 'lastBoot', type: 'datetime', synced: SOURCE }),
+      ],
+    })
+    const group = g(
+      'and',
+      f('fqdn', 'is', 'app01' as never),
+      f('diskFree', 'equal', 40 as never),
+      f('patched', 'isChecked'),
+      f('lastBoot', 'is', { exactDate: '2026-11-09' } as never),
+    )
+    expect(matchingValues(group, [host], 'host')).toEqual({ fqdn: 'app01' })
+  })
 })

@@ -26,14 +26,14 @@ function hostType(namePatterns?: string[]): TypeDef {
   })
 }
 
-function Harness() {
+function Harness({ disabled }: { disabled?: boolean }) {
   const editor = useTypeEditor('host')
-  return editor.type ? <NamePatternsSection type={editor.type} editor={editor} /> : null
+  return editor.type ? <NamePatternsSection type={editor.type} editor={editor} disabled={disabled} /> : null
 }
 
-function open(namePatterns?: string[]) {
+function open(namePatterns?: string[], disabled?: boolean) {
   useLinkIndex.setState({ types: [hostType(namePatterns)], objects: [], loaded: true })
-  render(<Harness />)
+  render(<Harness disabled={disabled} />)
 }
 
 const box = () => screen.getByRole('textbox', { name: T.title }) as HTMLTextAreaElement
@@ -84,6 +84,16 @@ describe('NamePatternsSection', () => {
     await user.tab()
     await waitFor(() => expect(api.saveType).toHaveBeenCalledTimes(1))
     expect(saved().namePatterns).toEqual([])
+  })
+
+  test('disabled (a read-only type): the box is disabled and saves nothing (M29 review #10)', async () => {
+    const user = userEvent.setup()
+    open(['{ip}'], true)
+    expect(box()).toBeDisabled()
+    await user.type(box(), 'SRV-*')
+    await user.tab()
+    expect(box().value).toBe('{ip}')
+    expect(api.saveType).not.toHaveBeenCalled()
   })
 
   test('a 422 from the server shows its detail', async () => {

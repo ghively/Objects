@@ -6,7 +6,8 @@ import type { PropertyDef } from '@/api/types'
 import { setLastTypeSpace, useLastType } from '@/create/lastType'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { useTabs } from '@/nav/tabs'
-import { objectSummary, propertyDef, typeDef } from '@/test/mockApi'
+import { collection, objectSummary, propertyDef, typeDef } from '@/test/mockApi'
+import { useDefs } from '@/types/useDefinitions'
 import { api } from '@/api/client'
 import { RelationPicker } from './RelationPicker'
 
@@ -99,6 +100,21 @@ describe('RelationPicker create rows (M29)', () => {
     await user.keyboard('{Enter}')
     await waitFor(() => expect(onChange).toHaveBeenCalledWith([{ target: 'SRV-09', path: 'host/SRV-09.md' }]))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it("an any-type relation doesn't take the active tab's scope (M29 review #13)", async () => {
+    const user = userEvent.setup()
+    // On a collection of Hosts, a relation to any type doesn't suggest Host for a name that isn't one.
+    useDefs.setState({ collections: [collection({ id: 'c-hosts', typeIds: ['host'] })], queries: [], loaded: true })
+    useTabs.getState().open({ kind: 'collection', id: 'c-hosts' })
+    try {
+      render(<RelationPicker def={relDef({ isArray: false })} value={[]} onChange={vi.fn()} />)
+      await user.type(screen.getByRole('textbox', { name: 'Search for objects' }), 'Payroll')
+      expect(createButtons().length).toBeGreaterThan(1)
+      expect(createButtons().filter((b) => b.text?.includes('Suggested'))).toEqual([])
+    } finally {
+      useDefs.setState({ collections: [], queries: [], loaded: false })
+    }
   })
 
   it('no create rows for an exact match, a fixed set or an empty query', async () => {
