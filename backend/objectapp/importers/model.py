@@ -132,7 +132,7 @@ class PreviewRequest(BaseModel):
     leaveOut: list[str] = Field(default_factory=list)
     """M27: "Leave out" folders and patterns (design section 6): matching files are never read."""
     keepAsSources: bool | None = None
-    """M30: plan every page as a Source (absent: off, as the preview of a mapped import)."""
+    """M30: plan every page as a Source (None: `sources.keep_as_sources`' default rule, on, as the start)."""
 
 
 class NewSpaceTarget(BaseModel):

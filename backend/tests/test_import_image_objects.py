@@ -34,7 +34,7 @@ def png(w: int, h: int, colour: int = 120) -> bytes:
 
 
 def preview(client, src) -> dict:
-    r = client.post("/api/import/preview", json={"source": {"path": str(src), "kind": "files"}, "target": "currentSpace"})
+    r = client.post("/api/import/preview", json={"source": {"path": str(src), "kind": "files"}, "target": "currentSpace", "keepAsSources": False})
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -128,7 +128,7 @@ def test_preview_counts_images_under_image(client, tmp_path):
     assert p["counts"]["objects"] == 2 and p["counts"]["types"] == 2
     # the same mapping previews the same
     r = client.post("/api/import/preview", json={"source": {"path": str(src), "kind": "files"}, "target": "currentSpace",
-                                                 "mapping": p["mapping"]})
+                                                 "keepAsSources": False, "mapping": p["mapping"]})
     assert r.status_code == 200 and r.json()["counts"] == p["counts"]
     # and the import makes what the preview said
     res = run(client, src)
@@ -144,11 +144,11 @@ def test_the_image_row_cannot_be_changed(client, tmp_path):
     src = library(tmp_path)
     for over in ({"skip": True}, {"name": "Picture"}, {"existingTypeId": "page"}):
         r = client.post("/api/import/preview", json={"source": {"path": str(src), "kind": "files"}, "target": "currentSpace",
-                                                     "mapping": {"types": {"image": over}}})
+                                                     "keepAsSources": False, "mapping": {"types": {"image": over}}})
         assert r.status_code == 422, r.text
         assert r.json()["detail"] == "Images always become Image objects, so the Image row can't be changed."
     r = client.post("/api/import/preview", json={"source": {"path": str(src), "kind": "files"}, "target": "currentSpace",
-                                                 "mapping": {"properties": {"image": {"x": {"skip": True}}}}})
+                                                 "keepAsSources": False, "mapping": {"properties": {"image": {"x": {"skip": True}}}}})
     assert r.status_code == 422, r.text
 
 
@@ -210,7 +210,7 @@ def test_image_in_a_mapped_type_follows_the_mapping(client, tmp_path):
     (src / "Shots" / "readme.txt").write_text("x\n", encoding="utf-8")
     mapping = {"typeSource": "folder"}
     r = client.post("/api/import/preview", json={"source": {"path": str(src), "kind": "files"}, "target": "currentSpace",
-                                                 "mapping": mapping})
+                                                 "keepAsSources": False, "mapping": mapping})
     assert r.status_code == 200, r.text
     p = r.json()
     # the preview says so too: the images stay with their folder type, and there is no Image row

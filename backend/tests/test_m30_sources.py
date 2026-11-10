@@ -125,8 +125,16 @@ def test_option_defaults_and_values(tmp_path, app_on) -> None:
     secret = client.post("/api/integrations/tokens", json={"name": "agent", "scope": "read-write"}).json()["secret"]
     auth = {"Authorization": f"Bearer {secret}"}
     src = make_itops_source(tmp_path / "d")
+    r = client.post("/api/v1/import/preview", json={"path": str(src), "target": "currentSpace",
+                                                    "keepAsSources": False}, headers=auth)
+    assert r.status_code == 200, r.text
+    assert "Source" not in [t["name"] for t in r.json()["types"]]
+    mcp_pv = _mcp_call(client, "import_preview", path=str(src), keep_as_sources=False)
+    assert "Source" not in [t["name"] for t in mcp_pv["types"]]
+    assert [t["name"] for t in _mcp_call(client, "import_preview", path=str(src))["types"]] == ["Source"]
     r = client.post("/api/v1/import/preview", json={"path": str(src), "target": "currentSpace"}, headers=auth)
     assert r.status_code == 200, r.text
+    assert [t["name"] for t in r.json()["types"]] == ["Source"]  # absent: what the start writes
     r = client.post("/api/v1/import/start", json={"previewId": r.json()["previewId"], "target": "currentSpace"},
                     headers=auth)
     assert r.status_code == 202, r.text
@@ -136,11 +144,15 @@ def test_option_defaults_and_values(tmp_path, app_on) -> None:
     assert sources.is_source_batch(root, batch)
     assert all(space.get(it["path"]).type == "source" for it in _items(root, batch).values())
 
-    # A re-preview with keepAsSources: true plans one type, Source; without it, the mapped types.
+    # A re-preview with keepAsSources: true plans one type, Source; with false, the mapped types.
+    # Absent, the preview plans what a start without it writes: Sources (call 25).
     root = _sample_space(tmp_path / "e")
     client, _space = app_on(root)
     src = make_itops_source(tmp_path / "e")
-    pv = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace"}).json()
+    absent = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace"}).json()
+    assert [t["name"] for t in absent["types"]] == ["Source"]
+    pv = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace",
+                                                  "keepAsSources": False}).json()
     assert "Source" not in [t["name"] for t in pv["types"]]
     again = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace",
                                                      "mapping": pv["mapping"], "keepAsSources": True})

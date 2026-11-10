@@ -173,7 +173,8 @@ class M25:
         ]
         (lib / "_manifest.jsonl").write_text("\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
         before_src = tree(lib)
-        code, preview = self.http("POST", "/import/preview", {"source": {"path": str(lib)}, "target": "currentSpace"})
+        code, preview = self.http("POST", "/import/preview", {"source": {"path": str(lib)}, "target": "currentSpace",
+                                                                 "keepAsSources": False})
         self.run.report(code == 200 and preview["kind"] == "files" and tree(lib) == before_src, "preview detects Files and changes nothing")
         r = self.do_import(lib)
         bs = blocks(self.root)
@@ -292,7 +293,8 @@ class M25:
         print("\n5. Reads write nothing")
         before = (snapshot(self.root), tree(self.src))
         for path in (self.vault, self.src / "Library"):
-            code, _ = self.http("POST", "/import/preview", {"source": {"path": str(path)}, "target": "currentSpace"})
+            code, _ = self.http("POST", "/import/preview", {"source": {"path": str(path)}, "target": "currentSpace",
+                                                     "keepAsSources": False})
             assert code == 200
         self.http("GET", "/import/batches")
         self.run.report((snapshot(self.root), tree(self.src)) == before, "previews and batch listings change no file")

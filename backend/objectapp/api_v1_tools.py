@@ -28,7 +28,8 @@ Routes (all JSON; ``read`` scope for the GETs and the import preview, ``read-wri
 - ``GET  /v1/history?path=`` -> ``{versions}``; ``GET /v1/history/version?path=&id=`` -> a version
 - ``GET  /v1/references?path=`` -> ``{mentions}`` (unlinked mentions in visible objects)
 - ``GET  /v1/trash`` -> ``{items}``; ``GET /v1/automations`` -> ``{automations}``
-- ``POST /v1/import/preview`` ``{path, kind?}`` -> the preview (writes nothing);
+- ``POST /v1/import/preview`` ``{path, kind?, leaveOut?, keepAsSources?}`` -> the preview (writes nothing;
+  M30: ``keepAsSources`` absent is on, as the start);
   ``GET /v1/import/jobs/{id}`` -> the job
 - ``POST /v1/object/body`` ``{path, version, body}`` -> ``{version}``
 - ``POST /v1/daily-notes`` ``{date}`` -> ``{path, version, created}``
@@ -207,6 +208,7 @@ class PreviewRequest(BaseModel):
     kind: str = "auto"
     target: str = "newSpace"
     leaveOut: list[str] = []
+    keepAsSources: bool | None = None  # M30: absent, on (as the start)
 
 
 class StartRequest(BaseModel):
@@ -590,7 +592,8 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         target = req.target if req.target in ("newSpace", "currentSpace") else "newSpace"
         status, body = _call(
             next(rt for rt in imports.routes if getattr(rt, "path", "") == "/import/preview"),
-            {"source": {"path": req.path, "kind": req.kind}, "target": target, "leaveOut": req.leaveOut},
+            {"source": {"path": req.path, "kind": req.kind}, "target": target, "leaveOut": req.leaveOut,
+             "keepAsSources": req.keepAsSources},
         )
         if status >= 400:
             return _failed(status, body)

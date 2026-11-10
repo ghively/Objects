@@ -292,13 +292,19 @@ def build_server(client: ObjectClient, write: bool = True, sync: bool | None = N
         return client.get("/automations")
 
     @server.tool(annotations=READ)
-    def import_preview(path: str, kind: str = "auto", leave_out: list[str] | None = None) -> dict:
+    def import_preview(
+        path: str, kind: str = "auto", leave_out: list[str] | None = None, keep_as_sources: bool | None = None,
+    ) -> dict:
         """What importing a folder or .zip (an Obsidian vault, a Notion or Anytype export)
         would make: types, counts, samples and the mapping `start_import` uses. Writes
         nothing. `kind` is auto, obsidian, notion, anytype or files (Word, Excel, PowerPoint, PDF,
         images; a `_manifest.jsonl` beside the files gives each file's url, author, dates and fields).
-        `leave_out` names folders and patterns that are never read (use the ones given to `import_scan`)."""
-        return client.post("/import/preview", {"path": path, "kind": kind, "leaveOut": leave_out or []})
+        `leave_out` names folders and patterns that are never read (use the ones given to `import_scan`).
+        `keep_as_sources` as `start_import` takes it (on when left out: every page planned as a Source)."""
+        return client.post(
+            "/import/preview",
+            {"path": path, "kind": kind, "leaveOut": leave_out or [], "keepAsSources": keep_as_sources},
+        )
 
     @server.tool(annotations=READ)
     def import_status(job_id: str) -> dict:

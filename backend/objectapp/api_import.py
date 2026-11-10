@@ -7,9 +7,9 @@
   (our choice): sent again with the same path and kind while the source's fingerprint is
   unchanged, the preview re-plans without reading the source again. A read is dropped when an
   import starts from one of its previews (the job keeps what it needs until it ends).
-- M30: both take ``keepAsSources`` ("Keep pages as Sources"). The preview plans every page as a
-  Source only when it is true; the start resolves it with `sources.keep_as_sources` (absent: on),
-  plans and writes with it, and the batch records it.
+- M30: both take ``keepAsSources`` ("Keep pages as Sources"), resolved by `sources.keep_as_sources`
+  (absent: on), so the preview plans every page as a Source exactly when the start writes them so;
+  the start plans and writes with it, and the batch records it.
 - ``POST /api/import/start`` `StartImportRequest` -> ``202`` `StartImportResponse`: checks the
   target (``409`` the new space's folder exists, another import runs or the source changed since
   the preview; ``422`` bad name, a target inside the source or the source inside the target;
@@ -173,7 +173,8 @@ def router(ctx: ApiContext) -> APIRouter:
         finally:
             src.close()
         target = Target("currentSpace", ctx.space) if req.target == "currentSpace" else Target("newSpace")
-        as_sources = bool(req.keepAsSources)  # M30: absent, the preview plans the mapped types
+        # M30: the start's default rule (absent: on), so the planned types match what is written
+        as_sources = sources.keep_as_sources(req.keepAsSources, False, False)
         reuse: dict[str, str] = {}
         mapping = req.mapping
         if req.target == "currentSpace":
