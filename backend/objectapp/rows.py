@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from .computed import COMPUTED_KINDS, Computer, Obj, has_computed
+from .counterparts import CounterpartSpec, defs_from_specs, specs_for
 from .propvalues import InvalidValue, decode_value
 from .typedefs import RawObject
 
@@ -304,6 +305,7 @@ def build_rows(
 
     rows: list[Row] = []
     computer = None
+    counterpart_cache: dict[str, _Counterparts] = {}
     for raw, summary in items:
         if type_ids is not None and summary.type not in type_ids:
             continue
@@ -319,8 +321,24 @@ def build_rows(
         if computer is None and has_computed(t):
             # M12: one per request, so "now" is one instant and each value is computed once.
             computer = Computer(space)
-        rows.append(_row(space, raw, summary, preview, computer))
+        rows.append(_row(space, raw, summary, preview, computer, counterpart_cache))
     return rows
+
+
+_Counterparts = tuple[list[CounterpartSpec], list[str]]
+"""A type's `specs_for` and its counterpart keys (`counterpart_defs` order), once per request."""
+
+
+def _counterparts_of(
+    space: Space, type_id: str, cache: dict[str, _Counterparts] | None
+) -> _Counterparts:
+    hit = cache.get(type_id) if cache is not None else None
+    if hit is None:
+        specs = specs_for(type_id, space.types)
+        hit = (specs, [d.key for d in defs_from_specs(specs)])
+        if cache is not None:
+            cache[type_id] = hit
+    return hit
 
 
 def _row(
@@ -329,6 +347,7 @@ def _row(
     summary: ObjectSummary,
     preview: bool = True,
     computer: Computer | None = None,
+    counterpart_cache: dict[str, _Counterparts] | None = None,
 ) -> Row:
     from .space import version_of
 
@@ -357,6 +376,22 @@ def _row(
         elif p.type == "entity_title" and value is None:
             value = summary.title
         values[p.key] = value
+    # M28: each counterpart key of the type holds the other objects of its rows (merged over the
+    # sources, by title then path), as a relation value would; a stored property of that key wins.
+    specs, keys = _counterparts_of(space, summary.type, counterpart_cache)
+    if keys:
+        index = space.links
+        cp_rows = index.counterparts(summary.path, specs)
+        summaries = space._summaries
+        for key in keys:
+            if key in values:
+                continue
+            merged = list(dict.fromkeys(p for r in cp_rows if r["key"] == key for p in r["paths"]))
+            merged.sort(key=index._title_key)
+            values[key] = [
+                {"target": summaries[p].title if p in summaries else p, "path": p} for p in merged
+            ]
+            links[key] = list(merged)
     if computed:
         # M12: formula and rollup values (`ComputedValue`s), computed here and never stored.
         if computer is None:

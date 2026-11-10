@@ -11,7 +11,9 @@ source or target) don't count; ``tags:`` membership is kept separately
 ``![[T#^id]]``) is a link to ``T``. Link targets written as a day
 (``[[YYYY-MM-DD]]``) are also kept unresolved (`day_backlinks`), and each
 object's date tokens (``<time datetime="YYYY-MM-DD">``, outside code) are
-counted (`date_tokens`, `date_references`).
+counted (`date_tokens`, `date_references`). M28: the computed other sides of
+named relations (`counterparts`) are answered from the same incoming links and
+the property keys each one holds.
 
 The index stores each source's link *targets* (`_extract`, one method, the hook
 point for other kinds of objects) and resolves them on read. `on_change` only
@@ -35,6 +37,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from .counterparts import CounterpartRow, CounterpartSpec, specs_for
 from .dailynotes import parse_day
 from .propvalues import decode_value
 from .relink import code_ranges, segments, wikilink_spans, wikilink_targets
@@ -448,16 +451,60 @@ class LinkIndex:
         cached = self._backlinks_cache.get(path)
         if cached is not None:
             return list(cached)
-        summaries = self._space._summaries
-
-        def key(p: str) -> tuple[str, str, str]:
-            s = summaries.get(p)
-            title = s.title if s is not None else p
-            return (title.casefold(), title, p)
-
-        out = sorted(self._in.get(path, ()), key=key)
+        out = sorted(self._in.get(path, ()), key=self._title_key)
         self._backlinks_cache[path] = out
         return list(out)
+
+    def _title_key(self, p: str) -> tuple[str, str, str]:
+        """Sort key: title (case-folded, then as written), then path."""
+        s = self._space._summaries.get(p)
+        title = s.title if s is not None else p
+        return (title.casefold(), title, p)
+
+    def counterparts(
+        self, path: str, specs: list[CounterpartSpec] | None = None
+    ) -> list[CounterpartRow]:
+        """The computed other sides of ``path`` (M28): one row per counterpart spec of its type.
+
+        A row lists the non-template objects of the spec's source type whose resolved value of
+        the source property includes ``path`` (never ``path`` itself), by title then path. Body
+        links and wikilinks in other front matter values don't count. A spec whose source names
+        the type explicitly always gives a row; one open to any type only while it has paths.
+        ``specs`` is `counterparts.specs_for` of the object's type, when the caller has it.
+        """
+        self._ensure()
+        summaries = self._space._summaries
+        summary = summaries.get(path)
+        if summary is None or summary.template is not None:
+            return []
+        if specs is None:
+            specs = specs_for(summary.type, self._space.types)
+        if not specs:
+            return []
+        incoming = self._in.get(path, ())
+        rows: list[CounterpartRow] = []
+        for spec in specs:
+            paths = []
+            for src in incoming:
+                s = summaries.get(src)
+                if s is None or s.template is not None or s.type != spec.source_type_id:
+                    continue
+                r = self._resolved.get(src)
+                entry = r.out.get(path) if r is not None else None
+                if entry is not None and spec.source_key in entry[1]:
+                    paths.append(src)
+            if not paths and not spec.targets:
+                continue
+            rows.append(
+                CounterpartRow(
+                    key=spec.key,
+                    name=spec.name,
+                    sourceTypeId=spec.source_type_id,
+                    sourcePropertyKey=spec.source_key,
+                    paths=sorted(paths, key=self._title_key),
+                )
+            )
+        return rows
 
     def mentioning(self, names: Iterable[str]) -> set[str]:
         """The objects (templates included) with a link whose target text is one of ``names``.

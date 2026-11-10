@@ -49,6 +49,51 @@ const CASES: Record<string, { hit: [string, Values, Summary?][]; miss: [string, 
   },
   organization: { hit: [['Acme', { category: ['Company'] }]], miss: [['College', { category: ['University'] }]] },
   area: { hit: [['Health', {}], ['Work', {}]], miss: [] },
+  // M28: the IT ops entries.
+  host: {
+    hit: [['APP-01', { environment: ['Production'] }], ['DB-01', { environment: ['Production'] }]],
+    miss: [['TEST-01', { environment: ['Test'] }], ['Bare', {}]],
+  },
+  software: {
+    hit: [
+      ['SQL Server 2022', { product: 'SQL Server', version: '2022' }],
+      ['SQL Server 2019', { product: 'SQL Server', version: '2019' }],
+      ['Windows Server 2022', { product: 'Windows Server', version: '2022' }],
+    ],
+    miss: [],
+  },
+  application: {
+    hit: [['Billing', { status: ['Live'] }], ['Inventory', { status: ['Live'] }]],
+    miss: [['Legacy', { status: ['Retired'] }], ['Next', { status: ['Planned'] }]],
+  },
+  container: { hit: [['api', {}], ['web', {}]], miss: [] },
+  configuration: { hit: [['Backup policy', {}], ['Firewall rule', {}]], miss: [] },
+  location: { hit: [['Main site', { kind: ['Site'] }]], miss: [['Rack A', { kind: ['Rack'] }], ['Unsorted', {}]] },
+  network: { hit: [['Server VLAN', {}], ['Wifi', {}]], miss: [] },
+  vendor: {
+    hit: [['Early', { contractEnds: day('2026-12-01') }], ['Later', { contractEnds: day('2027-06-01') }]],
+    miss: [['No contract', {}]],
+  },
+  script: {
+    hit: [
+      ['Newer', {}, { lastUpdated: '2026-11-03T10:00:00Z' }],
+      ['Older', {}, { lastUpdated: '2026-11-01T10:00:00Z' }],
+    ],
+    miss: [],
+  },
+  command: { hit: [['Get-Service', {}], ['ls', {}]], miss: [] },
+  runbook: {
+    hit: [['Restore', { lastReviewed: day('2025-01-15') }], ['Restart', { lastReviewed: day('2026-10-01') }]],
+    miss: [],
+  },
+  prompt: { hit: [['Summarise logs', {}], ['Write a runbook', {}]], miss: [] },
+  incident: {
+    hit: [
+      ['Outage', { status: ['Open'] }, { lastUpdated: '2026-11-03T10:00:00Z' }],
+      ['Slow app', { status: ['Open'] }, { lastUpdated: '2026-11-01T10:00:00Z' }],
+    ],
+    miss: [['Fixed', { status: ['Resolved'] }], ['Calmer', { status: ['Mitigated'] }]],
+  },
 }
 
 const NOW = new Date(2026, 10, 4, 12, 0) // Wednesday 2026-11-04
@@ -56,7 +101,7 @@ const NOW = new Date(2026, 10, 4, 12, 0) // Wednesday 2026-11-04
 describe('the starter templates’ saved queries', () => {
   test('every gallery template has a query and a case here', () => {
     expect(Object.keys(TEMPLATES).sort()).toEqual(Object.keys(CASES).sort())
-    expect(Object.keys(TEMPLATES)).toHaveLength(13)
+    expect(Object.keys(TEMPLATES)).toHaveLength(26)
   })
 
   test.each(Object.keys(CASES))('%s: the query picks its objects', (key) => {
