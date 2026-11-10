@@ -709,16 +709,19 @@ class Filing:
                 done.append(p)
             batches.write_json(batches.batch_dir(self.space.root, batch) / "decisions.json", decisions)
             if trial:
-                d["trialPaths"], d["verdicts"], d["state"] = list(done), {}, "trial"
+                d["trialPaths"], d["verdicts"], final = list(done), {}, "trial"
             elif as_sources:
-                d["normalise"], d["state"] = [], "entities"  # M30: Gene reviews the entities next
+                d["normalise"], final = [], "entities"  # M30: Gene reviews the entities next
             else:
                 d["normalise"] = self._normalise_suggestions(d, self._filed(batch, d))
                 self._links_pass(d)
                 self._inbox_items(batch, d)
-                d["state"] = "done"
+                final = "done"
             self._save(batch, d)
-        self.record_accuracy(batch)
+            # As in `_work`: the report first, then the state that says the pass ended.
+            self.record_accuracy(batch)
+            d["state"] = final
+            self._save(batch, d)
         self.announce()
         results = [d["results"][p] for p in done]
         return {"applied": sum(1 for r in results if not r["inbox"]), "inbox": sum(1 for r in results if r["inbox"]),
@@ -979,15 +982,19 @@ class Filing:
         if as_sources:
             # M30: no links pass (relations replace it) and nothing in the inbox yet: Gene reviews the
             # entities, and Write files them (`write_entities`).
-            d["normalise"], d["state"] = [], "entities"
+            d["normalise"], final = [], "entities"
         else:
             d["normalise"] = self._normalise_suggestions(d, self._filed(batch, d))
             self._links_pass(d)
             self._inbox_items(batch, d)
-            d["state"] = "done"
+            final = "done"
         d["trialDone"] = d["trialDone"] or bool(d["trialPaths"])
         self._save(batch, d)
+        # The report is written before the state says the pass ended, so whoever sees "entities" or
+        # "done" never meets the report half written (audit 2026-11-10).
         self.record_accuracy(batch)
+        d["state"] = final
+        self._save(batch, d)
 
     # normalise
 
