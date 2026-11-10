@@ -3,7 +3,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ChangeEvent, ComputedValue, ObjectDetail, SpaceInfo, TypeDef, UpdateResult } from '@/api/types'
-import { objectDetail, objectSummary, propertyDef, typeDef } from '@/test/mockApi'
+import { counterpartRow, objectDetail, objectSummary, propertyDef, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
@@ -128,6 +128,18 @@ describe('ObjectView: computed values stay fresh', () => {
     emit({ kind: 'changed', path: 'Pages/Notes.md', version: 'n2' })
     await waitFor(() => expect(screen.getAllByTestId('backlink-chip')).toHaveLength(1))
     expect(screen.queryByText('Not taken.')).not.toBeInTheDocument()
+  })
+
+  // M28 review #8: a type that only receives an other side from an "any type" source (Command or
+  // Runbook "Covers") has no `counterparts` of its own, yet its object has counterpart rows.
+  test('a change to another object refreshes counterpart rows from an any-type source', async () => {
+    setup([STAGE, DOUBLE])
+    const row = counterpartRow({ key: 'documentedIn', name: 'Documented in', sourceTypeId: 'runbook', sourcePropertyKey: 'covers', paths: ['Runbooks/Patching.md'] })
+    onDisk = { ...detail('v1', { double: num(8) }), counterparts: [row] }
+    await openPage()
+    onDisk = { ...onDisk, counterparts: [{ ...row, paths: ['Runbooks/Patching.md', 'Runbooks/Restart.md'] }] }
+    emit({ kind: 'changed', path: 'Runbooks/Restart.md', version: 'r2' })
+    await waitFor(() => expect(mocked.object).toHaveBeenCalledTimes(1))
   })
 
   test('without a rollup, other objects changing read nothing', async () => {
