@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/api/client'
 import type { EntityRef, ObjectSummary, PropertyDef, TypeDef } from '@/api/types'
 import { IconOrEmoji, Icon } from '@/components/Icon'
-import { fuzzyMatch } from '@/links/LinkPicker'
+import { suggestFor } from '@/create/suggestContext'
+import { SUGGEST_TEXT } from '@/create/typeSuggest'
+import { showToast } from '@/editor/media/upload'
+import { TypeChip } from '@/shell/Sidebar'
+import { creatableTypes, createTitled, fuzzyMatch } from '@/links/LinkPicker'
 import { ensureLinkIndex, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { tagStyle, themeColor } from '@/theme/palette'
 
@@ -25,6 +29,8 @@ export const RELATION_PICKER_TEXT = {
   nothingFound: 'Nothing found',
   nothingToSelect: 'This set has nothing to pick from. Search everything to add objects to it.',
   editProperty: 'Edit Property',
+  /** Item 22's Tag row, and M29's create rows (one per type). */
+  create: (q: string) => `Create '${q}'`,
 }
 
 function folderOf(path: string): string {
@@ -57,13 +63,20 @@ export function isTagType(type: TypeDef | undefined): boolean {
  * Item 22, a relation to the Tag type only (Object -> Tag "Status" or "Category"):
  * "Search or Create", each tag a chip in its own colour, and "Create 'x'" makes the Tag object
  * (`api.ensureTag`) and picks it.
+ *
+ * M29, any other relation without a fixed set: a query that matches no candidate exactly gains
+ * "Create '<q>'" rows below the list, one per allowed type (every writable type when any type is
+ * allowed), the suggested one first with "Suggested". Picking one creates the object (no
+ * `templateId`), adds it to the value and sets the space's last type.
  */
 export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }: RelationPickerProps) {
   const objects = useLinkIndex((s) => s.objects)
+  const types = useLinkIndex((s) => s.types)
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
   const multi = def.options.isArray ?? true
-  const allowed = def.options.allowedTypes ?? []
+  const allowedTypes = def.options.allowedTypes
+  const allowed = useMemo(() => allowedTypes ?? [], [allowedTypes])
   const tagsOnly = allowed.length === 1 && isTagType(typeOf(allowed[0]))
 
   useEffect(() => {
@@ -95,6 +108,34 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
   const q = query.trim()
   const canCreate =
     tagsOnly && !def.options.hasFixedSet && q !== '' && !candidates.some((o) => o.title.toLowerCase() === q.toLowerCase())
+  // M29: the create rows of any other relation, the suggested type first.
+  const exact = q !== '' && candidates.some((o) => o.title.toLowerCase() === q.toLowerCase())
+  const createTypes = useMemo(() => {
+    if (tagsOnly || def.options.hasFixedSet || !q || exact) return []
+    const writable = creatableTypes(types)
+    const offered = allowed.length
+      ? allowed.map((id) => writable.find((t) => t.id === id)).filter((t): t is TypeDef => !!t)
+      : writable
+    const first = suggestFor(q, offered, { allowed })[0]
+    const top = offered.find((t) => t.id === first)
+    const rest = offered.filter((t) => t !== top).map((t) => ({ t, suggested: false }))
+    return top ? [{ t: top, suggested: true }, ...rest] : rest
+  }, [tagsOnly, def.options.hasFixedSet, q, exact, types, allowed])
+  const createOf = async (t: TypeDef) => {
+    if (creating) return
+    setCreating(true)
+    try {
+      const { path } = await createTitled(t, q)
+      setQuery('')
+      pick({ path, title: q })
+    } catch (err) {
+      // The object couldn't be made; the query stays so the user can try again.
+      showToast(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCreating(false)
+    }
+  }
+
   const create = async () => {
     if (!canCreate || creating) return
     setCreating(true)
@@ -126,6 +167,9 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
             } else if (canCreate) {
               e.preventDefault()
               void create()
+            } else if (createTypes[0]) {
+              e.preventDefault()
+              void createOf(createTypes[0].t)
             }
           }}
           className="h-7 w-full rounded bg-transparent px-1.5 text-[14px] text-fg outline-none placeholder:text-fg-muted"
@@ -191,7 +235,7 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
             className="flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-[14px] text-fg hover:bg-hover"
           >
             <Icon name="ph-plus" size={14} />
-            {`Create '${q}'`}
+            {RELATION_PICKER_TEXT.create(q)}
           </div>
         )}
         {shown.length === 0 && !canCreate && (
@@ -202,6 +246,27 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
           </p>
         )}
       </div>
+      {createTypes.length > 0 && (
+        <div data-create-rows="" className="max-h-[8rem] shrink-0 overflow-y-auto border-t border-line p-1">
+          {createTypes.map(({ t, suggested }) => (
+            <button
+              key={t.id}
+              type="button"
+              disabled={creating}
+              data-create-type={t.id}
+              onClick={() => void createOf(t)}
+              className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[14px] text-fg hover:bg-hover"
+            >
+              <TypeChip type={t} size={18} />
+              <span className="min-w-0 flex-1 truncate">{RELATION_PICKER_TEXT.create(q)}</span>
+              <span className="shrink-0 text-[12px] text-fg-muted">{t.name}</span>
+              {suggested && (
+                <span className="shrink-0 rounded bg-hover px-1.5 text-[12px] text-fg-muted">{SUGGEST_TEXT.suggested}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
       {onOpenSettings && (
         <div data-type-setting="" className="border-t border-line p-1">
           <button
