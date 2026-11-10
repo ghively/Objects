@@ -7,6 +7,7 @@ import type {
   EntityRef,
   Icon as IconValue,
   ObjectSummary,
+  ObjectSynced,
   PropertyDef,
   PropertyType,
   TypeDef,
@@ -21,6 +22,7 @@ import { cellForDef, FRONTMATTER_KINDS } from '@/properties/cellFor'
 import { propertyIsEmpty } from '@/properties/format'
 import { kindIcon } from '@/properties/kinds'
 import { PropertyMenu } from '@/properties/PropertyMenu'
+import { isSynced, syncedStale, SyncedLine } from '@/properties/synced'
 import { DeletePropertySection, PropertySettings } from '@/properties/PropertySettings'
 import { useSettings } from '@/settings/useSettings'
 import { LAYOUT_KEYS, removeProperty } from '@/properties/typeEdits'
@@ -171,8 +173,16 @@ export function cellValue(
   backlinks?: EntityRef[],
   /** M12: the object's formula and rollup values (`GET /api/object`'s `computed`), never in frontmatter. */
   computed?: Record<string, ComputedValue>,
+  /** M29: the object's synced values (`GET /api/object`'s `synced`, decoded), never in frontmatter. */
+  synced?: ObjectSynced,
 ): unknown {
   if (COMPUTED_KINDS.has(def.type)) return computed?.[def.key] ?? null
+  // M29: a synced property shows the store's value; one typed into the file never shows (the
+  // property is empty until its first sync).
+  if (isSynced(def)) {
+    const values = synced?.values ?? {}
+    return def.key in values ? values[def.key] : cellValue({ ...def, synced: null }, {}, links, summary)
+  }
   const raw = frontmatter[def.key]
   switch (def.type) {
     case 'entity_type':
@@ -243,6 +253,8 @@ export interface PropertyPanelProps {
   computed?: Record<string, ComputedValue>
   /** M28: the computed other sides pointing here (`ObjectDetail.counterparts`). */
   counterparts?: CounterpartRow[]
+  /** M29: the object's synced values and when they were refreshed (`ObjectDetail.synced`). */
+  synced?: ObjectSynced
   /** M28: add or remove other objects on a counterpart row (writes their stored side). */
   onEditCounterpart?(key: string, add: string[], remove: string[]): Promise<void>
   readOnly?: boolean
@@ -338,6 +350,8 @@ interface PropertyRowProps {
   def: PropertyDef
   value: unknown
   readOnly: boolean
+  /** M29: for a synced property, when its values were refreshed (null: not yet). */
+  refreshedAt?: string | null
   frontmatter?: Record<string, unknown>
   /** The type, when its definitions can be edited here (the row's PropertyMenu and settings). */
   type?: TypeDef
@@ -360,8 +374,12 @@ function sameValue(a: unknown, b: unknown): boolean {
 
 /** One property's label and cell: re-renders only when its own definition, value or state changes. */
 const PropertyRow = memo(
-  function PropertyRow({ def, value, readOnly, frontmatter, type, menuOpen, typeId, path, handlers: h }: PropertyRowProps) {
+  function PropertyRow({ def, value, readOnly, refreshedAt, frontmatter, type, menuOpen, typeId, path, handlers: h }: PropertyRowProps) {
     const Cell = cellForDef(def)
+    // M29: a synced property is filled only through the API: read-only, with its source line.
+    const synced = isSynced(def)
+    const ro = readOnly || synced
+    const stale = synced && syncedStale(def, refreshedAt)
     const menu = type
       ? {
           open: menuOpen,
@@ -383,27 +401,40 @@ const PropertyRow = memo(
           ),
         }
       : undefined
+    const cell = Cell ? (
+      <Cell
+        def={def}
+        value={value}
+        readOnly={ro}
+        onChange={(next: unknown) => {
+          if (!synced) h.onChange(def.key, next)
+        }}
+        frontmatter={frontmatter}
+        onChangeMany={ro ? undefined : h.onChangeMany}
+        onSetReminder={ro ? undefined : h.onSetReminder}
+        onWorkWrite={ro ? undefined : h.onWorkWrite}
+        onDefChange={h.onDefChange}
+        onOpenTag={h.onOpenTag}
+        onOpenObject={h.onOpenObject}
+        onChangeType={h.onChangeType}
+        typeId={typeId}
+        path={path}
+        onOpenSettings={type ? () => h.setSettingsFor(def.id) : undefined}
+      />
+    ) : null
     return (
       <Row label={def.name} icon={def.icon ?? kindIcon(def.type)} menu={menu}>
-        {Cell ? (
-          <Cell
-            def={def}
-            value={value}
-            readOnly={readOnly}
-            onChange={(next: unknown) => h.onChange(def.key, next)}
-            frontmatter={frontmatter}
-            onChangeMany={readOnly ? undefined : h.onChangeMany}
-            onSetReminder={readOnly ? undefined : h.onSetReminder}
-            onWorkWrite={readOnly ? undefined : h.onWorkWrite}
-            onDefChange={h.onDefChange}
-            onOpenTag={h.onOpenTag}
-            onOpenObject={h.onOpenObject}
-            onChangeType={h.onChangeType}
-            typeId={typeId}
-            path={path}
-            onOpenSettings={type ? () => h.setSettingsFor(def.id) : undefined}
-          />
-        ) : null}
+        {synced ? (
+          <>
+            {/* Muted once stale (older than the property's stale-after days). */}
+            <div data-synced-value="" data-stale-value={stale ? '' : undefined} className={stale ? 'text-fg-muted opacity-60' : undefined}>
+              {cell}
+            </div>
+            <SyncedLine def={def} refreshedAt={refreshedAt ?? null} />
+          </>
+        ) : (
+          cell
+        )}
       </Row>
     )
   },
@@ -411,6 +442,7 @@ const PropertyRow = memo(
     a.def === b.def &&
     sameValue(a.value, b.value) &&
     a.readOnly === b.readOnly &&
+    a.refreshedAt === b.refreshedAt &&
     // Only the kinds whose cell reads sibling keys re-render for another key's change.
     (!FRONTMATTER_KINDS.has(a.def.type) || sameValue(a.frontmatter, b.frontmatter)) &&
     a.type === b.type &&
@@ -429,6 +461,7 @@ export function PropertyPanel({
   backlinks,
   computed,
   counterparts,
+  synced,
   onEditCounterpart,
   readOnly,
   onChange,
@@ -457,7 +490,7 @@ export function PropertyPanel({
   const hidden: PropertyDef[] = []
   for (const d of rows) {
     if (d.visibility === 'hidden') hidden.push(d)
-    else if (d.visibility === 'hideWhenEmpty' && propertyIsEmpty(d, cellValue(d, frontmatter, links, summary, backlinks, computed))) continue
+    else if (d.visibility === 'hideWhenEmpty' && propertyIsEmpty(d, cellValue(d, frontmatter, links, summary, backlinks, computed, synced))) continue
     else visible.push(d)
   }
   const external = externalKeys(type, frontmatter)
@@ -530,8 +563,9 @@ export function PropertyPanel({
   const renderRow = (def: PropertyDef) => (
     <PropertyRow
       def={def}
-      value={cellValue(def, frontmatter, links, summary, backlinks, computed)}
+      value={cellValue(def, frontmatter, links, summary, backlinks, computed, synced)}
       readOnly={ro}
+      refreshedAt={isSynced(def) ? (synced?.refreshedAt ?? null) : undefined}
       frontmatter={frontmatter}
       type={editDefs ? type : undefined}
       menuOpen={menuFor === def.id}

@@ -1,0 +1,58 @@
+// M29: synced facts. A property marked `synced` is filled only by a script or agent through the
+// API (`POST /api/v1/synced/{typeId}`); its values live in `.object/synced/<typeId>.json`, never
+// in the file, and the app shows them read-only with their source, when they were refreshed and
+// "Stale" once they are older than the property's stale-after days.
+import type { PropertyDef } from '@/api/types'
+import { SYNCED_STALE_DEFAULT } from '@/api/types'
+import { ago } from '@/automations/ruleModel'
+
+/** Our strings. */
+export const SYNCED_TEXT = {
+  refreshed: (source: string, ago: string) => `${source} · Refreshed ${ago}`,
+  never: (source: string) => `${source} · Not refreshed yet`,
+  stale: 'Stale',
+  readOnly: (name: string, source: string) => `"${name}" is filled by ${source} and can't be edited.`,
+}
+
+const DAY_MS = 86_400_000
+
+/** Whether the property is synced (its definition carries the synced mark). */
+export function isSynced(def: PropertyDef | undefined | null): boolean {
+  return !!def?.synced
+}
+
+/** The stale-after days of a synced mark (7 when it gives none). */
+export function staleAfterDays(def: PropertyDef | undefined | null): number {
+  const n = def?.synced?.staleAfterDays
+  return typeof n === 'number' && Number.isFinite(n) ? n : SYNCED_STALE_DEFAULT
+}
+
+/** Stale strictly after `staleAfterDays` days since `refreshedAt`; never refreshed is not stale. */
+export function isStale(refreshedAt: string | null | undefined, staleAfterDays: number, now: Date): boolean {
+  if (!refreshedAt) return false
+  const t = new Date(refreshedAt).getTime()
+  if (Number.isNaN(t)) return false
+  return now.getTime() - t > staleAfterDays * DAY_MS
+}
+
+/** Whether a synced property's values (refreshed at `refreshedAt`) are stale now. */
+export function syncedStale(def: PropertyDef, refreshedAt: string | null | undefined, now: Date = new Date()): boolean {
+  return isSynced(def) && isStale(refreshedAt, staleAfterDays(def), now)
+}
+
+/** The line under a synced value: "{source} · Refreshed {time ago}" (or "Not refreshed yet"), then "Stale". */
+export function SyncedLine({ def, refreshedAt, now }: { def: PropertyDef; refreshedAt: string | null; now?: Date }) {
+  const at = now ?? new Date()
+  const source = def.synced?.source ?? ''
+  const stale = syncedStale(def, refreshedAt, at)
+  return (
+    <p data-synced-line="" className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-fg-muted">
+      <span>{refreshedAt ? SYNCED_TEXT.refreshed(source, ago(refreshedAt, at)) : SYNCED_TEXT.never(source)}</span>
+      {stale && (
+        <span data-stale="" className="rounded bg-hover px-1.5 text-[11px] font-medium text-fg-muted">
+          {SYNCED_TEXT.stale}
+        </span>
+      )}
+    </p>
+  )
+}
