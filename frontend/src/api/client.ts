@@ -70,6 +70,8 @@ import type {
   FilingStatus,
   FilingVerdict,
   ImportProposalResponse,
+  EntitiesReview,
+  EntitiesView,
   ProposalReviewItem,
   CreatedDailyNote,
   GraphCustomization,
@@ -1537,6 +1539,23 @@ export const api = {
 
   normaliseFiling(batchId: string, merges: { from: string[]; to: string }[]): Promise<{ ok?: boolean }> {
     return request<{ ok?: boolean }>(`/import/batches/${seg(batchId)}/filing/normalise`, json('POST', { merges }))
+  },
+
+  // ---- M30 entity extraction: the Entities step of a batch kept as Sources ----
+
+  /** The batch's entity list with Gene's decisions (computed on read; writes nothing). 404 no batch; 409 not kept as Sources. */
+  importEntities(batchId: string): Promise<EntitiesView> {
+    return request<EntitiesView>(`/import/batches/${seg(batchId)}/entities`)
+  },
+
+  /** Save the whole review; answers the view the server computes from it. 422 an invalid review; 409 written already. */
+  saveEntitiesReview(batchId: string, review: EntitiesReview): Promise<{ ok?: boolean; view: EntitiesView }> {
+    return request<{ ok?: boolean; view: EntitiesView }>(`/import/batches/${seg(batchId)}/entities/review`, json('PUT', review))
+  },
+
+  /** "Write" (202): writes the accepted entities in the filing worker; poll `filingStatus`. App only, never an MCP tool. */
+  writeEntities(batchId: string): Promise<{ ok?: boolean }> {
+    return request<{ ok?: boolean }>(`/import/batches/${seg(batchId)}/entities/write`, json('POST', {}))
   },
 
   /** M25 "Move batch to Trash": every object the batch created goes to the Trash (restorable). 409 while an import runs. */

@@ -40,7 +40,8 @@ def _preview(client, path, **extra):
 def _import(client, preview: dict, target: dict, mapping: dict | None = None) -> dict:
     r = client.post(
         "/api/import/start",
-        json={"previewId": preview["previewId"], "mapping": mapping or preview["mapping"], "target": target},
+        json={"previewId": preview["previewId"], "mapping": mapping or preview["mapping"], "target": target,
+              "keepAsSources": False},
     )
     assert r.status_code == 202, r.text
     job = wait_job(client, r.json()["jobId"])

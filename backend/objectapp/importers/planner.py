@@ -56,16 +56,21 @@ from .model import (
     TypeOverride,
 )
 from .readmodel import ReadObject, ReadResult
+from .sources import SOURCE_TYPE_ID, is_imported_source
 
 if TYPE_CHECKING:
     from ..space import Space
 
-__all__ = ["MappingProblem", "Planned", "Target", "importable_type", "plan", "to_preview"]
+__all__ = ["SOURCE_KEY", "MappingProblem", "Planned", "Target", "importable_type", "plan", "to_preview"]
 
 PAGE_KEY = "page"
 IMAGE_KEY = "image"
 """The preview's row for the images the Page row would take (AC-2): the writer's rule shown, not a
 mapping row, so a mapping entry for it is refused (`IMAGE_ROW_FIXED`)."""
+SOURCE_KEY = "source"
+"""M30: the plan type of the pages kept as Sources (the Source type; never created or extended here)."""
+SOURCE_ORIGIN = "Pages kept as Sources"
+"""Our string: the preview's origin label of the Source row."""
 IMAGE_TYPE = "Image"
 IMAGE_FOLDER = "Images"
 IMAGE_ORIGIN = "Image files"
@@ -315,6 +320,7 @@ def plan(
     now: datetime | None = None,
     reuse: dict[str, str] | None = None,
     lenient: bool = False,
+    keep_as_sources: bool = False,
 ) -> Planned:
     """Plan the import of ``read`` with ``mapping`` (None: the defaults) into ``target``.
 
@@ -322,7 +328,13 @@ def plan(
     after the preview) is dropped instead of refused.
 
     ``reuse`` (M25 re-runs): source path -> the space path of the object an earlier import made
-    from it; such an object keeps that path (no `` (2)`` name) and the writer updates or skips it."""
+    from it; such an object keeps that path (no `` (2)`` name) and the writer updates or skips it.
+
+    ``keep_as_sources`` (M30, "Keep pages as Sources"): every page is planned as type Source
+    (`SOURCE_KEY`): no mapped type is created or extended, and its fields are planned as usual but
+    written as frontmatter keys the Source type doesn't declare. Images stay M25's Image objects.
+    The mapping is kept as given (the batch records it) but not applied. Whatever the option, a
+    page an earlier import made into an imported Source stays a Source."""
     reuse = reuse or {}
     now_iso = _stamp(now or datetime.now(UTC))
     if mapping is None:
@@ -330,9 +342,13 @@ def plan(
     else:
         mapping = mapping.model_copy(deep=True)
     is_notion = read.kind == "notion"
+    kept_mapping: ImportMapping | None = None
+    if keep_as_sources:  # kept as given for the batch records; nothing of it is applied
+        kept_mapping = mapping.model_copy(deep=True)
+        mapping = ImportMapping(typeSource=mapping.typeSource, typeKey=mapping.typeKey)
     if mapping.typeSource == "key" and not mapping.typeKey:
         mapping.typeKey = read.defaultTypeKey
-        if not mapping.typeKey:
+        if not mapping.typeKey and not keep_as_sources:
             raise MappingProblem("Choose the frontmatter key that names each object's type.")
     type_source = "notion" if is_notion else mapping.typeSource
     existing_types = target.types()
@@ -342,8 +358,27 @@ def plan(
             if o.existingTypeId:  # "" (a new type) is fine anywhere
                 raise MappingProblem("An existing type can only be chosen when importing into this space.")
 
+    # M30: the Source type (the space's, else M28's definition, made by the writer).
+    source_def = by_id.get(SOURCE_TYPE_ID)
+    if source_def is None:
+        from ..basicsetup import source_type
+
+        source_def = source_type()
+    source_space = target.space if target.kind == "currentSpace" else None
+
+    def as_source(o: ReadObject) -> bool:
+        rel = reuse.get(o.sourcePath)
+        if rel and source_space is not None:
+            if _is_source_at(source_space, rel):
+                return True  # a Source stays one whatever this run's option says
+            if source_space.root.joinpath(rel).is_file():
+                return False  # an object an earlier import filed into a type is never retyped
+        return keep_as_sources and not (o.native and kind_of(o.sourcePath) == "image")
+
     # 1. Each object's planned type key.
     def type_key_of(o: ReadObject) -> str:
+        if as_source(o):
+            return SOURCE_KEY
         if type_source == "notion":
             return o.group or PAGE_KEY
         if type_source == "folder":
@@ -361,13 +396,16 @@ def plan(
     order: list[tuple[str, str, str, str, str]] = []  # key, name, plural, origin, label
     if type_source == "notion":
         for db in read.databases:
-            order.append((db.key, db.name, db.name, "database", db.csvPath))
+            if not keep_as_sources or db.key in members:  # kept as Sources: no database becomes a type
+                order.append((db.key, db.name, db.name, "database", db.csvPath))
     elif type_source == "folder":
         for folder in sorted(k[7:] for k in members if k.startswith("folder:")):
             order.append((f"folder:{folder}", _singular(folder), folder, "folder", folder))
     elif type_source == "key":
         for value in sorted((k[4:] for k in members if k.startswith("key:")), key=str.casefold):
             order.append((f"key:{value}", value, f"{value}s", "key", f"{mapping.typeKey}: {value}"))
+    if SOURCE_KEY in members:
+        order.append((SOURCE_KEY, source_def.name, source_def.pluralName, "page", SOURCE_ORIGIN))
     if PAGE_KEY in members or not order:
         order.append((PAGE_KEY, "Page", "Pages", "page", _PAGE_ORIGIN[type_source]))
     known_keys = {k for k, *_ in order}
@@ -392,6 +430,13 @@ def plan(
     type_writes: dict[str, TypeWrite] = {}
     effective_types: dict[str, TypeOverride] = {}
     for key, name, plural, origin, label in order:
+        if key == SOURCE_KEY:
+            # Never created or extended here: the writer ensures the type (`ensure_source_type`).
+            src_id = source_def.id if source_def.id in by_id else None
+            folder = source_def.folder.strip("/") or safe_filename(source_def.pluralName)
+            plan_types.append(PlanType(key, name, plural, origin, label, [], src_id, False))
+            type_writes[key] = TypeWrite(key, src_id, name, plural, folder, True)
+            continue
         o = mapping.types.get(key) or TypeOverride()
         name = " ".join((o.name if o.name is not None else name).split()) or name
         plural = " ".join((o.pluralName if o.pluralName is not None else plural).split()) or plural
@@ -463,9 +508,15 @@ def plan(
     for pt in plan_types:
         tw = type_writes[pt.key]
         objs = members.get(pt.key, [])
-        existing = by_id.get(tw.existingTypeId) if tw.existingTypeId else (page_type if pt.key == PAGE_KEY and tw.basic else None)
-        existing_props = {p.key: p for p in existing.propertyDefinitions} if existing else {}
-        taken = set(existing_props)
+        if pt.key == SOURCE_KEY:
+            # The fields stay the page's own keys, never the Source type's (nor clashing with them).
+            existing = None
+            existing_props: dict[str, PropertyDefinition] = {}
+            taken = {p.key for p in source_def.propertyDefinitions}
+        else:
+            existing = by_id.get(tw.existingTypeId) if tw.existingTypeId else (page_type if pt.key == PAGE_KEY and tw.basic else None)
+            existing_props = {p.key: p for p in existing.propertyDefinitions} if existing else {}
+            taken = set(existing_props)
         names: list[str] = []
         if is_notion and pt.origin == "database":
             db = next(d for d in read.databases if d.key == pt.key)
@@ -878,8 +929,11 @@ def plan(
         renamed=len(renamed),
         skipped=len(skipped),
     )
+    effective_props.pop(SOURCE_KEY, None)
     mapping.types = effective_types
     mapping.properties = effective_props
+    if kept_mapping is not None:
+        mapping = kept_mapping
     if is_notion:
         mapping.typeSource = "folder"
 
@@ -925,6 +979,13 @@ def plan(
         image_sources=frozenset(image_sources),
         image_type_id=image_type.id if image_type is not None and target.kind == "currentSpace" else None,
     )
+
+
+def _is_source_at(space: Space, rel: str) -> bool:
+    """Whether the object at ``rel`` is an imported Source (M30)."""
+    with space._lock:
+        raw = space._raw.get(rel)
+    return raw is not None and is_imported_source(space._type_id(raw.typeName), raw.fm)
 
 
 def _short(value: Any) -> str:

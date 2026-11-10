@@ -42,7 +42,7 @@ def preview(client, src) -> dict:
 def run(client, src, **extra) -> dict:
     p = preview(client, src)
     r = client.post("/api/import/start", json={"previewId": p["previewId"], "mapping": p["mapping"],
-                                               "target": {"kind": "currentSpace"}, **extra})
+                                               "target": {"kind": "currentSpace"}, "keepAsSources": False, **extra})
     assert r.status_code == 202, r.text
     job = wait_job(client, r.json()["jobId"], timeout=60)
     assert job["phase"] == "done", job
@@ -216,7 +216,8 @@ def test_image_in_a_mapped_type_follows_the_mapping(client, tmp_path):
     # the preview says so too: the images stay with their folder type, and there is no Image row
     assert [(t["key"], t["objectCount"]) for t in p["types"]] == [("folder:Shots", 2)]
     assert p["counts"]["types"] == 1
-    r = client.post("/api/import/start", json={"previewId": p["previewId"], "mapping": p["mapping"], "target": {"kind": "currentSpace"}})
+    r = client.post("/api/import/start", json={"previewId": p["previewId"], "mapping": p["mapping"], "target": {"kind": "currentSpace"},
+                                               "keepAsSources": False})
     assert r.status_code == 202, r.text
     assert wait_job(client, r.json()["jobId"], timeout=60)["phase"] == "done"
     objs = objects_from(client, "Shots/photo.png")

@@ -33,7 +33,7 @@ def run(client, source) -> dict:
     assert r.status_code == 200, r.text
     preview = r.json()
     r = client.post("/api/import/start", json={"previewId": preview["previewId"], "mapping": preview["mapping"],
-                                               "target": {"kind": "currentSpace"}})
+                                               "target": {"kind": "currentSpace"}, "keepAsSources": False})
     assert r.status_code == 202, r.text
     job = wait_job(client, r.json()["jobId"], timeout=120)
     assert job["phase"] == "done", job

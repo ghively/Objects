@@ -59,7 +59,7 @@ def do_import(client, src: Path, **extra) -> dict:
     assert r.status_code == 200, r.text
     pv = r.json()
     r = client.post("/api/import/start", json={"previewId": pv["previewId"], "mapping": pv["mapping"],
-                                               "target": {"kind": "currentSpace"}, **extra})
+                                               "target": {"kind": "currentSpace"}, "keepAsSources": False, **extra})
     assert r.status_code == 202, r.text
     job = wait_job(client, r.json()["jobId"])
     assert job["phase"] == "done", job

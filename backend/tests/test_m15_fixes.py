@@ -50,7 +50,8 @@ def _preview(client, path, **extra):
 def _start(client, preview: dict, target: dict, mapping: dict | None = None):
     return client.post(
         "/api/import/start",
-        json={"previewId": preview["previewId"], "mapping": mapping or preview["mapping"], "target": target},
+        json={"previewId": preview["previewId"], "mapping": mapping or preview["mapping"], "target": target,
+              "keepAsSources": False},
     )
 
 
@@ -127,7 +128,7 @@ def test_2_import_into_this_space_announces_one_resync(client, tmp_path):
     r = client.post(  # the dialog sends no clientId; one sent anyway changes nothing
         "/api/import/start",
         json={"previewId": preview["previewId"], "mapping": preview["mapping"],
-              "target": {"kind": "currentSpace"}, "clientId": "me"},
+              "target": {"kind": "currentSpace"}, "clientId": "me", "keepAsSources": False},
     )
     assert r.status_code == 202
     job = wait_job(client, r.json()["jobId"])

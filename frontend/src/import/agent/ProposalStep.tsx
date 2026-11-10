@@ -2,6 +2,8 @@
  * M27 "Proposed schema" step (design section 8): each proposal item (use / extend / create) with
  * its evidence is accepted, edited or turned down; Apply is enabled only when nothing is undecided.
  * The review is saved as it changes, so a closed dialog resumes where it was.
+ * M30 (an IT ops space): an item the rules refuse as a look-alike offers "Use <type>, with a category",
+ * which saves it as an edit onto that existing type.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/api/client'
@@ -134,7 +136,8 @@ function GroupCard({
   locked: boolean
   onDecide: (status: ProposalStatus, edited?: ProposalReviewItem['edited']) => void
 }) {
-  const [editing, setEditing] = useState(decision?.status === 'edited')
+  // The offer taken is an edit too, but has no name or properties to edit.
+  const [editing, setEditing] = useState(decision?.status === 'edited' && !decision.edited?.useType)
   const [name, setName] = useState(decision?.edited?.name ?? g.name)
   const [plural, setPlural] = useState(decision?.edited?.plural ?? g.plural ?? '')
   const [dropped, setDropped] = useState<string[]>(decision?.edited?.dropProperties ?? [])
@@ -142,6 +145,8 @@ function GroupCard({
   const saveEdit = (n: string, p: string, d: string[]) =>
     onDecide('edited', { name: n, ...(p ? { plural: p } : {}), ...(d.length ? { dropProperties: d } : {}) })
   const status = decision?.status
+  const offer = g.offer
+  const offerTaken = !!offer && status === 'edited' && decision?.edited?.useType === offer.typeId
   return (
     <li role="group" aria-label={T.itemLabel(g.name)} className="flex flex-col gap-2 rounded-md border border-line p-3 text-[13px]">
       <div className="flex flex-wrap items-baseline gap-2">
@@ -244,6 +249,23 @@ function GroupCard({
           </label>
         </div>
       )}
+      {offer && (
+        <div>
+          <Button
+            type="button"
+            size="sm"
+            variant={offerTaken ? 'default' : 'outline'}
+            aria-pressed={offerTaken}
+            disabled={locked}
+            onClick={() => {
+              setEditing(false)
+              onDecide('edited', { useType: offer.typeId, category: offer.category })
+            }}
+          >
+            {offer.label}
+          </Button>
+        </div>
+      )}
       <div className="flex gap-2" role="group" aria-label={T.itemLabel(g.name) + ' decision'}>
         <Button
           type="button"
@@ -261,8 +283,8 @@ function GroupCard({
         <Button
           type="button"
           size="sm"
-          variant={status === 'edited' ? 'default' : 'outline'}
-          aria-pressed={status === 'edited'}
+          variant={status === 'edited' && !offerTaken ? 'default' : 'outline'}
+          aria-pressed={status === 'edited' && !offerTaken}
           disabled={locked}
           onClick={() => {
             setEditing(true)

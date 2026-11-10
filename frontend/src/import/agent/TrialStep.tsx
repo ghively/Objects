@@ -2,6 +2,9 @@
  * M27 "Trial" step (design section 9): the filing pass runs on the first 50 objects; every value is
  * shown with the quote it came from, marked right or wrong, and the bulk pass starts only on
  * "Continue with the rest". The share marked right is shown (and recorded in the report by the server).
+ * M30: on a batch kept as Sources the pass ends in `entities` (or a reopened dialog finds a Write running),
+ * which hands over to the Entities step as `done` hands over to Normalise; each result shows what the page is
+ * about and the entities it mentions.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/api/client'
@@ -13,6 +16,9 @@ import { AGENT_TEXT as T } from './text'
 export const agentTiming = { pollMs: 1500 }
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
+/** States in which the pass is over for this step: the next step takes the status (and does any polling). */
+const handedOver = (state: FilingStatus['state'] | undefined) => state === 'done' || state === 'entities' || state === 'writing'
 
 export function TrialStep({ batch, onDone }: { batch: string; onDone: (status: FilingStatus) => void }) {
   const [status, setStatus] = useState<FilingStatus | null>(null)
@@ -38,7 +44,7 @@ export function TrialStep({ batch, onDone }: { batch: string; onDone: (status: F
         ...Object.fromEntries(s.trial.items.filter((i) => i.verdict).map((i) => [i.path, i.verdict as FilingVerdict])),
         ...v,
       }))
-      if (s.state === 'done' && !finished.current) {
+      if (handedOver(s.state) && !finished.current) {
         finished.current = true
         onDone(s)
       }
@@ -72,7 +78,7 @@ export function TrialStep({ batch, onDone }: { batch: string; onDone: (status: F
     }
   }, [refresh])
   useEffect(() => {
-    if (state !== 'running' && !(continuing && state !== 'done' && state !== 'failed')) return
+    if (state !== 'running' && !(continuing && !handedOver(state) && state !== 'failed')) return
     const t = setInterval(() => void refresh(), agentTiming.pollMs)
     return () => clearInterval(t)
   }, [state, continuing, refresh])
@@ -177,6 +183,8 @@ function TrialRow({
   locked: boolean
   onMark: (v: FilingVerdict) => void
 }) {
+  // Only the entities that passed their check (a name the page doesn't say is left out).
+  const mentions = (item.entities ?? []).filter((e) => e.ok).map((e) => e.name)
   return (
     <li role="group" aria-label={item.title} className="flex flex-col gap-1 rounded-md border border-line p-2 text-[13px]">
       <div className="flex flex-wrap items-baseline gap-2">
@@ -200,6 +208,8 @@ function TrialRow({
           ))}
         </span>
       </div>
+      {item.mainEntity && <p>{T.mainEntity(item.mainEntity.type, item.mainEntity.name)}</p>}
+      {mentions.length > 0 && <p>{T.mentions(mentions)}</p>}
       <ul className="flex flex-col gap-1">
         {item.values.map((v) => (
           <li key={v.key}>

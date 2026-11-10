@@ -1553,6 +1553,8 @@ export interface ImportPreviewRequest {
   source: ImportSource
   mapping?: ImportMapping | null
   target?: 'newSpace' | 'currentSpace'
+  /** M30 "Keep pages as Sources": on, the planned types show one type, Source (absent: off). */
+  keepAsSources?: boolean
 }
 
 export type ImportTarget =
@@ -1573,6 +1575,8 @@ export interface StartImportRequest {
   keepOriginals?: ImportKeepOriginals
   /** M27: the scan step's choices (design section 6); omitted when there is nothing to carry. */
   scan?: ImportScanChoices
+  /** M30 "Keep pages as Sources": every page becomes a read-only Source (absent: the server's default, on). */
+  keepAsSources?: boolean
 }
 
 /** M27: what the scan step hands to the import: patterns to leave out, flagged files to leave out, flagged files imported with `excludeFromAI`. */
@@ -1719,6 +1723,8 @@ export interface ImportBatch {
   counts: Record<string, number>
   reportPath?: string | null
   trashedAt?: string
+  /** M30: the import kept its pages as Sources. */
+  keepAsSources?: boolean
 }
 
 /** GET /api/import/jobs/{id} */
@@ -2954,6 +2960,8 @@ export interface ProposalGroup {
   problems?: string[]
   /** Properties the app's rules left out of the item, each with the reason. */
   dropped?: { key: string; name: string; reason: string }[]
+  /** M30 (an IT ops space): "Use <type>, with a category" in place of a look-alike or category type. */
+  offer?: { label: string; typeId: string; category: string } | null
 }
 
 export interface SchemaProposal {
@@ -2967,6 +2975,9 @@ export interface ProposalEdit {
   plural?: string
   /** Keys of the properties left out. */
   dropProperties?: string[]
+  /** M30: the offer taken: extend this type id instead, adding `category` to its Category (else Kind) options. */
+  useType?: string
+  category?: string
 }
 
 export interface ProposalReviewItem {
@@ -2984,7 +2995,8 @@ export interface ImportProposalResponse {
   review: ProposalReview | null
 }
 
-export type FilingState = 'idle' | 'running' | 'trial' | 'done' | 'failed'
+/** M30: `entities` (a batch kept as Sources: the bulk pass finished, waiting for the Entities step) and `writing` (Write runs). */
+export type FilingState = 'idle' | 'running' | 'trial' | 'entities' | 'writing' | 'done' | 'failed'
 export type FilingConfidence = 'high' | 'medium' | 'low'
 export type FilingVerdict = 'right' | 'wrong'
 
@@ -3011,6 +3023,9 @@ export interface FilingTrialItem {
   tags?: FilingLabel[]
   collections?: FilingLabel[]
   verdict: FilingVerdict | null
+  /** M30 (a batch kept as Sources): what the page is mainly about, and the entities it mentions. */
+  mainEntity?: { type: string; name: string } | null
+  entities?: { type: string; name: string; ok: boolean }[]
 }
 
 export interface FilingMergeSuggestion {
@@ -3023,4 +3038,91 @@ export interface FilingStatus {
   state: FilingState
   trial: { items: FilingTrialItem[]; rightShare: number | null }
   normalise: FilingMergeSuggestion[]
+  /** M30: the batch kept its pages as Sources (its pass ends in `entities`). */
+  keepAsSources: boolean
+}
+
+// ---- M30 entity extraction and distillation (plan 2026-11-09-m30-entity-extraction.md) ----
+
+export type EntityStatus = 'accepted' | 'renamed' | 'rejected'
+
+export interface EntityDecision {
+  status: EntityStatus
+  name?: string
+}
+
+/** Gene's review of the entity list (`entities-review.json`, without its revision). */
+export interface EntitiesReview {
+  decisions: Record<string, EntityDecision>
+  merges: string[][]
+  splits: { id: string; names: string[] }[]
+}
+
+export interface SourceCite {
+  path: string
+  title: string
+  quote: string
+}
+
+export interface EntityValue {
+  key: string
+  name: string
+  value: unknown
+  sources: SourceCite[]
+  conflict: { value: unknown; sources: SourceCite[] }[] | null
+}
+
+export interface ImportEntity {
+  id: string
+  typeId: string
+  type: string
+  name: string
+  aliases: string[]
+  /** The Sources it is distilled from. */
+  pages: { path: string; title: string }[]
+  mainPages: string[]
+  values: EntityValue[]
+  /** The "From sources" lines' text, without citations. */
+  summary: string[]
+  confidence: FilingConfidence
+  joinedByAgent: boolean
+  existing: { path: string; title: string } | null
+  rule: 'own' | 'pages' | 'properties'
+  decision: EntityDecision | null
+}
+
+export interface EntityLeftOut {
+  id: string
+  type: string
+  name: string
+  pages: number
+  reason: 'text' | 'category'
+}
+
+export interface EntitiesWritten {
+  created: number
+  existing: number
+  relations: number
+  plainLinks: number
+  relationsInbox: number
+  sections: number
+  sectionsLeft: number
+  conflicts: number
+  failed: { name: string; reason: string }[]
+}
+
+/** GET /api/import/batches/{id}/entities. `state`: `collecting` while the filing state is idle, running or trial; `review` in `entities`; `writing` in `writing`; `written` in `done` after a write. */
+export interface EntitiesView {
+  state: 'collecting' | 'review' | 'writing' | 'written'
+  /** By type name, then name. */
+  entities: ImportEntity[]
+  leftOut: EntityLeftOut[]
+  suggestedMerges: { ids: string[]; names: string[] }[]
+  relations: { total: number; lowConfidence: number; plain: number }
+  /** The batch's Sources. */
+  sources: number
+  conflicts: number
+  review: EntitiesReview
+  undecided: number
+  written: EntitiesWritten | null
 }
