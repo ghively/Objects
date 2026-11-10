@@ -16,7 +16,7 @@ vi.mock('@/references/ReferencesSection', () => ({ ReferencesSection: () => null
 import { api } from '@/api/client'
 import { keysFor } from '@/lib/shortcuts'
 import { resetLinkIndex } from '@/links/linkIndex'
-import { usePeek, useTabs } from '@/nav/tabs'
+import { useCollectionPeek, usePeek, useTabs } from '@/nav/tabs'
 import { resetPinned } from '@/shell/usePinned'
 import { IMPORT_CSV_TEXT } from '@/types/ImportCsvDialog'
 import { EXPORT_TEXT } from './ExportDialog'
@@ -32,6 +32,7 @@ beforeEach(() => {
   localStorage.clear()
   useTabs.getState().reset()
   usePeek.getState().close()
+  useCollectionPeek.getState().close()
   resetLinkIndex()
   resetPinned()
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
@@ -111,10 +112,50 @@ describe('object … menu key hints, Import and Copy', () => {
   test('Ctrl+E opens Export and Ctrl+Shift+* pins, outside the editor', async () => {
     render(<ObjectView path={PATH} mode="page" />)
     await screen.findByText('Head')
-    fireEvent.keyDown(document.body, { key: 'e', code: 'KeyE', ctrlKey: true })
-    expect(await screen.findByRole('dialog', { name: EXPORT_TEXT.heading })).toBeInTheDocument()
     mocked.patchUi.mockResolvedValue({ ui: { pinned: [{ kind: 'object', id: 'N1' }], sections: [], allNotesLayout: 'list' }, revision: 'u1' })
     fireEvent.keyDown(document.body, { key: '*', code: 'Digit8', ctrlKey: true, shiftKey: true })
     await waitFor(() => expect(mocked.patchUi).toHaveBeenCalledWith({ pinned: [{ kind: 'object', id: 'N1' }] }, expect.anything()))
+    fireEvent.keyDown(document.body, { key: 'e', code: 'KeyE', ctrlKey: true })
+    expect(await screen.findByRole('dialog', { name: EXPORT_TEXT.heading })).toBeInTheDocument()
+  })
+
+  test('Ctrl+E, Ctrl+I and Ctrl+Shift+* leave a page with a dialog or the collection peek open over it alone', async () => {
+    render(<ObjectView path={PATH} mode="page" />)
+    await screen.findByText('Head')
+    // A dialog (Settings, say) with focus on its button.
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    const button = document.createElement('button')
+    dialog.appendChild(button)
+    document.body.appendChild(dialog)
+    button.focus()
+    expect(fireEvent.keyDown(button, { key: 'e', code: 'KeyE', ctrlKey: true })).toBe(true)
+    expect(fireEvent.keyDown(button, { key: 'i', code: 'KeyI', ctrlKey: true })).toBe(true)
+    expect(fireEvent.keyDown(button, { key: '*', code: 'Digit8', ctrlKey: true, shiftKey: true })).toBe(true)
+    dialog.remove()
+    // The collection peek, focus on the body.
+    useCollectionPeek.getState().peek('col-1')
+    expect(fireEvent.keyDown(document.body, { key: 'e', code: 'KeyE', ctrlKey: true })).toBe(true)
+    useCollectionPeek.getState().close()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(screen.queryByRole('dialog', { name: EXPORT_TEXT.heading })).toBeNull()
+    expect(mocked.patchUi).not.toHaveBeenCalled()
+  })
+
+  test('an object in the side panel (mode page too) does not open Export for the main page: the main page does', async () => {
+    render(
+      <>
+        <div data-sidepanel-entry="e1" data-testid="side">
+          <ObjectView path={PATH} mode="page" />
+        </div>
+        <div data-testid="main">
+          <ObjectView path={PATH} mode="page" />
+        </div>
+      </>,
+    )
+    await waitFor(() => expect(screen.getAllByText('Head')).toHaveLength(2))
+    fireEvent.keyDown(document.body, { key: 'e', code: 'KeyE', ctrlKey: true })
+    const exportDialogs = await screen.findAllByRole('dialog', { name: EXPORT_TEXT.heading })
+    expect(exportDialogs).toHaveLength(1)
   })
 })

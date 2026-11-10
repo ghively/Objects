@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { useSettings } from '@/settings/useSettings'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { SpacesMenu } from '@/spaces/SpacesMenu'
 import { openTodaysNote, TODAYS_NOTE_TEXT } from '@/calendar/openTodaysNote'
+import { isEditableTarget } from '@/lib/shortcuts'
 
 export const TOP_BAR_TEXT = {
   changeSpace: 'Change space',
@@ -61,11 +62,15 @@ function BarButton({
  * settings, Space history, Create space, Open folder…); Object's window has no menu bar of its own.
  * With the setting on the menu's button is hidden. A lone tap of Alt (pressed and released with no
  * other key or click between) shows it, focused, as a hidden window menu bar comes back with Alt;
- * another tap hides it. Its spaces and settings stay in the palette and Ctrl+, too.
+ * another tap hides it. Its spaces and settings stay in the palette and Ctrl+, too. While typing,
+ * the tap shows the menu but the caret stays in the field; hiding it gives focus back to where it
+ * was before the tap (`before`), not to the body.
  */
-function useAppMenuShown(): { shown: boolean; revealed: boolean } {
+function useAppMenuShown(button: RefObject<HTMLButtonElement | null>): { shown: boolean; revealed: boolean } {
   const hide = useSettings((s) => !!s.settings.hideAppMenu)
   const [revealed, setRevealed] = useState(false)
+  const revealedRef = useRef(false)
+  const before = useRef<Element | null>(null)
   useEffect(() => {
     if (!hide) return
     let armed = false
@@ -75,7 +80,10 @@ function useAppMenuShown(): { shown: boolean; revealed: boolean } {
     const onUp = (e: KeyboardEvent) => {
       if (e.key !== 'Alt' || !armed) return
       armed = false
-      setRevealed((r) => !r)
+      const next = !revealedRef.current
+      if (next) before.current = document.activeElement
+      revealedRef.current = next
+      setRevealed(next)
     }
     const disarm = () => {
       armed = false
@@ -90,10 +98,24 @@ function useAppMenuShown(): { shown: boolean; revealed: boolean } {
       window.removeEventListener('pointerdown', disarm, true)
       window.removeEventListener('blur', disarm)
       // Turned off (or unmounted): the next time it is on, the menu starts hidden.
+      revealedRef.current = false
       setRevealed(false)
     }
   }, [hide])
-  return { shown: !hide || revealed, revealed: hide && revealed }
+  const shownByAlt = hide && revealed
+  // Shown by Alt: focus it, so Enter or Space opens it, unless the tap came while typing (the caret
+  // stays). Hidden again: focus goes back where it was if it fell to the body with the button.
+  useEffect(() => {
+    if (shownByAlt) {
+      if (!isEditableTarget(before.current)) button.current?.focus()
+      return
+    }
+    const prev = before.current
+    before.current = null
+    const active = document.activeElement
+    if (prev instanceof HTMLElement && prev.isConnected && (active === null || active === document.body)) prev.focus()
+  }, [shownByAlt, button])
+  return { shown: !hide || revealed, revealed: shownByAlt }
 }
 
 export function TopBar({
@@ -115,12 +137,8 @@ export function TopBar({
   }, [])
   const name = info?.name || spaceName
   const sidepanelLabel = rightPanelOpen ? TOP_BAR_TEXT.hideSidepanel : TOP_BAR_TEXT.showSidepanel
-  const appMenu = useAppMenuShown()
   const spaceButtonRef = useRef<HTMLButtonElement>(null)
-  // Shown by Alt: focus it, so Enter or Space opens it.
-  useEffect(() => {
-    if (appMenu.revealed) spaceButtonRef.current?.focus()
-  }, [appMenu.revealed])
+  const appMenu = useAppMenuShown(spaceButtonRef)
   return (
     <header data-typing-fade="" className="flex h-[42px] shrink-0 items-center gap-1 bg-app pr-2 pl-2.5 text-fg">
       <div className={`flex w-[348px] shrink-0 items-center ${appMenu.shown ? 'justify-between' : 'justify-end'}`}>

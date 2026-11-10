@@ -21,6 +21,8 @@ import { BoardStoreContext, createBoardStore, type BoardStore } from './store'
 import { board, node } from './test/boards'
 import { TOOLS_KEY, loadToolMemory, saveToolMemory } from './toolMemory'
 import { WhiteboardCanvas } from './WhiteboardCanvas'
+import { MEDIA_TEXT, bumpMediaToken, resetMediaToken } from '@/settings/mediaLoading'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 
 const KEY = 'Whiteboards/Media.md'
 
@@ -293,6 +295,23 @@ describe('whiteboard media and web-link nodes', () => {
     expect(host.openAttachment).toHaveBeenCalledWith('Attachments/diagram.png')
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(mediaKindOf('Attachments/clip.MP4')).toBe('video')
+  })
+
+  test('with Media loading: Required only an image node waits behind Load; Clear media cache reloads it (M31 fix)', async () => {
+    useSettings.setState({ settings: { ...settingsDefaults, mediaLoading: 'required' }, revision: 'r0', loaded: true })
+    const b = createMedia(board(), 'Attachments/diagram.png', { x: 0, y: 0 }, { id: 'img' })
+    const host = nodeHost({ fileUrl: vi.fn((p: string) => `/api/file?path=${encodeURIComponent(p)}`), openAttachment: vi.fn(async () => ({ ok: true })) })
+    const { nodeEl } = renderBoard(b, { host })
+    await act(async () => {})
+    expect(nodeEl('img')!.querySelector('img')).toBeNull()
+    expect(nodeEl('img')!.querySelector('[data-testid="media-placeholder"]')).toHaveTextContent('diagram.png')
+    fireEvent.click(screen.getByRole('button', { name: MEDIA_TEXT.load }))
+    const img = nodeEl('img')!.querySelector('img')!
+    expect(img.getAttribute('src')).toBe('/api/file?path=Attachments%2Fdiagram.png')
+    act(() => void bumpMediaToken())
+    expect(nodeEl('img')!.querySelector('img')!.getAttribute('src')).toMatch(/^\/api\/file\?path=Attachments%2Fdiagram\.png&m=\w+$/)
+    useSettings.setState({ settings: settingsDefaults })
+    resetMediaToken()
   })
 
   test('test media nodes round trip through flow mapping', () => {

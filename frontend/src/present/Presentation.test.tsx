@@ -60,6 +60,18 @@ beforeEach(() => {
 })
 
 describe('Presentation', () => {
+  test('with Media loading: Required only the title slide cover waits behind Load (M31 fix)', async () => {
+    useSettings.setState({ settings: { ...settingsDefaults, mediaLoading: 'required' }, revision: 'r0', loaded: true })
+    render(<Presentation />)
+    act(() => usePresentation.getState().start(PATH))
+    expect(await screen.findByRole('heading', { name: 'Quarterly deck' })).toBeTruthy()
+    expect(document.querySelector('[data-slide-cover]')).toBeNull()
+    expect(screen.getByTestId('media-placeholder')).toHaveTextContent('cover.png')
+    fireEvent.click(screen.getByRole('button', { name: 'Load' }))
+    expect(document.querySelector('[data-slide-cover]')).not.toBeNull()
+    expect(slideNumber()).toBe('1 / 4')
+  })
+
   test('test title slide follows settings', async () => {
     setPrefs({ footerLeft: 'Acme', footerRight: 'Confidential' })
     const { unmount } = render(<Presentation />)

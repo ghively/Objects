@@ -5,12 +5,16 @@
  * extension. Images and videos keep their aspect while resizing. Double-click opens the file with
  * the OS (`/api/attachments/open`; our choice of the two the plan allows: the peek shows objects,
  * not attachments). Only same-origin URLs are used; nothing leaves the machine.
+ * M31: with "Media loading: Required only" an image, video, PDF or audio node shows the media
+ * blocks' placeholder with "Load" until clicked; its URL carries the media token.
  */
 import { useState, type MouseEvent as ReactMouseEvent } from 'react'
 import type { WhiteboardMediaBlock } from '@/api/whiteboardTypes'
 import { Icon } from '@/components/Icon'
+import { MediaPlaceholder } from '@/components/SpaceImage'
 import { FILE_NOT_FOUND, IMAGE_ERROR, fileIconFor } from '@/editor/media/MediaView'
 import { showToast } from '@/editor/media/upload'
+import { useMediaOnRequest, useMediaToken, withMediaToken } from '@/settings/mediaLoading'
 import type { WhiteboardNodeProps } from '../canvasTypes'
 import { borderStyle } from '../colors'
 import { mediaHost, useWhiteboardHost } from '../host'
@@ -24,6 +28,9 @@ export function mediaOpenLabel(path: string): string {
   return `Open ${KIND_WORD[mediaKindOf(path)]} on system`
 }
 
+/** The "Required only" placeholder's icon per kind (as the media blocks'). */
+const PLACEHOLDER_ICON = { image: 'ph-image', pdf: 'ph-file-pdf', audio: 'ph-speaker-high', video: 'ph-play', file: 'ph-file' } as const
+
 function baseName(path: string): string {
   return path.split('/').pop() ?? path
 }
@@ -34,7 +41,10 @@ export function MediaNode({ data, selected }: WhiteboardNodeProps) {
   const host = mediaHost(useWhiteboardHost())
   const path = block.path
   const kind = mediaKindOf(path)
-  const url = host.fileUrl(path)
+  // M31: the media token "Clear media cache" bumps; "Required only" waits behind Load.
+  const url = withMediaToken(host.fileUrl(path), useMediaToken())
+  const onRequest = useMediaOnRequest()
+  const [asked, setAsked] = useState(false)
   const name = baseName(path)
   // A failed load is remembered for its URL only, so a new path tries again.
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
@@ -52,7 +62,13 @@ export function MediaNode({ data, selected }: WhiteboardNodeProps) {
   }
 
   let body
-  if (failed) {
+  if (onRequest && !asked && kind !== 'file') {
+    body = (
+      <div className="flex h-full w-full items-center justify-center p-3">
+        <MediaPlaceholder name={name} icon={PLACEHOLDER_ICON[kind]} onLoad={() => setAsked(true)} className="w-full bg-raised/80" />
+      </div>
+    )
+  } else if (failed) {
     body = (
       <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-3 text-center text-[13px] text-fg-muted" data-testid="whiteboard-media-error">
         <span className="truncate font-medium text-fg">{name}</span>

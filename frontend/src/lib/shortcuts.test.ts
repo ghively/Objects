@@ -197,6 +197,21 @@ describe('letter shortcuts and keyboard layouts', () => {
     // Cyrillic: no Latin character, so the physical key decides.
     expect(matches(key({ key: 'я', code: 'KeyZ', ctrlKey: true }), ['Mod-z'])).toBe(true)
   })
+
+  test('AltGr+Shift+L (Ł) and AltGr+Shift+A (Ą) on a Polish layout are typed, not Copy deep link or Select all top-level blocks (M31 fix)', () => {
+    setPlatform('Win32')
+    // Windows reports AltGr as Ctrl+Alt, with AltGraph set.
+    const altGr = (init: KeyboardEventInit) => {
+      const e = new KeyboardEvent('keydown', { ctrlKey: true, altKey: true, ...init })
+      Object.defineProperty(e, 'getModifierState', { value: (k: string) => k === 'AltGraph' })
+      return e
+    }
+    expect(matches(altGr({ key: 'Ł', code: 'KeyL', shiftKey: true }), keysFor('copyDeepLink'))).toBe(false)
+    expect(matches(altGr({ key: 'Ą', code: 'KeyA', shiftKey: true }), keysFor('selectAllTopLevelBlocks'))).toBe(false)
+    // Ctrl+Alt+Shift+L itself (no AltGraph) still is Copy deep link.
+    const plain = new KeyboardEvent('keydown', { key: 'L', code: 'KeyL', ctrlKey: true, altKey: true, shiftKey: true })
+    expect(matches(plain, keysFor('copyDeepLink'))).toBe(true)
+  })
 })
 
 // The 2026-11-08 sweep: the easy catalogued keys Gene asked to bind ("bind the easy ones").

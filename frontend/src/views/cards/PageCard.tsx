@@ -4,9 +4,9 @@
 // empty "hide when empty" ones left out; a Table shows its table), then the first lines of the body. Clicking it, or Enter,
 // opens the object. Larger than the wide card; nothing in it is edited (our calls).
 import type { MouseEvent } from 'react'
-import { api } from '@/api/client'
 import type { PropertyType, Row, TypeDef } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
+import { SpaceImage } from '@/components/SpaceImage'
 import { cn } from '@/lib/utils'
 import { propertyIsEmpty } from '@/properties/format'
 import { chipStyle } from '@/theme/palette'
@@ -55,7 +55,7 @@ export function PageCard({ row, type, onOpen }: { row: Row; type?: TypeDef; onOp
       }}
       className={cn(CARD_BASE, 'w-full')}
     >
-      {image && <img src={api.fileUrl(image)} alt="" className="h-44 w-full object-cover" />}
+      {image && <SpaceImage path={image} className="h-44 w-full object-cover" />}
       <div className="flex min-w-0 flex-col gap-2 px-6 pt-5 pb-6">
         {type && (
           <span

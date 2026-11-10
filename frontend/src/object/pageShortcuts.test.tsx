@@ -12,12 +12,13 @@ import { blockSelectionKey, selectTopLevelBlocks } from '@/editor/extensions/blo
 import { editorExtensions, loadBody } from '@/editor/document'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { allShortcuts, formatKeys, keysFor } from '@/lib/shortcuts'
-import { usePeek } from '@/nav/tabs'
+import { useCollectionPeek, usePeek } from '@/nav/tabs'
 import { DEEP_LINK_TEXT, deepLinkFor, scrollContainerOf, scrollPage, usePageShortcuts } from './pageShortcuts'
 
 afterEach(() => {
   vi.restoreAllMocks()
   usePeek.setState({ path: null })
+  useCollectionPeek.getState().close()
   document.body.innerHTML = ''
 })
 
@@ -100,28 +101,48 @@ describe('the handlers', () => {
   })
 })
 
-function Harness({ mode, handle, copy }: { mode: 'page' | 'peek'; handle: Partial<BodyEditorHandle>; copy?: (t: string) => void }) {
+function Harness({ mode, handle, copy, testId = 'view' }: { mode: 'page' | 'peek'; handle: Partial<BodyEditorHandle>; copy?: (t: string) => void; testId?: string }) {
   const ref = useRef<BodyEditorHandle | null>(handle as BodyEditorHandle)
-  usePageShortcuts({ mode, path: summary.path, summary, editorRef: ref, copy })
-  return createElement(
-    'div',
-    { 'data-object-view': mode },
-    createElement(
-      'div',
-      { id: 'scroller', style: { overflowY: 'auto' } },
-      createElement('div', { 'data-object-path': summary.path }, createElement('input', { 'aria-label': 'field' })),
-    ),
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  usePageShortcuts({ mode, path: summary.path, summary, editorRef: ref, rootRef, copy })
+  return (
+    <div data-object-view={mode} ref={rootRef} data-testid={testId}>
+      <div id={`${testId}-scroller`} style={{ overflowY: 'auto' }}>
+        <div data-object-path={summary.path}>
+          <input aria-label={`${testId} field`} />
+          <button aria-label={`${testId} button`} />
+        </div>
+      </div>
+    </div>
   )
+}
+
+/** A scroller with room to scroll, at 700 of 2000. */
+function scrollerOf(testId = 'view'): HTMLElement {
+  const scroller = document.getElementById(`${testId}-scroller`)!
+  Object.defineProperty(scroller, 'scrollHeight', { value: 2000, configurable: true })
+  Object.defineProperty(scroller, 'clientHeight', { value: 400, configurable: true })
+  scroller.scrollTop = 700
+  return scroller
+}
+
+/** An open dialog (Settings, say) outside the view, with a button holding focus. */
+function openDialog(): HTMLElement {
+  const dialog = document.createElement('div')
+  dialog.setAttribute('role', 'dialog')
+  const button = document.createElement('button')
+  button.textContent = 'In the dialog'
+  dialog.appendChild(button)
+  document.body.appendChild(dialog)
+  button.focus()
+  return button
 }
 
 describe('usePageShortcuts', () => {
   test('Home and End scroll the page outside fields, never while typing in one', () => {
     setPlatform('Win32')
     const r = render(createElement(Harness, { mode: 'page', handle: {} }))
-    const scroller = document.getElementById('scroller')!
-    Object.defineProperty(scroller, 'scrollHeight', { value: 2000 })
-    Object.defineProperty(scroller, 'clientHeight', { value: 400 })
-    scroller.scrollTop = 700
+    const scroller = scrollerOf()
     expect(press({ key: 'Home' }).defaultPrevented).toBe(true)
     expect(scroller.scrollTop).toBe(0)
     press({ key: 'End' })
@@ -130,7 +151,7 @@ describe('usePageShortcuts', () => {
     press({ key: 'PageUp' })
     expect(scroller.scrollTop).toBe(340)
     scroller.scrollTop = 700
-    const typing = press({ key: 'Home' }, r.getByLabelText('field'))
+    const typing = press({ key: 'Home' }, r.getByLabelText('view field'))
     expect(typing.defaultPrevented).toBe(false)
     expect(scroller.scrollTop).toBe(700)
     // Shift+End is a selection key, not a scroll.
@@ -143,7 +164,7 @@ describe('usePageShortcuts', () => {
     const copy = vi.fn()
     const selectTop = vi.fn(() => true)
     const r = render(createElement(Harness, { mode: 'page', handle: { selectTopLevelBlocks: selectTop }, copy }))
-    const e = press({ key: 'L', ctrlKey: true, altKey: true, shiftKey: true }, r.getByLabelText('field'))
+    const e = press({ key: 'L', ctrlKey: true, altKey: true, shiftKey: true }, r.getByLabelText('view field'))
     expect(e.defaultPrevented).toBe(true)
     expect(copy).toHaveBeenCalledWith('[[Plan]]')
     press({ key: 'A', ctrlKey: true, altKey: true, shiftKey: true })
@@ -158,6 +179,115 @@ describe('usePageShortcuts', () => {
     const e = press({ key: 'L', ctrlKey: true, altKey: true, shiftKey: true })
     expect(e.defaultPrevented).toBe(false)
     expect(copy).not.toHaveBeenCalled()
+  })
+
+  test('with a dialog open (Settings) and focus on its button, Home and End leave the page alone and the dialog keeps its keys', () => {
+    setPlatform('Win32')
+    const copy = vi.fn()
+    const selectTop = vi.fn(() => true)
+    render(createElement(Harness, { mode: 'page', handle: { selectTopLevelBlocks: selectTop }, copy }))
+    const scroller = scrollerOf()
+    const button = openDialog()
+    for (const key of ['Home', 'End', 'PageUp', 'PageDown']) {
+      expect(press({ key }, button).defaultPrevented, key).toBe(false)
+    }
+    expect(scroller.scrollTop).toBe(700)
+    expect(press({ key: 'A', ctrlKey: true, altKey: true, shiftKey: true }, button).defaultPrevented).toBe(false)
+    expect(selectTop).not.toHaveBeenCalled()
+    press({ key: 'L', ctrlKey: true, altKey: true, shiftKey: true }, button)
+    expect(copy).not.toHaveBeenCalled()
+  })
+
+  test('with a dialog open and focus fallen to the body, the page behind does not act either', () => {
+    setPlatform('Win32')
+    const copy = vi.fn()
+    render(createElement(Harness, { mode: 'page', handle: {}, copy }))
+    const scroller = scrollerOf()
+    openDialog()
+    ;(document.activeElement as HTMLElement).blur()
+    expect(press({ key: 'End' }).defaultPrevented).toBe(false)
+    expect(scroller.scrollTop).toBe(700)
+    press({ key: 'L', ctrlKey: true, altKey: true, shiftKey: true })
+    expect(copy).not.toHaveBeenCalled()
+  })
+
+  test('the collection peek open over the page: the page keys stand down', () => {
+    setPlatform('Win32')
+    const copy = vi.fn()
+    const selectTop = vi.fn(() => true)
+    render(createElement(Harness, { mode: 'page', handle: { selectTopLevelBlocks: selectTop }, copy }))
+    const scroller = scrollerOf()
+    useCollectionPeek.getState().peek('col-1')
+    expect(press({ key: 'PageDown' }).defaultPrevented).toBe(false)
+    expect(scroller.scrollTop).toBe(700)
+    press({ key: 'A', ctrlKey: true, altKey: true, shiftKey: true })
+    press({ key: 'L', ctrlKey: true, altKey: true, shiftKey: true })
+    expect(selectTop).not.toHaveBeenCalled()
+    expect(copy).not.toHaveBeenCalled()
+  })
+
+  test('focus on a button in the page itself: the keys act (focus is in this view)', () => {
+    setPlatform('Win32')
+    const r = render(createElement(Harness, { mode: 'page', handle: {} }))
+    const scroller = scrollerOf()
+    const button = r.getByLabelText('view button')
+    button.focus()
+    expect(press({ key: 'End' }, button).defaultPrevented).toBe(true)
+    expect(scroller.scrollTop).toBe(2000)
+  })
+
+  test('an object in the side panel (also mode page, mounted first) does not act for the main page; focus inside it makes it the active view', () => {
+    setPlatform('Win32')
+    const side = vi.fn()
+    const main = vi.fn()
+    const r = render(
+      createElement(
+        'div',
+        null,
+        createElement('div', { 'data-sidepanel-entry': 'e1' }, createElement(Harness, { mode: 'page', handle: {}, copy: side, testId: 'side' })),
+        createElement(Harness, { mode: 'page', handle: {}, copy: main, testId: 'main' }),
+      ),
+    )
+    const sideScroller = scrollerOf('side')
+    const mainScroller = scrollerOf('main')
+    press({ key: 'L', ctrlKey: true, altKey: true, shiftKey: true })
+    expect(main).toHaveBeenCalledTimes(1)
+    expect(side).not.toHaveBeenCalled()
+    press({ key: 'End' })
+    expect(mainScroller.scrollTop).toBe(2000)
+    expect(sideScroller.scrollTop).toBe(700)
+    const button = r.getByLabelText('side button')
+    button.focus()
+    press({ key: 'L', ctrlKey: true, altKey: true, shiftKey: true }, button)
+    expect(side).toHaveBeenCalledTimes(1)
+    expect(main).toHaveBeenCalledTimes(1)
+    press({ key: 'Home' }, button)
+    expect(sideScroller.scrollTop).toBe(0)
+    expect(mainScroller.scrollTop).toBe(2000)
+  })
+
+  test('the peek acts with focus on its dialog frame, and the page behind it does not', () => {
+    setPlatform('Win32')
+    const peekCopy = vi.fn()
+    const pageCopy = vi.fn()
+    render(
+      createElement(
+        'div',
+        null,
+        createElement(Harness, { mode: 'page', handle: {}, copy: pageCopy, testId: 'page' }),
+        createElement(
+          'div',
+          { role: 'dialog', tabIndex: -1, 'data-testid': 'frame' },
+          createElement(Harness, { mode: 'peek', handle: {}, copy: peekCopy, testId: 'peek' }),
+        ),
+      ),
+    )
+    usePeek.setState({ path: summary.path })
+    const frame = document.querySelector<HTMLElement>('[data-testid="frame"]')!
+    frame.focus()
+    press({ key: 'L', ctrlKey: true, altKey: true, shiftKey: true }, frame)
+    expect(peekCopy).toHaveBeenCalledTimes(1)
+    expect(pageCopy).not.toHaveBeenCalled()
   })
 
   test('the copied toast reads "Deep link copied"', () => {

@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import type { ObjectDetail, TypeDef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
+import { SpaceImage } from '@/components/SpaceImage'
 import { Editor } from '@/editor/Editor'
 import { useLinkIndex } from '@/links/linkIndex'
 import { cellValue, propertyRows } from '@/object/PropertyPanel'
@@ -114,10 +115,9 @@ function TitleSlide({ detail, hideCover }: { detail: ObjectDetail; hideCover: bo
   return (
     <div data-slide-kind="title" className="flex flex-col gap-6">
       {!hideCover && summary.coverImage && (
-        <img
+        <SpaceImage
           data-slide-cover=""
-          src={api.fileUrl(summary.coverImage)}
-          alt=""
+          path={summary.coverImage}
           className="max-h-[40vh] w-full rounded-xl object-cover"
         />
       )}

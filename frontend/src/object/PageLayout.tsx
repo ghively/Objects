@@ -22,12 +22,12 @@
  * left panel here until Gene checks.
  */
 import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
-import { api } from '@/api/client'
 import type { ObjectFrontmatterLayout, ObjectSummary, TypeDef, TypeFont } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
 import { cn } from '@/lib/utils'
 import { CoverImage } from './CoverImage'
 import { Icon } from '@/components/Icon'
+import { SpaceImage } from '@/components/SpaceImage'
 import { loadPageInspectorPinned, PageInspector, PAGE_INSPECTOR_TEXT, savePageInspectorPinned } from './PageInspector'
 import { decodeIcon } from './PropertyPanel'
 
@@ -204,7 +204,7 @@ function ProfileImage({ summary, type }: { summary: ObjectSummary; type?: TypeDe
       className="flex size-[var(--profile-image-size)] shrink-0 items-center justify-center overflow-hidden rounded-full border border-line bg-raised"
     >
       {summary.coverImage ? (
-        <img src={api.fileUrl(summary.coverImage)} alt="" className="size-full object-cover" />
+        <SpaceImage path={summary.coverImage} compact className="size-full object-cover" />
       ) : (
         <IconOrEmoji icon={icon} size={56} fallback="ph-file-text" />
       )}

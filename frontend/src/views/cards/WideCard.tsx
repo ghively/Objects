@@ -1,7 +1,7 @@
 // The wide card: a horizontal card with the image on the left.
 import type { MouseEvent } from 'react'
-import { api } from '@/api/client'
 import type { Row, TypeDef } from '@/api/types'
+import { SpaceImage } from '@/components/SpaceImage'
 import { cn } from '@/lib/utils'
 import { CARD_BASE, CardProperties, cardImage } from './SmallCard'
 import type { CardProperty } from './cardConfig'
@@ -32,7 +32,7 @@ export function WideCard({
       }}
       className={cn(CARD_BASE, 'w-full flex-row')}
     >
-      {image && <img src={api.fileUrl(image)} alt="" className="h-auto w-40 shrink-0 object-cover" />}
+      {image && <SpaceImage path={image} compact className="h-auto min-h-16 w-40 shrink-0 object-cover" />}
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-3">
         <CardProperties row={row} type={type} props={props} hide={hide} />
       </div>

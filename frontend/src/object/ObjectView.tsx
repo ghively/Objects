@@ -65,7 +65,7 @@ import { lazyWithReload } from '@/lib/lazyReload'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, HeaderTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
-import { usePageShortcuts } from './pageShortcuts'
+import { keyIsForView, usePageShortcuts } from './pageShortcuts'
 import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
 import { ImportSourceLine, importSourceOf } from './ImportSourceLine'
 import { counterpartEditor } from './CounterpartRows'
@@ -959,15 +959,16 @@ export function ObjectView({
   /** Properties and the title can't be written while the file is gone. */
   const propsReadOnly = readOnly || deleted
 
-  // The menu's page keys for the active view (as Ctrl+F): Ctrl+E Export and Ctrl+I Import outside
-  // the editor (inside it they are code and italic), Ctrl+Shift+* pins or unpins anywhere.
+  // The menu's page keys for the active view (`keyIsForView`: the view holding focus, or the main
+  // page with focus on the body and nothing open over it): Ctrl+E Export and Ctrl+I Import outside
+  // the editor (inside it they are code and italic), Ctrl+Shift+* pins or unpins, the editor included.
+  const viewRootRef = useRef<HTMLDivElement | null>(null)
   const pageKeysRef = useRef({ summary, type })
   pageKeysRef.current = { summary, type }
   useEffect(() => {
     if (mode === 'inline') return
     const onKeyDown = (e: KeyboardEvent) => {
-      const peekPath = usePeek.getState().path
-      if (mode === 'page' ? peekPath !== null : peekPath !== path) return
+      if (!keyIsForView(e, viewRootRef.current, mode)) return
       const { summary: s, type: t } = pageKeysRef.current
       if (!s) return
       if (matches(e, keysFor('toggleFavorite')) || (e.key === '*' && (e.ctrlKey || e.metaKey) && !e.altKey)) {
@@ -990,7 +991,7 @@ export function ObjectView({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [mode, path])
   // M31: the Page group's Select all top-level blocks, Copy deep link and the scroll keys.
-  usePageShortcuts({ mode, path, summary, editorRef })
+  usePageShortcuts({ mode, path, summary, editorRef, rootRef: viewRootRef })
 
   const writeProperties = (updates: Record<string, unknown>) => {
     if ('tags' in updates && Array.isArray(updates.tags)) {
@@ -1552,7 +1553,7 @@ export function ObjectView({
 
   if (!detail || !summary) {
     return (
-      <div className="flex h-full min-h-0 w-full" data-object-view={mode}>
+      <div className="flex h-full min-h-0 w-full" data-object-view={mode} ref={viewRootRef}>
         <div className="relative flex min-w-0 flex-1 flex-col">
           {toolbar}
           <div className="min-h-0 flex-1 overflow-auto">
@@ -1574,7 +1575,7 @@ export function ObjectView({
   }
 
   return (
-    <div className="h-full min-h-0 w-full" data-object-view={mode}>
+    <div className="h-full min-h-0 w-full" data-object-view={mode} ref={viewRootRef}>
       <PageLayout
         type={type}
         summary={summary}

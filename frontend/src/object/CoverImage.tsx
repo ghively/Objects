@@ -12,10 +12,10 @@
  * whole percent (our choice).
  */
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
 import { ImagePicker } from '@/components/ImagePicker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { SpaceImage } from '@/components/SpaceImage'
 import { cn } from '@/lib/utils'
 
 /** The cover image strings. */
@@ -116,10 +116,9 @@ export function CoverImage({ path, wide, crop, offset, onChange, onToggleWide, o
       data-repositioning={repositioning ? 'true' : undefined}
       className={cn('group/cover-image relative w-full overflow-hidden', wide ? 'rounded-none' : 'rounded-xl')}
     >
-      <img
+      <SpaceImage
         ref={imgRef}
-        src={api.fileUrl(path)}
-        alt=""
+        path={path}
         draggable={false}
         onPointerDown={onPointerDown}
         style={crop ? { objectPosition: `0% ${shown}%` } : undefined}
