@@ -90,6 +90,11 @@ Object has no accounts.
     view or card shows "N rows" (column names on hover), and a table view's opens the table in a peek. Its cells are
     searchable; a document export lists it as "a, b; c, d". "Change property type": Table to Text or Text block (one
     line, "a, b; c, d"); Text or Text block to Table (one cell under the property's name, or the table it holds).
+  - "Card view and linking" › Default link view: Link block, Small card, Wide card, Embed, **Page** (M31, spec §3;
+    `defaultViewType: page`; also in an object block's `…` › Change Block View, `view=page`). Ours: a full-width,
+    read-only page preview: cover, type label, icon and title, the description, the properties the object's panel
+    shows (hidden and empty "hide when empty" ones left out, "Empty" otherwise), then the body's first lines; a click
+    or Enter opens the object.
 - Task management: "Hide Task Management" per space.
 - Automations (M14): in the rule editor, "Set a property" on a date needs a date or "Now" ticked; with neither it
   shows "Pick a date or tick Now." under the value and Save refuses with the same message (it would write the

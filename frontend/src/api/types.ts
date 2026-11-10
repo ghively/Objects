@@ -353,7 +353,8 @@ export interface TypeDef {
   templates: { ids: string[]; defaultTemplateId: string | null }
   /** Per-view card settings (store-only in M3 other than the small card). */
   typeViews?: Record<string, unknown>
-  defaultViewType?: 'inline' | 'smallCard' | 'wideCard' | 'embed'
+  /** The default link view; M31 adds `page` (a full-width page preview). */
+  defaultViewType?: 'inline' | 'smallCard' | 'wideCard' | 'embed' | 'page'
   smallCardViewConfig?: SmallCardViewConfig
   /** M4: absent = offered in the calendar's quick-create chips; `createOnce` = once per day. */
   createInCalendarOption?: 'disabled' | 'createOnce'

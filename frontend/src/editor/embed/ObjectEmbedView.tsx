@@ -5,7 +5,7 @@
  * the `view` option, else the type's `defaultViewType`, else `smallCard`.
  *
  * A `…` menu offers "Change Block View" with
- * "Link block", "Small card", "Wide card", "Embed",
+ * "Link block", "Small card", "Wide card", "Embed" and (M31) "Page",
  * writing `view`, and "Remove Block".
  * Clicking the card opens the object as a link (`via: 'link'`). An unresolved
  * target shows the muted `[[target]]` chip, as M1's unresolved wikilinks.
@@ -26,12 +26,13 @@ import type { Option } from '../annotations'
 import { EmbedMenu, ResizableEmbed } from '../media/ResizableEmbed'
 import { cardToLink, LINK_CARD_TEXT } from '../linkCard'
 
-/** The four views and their names, in menu order. */
+/** The five views and their names, in menu order (M31: "Page", a full-width read-only page preview). */
 export const EMBED_VIEWS: { view: CardView; name: string }[] = [
   { view: 'inline', name: 'Link block' },
   { view: 'smallCard', name: 'Small card' },
   { view: 'wideCard', name: 'Wide card' },
   { view: 'embed', name: 'Embed' },
+  { view: 'page', name: 'Page' },
 ]
 
 const VIEW_SET = new Set<string>(EMBED_VIEWS.map((v) => v.view))

@@ -22,12 +22,18 @@ export const CARD_VIEW_TEXT = {
   addProperties: 'Add Properties',
 }
 
-export const LINK_VIEWS: readonly { value: NonNullable<TypeDef['defaultViewType']>; name: string }[] = [
+type LinkView = NonNullable<TypeDef['defaultViewType']>
+
+/** The four card views (also the Editor settings' "Backlink content view" choices). */
+export const LINK_VIEWS: readonly { value: Exclude<LinkView, 'page'>; name: string }[] = [
   { value: 'inline', name: 'Link block' },
   { value: 'smallCard', name: 'Small card' },
   { value: 'wideCard', name: 'Wide card' },
   { value: 'embed', name: 'Embed' },
 ]
+
+/** A type's "Default link view" choices: the four, then (M31, spec §3) "Page" (our name). */
+export const TYPE_LINK_VIEWS: readonly { value: LinkView; name: string }[] = [...LINK_VIEWS, { value: 'page', name: 'Page' }]
 
 function PropRow({ id, name, disabled, onRemove }: { id: string; name: string; disabled: boolean; onRemove(): void }) {
   const s = useSortable({ id, disabled })
@@ -135,7 +141,7 @@ export function CardViewSettings({ typeId, editor, disabled }: { typeId: string;
           <p className="mt-0.5 text-[13px] text-fg-muted">{CARD_VIEW_TEXT.linkViewExplanation}</p>
         </div>
         <div role="radiogroup" aria-label={CARD_VIEW_TEXT.linkView} className="flex flex-wrap gap-1.5">
-          {LINK_VIEWS.map((v) => (
+          {TYPE_LINK_VIEWS.map((v) => (
             <button
               key={v.value}
               type="button"
