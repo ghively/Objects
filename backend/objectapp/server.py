@@ -1177,8 +1177,6 @@ def create_app(
             return _error(404, f'"{req.location}" is not a folder.')
         except FileExistsError:
             return _error(409, "A folder with that name already exists here.")
-        except NotImplementedError as exc:  # M8 Task 2: `basic` until Task 8 fills it
-            return _error(501, str(exc))
         registry().register(path, touch=False)
         return JSONResponse({"path": str(path)}, status_code=201)
 

@@ -4,7 +4,7 @@
 > recommendations"). S4 and S7 were settled by the live-CLI run the same day (`live-cli-check-2026-11-08.md`:
 > S4 fixed by escaping `[ ]`, `fix(sweep-18)`; S7 `--resume` PASS). Also approved the same day, from the
 > live-CLI and acceptance runs: **A-1** hide/grey the Glob and Grep switches when the shell is on (CLI 2.1.319
-> gives shell runs neither), with a note why; **A-2** accept and document that a `\` in a Linux folder name
+> gives shell runs neither), with a note why (superseded 2026-11-10, Gene: they stay ordinary switches, since the CLI offers them beside the shell); **A-2** accept and document that a `\` in a Linux folder name
 > can't be fenced; **AC-1** allow sub-items and dependencies on the basic Task type; **AC-2** imported images
 > become Image objects (the design's call), not a Page holding the image (2026-11-09: the preview lists them under an Image row); **OCR** fix mixed PDFs (OCR the
 > scanned pages of a PDF that has a text layer elsewhere) and the double OCR in the scan step, English only

@@ -64,7 +64,8 @@ Object has no accounts.
   rail and notes section | Minimal); Backlink sections start as (Backlinks Open | Closed; Unlinked
   Mentions Open | Closed | Hidden); Backlink content view (Embed default).
 - Language: interface language list (English, English (UK), Deutsch, Français, Español, Dutch, Português (BR),
-  Magyar, Italian); Decimal separator (Automatic | Dot | Comma).
+  Magyar, Italian); Decimal separator (Automatic | Dot | Comma). Gene, 2026-11-10: the interface stays in English;
+  the list sets date and number formatting only (translating every screen is not planned).
 - Date & Time: Time zone (list); Date formatting with a live preview (Localized | ISO 8601 (year-month-day); date order
   Automatic | day-month-year | month/day/year); 24-hour time (a switch); Start of the week
   (Monday | Sunday).
