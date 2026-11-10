@@ -8,6 +8,7 @@ import type { GroupBy, Row } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { usePeek } from '@/nav/tabs'
 import { LabelPill } from '@/properties/LabelMenu'
+import { isSynced } from '@/properties/synced'
 import { cn } from '@/lib/utils'
 import type { LayoutProps } from '../DataView'
 import { findDef, rowValue } from '../filter'
@@ -204,7 +205,8 @@ export function KanbanLayout(props: LayoutProps) {
     if (!type) return
     const values: Record<string, unknown> = { ...matchingValues(state.filterGroup, props.types, type.id, collections) }
     const change = update(g)
-    if (change) values[change.key] = change.value
+    // M29: a synced column value is filled by its source only; the new object goes without it.
+    if (change && !isSynced(type.propertyDefinitions.find((d) => d.key === change.key))) values[change.key] = change.value
     try {
       const created = await api.createObject(type.id, { values })
       usePeek.getState().peek(created.path)

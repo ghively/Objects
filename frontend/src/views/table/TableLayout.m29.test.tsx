@@ -1,6 +1,7 @@
 // M29: synced facts in views. A synced cell is read-only (and muted once stale), a Kanban drag
 // between Patch state columns sends nothing, and a `synced` event reloads that type's rows only.
 import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ChangeEvent, Row, TypeDef, ViewState } from '@/api/types'
@@ -124,6 +125,27 @@ describe('TableLayout: M29 synced facts', () => {
     act(() => dragEnd?.({ active: { id: APP01.summary.path }, over: { id: `col:${failed!.getAttribute('data-group')}` } }))
     await waitFor(() => expect(screen.getByText(SYNCED_TEXT.readOnly('Patch state', 'Inventory script'))).toBeInTheDocument())
     expect(mocked.updateProperties).not.toHaveBeenCalled()
+  })
+
+  test('a filter or grouping on a synced property creates without it (M29 review #2)', async () => {
+    const user = userEvent.setup()
+    // Grouped by Patch state (synced), filtered on Disk free (synced) and FQDN (not synced).
+    const kanban = view({
+      viewDefinition: { dataViewLayout: 'kanban' },
+      groupBy: { groups: [{ propertyId: 'patchState', option: 'default', typeId: 'host' }] },
+      filterGroup: {
+        type: 'filterGroup',
+        operator: 'and',
+        elements: [
+          { type: 'filter', propertyId: 'diskFree', option: 'equal', referenceValue: 40 },
+          { type: 'filter', propertyId: 'fqdn', option: 'is', referenceValue: 'app01.example.test' },
+        ],
+      },
+    })
+    render(<Harness init={kanban} rows={[APP01]} />)
+    const current = screen.getAllByTestId('kanban-column').find((c) => within(c).queryByText('Current'))!
+    await user.click(within(current).getByRole('button', { name: /Add to Current/ }))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('host', { values: { fqdn: 'app01.example.test' } }))
   })
 
   test("a stale row's synced cell is muted", () => {

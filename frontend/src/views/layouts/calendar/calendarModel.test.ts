@@ -99,6 +99,16 @@ describe('calendarModel', () => {
     expect(createType([], 'when')).toBeUndefined()
   })
 
+  test('a day click never creates with a synced date (M29 review #2)', () => {
+    const synced = (id: string) =>
+      typeDef({ id, propertyDefinitions: [propertyDef({ id: 'when', type: 'datetime', synced: { source: 'Inventory script', staleAfterDays: 7 } })] })
+    // The first view type with the date as its own (not synced) is the one created.
+    expect(createType([synced('host'), EVENT], 'when')?.id).toBe('event')
+    // Only a synced date: nothing can be created from a day.
+    expect(createType([synced('host')], 'when')).toBeUndefined()
+    expect(createType([synced('host'), NOTE], 'when')?.id).toBe('note')
+  })
+
   test('month weeks follow the week start and hold only the month\'s weeks', () => {
     const sun = monthWeeks('2026-11-17', 'sunday')
     expect(sun).toHaveLength(5)

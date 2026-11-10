@@ -295,6 +295,27 @@ describe('CalendarLayout create', () => {
     expect(onCreate).toHaveBeenCalledWith({ due: { start: '2026-11-09', resolution: 'day' } }, 'task')
   })
 
+  test('a synced date creates nothing from a day (M29 review #2)', () => {
+    const HOST = typeDef({
+      id: 'host',
+      name: 'Host',
+      pluralName: 'Hosts',
+      propertyDefinitions: [
+        propertyDef({ id: 'title', type: 'entity_title', name: 'Title' }),
+        propertyDef({ id: 'lastBoot', type: 'datetime', name: 'Last boot', synced: { source: 'Inventory script', staleAfterDays: 7 } }),
+      ],
+    })
+    const onCreate = vi.fn()
+    const rows = [row({ summary: objectSummary({ path: 'Hosts/APP01.md', type: 'host', title: 'APP01' }), values: { lastBoot: day('2026-11-10') } })]
+    render(
+      <DataView rows={rows} types={[HOST]} scope={{ typeIds: ['host'] }} state={view()} onState={vi.fn()} layouts={['calendar']} allowCreate onCreate={onCreate} />,
+    )
+    expect(screen.getByTestId('calendar-layout').getAttribute('data-property')).toBe('lastBoot')
+    fireEvent.click(cellOf('2026-11-18'))
+    expect(onCreate).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /New object on/ })).toBeNull()
+  })
+
   test('without onCreate a day click does nothing', () => {
     render(<Harness rows={UNDATED} />)
     expect(screen.queryByRole('button', { name: /New object on/ })).toBeNull()

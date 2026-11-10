@@ -6,6 +6,7 @@ import type { CalendarViewConfig, DateValue, PropertyType, Row, TypeDef, ViewSta
 import { addDays, addMonths, formatLong, monthGrid, monthName, parseYmd, startOfMonth, startOfWeek, type Day, type WeekStart } from '@/calendar/dates'
 import { zonedWallToInstant } from '@/lib/zonedShell'
 import { formatInZone, zonedParts } from '@/lib/zonedTime'
+import { isSynced } from '@/properties/synced'
 import { useSettings } from '@/settings/useSettings'
 import { rowValue } from '../../filter'
 import { dayReader, daySpan } from '../../dates'
@@ -180,9 +181,15 @@ export function canDragRow(row: Row, key: string, typesById: Record<string, Type
   return !!def && (def.type === 'datetime' || def.type === 'datetimeSimple')
 }
 
-/** The type a click on a day creates: the first view type that has the property, else the first view type. */
+/**
+ * The type a click on a day creates: the first view type that has the property, else the first
+ * view type. M29: a type whose property is synced (filled by its source only) is never one; with
+ * only those, a day click creates nothing.
+ */
 export function createType(viewTypes: TypeDef[], key: string): TypeDef | undefined {
-  return viewTypes.find((t) => t.propertyDefinitions.some((d) => d.key === key)) ?? viewTypes[0]
+  const synced = (t: TypeDef) => isSynced(t.propertyDefinitions.find((d) => d.key === key))
+  const open = viewTypes.filter((t) => !synced(t))
+  return open.find((t) => t.propertyDefinitions.some((d) => d.key === key)) ?? open[0]
 }
 
 /** The weeks a month grid shows: the week-start-aligned rows that hold a day of `anchor`'s month. */
