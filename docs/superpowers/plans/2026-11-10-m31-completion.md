@@ -15,7 +15,8 @@ the choice is ours and listed under "Our calls" in each lane's report and in the
    On hold, Complete; Priority Low, Medium, High; Tasks unchanged). **G4** keep (an IT ops type's own properties
    always shown).
 3. **G3: drop the duplicate.** An Incident has one "Resolved" (its own date and time); the ticket fields' Resolved
-   (`deskResolved`) is not on Incident. Desk sync writes an Incident's resolved time into its own Resolved.
+   (`deskResolved`) is not on Incident. Desk sync writes an Incident's resolved time into its own Resolved. An Incident type made before M31 is left as it
+   is (Gene, 2026-11-10: no tidy step): it keeps both, and desk sync writes to the ticket field's Resolved.
 4. The 30 seed tags stay. "Keep pages as Sources" stays on everywhere (M30 call 25). Categories are the options of
    Category, Kind and Environment fields plus tag names (M30 call 26).
 5. **A-1 superseded:** Find files and Search in files stay ordinary switches beside the shell (the CLI offers them).

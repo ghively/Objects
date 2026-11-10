@@ -115,8 +115,8 @@ The history below is in the order it was written: the per-milestone sections new
   on a view behind a dialog; git provenance turned off git's ownership check; tags written as `[[Tag]]` missed tag
   filters; AltGr characters were swallowed; "Required only" and the media token covered editor blocks only; Full
   Export held every space in memory at once). Also: a remodel carries every type of the space, empty ones too; a
-  Table cell keeps dashes and pipes; "First column is a header". One open question for Gene: G3 for Incident types
-  made before M31 (they keep the ticket Resolved beside their own).
+  Table cell keeps dashes and pipes; "First column is a header". G3 for Incident types made before M31: left as they
+  are (Gene, 2026-11-10; they keep the ticket Resolved beside their own and desk sync writes to it).
 
 - **M30 built: entity extraction and distillation** (T1 contract; T2-T12 on parallel lanes by file ownership, merged
   up to `2befd1ad` on top of all of M28 and M29; T13 integration). Every import has the option **Keep pages as
