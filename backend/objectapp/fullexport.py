@@ -29,7 +29,10 @@ automated one: when ``fullExportAuto`` is on it exports ``fullExportScope`` into
 ``fullExportFolder`` once per ``fullExportInterval`` (daily or weekly), checking on a timer
 from server start, and records its last run in the state dir (``full-export.json``). A folder
 that is unset, missing or inside a space skips the run (`AutoFullExport.status` says why). One
-export runs at a time in the process (`_RUN_LOCK`), manual or automated.
+export runs at a time in the process (`_RUN_LOCK`), manual or automated; and one automated run at
+a time across Object processes sharing the state dir: a run holds ``full-export.lock`` there
+(created exclusively, refreshed as the run writes, taken over once it is `LOCK_STALE`) and reads
+the record again under it.
 """
 
 from __future__ import annotations
@@ -39,6 +42,7 @@ import logging
 import os
 import shutil
 import threading
+import time
 import uuid
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
@@ -70,6 +74,8 @@ from .whiteboardfile import sidecar_owner
 
 __all__ = [
     "INTERVALS",
+    "LOCK_FILE",
+    "LOCK_STALE",
     "SCOPES",
     "STATE_FILE",
     "AutoFullExport",
@@ -86,6 +92,12 @@ __all__ = [
 SCOPES = ("current", "all")
 INTERVALS = {"daily": timedelta(days=1), "weekly": timedelta(days=7)}
 STATE_FILE = "full-export.json"
+LOCK_FILE = "full-export.lock"
+"""Held in the state dir for the whole of an automated run: one run across Object processes."""
+LOCK_STALE = timedelta(minutes=30)
+"""A lock not refreshed for this long is a dead process's and is taken over (our choice)."""
+LOCK_REFRESH_SECONDS = 60.0
+"""How often a run refreshes its lock as it writes (well inside `LOCK_STALE`)."""
 ALL_SPACES = "All Spaces"  # the catalog's "Spaces (All Spaces)"
 RETRY_AFTER = timedelta(hours=1)
 """A failed automated run is tried again after this long (our choice), not on every check."""
@@ -541,6 +553,60 @@ class FullExportJobs:
 # -- automated exports -----------------------------------------------------------------------
 
 
+class _StateLock:
+    """``full-export.lock``: created exclusively (``O_EXCL``), so only one process holds it; its
+    time is refreshed as the run goes, and one older than `LOCK_STALE` (its holder died) is
+    removed and taken. It holds the holder's pid and a token, so a release removes only its own."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path)
+        self._token = uuid.uuid4().hex
+        self._touched = 0.0
+
+    def _stale(self) -> bool:
+        try:
+            age = time.time() - self.path.stat().st_mtime
+        except FileNotFoundError:
+            return True  # gone since: try again
+        return age > LOCK_STALE.total_seconds()
+
+    def acquire(self) -> bool:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        for attempt in range(2):
+            try:
+                fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+            except FileExistsError:
+                if attempt == 0 and self._stale():
+                    self.path.unlink(missing_ok=True)
+                    continue
+                return False
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(json.dumps({"pid": os.getpid(), "token": self._token}) + "\n")
+            self._touched = time.monotonic()
+            return True
+        return False
+
+    def _ours(self) -> bool:
+        try:
+            return json.loads(self.path.read_text("utf-8")).get("token") == self._token
+        except (OSError, ValueError, AttributeError):
+            return False
+
+    def refresh(self) -> None:
+        """Keep the lock fresh while the run writes (at most every `LOCK_REFRESH_SECONDS`)."""
+        if time.monotonic() - self._touched < LOCK_REFRESH_SECONDS:
+            return
+        self._touched = time.monotonic()
+        try:
+            os.utime(self.path)
+        except OSError:
+            pass
+
+    def release(self) -> None:
+        if self._ours():
+            self.path.unlink(missing_ok=True)
+
+
 def _parse_instant(value: Any) -> datetime | None:
     if not isinstance(value, str):
         return None
@@ -670,9 +736,21 @@ class AutoFullExport:
             return None
         if not _RUN_LOCK.acquire(blocking=False):
             return None
+        lock = _StateLock(Path(self._state_dir()) / LOCK_FILE)
+        try:
+            held = lock.acquire()
+        except OSError:
+            held = False
+        if not held:  # another Object process is running its automated export
+            _RUN_LOCK.release()
+            return None
         scope = s.get("fullExportScope") if s.get("fullExportScope") in SCOPES else "current"
         self._running = True
         try:
+            # The record again, under the lock: another process may have run since it was read.
+            due = self.next_run(s, now)
+            if due is None or now < due:
+                return None
             spaces = self._spaces(scope)
             try:
                 result = _run(
@@ -682,7 +760,7 @@ class AutoFullExport:
                     self._local(now),
                     ALL_SPACES if scope == "all" else None,
                     self._all_spaces(),
-                    None,
+                    lambda _done, _total: lock.refresh(),
                 )
             except (Refused, OSError) as exc:
                 rec = self.record()
@@ -695,6 +773,7 @@ class AutoFullExport:
             return result
         finally:
             self._running = False
+            lock.release()
             _RUN_LOCK.release()
 
     def start(self) -> None:
