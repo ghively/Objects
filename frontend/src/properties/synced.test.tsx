@@ -1,6 +1,6 @@
 // M29: the synced mark's helpers and the line under a synced value.
-import { render, screen } from '@testing-library/react'
-import { describe, expect, test } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { propertyDef } from '@/test/mockApi'
 import { isStale, isSynced, SYNCED_TEXT, SyncedLine } from './synced'
 
@@ -8,6 +8,8 @@ const DAY = 86_400_000
 const NOW = new Date('2026-11-09T10:00:00.000Z')
 const before = (ms: number) => new Date(NOW.getTime() - ms).toISOString()
 const lastBoot = propertyDef({ id: 'lastBoot', name: 'Last boot', type: 'datetime', synced: { source: 'Inventory script', staleAfterDays: 7 } })
+
+afterEach(() => vi.useRealTimers())
 
 describe('synced facts', () => {
   test('isStale: 7 days exactly is fresh, a second more is stale, never refreshed is not stale', () => {
@@ -54,6 +56,28 @@ describe('synced facts', () => {
     const stale = screen.getByText('Stale')
     expect(stale).toHaveAttribute('data-stale')
     expect(stale.className).toContain('text-fg-muted')
+  })
+
+  test('SyncedLine re-renders on its own: the time ago moves on and Stale shows (M29 review #13)', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+    // Refreshed 7 days less 30 seconds ago: fresh now, stale a minute later.
+    const at = before(7 * DAY - 30_000)
+    const fresh = before(5 * 60_000)
+    const { unmount } = render(
+      <>
+        <SyncedLine def={lastBoot} refreshedAt={fresh} />
+        <SyncedLine def={lastBoot} refreshedAt={at} />
+      </>,
+    )
+    expect(screen.getByText('Inventory script · Refreshed 5 minutes ago')).toBeInTheDocument()
+    expect(screen.queryByText('Stale')).not.toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(2 * 60_000))
+    expect(screen.getByText('Inventory script · Refreshed 7 minutes ago')).toBeInTheDocument()
+    expect(screen.getByText('Stale')).toBeInTheDocument()
+    // The timer goes with the line.
+    unmount()
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   test('the read-only message names the property and its source', () => {

@@ -116,7 +116,9 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
     const offered = allowed.length
       ? allowed.map((id) => writable.find((t) => t.id === id)).filter((t): t is TypeDef => !!t)
       : writable
-    const first = suggestFor(q, offered, { allowed })[0]
+    // A relation's context is its allowed types only: with none (any type), not the active tab's
+    // collection or query, which says nothing about what this relation points at.
+    const first = suggestFor(q, offered, { allowed, scope: [] })[0]
     const top = offered.find((t) => t.id === first)
     const rest = offered.filter((t) => t !== top).map((t) => ({ t, suggested: false }))
     return top ? [{ t: top, suggested: true }, ...rest] : rest

@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest'
 import type { TypeDef } from '@/api/types'
 import { typeDef } from '@/test/mockApi'
 import fixture from './__fixtures__/suggest-cases.json'
-import { compilePattern, matches, suggestType, SUGGEST_TEXT } from './typeSuggest'
+import { compilePattern, matches, NAME_MAX, suggestType, SUGGEST_TEXT } from './typeSuggest'
 
 interface Fixture {
   types: { id: string; namePatterns: unknown[] }[]
@@ -60,6 +60,18 @@ describe('type suggestion (TS port)', () => {
     expect(matches('٣٤', ['##'])).toBe(false) // # is ASCII 0-9
     const host = typeDef({ id: 'host', namePatterns: ['@@@##'] })
     expect(suggestType('APP01', { types: [host], allowed: ['host', 'host'] })).toEqual(['host'])
+  })
+
+  test('a name over NAME_MAX (300) code points matches no pattern, counted before the trim (M29 review #13)', () => {
+    expect(NAME_MAX).toBe(300)
+    expect(matches('a'.repeat(300), ['*'])).toBe(true)
+    expect(matches('a'.repeat(301), ['*'])).toBe(false)
+    // Code points, not UTF-16 units: 300 emoji are 600 units but still match.
+    expect(matches('😀'.repeat(300), ['*'])).toBe(true)
+    // Counted before the trim: 299 letters and two spaces are 301.
+    expect(matches(' ' + 'a'.repeat(299) + ' ', ['*'])).toBe(false)
+    const host = typeDef({ id: 'host', namePatterns: ['*'] })
+    expect(suggestType('a'.repeat(301), { types: [host] })).toEqual([])
   })
 
   test('ignores non-string patterns', () => {
