@@ -18,7 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 from objectapp import api_work_section, windowhost, workseams
 from objectapp.space import ReadOnly, Space
-from objectapp.workseams import SeamRefused, WorkSeams
+from objectapp.workseams import SeamRefused, SeamUnavailable, WorkSeams
 
 NOW = datetime(2026, 11, 5, 10, 0, tzinfo=UTC)
 PRINTER = "Tasks/Printer jams on line 3.md"
@@ -288,11 +288,37 @@ def test_floor_general_routes(env: Env) -> None:
 # -- The M24 seams ------------------------------------------------------------------------
 
 
-def test_seams_until_m24(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # M24 fills the seams in `create_app`; this keeps checking M23's own 501 path with its defaults.
+_UNFILLED = "This seam is not filled here."  # the test's own string
+
+
+class _UnfilledAgent:
+    """A local stand-in for an agent seam that isn't there: what the routes do with one."""
+
+    def status(self, space, board):
+        return {"available": False, "agentName": None, "actsOnApprovals": False,
+                "carrying": sum(1 for item in board if item.get("turn") == "agent"), "rows": [],
+                "note": _UNFILLED}
+
+    def set_acts(self, space, on):
+        raise SeamUnavailable(_UNFILLED)
+
+    def retry(self, space, entry_id):
+        raise SeamUnavailable(_UNFILLED)
+
+
+class _UnfilledCaptures:
+    def save(self, space, req, now):
+        raise SeamUnavailable(_UNFILLED)
+
+    def list(self, space, status):
+        return []
+
+
+def test_unfilled_seams_answer_501(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # M24 fills the seams in `create_app`; this keeps checking the routes' own 501 path.
     monkeypatch.setattr(
         "objectapp.server.build_seams",
-        lambda space, service: WorkSeams(workseams.NoAgent(), workseams.NoCaptures()),
+        lambda space, service: WorkSeams(_UnfilledAgent(), _UnfilledCaptures()),
     )
     windowhost.set_opener(None)
     env = _make(tmp_path, monkeypatch)
@@ -302,14 +328,14 @@ def test_seams_until_m24(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     a = agent.json()
     assert a["available"] is False and a["rows"] == []
     assert a["carrying"] == sum(1 for i in board if i["turn"] == "agent")
-    assert a["note"] == "The agent loop comes with M24."
+    assert a["note"] == _UNFILLED
     res = env.c.put("/api/work/agent/acts", json={"on": True})
-    assert res.status_code == 501 and res.json() == {"detail": "The agent loop comes with M24."}
+    assert res.status_code == 501 and res.json() == {"detail": _UNFILLED}
     res = env.c.post("/api/work/agent/retry", json={"id": "q1"})
-    assert res.status_code == 501 and res.json() == {"detail": "The agent loop comes with M24."}
+    assert res.status_code == 501 and res.json() == {"detail": _UNFILLED}
     res = env.c.post("/api/work/captures", json={"text": "x", "fromView": "now"})
     assert res.status_code == 501
-    assert res.json() == {"detail": "Saving a brain dump comes with M24."}
+    assert res.json() == {"detail": _UNFILLED}
     res = env.c.get("/api/work/captures", params={"status": "needsYou"})
     assert res.status_code == 200 and res.json() == {"captures": []}
     assert env.status() == ""
@@ -410,7 +436,7 @@ def test_step_actions_still_go_through_m22(env: Env) -> None:
 
     r = api_work_section.router(
         _ctx(env), None,  # type: ignore[arg-type]  # building the router calls neither
-        workseams.WorkSeams(workseams.NoAgent(), workseams.NoCaptures()), None,  # type: ignore[arg-type]
+        workseams.WorkSeams(_UnfilledAgent(), _UnfilledCaptures()), None,  # type: ignore[arg-type]
     )
     paths = [route.path for route in r.routes]
     for banned in ("/work/step", "/work/steps", "/work/fields"):
