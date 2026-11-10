@@ -102,6 +102,29 @@ def test_host_rows(itops_dir: Path) -> None:
     assert _paths(space, DB01)[("configuredBy", "configuration")] == ["Configurations/Backup schedule.md"]
 
 
+def test_counterparts_read_a_snapshot_of_the_incoming_links(
+    itops_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fix pass, finding 4: `counterparts` runs outside the space lock, so another thread's index
+    update may change the live incoming set while it walks it; it walks a snapshot instead."""
+    space = Space(itops_dir)
+    before = space.links.counterparts(APP01)
+    live = space.links._in[APP01]
+    added: list[str] = []
+
+    class Mutating(dict):
+        def get(self, key, default=None):  # another thread adding a link meanwhile
+            if key in live and len(added) < 5:
+                ghost = f"Ghost/{len(added)}.md"
+                added.append(ghost)
+                live.add(ghost)
+            return super().get(key, default)
+
+    monkeypatch.setattr(space, "_summaries", Mutating(space._summaries))
+    assert space.links.counterparts(APP01) == before
+    assert added
+
+
 def test_other_targets(itops_dir: Path) -> None:
     space = Space(itops_dir)
     windows = _paths(space, "Software/Windows Server 2022.md")

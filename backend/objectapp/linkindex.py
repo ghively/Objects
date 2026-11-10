@@ -481,7 +481,9 @@ class LinkIndex:
             specs = specs_for(summary.type, self._space.types)
         if not specs:
             return []
-        incoming = self._in.get(path, ())
+        # A snapshot: this runs outside the space lock, where another thread's `_ensure` may
+        # change the live set while the specs walk it.
+        incoming = tuple(self._in.get(path, ()))
         rows: list[CounterpartRow] = []
         for spec in specs:
             paths = []
