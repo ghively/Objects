@@ -27,6 +27,8 @@ export const CREATE_TYPE_TEXT = {
   research: 'Research',
   media: 'Media',
   planningAndReflection: 'Planning and reflection',
+  // M28 (T1 adds the title so `TypeTemplate['section']` type-checks; T8 places the section)
+  itOperations: 'IT operations',
   added: 'Added',
   templateHint: "You can change a type's settings whenever you like.",
   properties: 'Properties',

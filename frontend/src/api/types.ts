@@ -164,7 +164,45 @@ export interface PropertyOptions {
   prefix?: string
   /** M12 ID: the number the next created object gets. The server never lets it go back. */
   nextNumber?: number
+  /** M28, the stored side of an `entity`: the computed other side's name and key (`null`: none). */
+  counterpart?: Counterpart | null
+  /** M28, virtual counterpart definitions only (API): the stored properties this other side mirrors. */
+  counterpartOf?: { typeId: string; key: string }[]
   [extra: string]: unknown
+}
+
+/** M28: the other side of a relation, named on its stored side (`options.counterpart`). */
+export interface Counterpart {
+  name: string
+  key: string
+}
+
+/**
+ * M28: one computed other side on a target object: the objects of `sourceTypeId` whose
+ * `sourcePropertyKey` links to it (by title, then path). Never stored.
+ */
+export interface CounterpartRow {
+  key: string
+  name: string
+  sourceTypeId: string
+  sourcePropertyKey: string
+  paths: string[]
+}
+
+/** M28: POST /api/object/counterpart (writes the stored side of each other object). */
+export interface CounterpartEditRequest {
+  path: string
+  key: string
+  sourceTypeId: string
+  add: string[]
+  remove: string[]
+  clientId?: string
+}
+
+export interface CounterpartEditResult {
+  counterparts: CounterpartRow[]
+  written: { path: string; version: string }[]
+  skipped: { path: string; reason: string }[]
 }
 
 /** M12: a rollup's calculation (the `views/calc.ts` names, plus show original/unique). */
@@ -306,13 +344,15 @@ export interface TypeDef {
   readOnlyReason: string | null
   /** API only: sha256 of the type file, `''` if unsaved. */
   revision: string
+  /** M28, API only (never saved): the virtual definitions of this type's computed other sides. */
+  counterparts?: PropertyDef[]
   [extra: string]: unknown
 }
 
 /** One template of the "Add new object type" gallery (`GET /api/type-gallery`, item 21). */
 export interface TypeTemplate {
   key: string
-  section: 'useCases' | 'research' | 'media' | 'planningAndReflection' | null
+  section: 'useCases' | 'research' | 'media' | 'planningAndReflection' | 'itOperations' | null
   name: string
   pluralName: string
   description: string
@@ -529,6 +569,8 @@ export interface ObjectDetail {
   backlinks: EntityRef[]
   /** M12: the object's formula and rollup values by property key (computed, never stored). */
   computed?: Record<string, ComputedValue>
+  /** M28: the computed other sides of relations pointing here, one per source type and key. */
+  counterparts?: CounterpartRow[]
 }
 
 /** PUT /api/object/body → 200 */
@@ -1301,6 +1343,8 @@ export interface GraphData {
   links: number[]
   /** One per `links` pair: 1 = a links to b, 2 = b links to a, 3 = both. Absent: both. */
   linkDirs?: number[]
+  /** M28: one per `links` pair: the relation names linking it (" · " between), `null` for plain links. */
+  linkLabels?: (string | null)[]
   /** `[object0, tag0, …]`. */
   tagged: number[]
 }
@@ -1396,7 +1440,8 @@ export interface MergeResult {
   trashId: string
 }
 
-export type SpaceSetup = 'blank' | 'basic'
+/** "Pick a starting point": empty, the basic setup, or (M28) IT operations. */
+export type SpaceSetup = 'blank' | 'basic' | 'itops'
 
 // ---- M15 importers (docs/superpowers/plans/2026-11-05-m15-importers.md) ----
 // Mirrors backend/objectapp/importers/model.py; field names match exactly.

@@ -61,6 +61,8 @@ import type {
   ChangeEvent,
   ChangeKind,
   ChangeKindResult,
+  CounterpartEditRequest,
+  CounterpartEditResult,
   FormulaPreviewRequest,
   FormulaPreviewResult,
   NumberExistingResult,
@@ -709,6 +711,20 @@ export const api = {
       json('POST', { path, typeId, mapping, baseVersion, clientId: CLIENT_ID }),
     )
     emitLocal([movedOrChanged(path, res.path, res.version), ...(res.relinked ?? []).map((p) => changed(p))])
+    return res
+  },
+
+  /**
+   * M28: add or remove other objects on one of `req.path`'s counterpart rows. The server writes
+   * only the stored side of each other object; each written one is announced as `changed`, naming
+   * `req.path` as linked (its counterparts changed). 404 no object; 422 a bad key or type; 423.
+   */
+  async editCounterpart(req: CounterpartEditRequest): Promise<CounterpartEditResult> {
+    const res = await request<CounterpartEditResult>(
+      '/object/counterpart',
+      json('POST', { ...req, clientId: req.clientId ?? CLIENT_ID }),
+    )
+    emitLocal((res.written ?? []).map((w) => changed(w.path, w.version, [req.path])))
     return res
   },
 
