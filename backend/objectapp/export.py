@@ -31,14 +31,17 @@ import re
 import tempfile
 import time
 import zipfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote
 
 from .exportdoc import Doc, parse_blocks, render_docx, render_html, render_latex
+from .frontmatter import FlowList, FrontmatterError, delete_keys, set_keys
 from .media import Attachment, NotServed, attachment_path, list_attachments
+from .objfile import join_object, split_object
 from .relink import code_ranges, wikilink_spans, wikilink_targets
+from .synced import synced_props
 from .typedefs import read_raw
 
 if TYPE_CHECKING:
@@ -286,13 +289,16 @@ def _markdown(
     BOM, newlines and frontmatter are kept as they are.
     """
     data = (space.root / rel).read_bytes()
-    if not opts.title_h1 and opts.wikilinks:
+    synced = _synced_lines(space, rel)
+    if not opts.title_h1 and opts.wikilinks and synced is None:
         return data
     bom = data.startswith(b"\xef\xbb\xbf")
     text = data[3 if bom else 0 :].decode("utf-8", "surrogateescape")
     nl = "\r\n" if "\r\n" in text else "\n"
     m = _FM_RE.match(text)
     head, body = (text[: m.end()], text[m.end() :]) if m else ("", text)
+    if synced is not None and head:
+        head = _with_synced(head, nl, *synced)
     if not opts.wikilinks:
         body = _paths_for_wikilinks(space, rel, body, PurePosixPath(zip_path).parent.as_posix(), placed)
     if opts.title_h1:
@@ -302,6 +308,43 @@ def _markdown(
             body = f"# {title}{nl}{nl}" + body.lstrip("\r\n")
     out = (head + body).encode("utf-8", "surrogateescape")
     return (b"\xef\xbb\xbf" if bom else b"") + out
+
+
+def _synced_lines(space: Space, rel: str) -> tuple[dict[str, Any], list[str]] | None:
+    """M29: the synced values the exported copy's front matter gets (``sets``) and the synced
+    keys it drops (``drops``: a hand-typed value the store doesn't hold), or None when the
+    object's type has no synced properties or the copy would not change."""
+    raw = read_raw(space.root, rel)
+    tdef = _type_of(space, raw)
+    props = synced_props(tdef)
+    if not props:
+        return None
+    fm = space.synced.overlay(tdef, raw.fm)
+    sets: dict[str, Any] = {}
+    drops: list[str] = []
+    for p in props:
+        if p.key in fm:
+            if raw.fm.get(p.key) != fm[p.key]:
+                value = fm[p.key]
+                sets[p.key] = FlowList(value) if isinstance(value, list) else value
+        elif p.key in raw.fm:
+            drops.append(p.key)
+    return (sets, drops) if sets or drops else None
+
+
+def _with_synced(head: str, nl: str, sets: dict[str, Any], drops: list[str]) -> str:
+    """The front matter block ``head`` (fences included, newlines ``nl``) with the synced
+    values set and the dropped keys removed; ``head`` as it was if it can't be edited."""
+    of = split_object(head.replace("\r\n", "\n"))
+    if of.frontmatter_src is None:
+        return head
+    try:
+        src = set_keys(of.frontmatter_src, sets) if sets else of.frontmatter_src
+        src = delete_keys(src, drops)
+    except FrontmatterError:
+        return head
+    out = join_object(replace(of, frontmatter_src=src))
+    return out.replace("\n", nl) if nl != "\n" else out
 
 
 def _paths_for_wikilinks(
@@ -416,8 +459,9 @@ def export_properties(space: Space, path: str) -> list[dict[str, Any]]:
     tdef = _type_of(space, raw)
     if tdef is None:
         return []
+    fm = space.synced.overlay(tdef, raw.fm)  # M29: synced facts, not a hand-typed value
     return [
-        {"key": p.key, "name": p.name, "empty": _is_empty(raw.fm.get(p.key))}
+        {"key": p.key, "name": p.name, "empty": _is_empty(fm.get(p.key))}
         for p in tdef.propertyDefinitions
         if p.type not in _NOT_EXPORTED
     ]
@@ -427,11 +471,12 @@ def build_doc(space: Space, rel: str, opts: ExportOptions) -> Doc:
     """The object at ``rel`` as an `exportdoc.Doc` (title, type, shown properties, blocks)."""
     raw = read_raw(space.root, rel)
     tdef = _type_of(space, raw)
+    fm = space.synced.overlay(tdef, raw.fm)  # M29: synced facts, not a hand-typed value
     props: list[tuple[str, str]] = []
     for p in tdef.propertyDefinitions if tdef else []:
         if p.type in _NOT_EXPORTED or p.key in opts.hidden:
             continue
-        value = raw.fm.get(p.key)
+        value = fm.get(p.key)
         if opts.hide_empty and _is_empty(value):
             continue
         props.append((p.name, "" if _is_empty(value) else _value_text(value)))

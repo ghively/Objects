@@ -116,6 +116,20 @@ from .textfile import (
     move_no_overwrite,
     retry_os,
 )
+from .synced import (
+    FOLDER as SYNCED_FOLDER,
+    MAX_ITEMS as MAX_SYNC_ITEMS,
+    SYNCED_READ_ONLY,
+    Candidate,
+    ItemResult,
+    SyncedStore,
+    SyncOutcome,
+    check_match,
+    encode_facts,
+    find_matches,
+    is_synced,
+    synced_props,
+)
 from .trash import Trash, TrashItem
 from .typedefs import (
     DEFAULT_TYPE,
@@ -888,6 +902,13 @@ def version_of(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _refuse_synced(pdef: PropertyDefinition | None) -> None:
+    """M29: a synced property is filled by its source only (`Space.sync_facts`)."""
+    if pdef is not None and is_synced(pdef):
+        assert pdef.synced is not None
+        raise InvalidValue(SYNCED_READ_ONLY.format(name=pdef.name, source=pdef.synced.source))
+
+
 def _str_or_none(value: object) -> str | None:
     if value is None:
         return None
@@ -1026,6 +1047,10 @@ class Space:
         self.own_deletes: dict[str, str] = {}
         """Path -> version of a file the app moved away (to the trash); the watcher stays silent."""
         self.trash = Trash(self.root)
+        synced_store = self.store(SYNCED_FOLDER)
+        synced_store.before_write = None  # synced facts keep no version history
+        self.synced = SyncedStore(synced_store)
+        """M29: synced facts, ``.object/synced/<typeId>.json`` (`sync_facts` writes it)."""
         self.clock: Callable[[], datetime] = lambda: datetime.now(UTC)
         """The only source of "now" for stamps, the Task hook and the calendar (tests set it)."""
         self.tz: tzinfo = SystemTz()
@@ -2218,6 +2243,135 @@ class Space:
         raw = read_raw(self.root, rel)
         return raw.of, dict(raw.fm), version_of(raw.data)
 
+    # -- synced facts (M29) ---------------------------------------------------
+
+    def synced_fm(self, summary: ObjectSummary, fm: dict) -> dict:
+        """`fm` with the synced values of the summary's type overlaid (`SyncedStore.overlay`):
+        what every reader decodes. `fm` itself when the type has no synced properties."""
+        return self.synced.overlay(self.type_by_id(summary.type), fm)
+
+    def sync_facts(
+        self,
+        type_id: str,
+        items: list[dict[str, Any]],
+        hidden: set[str],
+        now: datetime | None = None,
+    ) -> SyncOutcome:
+        """Fill the synced properties of the type's objects, one result per item, in order.
+
+        ``type_id`` is a type id or name. Each item is ``{"match": {"by", "value", "key"?},
+        "values": {key: API value}}``; it is matched among the type's objects that are not
+        templates and not in ``hidden`` (`V1Guard.hidden_paths`). A matched object without an
+        ``id`` gets one first (`ensure_id`, one unstamped line, no version kept); nothing else
+        of any ``.md`` is written. Then one `SyncedStore.apply` stamps every updated object
+        with one ``refreshedAt``; two items of one object merge in item order. Items that fail
+        never stop the others. Raises `KeyError` (no such type), `InvalidValue` (the type has
+        no synced properties, more than `MAX_ITEMS` items) and `ReadOnly` (the store file
+        isn't readable, checked before anything is written).
+        """
+        t = self.type_by_id(self._type_id(type_id))
+        if t is None:
+            raise KeyError(type_id)
+        if not synced_props(t):
+            raise InvalidValue(f"{t.name} has no synced properties.")
+        if len(items) > MAX_SYNC_ITEMS:
+            raise InvalidValue(f"At most {MAX_SYNC_ITEMS} items per call.")
+        self.synced.check_readable(t.id)
+        keyed = [
+            p for p in t.propertyDefinitions if p.type in ("text", "url") and not is_synced(p)
+        ]
+        with self._lock:
+            members = [
+                (s, self._raw.get(s.path))
+                for s in self._summaries.values()
+                if s.type == t.id and s.template is None and s.path not in hidden
+            ]
+        members.sort(key=lambda m: m[0].path)
+        candidates = []
+        for s, raw in members:
+            fm = raw.fm if raw is not None else {}
+            keys: dict[str, str] = {}
+            for p in keyed:
+                value = decode_value(p, fm.get(p.key), fm)
+                if isinstance(value, str):
+                    keys[p.key] = value
+            candidates.append(Candidate(s.path, s.id, s.title, tuple(s.aliases), keys))
+
+        results: list[ItemResult] = []
+        matched: list[tuple[ItemResult, dict[str, Any]]] = []
+        for index, item in enumerate(items):
+            item = item if isinstance(item, dict) else {}
+            match = item.get("match")
+            match = match if isinstance(match, dict) else {}
+            by, value, key = match.get("by"), match.get("value"), match.get("key")
+            detail = check_match(t, by, value, key)
+            values = item.get("values")
+            if detail is None and not isinstance(values, dict):
+                detail = '"values" must be an object.'  # our string
+            encoded: dict[str, Any] = {}
+            if detail is None:
+                try:
+                    encoded = encode_facts(t, values)
+                except InvalidValue as exc:
+                    detail = str(exc)
+            if detail is not None:
+                results.append(ItemResult(index, "invalid", detail=detail))
+                continue
+            found = find_matches(candidates, by, value, key if by == "key" else None)
+            what = f"the {by}" if by != "key" else f"the {t.prop(key).name}"  # type: ignore[union-attr]
+            if not found:
+                results.append(
+                    ItemResult(index, "notFound", detail=f'No {t.name} has {what} "{value}".')
+                )
+                continue
+            if len(found) > 1:
+                results.append(
+                    ItemResult(
+                        index,
+                        "ambiguous",
+                        paths=[c.path for c in found],
+                        detail=f'{len(found)} {t.pluralName} have {what} "{value}".',
+                    )
+                )
+                continue
+            result = ItemResult(index, "updated", path=found[0].path, objectId=found[0].objectId)
+            results.append(result)
+            matched.append((result, encoded))
+
+        id_writes: list[tuple[str, str]] = []
+        ids: dict[str, str | None] = {}
+        failed: dict[str, str] = {}
+        for result, _encoded in matched:
+            path = result.path
+            assert path is not None
+            if result.objectId is not None:
+                continue
+            if path not in ids:
+                ids[path] = None
+                try:
+                    before = self.cached_version(path)
+                    new_id, version = self.ensure_id(path, history=False)
+                except (Conflict, ReadOnly, KeyError, FileNotFoundError, ValueError) as exc:
+                    failed[path] = getattr(exc, "reason", None) or str(exc)
+                else:
+                    ids[path] = new_id
+                    if version != before:  # the file had its id already: nothing was written
+                        id_writes.append((path, version))
+            result.objectId = ids[path]
+            if result.objectId is None:
+                result.status = "invalid"
+                result.path = None
+                result.detail = failed.get(path)
+        updates: dict[str, dict[str, Any]] = {}
+        for result, encoded in matched:
+            if result.status == "updated" and result.objectId:
+                updates.setdefault(result.objectId, {}).update(encoded)
+        refreshed_at = now_stamp(now or self.clock())
+        revision = (
+            self.synced.apply(t.id, updates, refreshed_at) if updates else self.synced.revision(t.id)
+        )
+        return SyncOutcome(t.id, refreshed_at, revision, results, id_writes)
+
     # -- the write engine -----------------------------------------------------
 
     def _write(
@@ -2572,6 +2726,7 @@ class Space:
         t = self._type_of(rel)
         for key in (*updates, *remove):
             pdef = t.prop(key) if t is not None else None
+            _refuse_synced(pdef)
             if pdef is not None and pdef.type in _READ_ONLY_VALUE_KINDS:
                 raise InvalidValue(f'"{pdef.name}" can\'t be edited.')
             if pdef is not None and pdef.type in GATED_KINDS:
@@ -2664,6 +2819,7 @@ class Space:
         t = self._type_of(rel)
         for key in (*updates, *remove):
             pdef = t.prop(key) if t is not None else None
+            _refuse_synced(pdef)
             if pdef is not None and pdef.type in _READ_ONLY_VALUE_KINDS:
                 raise InvalidValue(f'"{pdef.name}" can\'t be edited.')
         before: dict = {}
@@ -3618,6 +3774,7 @@ class Space:
             for key in values:
                 if key in _LOCKED_KEYS:
                     raise InvalidValue(f'"{key}" can\'t be changed as a property.')
+                _refuse_synced(t.prop(key))
             src = of.frontmatter_src or ""
             of = replace(
                 of,

@@ -43,6 +43,7 @@ __all__ = [
     "encode_facts",
     "find_matches",
     "is_stale",
+    "is_synced",
     "norm",
     "synced_props",
 ]
@@ -128,7 +129,12 @@ def synced_props(t: TypeDefinition | None) -> list[PropertyDefinition]:
     """
     if t is None:
         return []
-    return [p for p in t.propertyDefinitions if p.synced is not None and p.type in SYNCABLE_KINDS]
+    return [p for p in t.propertyDefinitions if is_synced(p)]
+
+
+def is_synced(pdef: PropertyDefinition | None) -> bool:
+    """Whether `pdef` is one of its type's synced properties (`synced_props`)."""
+    return pdef is not None and pdef.synced is not None and pdef.type in SYNCABLE_KINDS
 
 
 def _parse_iso(text: str | None) -> datetime | None:
@@ -252,6 +258,18 @@ class SyncedStore:
             return jsonstore.parse_json_object(raw), revision
         except (ValueError, UnicodeDecodeError):
             return None, revision
+
+    def revision(self, type_id: str) -> str:
+        """The file's revision (``''`` when there is none)."""
+        return self._store.revision(type_id)
+
+    def check_readable(self, type_id: str) -> None:
+        """Raise `ReadOnly` when the type's file exists and isn't a JSON object (a sync checks
+        this before it writes anything, the id lines included)."""
+        from .space import ReadOnly  # space imports this module
+
+        if self._read(type_id)[0] is None:
+            raise ReadOnly(f"{self._store.rel(type_id)} is not a valid JSON object.")
 
     def data(self, type_id: str) -> dict[str, Any]:
         """The type's whole file ({} when there is none, or it isn't readable); cached by the

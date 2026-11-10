@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from .computed import COMPUTED_KINDS, Computer, Obj, has_computed
 from .counterparts import CounterpartSpec, defs_from_specs, specs_for
 from .propvalues import InvalidValue, decode_value
+from .synced import synced_props
 from .typedefs import RawObject
 
 if TYPE_CHECKING:
@@ -48,6 +49,9 @@ class Row:
     preview: str
     #: Words in the body (the table's "Content" column), with or without the preview.
     words: int = 0
+    #: M29: when the object's synced facts were last refreshed (None: not yet, or its type has
+    #: no synced properties).
+    syncedAt: str | None = None
 
 
 # -- body preview ---------------------------------------------------------------------
@@ -353,6 +357,13 @@ def _row(
 
     t = space.type_by_id(summary.type)
     version = version_of(raw.data)
+    # M29: the synced facts replace the file's values under their keys (a hand-typed value
+    # there is ignored) before anything is decoded or computed.
+    fm = space.synced.overlay(t, raw.fm)
+    synced_at = None
+    if t is not None and synced_props(t):
+        entry = space.synced.entry(t.id, summary.id)
+        synced_at = (entry.refreshedAt or None) if entry is not None else None
     values: dict[str, Any] = {}
     links: dict[str, list[str | None]] = {}
     computed: list[PropertyDefinition] = []
@@ -367,7 +378,7 @@ def _row(
             computed.append(p)  # after the loop, once every relation is resolved
             values[p.key] = None
             continue
-        value = decode_value(p, raw.fm.get(p.key), raw.fm)
+        value = decode_value(p, fm.get(p.key), fm)
         if p.type == "entity":
             paths = [space.resolve(r["target"], summary.path) for r in value]
             for ref, path in zip(value, paths, strict=True):
@@ -396,7 +407,7 @@ def _row(
         # M12: formula and rollup values (`ComputedValue`s), computed here and never stored.
         if computer is None:
             computer = Computer(space)
-        obj = Obj(summary.path, raw.fm, summary, t, links)
+        obj = Obj(summary.path, fm, summary, t, links)
         for p in computed:
             values[p.key] = computer.computed_value(obj, p)
     if "backlinks" not in values:
@@ -419,4 +430,5 @@ def _row(
         links=links,
         preview=cached_preview(raw.path, version, raw.of.body) if preview else "",
         words=cached_word_count(raw.path, version, raw.of.body),
+        syncedAt=synced_at,
     )
