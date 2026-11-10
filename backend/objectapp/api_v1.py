@@ -76,7 +76,7 @@ from .apiquery import (
 )
 from .automation_filter import tag_names
 from .propvalues import InvalidValue
-from .queryeval import evaluate, row_collection_ids
+from .queryeval import evaluate, row_collection_ids, seeded_rng
 from .recurrence import week_start_of
 from .rows import check_search
 from .space import Conflict, ReadOnly
@@ -455,12 +455,21 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             return _error(404, f'There is no query "{query_id}".')
         # M31: the app's own evaluation (`queryeval`, a port of `queries/runQuery.ts`): every
         # part of the query applies, and the rows come in the order the query page lists them.
+        # Objects excluded from AI go before the query's own limit; rows only in groups the view
+        # hides are not listed; a random limit is one draw per version of the query (paging).
+        hidden = hidden_paths()
+        view = q.view.get("viewDefinition") if isinstance(q.view, dict) else None
         try:
-            run = evaluate(space, q.definition or {})
+            run = evaluate(
+                space,
+                q.definition or {},
+                seeded_rng(q.id, space.query_revision(q.id)),
+                hidden=hidden,
+                group_config=view.get("groupByConfig") if isinstance(view, dict) else None,
+            )
         except InvalidValue as exc:
             return _error(422, str(exc))
-        hidden = hidden_paths()
-        rows = [x for x in run.rows if x.summary.path not in hidden]
+        rows = run.rows
         limit = max(1, min(int(req.limit), MAX_ROWS))
         offset = max(0, int(req.offset))
         out = {
