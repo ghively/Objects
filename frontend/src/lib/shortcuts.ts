@@ -187,11 +187,19 @@ function keyMatches(e: Pick<KeyboardEvent, 'key' | 'code'>, key: string): boolea
   return e.key === key
 }
 
-type KeyEventLike = Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>
+type KeyEventLike = Pick<KeyboardEvent, 'key' | 'code' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'> & {
+  getModifierState?: (key: string) => boolean
+}
 
-/** Whether `e` is one of `keys` (exact modifiers; `Mod` is Ctrl, or Cmd on macOS). */
+/**
+ * Whether `e` is one of `keys` (exact modifiers; `Mod` is Ctrl, or Cmd on macOS). An AltGr press
+ * is never a shortcut: Windows reports it as Ctrl+Alt, so AltGr+Shift+L ("Ł" on a Polish layout)
+ * would otherwise be Ctrl+Alt+Shift+L and couldn't be typed. Not on macOS, where some browsers
+ * report Option as AltGraph and ⌥ shortcuts must still work.
+ */
 export function matches(e: KeyEventLike, keys: string[]): boolean {
   const mac = isMacPlatform()
+  if (!mac && e.getModifierState?.('AltGraph')) return false
   for (const spec of keys) {
     if (isSequence(spec)) continue
     const c = parseKeys(spec, mac)
