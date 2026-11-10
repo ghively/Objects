@@ -86,7 +86,14 @@ known-limits fix pass.
 
 ## Gate (after the fixes)
 
-The final gate over the fixed tree is running; its numbers replace this line when it finishes.
+Linux, at the tree with every fix above, suites run one after the other:
+
+| Check | Result |
+|---|---|
+| Back end | 3827 passed, 19 skipped, 0 failed apart from `test_task_stats_fast` (a 0.35 s budget that fails only under the full suite's load; it passed alone 3 times out of 3) |
+| Front end | 4275 passed, 1 skipped |
+| `tsc`, lint, build | clean |
+| Acceptance sweep | 56 of 56 PASS |
 
 ## Not built: specified but missing (Gene decides)
 
