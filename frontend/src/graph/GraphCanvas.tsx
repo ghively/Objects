@@ -49,6 +49,12 @@ export interface GraphCanvasProps {
   onNodeClick(path: string, event: MouseEvent | TouchEvent | undefined): void
   /** Animate the camera to this node. */
   focusPath?: string | null
+  /** M31: any change animates to `focusPath` again (the same node picked twice). */
+  focusSignal?: number
+  /** M31: animate the camera to this ratio (1 = the whole graph in view); a new `n` repeats one. */
+  zoomRequest?: { ratio: number; n: number } | null
+  /** M31: the camera's ratio each time it changes (the zoom controls, the wheel, a fit). */
+  onCameraRatio?(ratio: number): void
   /** Any change resets the camera ("Fit graph to view"). */
   fitSignal?: number
   /** A node always labelled and highlighted (the local graph's centre). */
@@ -107,11 +113,16 @@ export function GraphCanvas({
   custom,
   onNodeClick,
   focusPath,
+  focusSignal,
+  zoomRequest,
+  onCameraRatio,
   fitSignal,
   highlightPath,
   onLayout,
   rendererRef,
 }: GraphCanvasProps) {
+  const cameraRef = useRef(onCameraRatio)
+  cameraRef.current = onCameraRatio
   const container = useRef<HTMLDivElement>(null)
   const sigmaRef = useRef<Sigma<NodeAttrs, EdgeAttrs> | null>(null)
   const keyByPath = useRef(new Map<string, string>())
@@ -265,6 +276,9 @@ export function GraphCanvas({
       if (!g.hasNode(node)) return
       clickRef.current(g.getNodeAttribute(node, 'path'), event?.original)
     })
+    const camera = sigma.getCamera()
+    camera.on('updated', (state: { ratio: number }) => cameraRef.current?.(state.ratio))
+    cameraRef.current?.(camera.ratio)
     return sigma
   }
 
@@ -422,7 +436,16 @@ export function GraphCanvas({
     hovered.current = key
     sigma.refresh()
     void sigma.getCamera().animate({ x: d.x, y: d.y, ratio: 0.35 }, { duration: 500 })
-  }, [focusPath, sigmaReady])
+  }, [focusPath, focusSignal, sigmaReady])
+
+  // M31: the zoom controls. Each request is applied once (not again on a remount).
+  const appliedZoom = useRef(zoomRequest?.n)
+  useEffect(() => {
+    const sigma = sigmaRef.current
+    if (!sigma || !zoomRequest || zoomRequest.n === appliedZoom.current) return
+    appliedZoom.current = zoomRequest.n
+    void sigma.getCamera().animate({ ratio: zoomRequest.ratio }, { duration: 250 })
+  }, [zoomRequest, sigmaReady])
 
   const firstFit = useRef(fitSignal)
   useEffect(() => {

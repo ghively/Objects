@@ -106,7 +106,7 @@ describe('GraphPage', () => {
     expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'object', path: 'Analytical Engine.md' }, { newTab: true })
   })
 
-  test('search in graph focuses the best match; fit resets the camera', async () => {
+  test('search in graph focuses the best match; Page Fit resets the camera', async () => {
     const user = userEvent.setup()
     render(<GraphPage onOpenTarget={vi.fn()} />)
     const sigma = await sigmaReady()
@@ -120,7 +120,10 @@ describe('GraphPage', () => {
     expect(sigma.camera.animate).toHaveBeenCalledTimes(1)
 
     expect(sigma.camera.animatedReset).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: 'Fit graph to view' }))
+    // M31: fitting is the zoom menu's "Page Fit" (bottom right of the canvas).
+    expect(screen.queryByRole('button', { name: 'Fit graph to view' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Zoom' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Page Fit' }))
     expect(sigma.camera.animatedReset).toHaveBeenCalledTimes(1)
   })
 

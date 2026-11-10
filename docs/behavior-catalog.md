@@ -347,6 +347,14 @@ Each starter template pre-fills the new type's properties.
   Bottom right: zoom out, a zoom dropdown (Page Fit, 5% ... 300%), zoom in, download (image), and a settings
   dropdown: Show tags network, Filter object types, Exclude object types, Show completed tasks, Hide heavily
   linked objects, Hide dates, Hide indirect links, Show simplified graph (Object's own, last).
+- **Graph controls** (M31; what the two icons do is our call): the count pill shows the objects shown after the
+  filters ("N objects shown" on hover). The document icon, "Open as list", lists those objects by title; a pick peeks
+  it with the list as the pager (Ctrl/Cmd+click opens a tab). The history icon, "Recently opened", lists the objects
+  opened lately (newest first, up to 10) that the graph shows; a pick finds it on the graph. The zoom menu's steps are
+  Page Fit, 5%, 10%, 25%, 50%, 75%, 100%, 150%, 200%, 300% (100% is the whole graph in view; Page Fit also centres
+  it); zoom in and out go to the next step and the menu shows the zoom now, wheel zooms included. Download is "Export
+  view as PNG"; the settings dropdown is Customize. The search field ("Find a note in this graph", Object's own)
+  stays in the header. The local graph panel keeps its compact toolbar.
 - **Edge labels** (Object's own, M28): a link made by a relation property is labelled with the relation's name
   ("Runs on"; a pair linked by relations both ways joins the names with " · "); a link from body text only has no
   label. Labels show only on the hovered node's edges, or on the local graph centre's while nothing is hovered,
@@ -961,6 +969,14 @@ ssh: GitHub, GitLab, a self-hosted server).
   id (`spaceId` in `.object/space.json`, written when version control is turned on or on the next app save in a
   space that has a `space.json`), so moving or renaming the folder keeps them; older path-keyed history is moved over.
   Type, collection, query and view definitions keep a saved version before each app save too.
+- **Definition Version History** (M31; our wording and summary): "Version History" in Object type settings' header,
+  a saved query's `…` menu and a collection's `…` menu opens the definition's saved versions, newest first
+  ("Version N", the time). A picked one shows "In this version" (name, plural name and properties for a type; object
+  types for a collection; object types, search, filters, sorts for a query), "Changed since" (renamed, properties or
+  object types added, removed or renamed since) and the "Definition file" pretty-printed. "Restore this version" asks
+  "Restore this version?" and saves it back through the normal save (revision checked; what is there now is kept as
+  a version first); a type version that would remove values asks "Apply changes?" first. Views have versions but no
+  restore page.
 - **Settings > Offline & Sync > Backup**: "Back up all spaces" (version control on for every space on this device,
   with a line per space that couldn't) and the "Back up agents and settings" switch: the per-user state folder
   (agents, automations, device settings, the spaces list) in its own repository, with a remote field and "Push now".

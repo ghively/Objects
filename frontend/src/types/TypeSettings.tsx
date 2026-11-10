@@ -30,6 +30,7 @@ import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
+import { DefinitionHistoryDialog, DEFINITION_HISTORY } from '@/history/DefinitionHistoryDialog'
 import { cn } from '@/lib/utils'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTypeEditor } from '@/object/useTypeEditor'
@@ -315,6 +316,7 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
   const [addOpen, setAddOpen] = useState(false)
   const [settingsFor, setSettingsFor] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -378,6 +380,15 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
             {type.name}
           </button>
         </nav>
+        {/* M31: the type definition's kept versions. */}
+        <button
+          type="button"
+          onClick={() => setHistoryOpen(true)}
+          className="ml-auto flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[14px] hover:bg-hover"
+        >
+          <Icon name="ph-clock-counter-clockwise" size={14} />
+          {DEFINITION_HISTORY.menuItem}
+        </button>
       </header>
 
       <div className="mx-auto w-full max-w-[900px] px-10 pt-6 pb-16">
@@ -642,6 +653,14 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
         <DeleteTypeDialog type={type} open={deleteOpen} onOpenChange={setDeleteOpen} onDeleted={() => onDeleted?.()} />
       )}
       {editor.dialog}
+      <DefinitionHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        kind="types"
+        id={type.id}
+        current={type}
+        readOnly={readOnly}
+      />
     </div>
   )
 }

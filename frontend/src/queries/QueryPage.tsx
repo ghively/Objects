@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from 'react'
 import type { Query, QueryDefinition, TypeDef, ViewState } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
+import { DefinitionHistoryDialog, DEFINITION_HISTORY } from '@/history/DefinitionHistoryDialog'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -82,6 +83,7 @@ export function QueryPage({ id }: { id: string }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<string | null>(null)
   const [iconOpen, setIconOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [typePins, setTypePins] = useState<Record<string, boolean>>({})
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -280,6 +282,10 @@ export function QueryPage({ id }: { id: string }) {
                 ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
+            <DropdownMenuItem onSelect={() => setHistoryOpen(true)}>
+              <Icon name="ph-clock-counter-clockwise" size={14} />
+              {DEFINITION_HISTORY.menuItem}
+            </DropdownMenuItem>
             {!tickets && (
               <>
                 <DropdownMenuSeparator />
@@ -336,6 +342,7 @@ export function QueryPage({ id }: { id: string }) {
           />
         )}
       </div>
+      <DefinitionHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} kind="queries" id={q.id} current={q} readOnly={readOnly} />
     </div>
   )
 }
