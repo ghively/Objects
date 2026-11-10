@@ -246,3 +246,31 @@ def test_another_users_repository_is_refused_by_git(tmp_path: Path) -> None:
         pytest.skip("this machine's git trusts other users' repositories (safe.directory)")
     assert gitprov.repo_of(repo / "docs") is None
     assert gitprov.refused(repo / "docs") is True
+
+
+# -- 4. WriteState's docstrings stay with their fields ---------------------------------------------
+
+
+def _field_docs(source: str, cls: str) -> tuple[dict[str, str], list[str]]:
+    """(field -> the docstring right after it, docstrings that follow another docstring) of ``cls``."""
+    import ast
+
+    node = next(n for n in ast.walk(ast.parse(source)) if isinstance(n, ast.ClassDef) and n.name == cls)
+    docs: dict[str, str] = {}
+    stray: list[str] = []
+    for a, b in zip(node.body, node.body[1:], strict=False):
+        if isinstance(b, ast.Expr) and isinstance(b.value, ast.Constant) and isinstance(b.value.value, str):
+            if isinstance(a, ast.AnnAssign) and isinstance(a.target, ast.Name):
+                docs[a.target.id] = b.value.value
+            else:
+                stray.append(b.value.value)
+    return docs, stray
+
+
+def test_write_state_docstrings_follow_their_fields() -> None:
+    from objectapp.importers import writer
+
+    docs, stray = _field_docs(Path(writer.__file__).read_text(encoding="utf-8"), "WriteState")
+    assert stray == []
+    assert docs["losses"].startswith("(source path, what the conversion lost")
+    assert docs["uncommitted"].startswith("M31: source paths whose file differs from its git commit")

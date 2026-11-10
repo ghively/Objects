@@ -122,9 +122,9 @@ class WriteState:
     conflicts: list[dict[str, Any]] = field(default_factory=list)
     removed: list[dict[str, Any]] = field(default_factory=list)
     losses: list[tuple[str, str]] = field(default_factory=list)
+    """(source path, what the conversion lost or couldn't do)."""
     uncommitted: list[str] = field(default_factory=list)
     """M31: source paths whose file differs from its git commit (the report's Git section)."""
-    """(source path, what the conversion lost or couldn't do)."""
     originals_kept: int = 0
     originals_large: list[str] = field(default_factory=list)
     attachment_records: dict[str, dict[str, str]] = field(default_factory=dict)
