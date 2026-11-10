@@ -155,7 +155,7 @@ def test_graph_get_writes_nothing(links_space_dir: Path):
         assert r.status_code == 200
         body = r.json()
         assert body == graph_data(space)
-        assert set(body) == {"nodes", "links", "linkDirs", "tagged"}
+        assert set(body) == {"nodes", "links", "linkDirs", "linkLabels", "tagged"}
     assert _snapshot(links_space_dir) == before
 
 

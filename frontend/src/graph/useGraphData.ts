@@ -1,5 +1,6 @@
 // The graph payload, shared by the global graph and the local graph panel: one `api.graph()`,
-// reloaded (debounced 500 ms) when objects or types change.
+// reloaded (debounced 500 ms) when objects or types change. The payload is kept whole, `linkLabels`
+// (M28) included, so a renamed relation (a `types` change) relabels the edges.
 import { useEffect } from 'react'
 import { create } from 'zustand'
 import { api } from '@/api/client'
@@ -25,7 +26,7 @@ export const useGraphDataStore = create<GraphDataState>()((set) => ({
     const n = ++seq
     set({ loading: true })
     try {
-      const next = (await api.graph()) ?? { nodes: [], links: [], tagged: [] }
+      const next = (await api.graph()) ?? { nodes: [], links: [], linkLabels: [], tagged: [] }
       // The same payload keeps the same object: the canvas rebuilds its graph and restarts the
       // layout (up to seconds) on a new `data`, and a body-only save changes no node or link.
       // A `304` answers the cached body itself, so identity skips the deep compare.
