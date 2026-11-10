@@ -605,3 +605,41 @@ def test_failed_write_can_run_again(env: Env) -> None:
     e.monkeypatch.setattr(entitywrite, "write_entities", real)
     _write(e, batch)
     assert e.fil.entities_view(batch)["written"]["created"] > 0
+
+
+def test_reopened_step_shows_a_failed_write(env: Env) -> None:
+    """``writeError``: the last Write's recorded error while it is failed (or interrupted), else None."""
+    e = env
+    batch = _import(e)
+    assert e.fil.entities_view(batch)["writeError"] is None  # collecting
+    _decide(e, batch)
+    _trial_and_bulk(e, batch)
+    _accept_all(e, batch)
+    assert e.fil.entities_view(batch)["writeError"] is None  # review
+    real = entitywrite.write_entities
+
+    def boom(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        raise OSError("disk full")
+
+    e.monkeypatch.setattr(entitywrite, "write_entities", boom)
+    e.fil.write_entities(batch)
+    _wait(e, batch, {"failed", "done"})
+    view = e.fil.entities_view(batch)
+    assert view["state"] == "review" and view["writeError"] == "disk full"
+
+    # a write no thread runs any more (the app stopped mid-write) reads as interrupted
+    d = e.fil._load(batch)
+    e.fil._save(batch, {**d, "state": "writing", "error": None})
+    assert e.fil.entities_view(batch)["writeError"] == filing.WRITE_INTERRUPTED
+
+    e.fil._save(batch, {**d, "state": "entities", "error": None})
+    e.monkeypatch.setattr(entitywrite, "write_entities", real)
+    _write(e, batch)
+    view = e.fil.entities_view(batch)
+    assert view["state"] == "written" and view["writeError"] is None
+
+    # a failed pass (not a write) is no write error
+    batch2 = _import(e)
+    d2 = e.fil._load(batch2)
+    e.fil._save(batch2, {**d2, "state": "failed", "mode": "bulk", "error": "The agent run failed."})
+    assert e.fil.entities_view(batch2)["writeError"] is None

@@ -163,7 +163,8 @@ def load_review(root: Path | str, batch: str) -> dict                 # Entities
 def save_review(space: Space, batch: str, review: dict, results: dict[str, dict]) -> dict   # ReviewInvalid
 def accepted(res: Resolution, review: dict) -> list[tuple[Entity, str]]  # (entity, final name), accepted or renamed
 def undecided(res: Resolution, review: dict) -> list[str]                # ids of entities with no decision
-def view(space: Space, batch: str, results: dict[str, dict], state: str) -> dict   # EntitiesView
+def view(space: Space, batch: str, results: dict[str, dict], state: str,
+         write_error: str | None = None) -> dict   # EntitiesView; writeError is write_error in "failed"
 
 # sources.py (T4)
 SOURCE_TYPE_ID = "source"
@@ -322,6 +323,7 @@ export interface EntitiesView {
   review: EntitiesReview
   undecided: number
   written: EntitiesWritten | null
+  writeError?: string | null        // fix pass: the last Write's recorded error while it is failed (or interrupted); else null
 }
 // FilingStatus gains   keepAsSources: boolean
 // FilingTrialItem gains:
@@ -332,7 +334,7 @@ export interface EntitiesView {
 // the proposal review's `edited` gains: useType?: string; category?: string
 ```
 
-`EntitiesView.state`: `collecting` while the filing state is `idle | running | trial`, `review` in `entities`, `writing` in `writing`, `written` in `done` after a write.
+`EntitiesView.state`: `collecting` while the filing state is `idle | running | trial`, `review` in `entities` (and in `failed` after a Write, with `writeError` set to the recorded error), `writing` in `writing`, `written` in `done` after a write.
 
 ### Client (`frontend/src/api/client.ts`) and mock (`frontend/src/test/mockApi.ts`)
 

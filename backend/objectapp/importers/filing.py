@@ -778,10 +778,10 @@ class Filing:
 
         alive = self.running()  # before the read, as in `status`
         d = self._source_batch(batch)
-        state, _error = self._state(d, alive)
+        state, error = self._state(d, alive)
         if state == "failed" and d.get("mode") != "entities":
             state = "running"  # a pass that failed: its entities are still being collected
-        return entities.view(self.space, batch, d["results"], state)
+        return entities.view(self.space, batch, d["results"], state, error)
 
     def save_entity_review(self, batch: str, review: dict[str, Any]) -> dict[str, Any]:
         """Check and store Gene's review (``entities-review.json``, the only file written); answers the

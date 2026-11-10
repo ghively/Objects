@@ -576,12 +576,14 @@ _STATES = {"idle": "collecting", "running": "collecting", "trial": "collecting",
            "writing": "writing", "failed": "review"}  # fmt: skip
 
 
-def view(space: Space, batch: str, results: dict[str, dict[str, Any]], state: str) -> dict[str, Any]:
+def view(space: Space, batch: str, results: dict[str, dict[str, Any]], state: str,
+         write_error: str | None = None) -> dict[str, Any]:  # fmt: skip
     """The wizard's ``EntitiesView`` for the batch in filing ``state``. Reads only.
 
     ``collecting`` while the filing state is ``idle``, ``running`` or ``trial``; ``review`` in
     ``entities`` (and ``failed``, which Write can be run again from); ``writing``; ``written`` in
-    ``done`` after a write."""
+    ``done`` after a write. ``writeError`` is ``write_error`` (the failed Write's recorded error) in
+    ``failed``, else None."""
     from . import entitywrite
 
     review = load_review(space.root, batch)
@@ -655,4 +657,5 @@ def view(space: Space, batch: str, results: dict[str, dict[str, Any]], state: st
         "review": {k: review[k] for k in ("decisions", "merges", "splits")},
         "undecided": len(undecided(res, review)),
         "written": written,
+        "writeError": (write_error or None) if state == "failed" else None,
     }  # fmt: skip

@@ -356,8 +356,11 @@ def test_view_shape_and_reads_write_nothing(tmp_path: Path) -> None:
 
     v = entities.view(sp, "b1", results, "entities")
     assert set(v) == {"state", "entities", "leftOut", "suggestedMerges", "relations", "sources", "conflicts",
-                      "review", "undecided", "written"}  # fmt: skip
-    assert v["state"] == "review"
+                      "review", "undecided", "written", "writeError"}  # fmt: skip
+    assert v["state"] == "review" and v["writeError"] is None
+    failed = entities.view(sp, "b1", results, "failed", "disk full")
+    assert failed["state"] == "review" and failed["writeError"] == "disk full"
+    assert entities.view(sp, "b1", results, "entities", "disk full")["writeError"] is None
     assert [(e["type"], e["name"]) for e in v["entities"]] == [
         ("Application", "Payroll"), ("Host", "APP01"), ("Host", "SRV-DB01"), ("Location", "HQ"),
         ("Runbook", "Restart Payroll"), ("Software", "SQL Server 2019")]  # fmt: skip
