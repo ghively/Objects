@@ -29,7 +29,10 @@ automated one: when ``fullExportAuto`` is on it exports ``fullExportScope`` into
 ``fullExportFolder`` once per ``fullExportInterval`` (daily or weekly), checking on a timer
 from server start, and records its last run in the state dir (``full-export.json``). A folder
 that is unset, missing or inside a space skips the run (`AutoFullExport.status` says why). One
-export runs at a time in the process (`_RUN_LOCK`), manual or automated.
+export runs at a time in the process (`_RUN_LOCK`), manual or automated; and one automated run at
+a time across Object processes sharing the state dir: a run holds ``full-export.lock`` there
+(created exclusively, refreshed as the run writes, taken over once it is `LOCK_STALE`) and reads
+the record again under it.
 """
 
 from __future__ import annotations
@@ -39,8 +42,9 @@ import logging
 import os
 import shutil
 import threading
+import time
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -70,6 +74,8 @@ from .whiteboardfile import sidecar_owner
 
 __all__ = [
     "INTERVALS",
+    "LOCK_FILE",
+    "LOCK_STALE",
     "SCOPES",
     "STATE_FILE",
     "AutoFullExport",
@@ -86,6 +92,12 @@ __all__ = [
 SCOPES = ("current", "all")
 INTERVALS = {"daily": timedelta(days=1), "weekly": timedelta(days=7)}
 STATE_FILE = "full-export.json"
+LOCK_FILE = "full-export.lock"
+"""Held in the state dir for the whole of an automated run: one run across Object processes."""
+LOCK_STALE = timedelta(minutes=30)
+"""A lock not refreshed for this long is a dead process's and is taken over (our choice)."""
+LOCK_REFRESH_SECONDS = 60.0
+"""How often a run refreshes its lock as it writes (well inside `LOCK_STALE`)."""
 ALL_SPACES = "All Spaces"  # the catalog's "Spaces (All Spaces)"
 RETRY_AFTER = timedelta(hours=1)
 """A failed automated run is tried again after this long (our choice), not on every check."""
@@ -162,24 +174,68 @@ class FullExportResult:
 # -- reading a space without writing to it -----------------------------------------------
 
 
+def _scan_objects(root: Path) -> Iterator[tuple[str, RawObject]]:
+    """A space's objects, one read at a time (an unreadable file and the templates left out),
+    from the files only: the frontmatter cache is bypassed."""
+    for rel in iter_object_paths(root):
+        try:
+            raw = read_raw(root, rel, cache=False)
+        except OSError:
+            continue
+        if not raw.readOnly and _str_or_none(raw.fm.get("template")):
+            continue  # a template is no object (our call: left out)
+        yield rel, raw
+
+
+def _media_paths(root: Path, objects: Iterable[tuple[str, RawObject]]) -> list[str]:
+    """The space paths of the files "Include media" copies: every attachment, every file one of
+    ``objects`` references and every whiteboard sidecar of one of them."""
+    found: dict[str, None] = {a["path"]: None for a in list_attachments(root)}
+    names: set[str] = set()
+    for rel, raw in objects:
+        names.add(rel)
+        for item in referenced_media(root, rel, raw.fm, raw.of.body):
+            found.setdefault(item, None)
+    for folder, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        base = Path(folder).relative_to(root).as_posix()
+        for name in files:
+            rel = name if base == "." else f"{base}/{name}"
+            owner = sidecar_owner(rel)
+            if owner is not None and owner in names and not os.path.islink(os.path.join(folder, name)):
+                found.setdefault(rel, None)
+    return sorted(found)
+
+
+def _count_files(root: Path, media: bool) -> int:
+    """How many files a space's export writes (its objects, and its media with ``media``),
+    counted reading one object at a time, so no space is held in memory to count it."""
+    seen = 0
+
+    def each() -> Iterator[tuple[str, RawObject]]:
+        nonlocal seen
+        for item in _scan_objects(root):
+            seen += 1
+            yield item
+
+    if media:
+        return len(_media_paths(root, each())) + seen
+    for _item in each():
+        pass
+    return seen
+
+
 class _SpaceView:
     """What the Markdown export reads of a space (``root``, ``types``, ``synced``, ``resolve``),
     read from its files only: no `Space` is opened (that writes the frontmatter cache and purges
-    the trash), no type file is migrated and the frontmatter cache is bypassed."""
+    the trash), no type file is migrated and the frontmatter cache is bypassed. It holds every
+    object's bytes, so a run builds one space's view at a time and releases it before the next."""
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root).resolve()
         self.types = _read_types(self.root)
         self.synced = SyncedStore(JsonStore(self.root, SYNCED_FOLDER, {}))
-        self.objects: dict[str, RawObject] = {}
-        for rel in iter_object_paths(self.root):
-            try:
-                raw = read_raw(self.root, rel, cache=False)
-            except OSError:
-                continue
-            if not raw.readOnly and _str_or_none(raw.fm.get("template")):
-                continue  # a template is no object (our call: left out)
-            self.objects[rel] = raw
+        self.objects: dict[str, RawObject] = dict(_scan_objects(self.root))
         summaries = [
             SimpleNamespace(
                 path=rel,
@@ -196,21 +252,8 @@ class _SpaceView:
         return self._resolver.resolve(link, from_path)
 
     def media(self) -> list[str]:
-        """The space paths of the files "Include media" copies: every attachment, every file an
-        object references and every whiteboard sidecar."""
-        found: dict[str, None] = {a["path"]: None for a in list_attachments(self.root)}
-        for rel, raw in self.objects.items():
-            for item in referenced_media(self.root, rel, raw.fm, raw.of.body):
-                found.setdefault(item, None)
-        for folder, dirs, files in os.walk(self.root):
-            dirs[:] = [d for d in dirs if not d.startswith(".")]
-            base = Path(folder).relative_to(self.root).as_posix()
-            for name in files:
-                rel = name if base == "." else f"{base}/{name}"
-                owner = sidecar_owner(rel)
-                if owner is not None and owner in self.objects and not os.path.islink(os.path.join(folder, name)):
-                    found.setdefault(rel, None)
-        return sorted(found)
+        """The space paths of the files "Include media" copies (`_media_paths`)."""
+        return _media_paths(self.root, self.objects.items())
 
 
 def _read_types(root: Path) -> list[TypeDefinition]:
@@ -359,9 +402,10 @@ def _run(spaces, destination, options, now, label, all_spaces, progress) -> Full
     roots = [Path(root) for _name, root in spaces]
     dest = check_destination(destination, [*roots, *map(Path, all_spaces)])
     opts = ExportOptions(media=options.media, wikilinks=options.wikilinks, title_h1=options.title_heading)
-    views = [(name, _SpaceView(root)) for name, root in spaces]
-    plans = [(name, view, view.media() if options.media else []) for name, view in views]
-    total = sum(len(view.objects) + len(media) for _n, view, media in plans)
+    # Count first, one object at a time; then read, export and release one space at a time, so
+    # All Spaces never holds every space's notes in memory at once.
+    counts = [_count_files(Path(root), options.media) for _name, root in spaces]
+    total = sum(counts)
     done = 0
     if progress:
         progress(0, total)
@@ -373,7 +417,14 @@ def _run(spaces, destination, options, now, label, all_spaces, progress) -> Full
     result = FullExportResult(folder=str(dest / final))
     try:
         taken: set[str] = set()
-        for name, view, media in plans:
+        for (name, root), counted in zip(spaces, counts, strict=True):
+            view = _SpaceView(Path(root))
+            media = view.media() if options.media else []
+            files = len(view.objects) + len(media)
+            if files != counted:  # the space changed since it was counted: the total follows
+                total += files - counted
+                if progress:
+                    progress(done, total)
             folder = _unique(partial, safe_filename(name), taken)
             taken.add(folder.casefold())
             out = partial / folder
@@ -401,6 +452,7 @@ def _run(spaces, destination, options, now, label, all_spaces, progress) -> Full
                 if progress:
                     progress(done, total)
             result.spaces.append(entry)
+            del view, media  # released before the next space is read
         os.rename(partial, dest / final)
     except BaseException:
         shutil.rmtree(partial, ignore_errors=True)
@@ -499,6 +551,60 @@ class FullExportJobs:
 
 
 # -- automated exports -----------------------------------------------------------------------
+
+
+class _StateLock:
+    """``full-export.lock``: created exclusively (``O_EXCL``), so only one process holds it; its
+    time is refreshed as the run goes, and one older than `LOCK_STALE` (its holder died) is
+    removed and taken. It holds the holder's pid and a token, so a release removes only its own."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path)
+        self._token = uuid.uuid4().hex
+        self._touched = 0.0
+
+    def _stale(self) -> bool:
+        try:
+            age = time.time() - self.path.stat().st_mtime
+        except FileNotFoundError:
+            return True  # gone since: try again
+        return age > LOCK_STALE.total_seconds()
+
+    def acquire(self) -> bool:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        for attempt in range(2):
+            try:
+                fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+            except FileExistsError:
+                if attempt == 0 and self._stale():
+                    self.path.unlink(missing_ok=True)
+                    continue
+                return False
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(json.dumps({"pid": os.getpid(), "token": self._token}) + "\n")
+            self._touched = time.monotonic()
+            return True
+        return False
+
+    def _ours(self) -> bool:
+        try:
+            return json.loads(self.path.read_text("utf-8")).get("token") == self._token
+        except (OSError, ValueError, AttributeError):
+            return False
+
+    def refresh(self) -> None:
+        """Keep the lock fresh while the run writes (at most every `LOCK_REFRESH_SECONDS`)."""
+        if time.monotonic() - self._touched < LOCK_REFRESH_SECONDS:
+            return
+        self._touched = time.monotonic()
+        try:
+            os.utime(self.path)
+        except OSError:
+            pass
+
+    def release(self) -> None:
+        if self._ours():
+            self.path.unlink(missing_ok=True)
 
 
 def _parse_instant(value: Any) -> datetime | None:
@@ -630,9 +736,21 @@ class AutoFullExport:
             return None
         if not _RUN_LOCK.acquire(blocking=False):
             return None
+        lock = _StateLock(Path(self._state_dir()) / LOCK_FILE)
+        try:
+            held = lock.acquire()
+        except OSError:
+            held = False
+        if not held:  # another Object process is running its automated export
+            _RUN_LOCK.release()
+            return None
         scope = s.get("fullExportScope") if s.get("fullExportScope") in SCOPES else "current"
         self._running = True
         try:
+            # The record again, under the lock: another process may have run since it was read.
+            due = self.next_run(s, now)
+            if due is None or now < due:
+                return None
             spaces = self._spaces(scope)
             try:
                 result = _run(
@@ -642,7 +760,7 @@ class AutoFullExport:
                     self._local(now),
                     ALL_SPACES if scope == "all" else None,
                     self._all_spaces(),
-                    None,
+                    lambda _done, _total: lock.refresh(),
                 )
             except (Refused, OSError) as exc:
                 rec = self.record()
@@ -655,6 +773,7 @@ class AutoFullExport:
             return result
         finally:
             self._running = False
+            lock.release()
             _RUN_LOCK.release()
 
     def start(self) -> None:

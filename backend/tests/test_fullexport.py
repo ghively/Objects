@@ -305,6 +305,117 @@ def test_progress_counts_every_file(links_space: Path, tmp_path: Path):
     assert seen[0] == (0, 4) and seen[-1] == (4, 4)
 
 
+def test_all_spaces_reads_one_space_at_a_time(links_space: Path, tmp_path: Path, monkeypatch):
+    """With All Spaces only one space's objects are held in memory at a time (finding 9): the
+    total is counted first, then each space is read, exported and released before the next."""
+    import gc
+    import weakref
+
+    other = _copy("space-sample", tmp_path, "Sample")
+    twin = _copy("space-whiteboard", tmp_path, "Twin")
+    dest = tmp_path / "out"
+    dest.mkdir()
+    views: list[weakref.ref] = []
+    real_init = fullexport._SpaceView.__init__
+
+    def init(self, root):
+        real_init(self, root)
+        views.append(weakref.ref(self))
+
+    alive: list[int] = []
+    real_markdown = fullexport._object_markdown
+
+    def markdown(view, rel, raw, opts):
+        gc.collect()
+        alive.append(sum(1 for v in views if v() is not None))
+        return real_markdown(view, rel, raw, opts)
+
+    monkeypatch.setattr(fullexport._SpaceView, "__init__", init)
+    monkeypatch.setattr(fullexport, "_object_markdown", markdown)
+    seen: list[tuple[int, int]] = []
+    spaces = [("Linky", links_space), ("Sample", other), ("Linky", twin)]
+    res = run_full_export(spaces, dest, FullExportOptions(media=True), NOW, progress=lambda d, t: seen.append((d, t)))
+    assert alive and max(alive) == 1
+    total = res.objects + res.media
+    assert seen[0] == (0, total) and seen[-1] == (total, total)
+    assert {t for _d, t in seen} == {total}  # the total is right from the start
+    assert [d for d, _t in seen] == list(range(total + 1))
+
+
+def test_the_total_follows_a_space_that_changed_since_it_was_counted(links_space: Path, tmp_path: Path, monkeypatch):
+    dest = tmp_path / "out"
+    dest.mkdir()
+    monkeypatch.setattr(fullexport, "_count_files", lambda root, media: 1)  # counted before two notes came
+    seen: list[tuple[int, int]] = []
+    run_full_export([("Linky", links_space)], dest, FullExportOptions(media=True), NOW, progress=lambda d, t: seen.append((d, t)))
+    assert seen[0] == (0, 1) and seen[-1] == (4, 4)
+
+
+# -- two Object processes: the lock file in the state dir (finding 15b) ------------------------
+
+
+def test_auto_skips_while_another_process_holds_the_lock(links_space: Path, tmp_path: Path):
+    dest = tmp_path / "out"
+    dest.mkdir()
+    state = tmp_path / "state"
+    state.mkdir()
+    (state / fullexport.LOCK_FILE).write_text('{"pid": 1}', "utf-8")  # another Object is exporting
+    auto = _auto(links_space, state, _on(dest), _Clock(datetime(2026, 11, 10, 9, tzinfo=UTC)))
+    assert auto.tick() is None
+    assert list(dest.iterdir()) == [] and not (state / "full-export.json").exists()
+    assert (state / fullexport.LOCK_FILE).exists()  # never taken from a live holder
+
+
+def test_auto_takes_over_a_stale_lock_and_releases_its_own(links_space: Path, tmp_path: Path):
+    import os
+    import time
+
+    dest = tmp_path / "out"
+    dest.mkdir()
+    state = tmp_path / "state"
+    state.mkdir()
+    lock = state / fullexport.LOCK_FILE
+    lock.write_text('{"pid": 1}', "utf-8")
+    old = time.time() - fullexport.LOCK_STALE.total_seconds() - 60
+    os.utime(lock, (old, old))  # a process that died mid-export
+    auto = _auto(links_space, state, _on(dest), _Clock(datetime(2026, 11, 10, 9, tzinfo=UTC)))
+    assert auto.tick() is not None
+    assert not lock.exists() and auto.record()["lastRun"] == "2026-11-10T09:00:00Z"
+
+
+def test_auto_rereads_the_record_under_the_lock(links_space: Path, tmp_path: Path, monkeypatch):
+    """Another process finished a run between this one's check and its lock: no second run."""
+    dest = tmp_path / "out"
+    dest.mkdir()
+    state = tmp_path / "state"
+    clock = _Clock(datetime(2026, 11, 10, 9, tzinfo=UTC))
+    auto = _auto(links_space, state, _on(dest), clock)
+    real = fullexport._StateLock.acquire
+
+    def acquire(self):
+        state.mkdir(exist_ok=True)
+        (state / "full-export.json").write_text(json.dumps({"lastRun": "2026-11-10T08:59:00Z"}), "utf-8")
+        return real(self)
+
+    monkeypatch.setattr(fullexport._StateLock, "acquire", acquire)
+    assert auto.tick() is None
+    assert list(dest.iterdir()) == [] and not (state / fullexport.LOCK_FILE).exists()
+
+
+def test_a_long_run_keeps_its_lock_fresh(tmp_path: Path, monkeypatch):
+    import os
+
+    path = tmp_path / fullexport.LOCK_FILE
+    lock = fullexport._StateLock(path)
+    assert lock.acquire() and not fullexport._StateLock(path).acquire()
+    os.utime(path, (1, 1))
+    monkeypatch.setattr(fullexport, "LOCK_REFRESH_SECONDS", 0.0)
+    lock.refresh()
+    assert path.stat().st_mtime > 1
+    lock.release()
+    assert not path.exists()
+
+
 def test_folder_name():
     assert export_folder_name("Work", datetime(2026, 1, 2, 3, 4)) == "Object export Work 2026-01-02 0304"
     assert export_folder_name("a/b: c", NOW) == "Object export a"

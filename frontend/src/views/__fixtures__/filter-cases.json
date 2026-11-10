@@ -324,6 +324,33 @@
         "estimate": "about three"
       },
       "links": {}
+    },
+    {
+      "summary": {
+        "path": "Pages/Delta.md",
+        "id": null,
+        "type": "page",
+        "title": "Delta",
+        "icon": null,
+        "iconColor": null,
+        "description": null,
+        "aliases": [],
+        "createdAt": null,
+        "lastUpdated": null,
+        "tags": [
+          "[[Urgent|now]]",
+          "[[Tags/Home]]"
+        ],
+        "template": null,
+        "color": null,
+        "coverImage": null,
+        "readOnly": false,
+        "collections": []
+      },
+      "version": "v1",
+      "preview": "",
+      "values": {},
+      "links": {}
     }
   ],
   "cases": [
@@ -371,7 +398,8 @@
       "matches": [
         "Tasks/Alpha.md",
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -400,7 +428,8 @@
       },
       "matches": [
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -411,7 +440,8 @@
         "option": "isEmpty"
       },
       "matches": [
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -454,7 +484,8 @@
       "matches": [
         "Tasks/Alpha.md",
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -494,7 +525,8 @@
       "matches": [
         "Tasks/Alpha.md",
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -518,7 +550,8 @@
       },
       "matches": [
         "Tasks/Alpha.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -531,7 +564,8 @@
       },
       "matches": [
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -545,7 +579,8 @@
       },
       "matches": [
         "Tasks/Alpha.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -559,7 +594,8 @@
       "matches": [
         "Tasks/Alpha.md",
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -582,7 +618,8 @@
       },
       "matches": [
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -620,7 +657,8 @@
       "matches": [
         "Tasks/Alpha.md",
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -632,7 +670,8 @@
       },
       "matches": [
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -669,7 +708,8 @@
       },
       "matches": [
         "Tasks/Alpha.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -725,7 +765,8 @@
       "matches": [
         "Tasks/Alpha.md",
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -755,7 +796,8 @@
         ]
       },
       "matches": [
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -802,7 +844,8 @@
       },
       "matches": [
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -843,7 +886,8 @@
       },
       "matches": [
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -855,7 +899,8 @@
       },
       "matches": [
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -1038,7 +1083,8 @@
         "option": "isEmpty"
       },
       "matches": [
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -1150,7 +1196,8 @@
       },
       "matches": [
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -1175,7 +1222,8 @@
       "matches": [
         "Tasks/Alpha.md",
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -1189,7 +1237,8 @@
       "matches": [
         "Tasks/Alpha.md",
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -1204,7 +1253,8 @@
       "matches": [
         "Tasks/Alpha.md",
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -1233,7 +1283,8 @@
       },
       "matches": [
         "Tasks/Alpha.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -1283,7 +1334,8 @@
       "matches": [
         "Tasks/Alpha.md",
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -1308,7 +1360,8 @@
       "matches": [
         "Tasks/Alpha.md",
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -1333,7 +1386,8 @@
       },
       "matches": [
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -1345,7 +1399,8 @@
       },
       "matches": [
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
       ]
     },
     {
@@ -1368,7 +1423,54 @@
       },
       "matches": [
         "Tasks/Beta.md",
-        "Pages/Gamma.md"
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
+      ]
+    },
+    {
+      "name": "a tag written as a link names its Tag (the alias dropped)",
+      "filter": {
+        "type": "filter",
+        "propertyId": "tags",
+        "option": "contains",
+        "referenceValue": [
+          "T1"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
+      ]
+    },
+    {
+      "name": "a tag written as the Tag's path names its Tag",
+      "filter": {
+        "type": "filter",
+        "propertyId": "tags",
+        "option": "contains",
+        "referenceValue": [
+          "T2"
+        ]
+      },
+      "matches": [
+        "Pages/Gamma.md",
+        "Pages/Delta.md"
+      ]
+    },
+    {
+      "name": "link-form tags do not include",
+      "filter": {
+        "type": "filter",
+        "propertyId": "tags",
+        "option": "notContains",
+        "referenceValue": [
+          "T2"
+        ]
+      },
+      "matches": [
+        "Tasks/Alpha.md",
+        "Tasks/Beta.md"
       ]
     }
   ]

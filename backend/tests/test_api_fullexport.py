@@ -51,13 +51,15 @@ def client(spaces: tuple[Path, Path]):
         yield c
 
 
-def _wait(c: TestClient, job_id: str) -> dict:
-    for _ in range(500):
+def _wait(c: TestClient, job_id: str, timeout: float = 30.0) -> dict:
+    deadline = time.monotonic() + timeout  # a deadline, not a count of polls (a slow machine)
+    while True:
         job = c.get(f"/api/full-export/jobs/{job_id}").json()
         if job["state"] != "running":
             return job
+        if time.monotonic() > deadline:
+            raise AssertionError("the export did not finish")
         time.sleep(0.02)
-    raise AssertionError("the export did not finish")
 
 
 def test_export_this_space(client: TestClient, spaces, tmp_path: Path):

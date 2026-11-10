@@ -38,10 +38,8 @@ from objectapp.worksection_model import (
     GeneralFloorRequest,
 )
 from objectapp.workseams import (
-    AGENT_LATER,
-    CAPTURE_LATER,
-    NoAgent,
-    NoCaptures,
+    AgentProvider,
+    CaptureSink,
     SeamRefused,
     SeamUnavailable,
     WorkSeams,
@@ -74,8 +72,6 @@ def _params(fn) -> list[str]:
 
 
 def test_models_and_constants() -> None:
-    assert AGENT_LATER == "The agent loop comes with M24."
-    assert CAPTURE_LATER == "Saving a brain dump comes with M24."
     assert windowhost.KEEP_ON_TOP_LATER == "Keep on top needs the Object window."
     assert writeorigin.ALERTS == "alerts"
     assert alertwatch.POLL_SECONDS == 60.0
@@ -122,25 +118,23 @@ def test_models_and_constants() -> None:
     assert _params(build_seams) == ["space", "service"]
 
 
-def test_seam_defaults(space: Space) -> None:
-    status = NoAgent().status(space, [{"turn": "agent"}, {"turn": "you"}])
-    assert status == {
-        "available": False, "agentName": None, "actsOnApprovals": False, "carrying": 1,
-        "rows": [], "note": AGENT_LATER,
-    }
-    for call in (lambda: NoAgent().set_acts(space, True), lambda: NoAgent().retry(space, "q1")):
-        with pytest.raises(SeamUnavailable) as exc:
-            call()
-        assert exc.value.detail == AGENT_LATER
-    with pytest.raises(SeamUnavailable) as exc:
-        NoCaptures().save(space, CaptureRequestModel(text="x", fromView="now"), NOW)
-    assert exc.value.detail == CAPTURE_LATER
-    assert NoCaptures().list(space, "needsYou") == []
+def test_no_m24_placeholders_remain() -> None:
+    # M24 filled the seams: M23's stand-ins ("comes with M24") are gone, the Protocols stay.
+    for gone in ("NoAgent", "NoCaptures", "AGENT_LATER", "CAPTURE_LATER"):
+        assert not hasattr(workseams, gone) and gone not in workseams.__all__
+    assert "comes with M24" not in Path(workseams.__file__).read_text(encoding="utf-8")
+    assert {"AgentProvider", "CaptureSink", "SeamRefused", "SeamUnavailable", "WorkSeams"} <= set(workseams.__all__)
+    assert _params(AgentProvider.status) == ["self", "space", "board"]
+    assert _params(CaptureSink.save) == ["self", "space", "req", "now"]
 
+
+def test_seam_defaults(space: Space) -> None:
     seams = build_seams(space, m23_helpers.service(space))
     assert isinstance(seams, WorkSeams)
-    # M24 fills `build_seams` with its own seams (NoAgent / NoCaptures stay as M23's defaults).
+    # M24 fills `build_seams` with its own seams.
     assert type(seams.agent).__name__ == "AgentSeam" and type(seams.captures).__name__ == "CaptureSeam"
+    unavailable = SeamUnavailable("x")
+    assert unavailable.detail == "x"
 
     refused = SeamRefused(409, "x")
     assert (refused.status, refused.detail) == (409, "x")
