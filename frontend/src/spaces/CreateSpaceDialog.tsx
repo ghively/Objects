@@ -4,7 +4,8 @@
  * and offers to switch to it. An existing folder is never touched (the server answers 409, shown
  * as "A folder with that name already exists here."). M8: "Pick a starting point" picks
  * "Start with basic setup" (the server also writes the Person, Meeting, Project and Book types)
- * or "Empty space" (nothing else is created; the default, our choice).
+ * or "Empty space" (nothing else is created; the default, our choice). M28: "IT operations", between
+ * them, writes the IT ops types, their templates and the seed tags.
  * M15: "Import from…" below the choices closes this dialog and opens the import dialog with the
  * name and location typed here (the import makes the new space itself).
  */
@@ -35,6 +36,8 @@ export const CREATE_SPACE_TEXT = {
   howToStart: 'Pick a starting point',
   basicLabel: 'Start with basic setup',
   basicDescription: 'Comes with types for people, meetings, projects and books.',
+  itopsLabel: 'IT operations',
+  itopsDescription: 'Includes hosts, software, applications, runbooks and incidents.',
   blankLabel: 'Empty space',
   blankDescription: 'Starts with no extra types; create them as you go.',
   importFrom: 'Import from…', // our string
@@ -43,9 +46,10 @@ export const CREATE_SPACE_TEXT = {
 
 const T = CREATE_SPACE_TEXT
 
-/** M8's two starting points; also offered when a new or empty folder is opened (`StartingPointDialog`). */
+/** M8's starting points (M28 adds IT operations between them); also offered when a new or empty folder is opened (`StartingPointDialog`). */
 export const SETUPS: { value: SpaceSetup; icon: string; label: string; description: string }[] = [
   { value: 'basic', icon: 'ph-shapes', label: T.basicLabel, description: T.basicDescription },
+  { value: 'itops', icon: 'ph-hard-drives', label: T.itopsLabel, description: T.itopsDescription },
   { value: 'blank', icon: 'ph-file-dashed', label: T.blankLabel, description: T.blankDescription },
 ]
 

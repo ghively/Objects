@@ -70,6 +70,37 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     expect(within(useCases).getByRole('button', { name: /Meeting/ })).toHaveTextContent('Added')
   })
 
+  test('test the gallery shows an IT operations heading over its entries, after Planning and reflection (M28)', async () => {
+    const itops: TypeTemplate = {
+      key: 'host',
+      section: 'itOperations',
+      name: 'Host',
+      pluralName: 'Hosts',
+      description: 'Servers, workstations and network devices.',
+      icon: { type: 'iconify', val: 'ph-hard-drives' },
+      color: 'blue',
+      properties: [{ name: 'Category', type: 'label' }],
+      added: false,
+    }
+    const planning: TypeTemplate = { ...GALLERY[1], key: 'goal', section: 'planningAndReflection', name: 'Goal', pluralName: 'Goals' }
+    const more: TypeTemplate = { ...GALLERY[1], key: 'thing', section: null, name: 'Thing', pluralName: 'Things' }
+    ;(api as unknown as { typeGallery: () => Promise<TypeTemplate[]> }).typeGallery = vi.fn(async () => [
+      more,
+      itops,
+      planning,
+      ...GALLERY,
+    ])
+    render(<CreateTypeDialog open />)
+    const group = await screen.findByRole('group', { name: 'IT operations' })
+    expect(within(group).getByRole('heading', { name: 'IT operations' })).toBeInTheDocument()
+    expect(within(group).getByRole('button', { name: /Hosts/ })).toBeInTheDocument()
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    expect(headings).toEqual(['Use cases', 'Media', 'Planning and reflection', 'IT operations'])
+    // The unsectioned row stays last.
+    const cards = screen.getAllByRole('button').map((b) => b.textContent ?? '')
+    expect(cards.findIndex((t) => t.startsWith('Things'))).toBeGreaterThan(cards.findIndex((t) => t.startsWith('Hosts')))
+  })
+
   test('a template shows its properties and creates the type from it', async () => {
     withGallery()
     const user = userEvent.setup()

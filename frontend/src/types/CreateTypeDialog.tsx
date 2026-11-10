@@ -27,7 +27,7 @@ export const CREATE_TYPE_TEXT = {
   research: 'Research',
   media: 'Media',
   planningAndReflection: 'Planning and reflection',
-  // M28 (T1 adds the title so `TypeTemplate['section']` type-checks; T8 places the section)
+  // M28: the IT ops types (after Planning and reflection, before the unsectioned row)
   itOperations: 'IT operations',
   added: 'Added',
   templateHint: "You can change a type's settings whenever you like.",
@@ -43,7 +43,14 @@ export const CREATE_TYPE_TEXT = {
   action: 'Create object type',
 }
 
-const SECTIONS: readonly (TypeTemplate['section'])[] = ['useCases', 'research', 'media', 'planningAndReflection', null]
+const SECTIONS: readonly (TypeTemplate['section'])[] = [
+  'useCases',
+  'research',
+  'media',
+  'planningAndReflection',
+  'itOperations',
+  null,
+]
 
 function sectionTitle(s: TypeTemplate['section']): string | null {
   return s ? CREATE_TYPE_TEXT[s] : null

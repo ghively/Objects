@@ -1,6 +1,6 @@
 /**
  * Fix pass H2: "Pick a starting point" for a space opened as a new or empty folder (`objectapp
- * --space <folder>`), the same two choices "Create new space" offers (`SETUPS`). Shown once the
+ * --space <folder>`), the same choices "Create new space" offers (`SETUPS`). Shown once the
  * space info says `needsSetup` (the server: no `setup` in `space.json`, no basic types, no files).
  * Nothing is written until a choice is clicked; closing the dialog leaves the space untouched and
  * asks again next time it opens empty.
@@ -33,8 +33,9 @@ export function StartingPointDialog() {
     try {
       const info = await api.spaceSetup(setup)
       useSpaceInfo.setState({ space: info, loaded: true })
-      // The sidebar and the New menu read the types from the link index: reload it for the new ones.
-      if (setup === 'basic') void useLinkIndex.getState().load()
+      // The sidebar and the New menu read the types from the link index: reload it for the new ones
+      // (every setup but an empty space writes types).
+      if (setup !== 'blank') void useLinkIndex.getState().load()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {

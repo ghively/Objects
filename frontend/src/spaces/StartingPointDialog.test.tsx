@@ -9,6 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import type { SpaceInfo } from '@/api/types'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { CREATE_SPACE_TEXT } from './CreateSpaceDialog'
 import { STARTING_POINT_TEXT, StartingPointDialog } from './StartingPointDialog'
@@ -20,6 +21,7 @@ const info = (over: Partial<SpaceInfo> = {}): SpaceInfo => ({ name: 'Fresh', roo
 beforeEach(() => {
   vi.clearAllMocks()
   resetSpaceInfo()
+  resetLinkIndex()
 })
 
 describe('StartingPointDialog', () => {
@@ -40,6 +42,36 @@ describe('StartingPointDialog', () => {
     await user.click(await screen.findByRole('button', { name: CREATE_SPACE_TEXT.basicLabel }))
     expect(mocked.spaceSetup).toHaveBeenCalledWith('basic')
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  test('test picking IT operations applies it and reloads the link index (M28)', async () => {
+    const user = userEvent.setup()
+    act(() => useSpaceInfo.setState({ space: info({ needsSetup: true }), loaded: true }))
+    mocked.spaceSetup.mockResolvedValue(info({ needsSetup: false }))
+    const load = vi.spyOn(useLinkIndex.getState(), 'load').mockResolvedValue(undefined)
+    render(<StartingPointDialog />)
+    const buttons = (await screen.findByRole('dialog')).querySelectorAll('button[aria-describedby]')
+    expect([...buttons].map((b) => b.getAttribute('aria-label'))).toEqual([
+      CREATE_SPACE_TEXT.basicLabel,
+      CREATE_SPACE_TEXT.itopsLabel,
+      CREATE_SPACE_TEXT.blankLabel,
+    ])
+    await user.click(screen.getByRole('button', { name: 'IT operations' }))
+    expect(mocked.spaceSetup).toHaveBeenCalledWith('itops')
+    await waitFor(() => expect(load).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  test('test picking an empty space does not reload the link index', async () => {
+    const user = userEvent.setup()
+    act(() => useSpaceInfo.setState({ space: info({ needsSetup: true }), loaded: true }))
+    mocked.spaceSetup.mockResolvedValue(info({ needsSetup: false }))
+    const load = vi.spyOn(useLinkIndex.getState(), 'load').mockResolvedValue(undefined)
+    render(<StartingPointDialog />)
+    await user.click(await screen.findByRole('button', { name: CREATE_SPACE_TEXT.blankLabel }))
+    expect(mocked.spaceSetup).toHaveBeenCalledWith('blank')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(load).not.toHaveBeenCalled()
   })
 
   test('test closing without a pick writes nothing', async () => {
