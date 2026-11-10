@@ -1,6 +1,7 @@
 // M11 "Integrations": the local API tokens of this space. A token lets a program on this
 // computer (an MCP client such as Claude Code or Claude Desktop, or a script) read the space
-// and, with a read-write token, change it through `/api/v1`. The secret is shown once, with a
+// and, with a read-write token, change it through `/api/v1` (M29: a "Synced facts only" token
+// reads and fills synced properties only). The secret is shown once, with a
 // ready-to-paste MCP config; only a hash is kept (in the app's state folder, never the space).
 // Objects marked "Exclude from AI" stay invisible to every token. M19 adds the outside MCP
 // servers and secret variables after the token groups (hidden while AI features are hidden).
@@ -31,6 +32,9 @@ export const INTEGRATIONS_TEXT = {
   readHelp: 'Search, query and read objects.',
   readWrite: 'Read and write',
   readWriteHelp: 'Also create objects, edit properties and sections, rename and move to the Trash.',
+  // M29 (our strings): a token that reads and fills synced properties only.
+  sync: 'Synced facts only',
+  syncHelp: 'Read, and fill synced properties (POST /api/v1/synced).',
   create: 'Create token',
   created: 'Copy this token now. It will not be shown again.',
   copyToken: 'Copy token',
@@ -50,6 +54,8 @@ export const INTEGRATIONS_TEXT = {
 const T = INTEGRATIONS_TEXT
 
 export const INTEGRATIONS_SEARCH: string[] = [T.tokens, T.mcp, 'MCP', 'API', MCP_TEXT.heading, MCP_TEXT.secretVariables]
+
+const SCOPE_LABEL: Record<ApiTokenScope, string> = { read: T.read, 'read-write': T.readWrite, sync: T.sync }
 
 function when(stamp: string | null): string {
   if (!stamp) return T.never
@@ -157,7 +163,7 @@ export function IntegrationsSection() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[14px] text-fg">{t.name}</p>
                   <p className="text-[12px] text-fg-muted">
-                    {confirming === t.id ? T.revokeHelp : `${t.scope === 'read' ? T.read : T.readWrite} · ${when(t.lastUsedAt)}`}
+                    {confirming === t.id ? T.revokeHelp : `${SCOPE_LABEL[t.scope] ?? T.readWrite} · ${when(t.lastUsedAt)}`}
                   </p>
                 </div>
                 <Button
@@ -200,6 +206,7 @@ export function IntegrationsSection() {
               options={[
                 { value: 'read', label: T.read, description: T.readHelp },
                 { value: 'read-write', label: T.readWrite, description: T.readWriteHelp },
+                { value: 'sync', label: T.sync, description: T.syncHelp },
               ]}
             />
             <div>

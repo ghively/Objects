@@ -52,7 +52,7 @@ describe('TypeSettings', () => {
     expect(nav).toHaveTextContent('Object Types')
     expect(nav).toHaveTextContent('Project')
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Properties', 'Templates', 'Work', 'Configuration', 'Delete object type'])
+    expect(headings).toEqual(['Properties', 'Templates', 'Name patterns', 'Work', 'Configuration', 'Delete object type'])
     // The basics come first, in order.
     const labels = ['Type icon', 'Name', 'Plural of name', 'Color', 'Description']
     const nodes = labels.map((l) => screen.getByLabelText(l))
