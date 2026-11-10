@@ -46,7 +46,8 @@ describe('SidePanel (M10)', () => {
     render(<SidePanel space={null} renderTarget={renderTarget} />)
     const buttons = within(area(1))
       .getAllByRole('button')
-      .map((b) => b.textContent)
+      // M31: the AI Chat card's name is its label (its help text is the description).
+      .map((b) => b.getAttribute('aria-label') ?? b.textContent)
       .filter((t) => t === 'AI Chat' || t === 'Graph View' || t === 'Backlinks')
     expect(buttons).toEqual(['AI Chat', 'Graph View', 'Backlinks'])
     await user.click(within(area(1)).getByRole('button', { name: 'AI Chat' }))

@@ -345,6 +345,12 @@ Each starter template pre-fills the new type's properties.
 - **Explore** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
   (objects related to the page you are on) with "Find More". Toggled with Ctrl+Shift+Right; the tooltip reads
   "Hide sidepanel".
+- **Explore panel, as built** (M31): an empty side-panel entry (Ctrl+Shift+Right with nothing open, "New Sidepanel
+  Tab") shows the tabs "Explore" (first) and "Relevant Content". Explore: the cards "AI Chat" (hidden with "Hide AI
+  features") and "Search" (the Search page, in the entry), then Graph View and Backlinks as small buttons (Object's
+  own: kept so neither is lost). Relevant Content: up to 20 objects related to the main view's object (the same
+  list as the AI chat's), and "Find More" (the search palette); "Open a page to see content related to it." when the
+  main view shows no object.
 - **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback. Object's own
   section is local only: Keyboard shortcuts, Getting started, Markdown reference and **How-to guides** (Gene's
   decision D1). How-to guides opens a read-only list (People, Meetings, Projects, Books — one per basic-setup type —
