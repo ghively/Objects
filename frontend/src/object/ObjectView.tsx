@@ -66,7 +66,7 @@ import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, HeaderTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
 import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
-import { ImportSourceLine } from './ImportSourceLine'
+import { ImportSourceLine, importSourceOf } from './ImportSourceLine'
 import { counterpartEditor } from './CounterpartRows'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
@@ -1056,10 +1056,47 @@ export function ObjectView({
   /** No Duplicate for daily notes and templates; whiteboards are ours to refuse. */
   const canDuplicate = !!summary && !isTemplate && !dailyNote && !isWhiteboardType(type)
 
+  // What shows under the properties goes inside the panel: in the side layout a sibling of the
+  // panel would be a flex column of its own and squeeze the page (D3).
+  const showSource = !!detail && importSourceOf(detail.frontmatter.importSource) !== null
+  const showResolution = isTicket && !showWorkHeader
+  const showTaskStats =
+    isTask && typeof detail?.frontmatter.repeat === 'string' && detail.frontmatter.repeat.trim() !== ''
+  const panelFooter =
+    detail && (showSource || showResolution || showTaskStats) ? (
+      <>
+        {/* M25: where an imported object came from, under its properties. */}
+        <ImportSourceLine source={detail.frontmatter.importSource} />
+        {/* M22: a ticket's resolution note (two copy-ready texts), collapsed by default. */}
+        {showResolution && (
+          <ResolutionNoteSection
+            path={path}
+            version={version}
+            note={workNote && workNote.version === version ? workNote.note : undefined}
+          />
+        )}
+        {/* M8: "Task Stats" under the property panel of a recurring task-role object. */}
+        {showTaskStats && (
+          <>
+            <TaskStatsSection path={path} version={version} />
+            {/* "Completion Log": deleting an entry writes only the log's remaining lines. */}
+            <CompletionLog
+              log={typeof detail.frontmatter.occurrenceLog === 'string' ? detail.frontmatter.occurrenceLog : null}
+              readOnly={propsReadOnly}
+              onChange={(next) =>
+                void (next === null
+                  ? writes.updateProperties({}, ['occurrenceLog'])
+                  : writes.updateProperties({ occurrenceLog: next }))
+              }
+            />
+          </>
+        )}
+      </>
+    ) : undefined
+
   // A render function: the layout picks the variant (inline as a card when the page is narrow).
   const properties =
     detail && panelOpen ? (variant: PanelVariant) => (
-      <>
       <PropertyPanel
         type={type}
         frontmatter={panelFrontmatter}
@@ -1079,34 +1116,8 @@ export function ObjectView({
         onOpenTag={onOpenTag}
         onOpenObject={onOpenObject}
         variant={variant}
+        footer={panelFooter}
       />
-      {/* M25: where an imported object came from, under its properties. */}
-      <ImportSourceLine source={detail.frontmatter.importSource} />
-      {/* M22: a ticket's resolution note (two copy-ready texts), collapsed by default. */}
-      {isTicket && !showWorkHeader && (
-        <ResolutionNoteSection
-          path={path}
-          version={version}
-          note={workNote && workNote.version === version ? workNote.note : undefined}
-        />
-      )}
-      {/* M8: "Task Stats" under the property panel of a recurring task-role object. */}
-      {isTask && typeof detail.frontmatter.repeat === 'string' && detail.frontmatter.repeat.trim() !== '' && (
-        <>
-          <TaskStatsSection path={path} version={version} />
-          {/* "Completion Log": deleting an entry writes only the log's remaining lines. */}
-          <CompletionLog
-            log={typeof detail.frontmatter.occurrenceLog === 'string' ? detail.frontmatter.occurrenceLog : null}
-            readOnly={propsReadOnly}
-            onChange={(next) =>
-              void (next === null
-                ? writes.updateProperties({}, ['occurrenceLog'])
-                : writes.updateProperties({ occurrenceLog: next }))
-            }
-          />
-        </>
-      )}
-      </>
     ) : null
 
   // The `…` menu: in the page and peek toolbar, and (inline mode) in a slot the owner provides.
