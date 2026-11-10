@@ -696,3 +696,47 @@ export const usePeek = create<PeekState>()((set, get) => ({
     set({ path: path === oldPath ? newPath : path, list: list.map((p) => (p === oldPath ? newPath : p)) })
   },
 }))
+
+/**
+ * M31: the collection peek (catalog section 9: a collection page "opens in a peek"). `list` is the
+ * type's collections the stepper goes through ("1 / 3"), `typeId` the parent type its chip names.
+ */
+export interface CollectionPeekState {
+  /** The collection shown in the peek, or null when closed. */
+  id: string | null
+  list: string[]
+  index: number
+  typeId: string | null
+  peek(id: string, list?: string[], typeId?: string | null): void
+  close(): void
+  next(): void
+  prev(): void
+}
+
+export const useCollectionPeek = create<CollectionPeekState>()((set, get) => ({
+  id: null,
+  list: [],
+  index: 0,
+  typeId: null,
+
+  peek(id, list, typeId) {
+    const l = list && list.includes(id) ? [...list] : [id]
+    set({ id, list: l, index: l.indexOf(id), typeId: typeId ?? null })
+  },
+
+  close() {
+    set({ id: null, list: [], index: 0, typeId: null })
+  },
+
+  next() {
+    const { list, index, id } = get()
+    if (id === null || index >= list.length - 1) return
+    set({ index: index + 1, id: list[index + 1] })
+  },
+
+  prev() {
+    const { list, index, id } = get()
+    if (id === null || index <= 0) return
+    set({ index: index - 1, id: list[index - 1] })
+  },
+}))

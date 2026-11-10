@@ -456,6 +456,12 @@ Each starter template pre-fills the new type's properties.
 - **Collection page**: opens in a peek: collection icon + name, the full view toolbar (count, Filter, Sort,
   Group, layout, Customize), search, `...`, a split New button, expand; under the header a chip of the parent
   type ("Projects"); the cards; a "+ New object" row; a stepper through the type's collections ("1 / 3").
+- **Collection peek, as built** (M31): a click on a collection tile in a type's Overview opens the peek (Ctrl or Cmd
+  opens the page in a new tab); the sidebar, pins, a type tab's "Open" and links still open the page. The peek shows
+  the collection's All view (its saved layout; the header's toolbar changes it as on the page) with the header icon,
+  name, view toolbar, "Search title...", `...` (the page's menu, plus "Add existing"), New (split when the type has
+  templates) and "Open as page" (expand: the tab page); the type chip opens the type's page. "+ New object" opens the
+  new object in the object peek over the collection's. The peek closes when the main view goes elsewhere.
 - **Outline popover** (hover the dash column at the right edge, in a peek or full page): tabs "Outline" and
   "Stats" and a pin button. Outline lists headings indented by level with an active marker on the left; click
   scrolls. Stats: Words, Sentences, Paragraphs, Characters, Created At, Last Updated.

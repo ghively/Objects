@@ -1,7 +1,7 @@
 // A collection: header (icon, name, menu, New), the Overview / All / query tabs, and "Add existing".
 // The collection's own definition (name, types, views, pins, templates) is saved through
 // `saveCollectionEdit`; membership is the `collections:` key of each object.
-import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { Collection, DashboardSectionKey, Layout, ObjectSummary, Query, Row, TypeDef, ViewState, Views } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
@@ -37,7 +37,7 @@ import { CustomizeOverview } from '@/types/TypeOverview'
 import { SectionView, searchRows } from '@/types/SectionView'
 import { templateKey } from '@/types/TemplateManager'
 import { reloadDefinitions, useDefinitions, useDefs } from '@/types/useDefinitions'
-import { DataView, type RowMenuItem } from '@/views/DataView'
+import { DataView, ToolbarSlot, type RowMenuItem } from '@/views/DataView'
 import { matchingValues } from '@/views/matching'
 import { FULL_VIEW_LAYOUTS, defaultViewState } from '@/views/model'
 import { useRows } from '@/views/useRows'
@@ -63,6 +63,8 @@ export const COLLECTION_PAGE_TEXT = {
   pin: 'Pin to collection',
   unpin: 'Unpin',
   remove: 'Remove from collection',
+  /** M31: the peek's expand (as the object peek's) */
+  expand: 'Open as page',
 }
 
 function mods(e: MouseEvent): OpenMods {
@@ -283,7 +285,24 @@ function TemplatesMenu({ collection, types }: { collection: Collection; types: T
 
 // ---------------------------------------------------------------------------------------------
 
-export function CollectionPage({ id }: { id: string }) {
+export interface CollectionPageProps {
+  id: string
+  /**
+   * M31: `peek` is the collection peek's layout (catalog section 9): one header row (icon, name,
+   * the view toolbar, search, `...`, New, expand), the parent type's chip, the All view's cards, a
+   * "+ New object" row and `footer` (the stepper). No Overview / All tabs: the peek shows All.
+   */
+  mode?: 'page' | 'peek'
+  /** The peek's parent type (the type whose collections it steps through); else the first type. */
+  typeId?: string | null
+  /** The peek's expand: open the tab page. */
+  onExpand?(): void
+  footer?: ReactNode
+}
+
+export function CollectionPage({ id, mode = 'page', typeId, onExpand, footer }: CollectionPageProps) {
+  const peek = mode === 'peek'
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null)
   const defs = useDefinitions()
   const allTypes = useLinkIndex((s) => s.types)
   const c = defs.collections.find((x) => x.id === id)
@@ -477,142 +496,158 @@ export function CollectionPage({ id }: { id: string }) {
     </>
   )
 
-  return (
-    <div className="w-full" data-collection={c.id}>
-      <header className="flex flex-wrap items-center gap-2.5 px-4 pt-5 pb-3">
-        <Popover open={iconOpen} onOpenChange={setIconOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="Collection icon"
-              disabled={readOnly}
-              className="flex size-8 items-center justify-center rounded-lg border border-line hover:bg-hover"
-            >
-              <IconOrEmoji icon={c.icon} fallback={COLLECTION_ICON} size={18} />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-auto border-line bg-raised p-2 text-fg">
-            <IconPicker
-              value={c.icon}
-              onChange={(next) => {
-                setIconOpen(false)
-                void save((x) => ({ ...x, icon: next }))
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-        <input
-          id="collection-name"
-          aria-label="Collection name"
-          value={draft ?? c.name}
-          readOnly={readOnly}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commitName}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur()
-            if (e.key === 'Escape') {
-              setDraft(null)
-              e.currentTarget.blur()
-            }
-          }}
-          className="dataview-heading min-w-0 flex-1 bg-transparent text-[20px] font-bold outline-none md:text-[22px]"
-        />
-        <input
-          type="search"
-          aria-label="Search title..."
-          placeholder="Search title..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-8 w-48 rounded-lg border border-line bg-transparent px-2.5 text-[14px] outline-none focus:border-fg-muted"
-        />
+  const iconButton = (
+    <Popover open={iconOpen} onOpenChange={setIconOpen}>
+      <PopoverTrigger asChild>
         <button
           type="button"
-          onClick={() => setAddOpen(true)}
-          disabled={readOnly || types.length === 0}
-          className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[14px] font-medium hover:bg-hover disabled:opacity-50"
+          aria-label="Collection icon"
+          disabled={readOnly}
+          className="flex size-8 items-center justify-center rounded-lg border border-line hover:bg-hover"
         >
-          <Icon name="ph-link-simple" size={14} />
-          {COLLECTION_PAGE_TEXT.addExisting}
+          <IconOrEmoji icon={c.icon} fallback={COLLECTION_ICON} size={18} />
         </button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="More"
-              className="flex size-8 items-center justify-center rounded-lg border border-line bg-raised hover:bg-hover"
-            >
-              <Icon name="ph-dots-three" size={16} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="border-line bg-raised">
-            <DropdownMenuItem
-              disabled={readOnly}
-              onSelect={() => setTimeout(() => document.getElementById('collection-name')?.focus(), 0)}
-            >
-              <Icon name="ph-pencil-simple" size={14} />
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={readOnly} onSelect={() => setIconOpen(true)}>
-              <Icon name="ph-smiley" size={14} />
-              Icon
-            </DropdownMenuItem>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger disabled={readOnly}>
-                <Icon name="ph-cube" size={14} />
-                Types
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="max-h-[360px] overflow-auto border-line bg-raised">
-                {allTypes.map((t) => (
-                  <DropdownMenuCheckboxItem
-                    key={t.id}
-                    checked={c.typeIds.includes(t.id)}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(on) => toggleType(t, on)}
-                  >
-                    {t.name}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            <TemplatesMenu collection={c} types={types} />
-            <PinMenuItems pin={{ kind: 'collection', id: c.id }} />
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" disabled={readOnly} onSelect={() => setDeleteOpen(true)}>
-              <Icon name="ph-trash" size={14} />
-              {COLLECTION_DIALOG_TEXT.deleteAction}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {types.length === 1 ? (
-          <NewSplitButton
-            type={types[0]}
-            values={tab === 'all' ? createValues(newValues) : createValues()}
-            defaultTemplateId={c.templates.defaultTemplateId}
-          />
-        ) : (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                disabled={types.length === 0}
-                className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[14px] font-medium hover:bg-hover disabled:opacity-50"
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto border-line bg-raised p-2 text-fg">
+        <IconPicker
+          value={c.icon}
+          onChange={(next) => {
+            setIconOpen(false)
+            void save((x) => ({ ...x, icon: next }))
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  )
+  const nameInput = (
+    <input
+      id="collection-name"
+      aria-label="Collection name"
+      value={draft ?? c.name}
+      readOnly={readOnly}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commitName}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        if (e.key === 'Escape') {
+          setDraft(null)
+          e.currentTarget.blur()
+        }
+      }}
+      className="dataview-heading min-w-0 flex-1 bg-transparent text-[20px] font-bold outline-none md:text-[22px]"
+    />
+  )
+  const searchInput = (
+    <input
+      type="search"
+      aria-label="Search title..."
+      placeholder="Search title..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      className="h-8 w-48 rounded-lg border border-line bg-transparent px-2.5 text-[14px] outline-none focus:border-fg-muted"
+    />
+  )
+  const addButton = (
+    <button
+      type="button"
+      onClick={() => setAddOpen(true)}
+      disabled={readOnly || types.length === 0}
+      className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[14px] font-medium hover:bg-hover disabled:opacity-50"
+    >
+      <Icon name="ph-link-simple" size={14} />
+      {COLLECTION_PAGE_TEXT.addExisting}
+    </button>
+  )
+  const moreMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="More"
+          className="flex size-8 items-center justify-center rounded-lg border border-line bg-raised hover:bg-hover"
+        >
+          <Icon name="ph-dots-three" size={16} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="border-line bg-raised">
+        <DropdownMenuItem
+          disabled={readOnly}
+          onSelect={() => setTimeout(() => document.getElementById('collection-name')?.focus(), 0)}
+        >
+          <Icon name="ph-pencil-simple" size={14} />
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={readOnly} onSelect={() => setIconOpen(true)}>
+          <Icon name="ph-smiley" size={14} />
+          Icon
+        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger disabled={readOnly}>
+            <Icon name="ph-cube" size={14} />
+            Types
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="max-h-[360px] overflow-auto border-line bg-raised">
+            {allTypes.map((t) => (
+              <DropdownMenuCheckboxItem
+                key={t.id}
+                checked={c.typeIds.includes(t.id)}
+                onSelect={(e) => e.preventDefault()}
+                onCheckedChange={(on) => toggleType(t, on)}
               >
-                <Icon name="ph-plus" size={14} />
-                New
-                <Icon name="ph-caret-down" size={12} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="border-line bg-raised">
-              {types.map((t) => (
-                <DropdownMenuItem key={t.id} onClick={(e) => create(t.id, mods(e))}>
-                  <TypeChip type={t} size={18} />
-                  {`New ${t.name}`}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {t.name}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        {peek && (
+          <DropdownMenuItem disabled={readOnly || types.length === 0} onSelect={() => setAddOpen(true)}>
+            <Icon name="ph-link-simple" size={14} />
+            {COLLECTION_PAGE_TEXT.addExisting}
+          </DropdownMenuItem>
         )}
-      </header>
+        <TemplatesMenu collection={c} types={types} />
+        <PinMenuItems pin={{ kind: 'collection', id: c.id }} />
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" disabled={readOnly} onSelect={() => setDeleteOpen(true)}>
+          <Icon name="ph-trash" size={14} />
+          {COLLECTION_DIALOG_TEXT.deleteAction}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+  const newButton =
+    types.length === 1 ? (
+      <NewSplitButton
+        type={types[0]}
+        values={tab === 'all' || peek ? createValues(newValues) : createValues()}
+        defaultTemplateId={c.templates.defaultTemplateId}
+      />
+    ) : (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            disabled={types.length === 0}
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[14px] font-medium hover:bg-hover disabled:opacity-50"
+          >
+            <Icon name="ph-plus" size={14} />
+            New
+            <Icon name="ph-caret-down" size={12} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="border-line bg-raised">
+          {types.map((t) => (
+            <DropdownMenuItem key={t.id} onClick={(e) => create(t.id, mods(e))}>
+              <TypeChip type={t} size={18} />
+              {`New ${t.name}`}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+
+  const notices = (
+    <>
       {readOnly && (
         <p role="status" className="px-4 pb-2 text-[13px] text-fg-muted">
           {`This collection's file couldn't be read, so it opens read-only. Fix the file to edit it.`}
@@ -626,6 +661,117 @@ export function CollectionPage({ id }: { id: string }) {
           </button>
         </div>
       )}
+    </>
+  )
+  const dialogs = (
+    <>
+      <DeleteCollectionDialog
+        collection={c}
+        open={deleteOpen}
+        onOpenChange={(o) => {
+          setDeleteOpen(o)
+          // Closed after the delete: leave the page of the collection that is gone.
+          if (!o && !useDefs.getState().collections.some((x) => x.id === c.id)) {
+            const t = c.typeIds[0]
+            if (t) useTabs.getState().open({ kind: 'type', typeId: t })
+          }
+        }}
+        onDeleted={() => {
+          void flushCollectionViews(c.id)
+        }}
+      />
+      <AddExistingDialog collection={c} open={addOpen} onOpenChange={setAddOpen} onPicked={(p) => void addExisting(p)} />
+      <RemoveFromCollectionDialog
+        open={removing !== null}
+        onOpenChange={(o) => !o && setRemoving(null)}
+        count={1}
+        onRemove={() => (removing ? removeRow(removing) : undefined)}
+        onDelete={async () => {
+          if (!removing) return
+          try {
+            await api.deleteObject(removing.summary.path, { baseVersion: removing.version })
+          } catch (e) {
+            if (e instanceof ConflictError) {
+              setNotice(`${removing.summary.title} changed on disk. It was reloaded; try again.`)
+              void reload()
+            } else setNotice(e instanceof Error ? e.message : String(e))
+          }
+        }}
+      />
+    </>
+  )
+
+  if (peek) {
+    const parent = allTypes.find((t) => t.id === (typeId ?? c.typeIds[0])) ?? types[0]
+    const createType = (parent && c.typeIds.includes(parent.id) ? parent : types[0]) ?? null
+    return (
+      <div className="relative flex h-full min-h-0 w-full flex-col" data-collection={c.id} data-mode="peek">
+        <header data-testid="collection-peek-header" className="flex shrink-0 flex-wrap items-center gap-2 px-5 pt-4 pb-2">
+          {iconButton}
+          {nameInput}
+          {/* The All view's toolbar (count, Filter, Sort, Group, layout, Customize) renders here. */}
+          <div ref={setToolbarSlot} data-testid="toolbar-slot" className="flex min-w-0 flex-[3] justify-end" />
+          {searchInput}
+          {moreMenu}
+          {newButton}
+          {onExpand && (
+            <button
+              type="button"
+              aria-label={COLLECTION_PAGE_TEXT.expand}
+              title={COLLECTION_PAGE_TEXT.expand}
+              onClick={onExpand}
+              className="flex size-8 items-center justify-center rounded-lg text-fg hover:bg-hover"
+            >
+              <Icon name="ph-arrows-out-simple" size={16} />
+            </button>
+          )}
+        </header>
+        {parent && (
+          <div className="flex shrink-0 px-5 pb-2">
+            <button
+              type="button"
+              data-testid="collection-peek-type"
+              onClick={() => useTabs.getState().open({ kind: 'type', typeId: parent.id })}
+              className="flex h-7 items-center gap-1.5 rounded-full border border-line bg-raised pr-2.5 pl-1 text-[13px] font-medium hover:bg-hover"
+            >
+              <TypeChip type={parent} size={20} />
+              {parent.pluralName || parent.name}
+            </button>
+          </div>
+        )}
+        {notices}
+        <div className="min-h-0 flex-1 overflow-auto px-5 pt-2 pb-20">
+          <ToolbarSlot.Provider value={toolbarSlot}>{all}</ToolbarSlot.Provider>
+          {createType && rows.length > 0 && !readOnly && (
+            <div className="mx-auto w-full max-w-5xl">
+              <button
+                type="button"
+                onClick={(e) => create(createType.id, e.ctrlKey || e.metaKey ? mods(e) : { altKey: true, shiftKey: true }, newValues)}
+                className="mt-1 flex h-9 w-full items-center gap-1.5 rounded-lg px-2 text-left text-[14px] text-fg-muted hover:bg-hover hover:text-fg"
+              >
+                <Icon name="ph-plus" size={14} />
+                {COLLECTION_PAGE_TEXT.createEntry}
+              </button>
+            </div>
+          )}
+        </div>
+        {footer && <div className="absolute right-4 bottom-4">{footer}</div>}
+        {dialogs}
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full" data-collection={c.id}>
+      <header className="flex flex-wrap items-center gap-2.5 px-4 pt-5 pb-3">
+        {iconButton}
+        {nameInput}
+        {searchInput}
+        {addButton}
+        {moreMenu}
+        {newButton}
+      </header>
+      {notices}
       <nav role="tablist" aria-label="Views" className="flex flex-wrap items-center gap-1 border-b border-line px-4 pb-3">
         <TabPill active={tab === 'overview'} onClick={() => select('overview')} icon="ph-layout">
           {SECTION_TEXT.overview}
@@ -742,39 +888,7 @@ export function CollectionPage({ id }: { id: string }) {
           />
         )}
       </div>
-      <DeleteCollectionDialog
-        collection={c}
-        open={deleteOpen}
-        onOpenChange={(o) => {
-          setDeleteOpen(o)
-          // Closed after the delete: leave the page of the collection that is gone.
-          if (!o && !useDefs.getState().collections.some((x) => x.id === c.id)) {
-            const t = c.typeIds[0]
-            if (t) useTabs.getState().open({ kind: 'type', typeId: t })
-          }
-        }}
-        onDeleted={() => {
-          void flushCollectionViews(c.id)
-        }}
-      />
-      <AddExistingDialog collection={c} open={addOpen} onOpenChange={setAddOpen} onPicked={(p) => void addExisting(p)} />
-      <RemoveFromCollectionDialog
-        open={removing !== null}
-        onOpenChange={(o) => !o && setRemoving(null)}
-        count={1}
-        onRemove={() => (removing ? removeRow(removing) : undefined)}
-        onDelete={async () => {
-          if (!removing) return
-          try {
-            await api.deleteObject(removing.summary.path, { baseVersion: removing.version })
-          } catch (e) {
-            if (e instanceof ConflictError) {
-              setNotice(`${removing.summary.title} changed on disk. It was reloaded; try again.`)
-              void reload()
-            } else setNotice(e instanceof Error ? e.message : String(e))
-          }
-        }}
-      />
+      {dialogs}
     </div>
   )
 }
