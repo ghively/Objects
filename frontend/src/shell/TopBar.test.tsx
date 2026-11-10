@@ -104,6 +104,39 @@ describe('TopBar', () => {
     expect(screen.queryByTitle('Change space')).not.toBeInTheDocument()
   })
 
+  test('a lone Alt tap while typing shows the menu but leaves the caret in the field; the next tap hides it, focus still there (M31 fix)', async () => {
+    const user = userEvent.setup()
+    useSettings.setState({ settings: { ...settingsDefaults, hideAppMenu: true } })
+    bar()
+    const field = document.createElement('textarea')
+    field.setAttribute('aria-label', 'Typing here')
+    document.body.appendChild(field)
+    field.focus()
+    await user.keyboard('{Alt}')
+    expect(await screen.findByTitle('Change space')).toBeInTheDocument()
+    expect(field).toHaveFocus()
+    await user.keyboard('{Alt}')
+    await waitFor(() => expect(screen.queryByTitle('Change space')).not.toBeInTheDocument())
+    expect(field).toHaveFocus()
+    field.remove()
+  })
+
+  test('outside a field Alt focuses the shown menu; hiding it gives focus back where it was, not to the body (M31 fix)', async () => {
+    const user = userEvent.setup()
+    useSettings.setState({ settings: { ...settingsDefaults, hideAppMenu: true } })
+    bar()
+    const before = document.createElement('button')
+    before.textContent = 'Somewhere'
+    document.body.appendChild(before)
+    before.focus()
+    await user.keyboard('{Alt}')
+    expect(await screen.findByTitle('Change space')).toHaveFocus()
+    await user.keyboard('{Alt}')
+    await waitFor(() => expect(screen.queryByTitle('Change space')).not.toBeInTheDocument())
+    expect(before).toHaveFocus()
+    before.remove()
+  })
+
   test('with Hide App Menu off, Alt does nothing to the space menu', async () => {
     const user = userEvent.setup()
     bar()
