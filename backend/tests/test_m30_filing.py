@@ -116,6 +116,9 @@ def _decide(e: Env, batch: str, edit: Callable[[str, dict[str, Any]], None] | No
 
 
 def _wait(e: Env, batch: str, states: set[str], timeout: float = 60) -> dict[str, Any]:
+    """The status once in one of ``states``. Every wait here is for the end of a worker's run, so it
+    joins the worker first: the status is read after its last save, never while it runs."""
+    e.fil.join(timeout)
     end = time.monotonic() + timeout
     s: dict[str, Any] = {}
     while time.monotonic() < end:
@@ -295,6 +298,46 @@ def test_write_needs_every_entity_decided(env: Env) -> None:
     assert inbox[0]["suggestedType"] is None
     assert "Import inbox" in _collections(e, runbook[0])
     assert not any(_collections(e, p) for p in paths.values())
+
+
+def test_status_never_reads_a_finished_pass_as_failed(env: Env) -> None:
+    """The worker saves its last state and exits between the status' read of ``filing.json`` and its
+    check of the thread: the status is the state read (``running``), never ``failed``. Deterministic:
+    the read itself finishes the worker."""
+    import threading
+
+    e = env
+    batch = _import(e)
+    for final in ("entities", "done"):
+        mode = "bulk" if final == "entities" else "entities"
+        started = "running" if final == "entities" else "writing"
+        rec = {"state": started, "mode": mode, "results": {}, "trialDone": True}
+        e.fil._save(batch, rec)
+        release = threading.Event()
+        worker = threading.Thread(target=release.wait, daemon=True)
+        worker.start()
+        e.fil._thread = worker
+        load = e.fil._load
+
+        def racing(b: str, load: Callable[[str], dict[str, Any]] = load, release: threading.Event = release,
+                   worker: threading.Thread = worker, final: str = final, mode: str = mode) -> dict[str, Any]:
+            got = load(b)
+            if not release.is_set():  # the worker saves its last state and exits right after this read
+                e.fil._save(b, {**got, "state": final, "mode": mode})
+                release.set()
+                worker.join()
+            return got
+
+        e.monkeypatch.setattr(e.fil, "_load", racing)
+        s = e.fil.status(batch)
+        assert s["state"] == started and s["error"] is None, s
+        e.monkeypatch.setattr(e.fil, "_load", load)
+        assert e.fil.status(batch)["state"] == final
+
+    e.fil._thread = None
+    e.fil._save(batch, {"state": "running", "mode": "bulk", "results": {}})
+    s = e.fil.status(batch)  # no thread runs it: interrupted
+    assert s["state"] == "failed" and s["error"] == "The pass was interrupted.", s
 
 
 def test_no_entities_still_finishes(env: Env) -> None:
