@@ -80,6 +80,42 @@ describe('Import Content', () => {
     expect(useSettingsModal.getState().isOpen).toBe(false)
   })
 
+  test('test import history offers move batch to trash for each batch (M30 hands-on)', async () => {
+    vi.mocked(api.importBatches).mockResolvedValueOnce([
+      {
+        id: 'b3',
+        startedAt: '2026-11-09T10:00:00',
+        finishedAt: '2026-11-09T10:01:00',
+        source: { path: '/home/gene/Notes', kind: 'markdown', system: 'markdown' },
+        counts: { imported: 4, sourceItems: 4 },
+      },
+      {
+        id: 'b2',
+        startedAt: '2026-11-08T10:00:00',
+        finishedAt: '2026-11-08T10:01:00',
+        source: { path: '/home/gene/Vault', kind: 'obsidian', system: 'obsidian' },
+        counts: { imported: 12, sourceItems: 12 },
+      },
+    ])
+    mocked.trashImportBatch.mockResolvedValueOnce({ trashed: 4, missing: 0 })
+    const user = userEvent.setup()
+    act(() => useSettingsModal.getState().open('importContent'))
+    render(<ImportContentSection />)
+    await screen.findByRole('button', { name: T.reviewLabel('Notes') })
+    const rows = screen.getAllByRole('listitem').filter((li) => li.hasAttribute('data-import-batch'))
+    expect(rows).toHaveLength(2)
+    for (const row of rows) expect(within(row).getByRole('button', { name: 'Move batch to Trash' })).toBeInTheDocument()
+    const notes = rows[0]
+    await user.click(within(notes).getByRole('button', { name: 'Move batch to Trash' }))
+    expect(within(notes).getByText('Move the 4 objects this import created to the Trash?')).toBeInTheDocument()
+    await user.click(within(notes).getByRole('button', { name: 'Move to Trash' }))
+    expect(mocked.trashImportBatch).toHaveBeenCalledWith('b3')
+    expect(await within(notes).findByText('4 objects were moved to the Trash.')).toBeInTheDocument()
+    // Once in the Trash there is nothing left to review.
+    expect(within(notes).queryByRole('button', { name: T.reviewLabel('Notes') })).toBeNull()
+    expect(within(rows[1]).getByRole('button', { name: T.reviewLabel('Vault') })).toBeInTheDocument()
+  })
+
   test('test import history says when nothing was imported', async () => {
     act(() => useSettingsModal.getState().open('importContent'))
     render(<ImportContentSection />)

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import type { ProposalGroup, ProposalReviewItem, ProposalStatus, SchemaProposal } from '@/api/types'
 import { Button } from '@/components/ui/button'
+import { useLinkIndex } from '@/links/linkIndex'
 import { AGENT_TEXT as T } from './text'
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -147,10 +148,15 @@ function GroupCard({
   const status = decision?.status
   const offer = g.offer
   const offerTaken = !!offer && status === 'edited' && decision?.edited?.useType === offer.typeId
+  const types = useLinkIndex((s) => s.types)
+  // The offer taken makes the item a use of that type: its own create, skip and properties no longer apply.
+  const offerType = offerTaken ? (types.find((t) => t.id === offer.typeId)?.name ?? offer.typeId) : null
   return (
     <li role="group" aria-label={T.itemLabel(g.name)} className="flex flex-col gap-2 rounded-md border border-line p-3 text-[13px]">
       <div className="flex flex-wrap items-baseline gap-2">
-        <span className="rounded bg-hover px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide">{T.actions[g.action]}</span>
+        <span className="rounded bg-hover px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide">
+          {T.actions[offerType !== null ? 'use' : g.action]}
+        </span>
         <span className="text-[14px] font-semibold">{g.name}</span>
         <span className="text-fg-muted">{T.documents(g.documentCount)}</span>
         <span className="ml-auto text-[12px] text-fg-muted">{T.status[status ?? 'undecided']}</span>
@@ -160,12 +166,14 @@ function GroupCard({
           {T.examples}: {g.examples.join(', ')}
         </p>
       )}
-      {(g.problems ?? []).map((p) => (
-        <p key={p} className="text-[12px] text-danger">
-          {T.willSkip(p)}
-        </p>
-      ))}
-      {g.properties.length > 0 && (
+      {offerType !== null && offer && <p>{T.offerTaken(offerType, offer.category)}</p>}
+      {offerType === null &&
+        (g.problems ?? []).map((p) => (
+          <p key={p} className="text-[12px] text-danger">
+            {T.willSkip(p)}
+          </p>
+        ))}
+      {offerType === null && g.properties.length > 0 && (
         <div>
           <h4 className="text-[12px] font-semibold">{T.propertiesHeading}</h4>
           <ul className="flex flex-col gap-1">
@@ -211,7 +219,7 @@ function GroupCard({
           </ul>
         </div>
       )}
-      {(g.dropped ?? []).length > 0 && (
+      {offerType === null && (g.dropped ?? []).length > 0 && (
         <div>
           <h4 className="text-[12px] font-semibold">{T.droppedHeading}</h4>
           <ul className="flex flex-col gap-1 text-[12px] text-fg-muted">

@@ -39,6 +39,8 @@ export const AGENT_TEXT = {
   applied: (created: number, extended: number) => `${pl(created, 'type', 'types')} created, ${pl(extended, 'type', 'types')} extended.`,
   itemLabel: (name: string) => `Proposal item ${name}`,
   willSkip: (reason: string) => `Apply will skip this: ${reason}`,
+  // M30: in place of the item's own action and skip once "Use <type>, with a category" is taken.
+  offerTaken: (type: string, category: string) => `Apply will use ${type}, with ${category} as its category.`,
   droppedHeading: 'Left out',
   droppedLine: (name: string, reason: string) => `${name}: ${reason}`,
   skippedSummary: (items: { name: string; reason: string }[]) =>
@@ -117,6 +119,8 @@ export const AGENT_TEXT = {
   doneHeading: 'Import inbox',
   inboxCount: (n: number) => `${pl(n, 'object', 'objects')} in the Import inbox for you to look at.`,
   inboxEmpty: 'The Import inbox is empty.',
+  // One of this batch's Import inbox rows and why it went there.
+  inboxReason: (title: string, reason: string) => `${title}: ${reason}`,
   openInbox: 'Open Import inbox',
   inboxName: 'Import inbox',
   close: 'Close',

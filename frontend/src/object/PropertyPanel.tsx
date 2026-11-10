@@ -275,6 +275,8 @@ export interface PropertyPanelProps {
   typeEditor?: TypeEditor
   /** Where the page layout puts the panel: the left side panel (Standard), a card, a column or an infobox. */
   variant?: 'side' | 'card' | 'column' | 'infobox'
+  /** What the page shows under the properties (the Source line, Task Stats ...), inside the panel. */
+  footer?: ReactNode
 }
 
 const PANEL_CLASS: Record<NonNullable<PropertyPanelProps['variant']>, string> = {
@@ -474,6 +476,7 @@ export function PropertyPanel({
   onChangeType,
   typeEditor,
   variant = 'side',
+  footer,
 }: PropertyPanelProps) {
   const [showHidden, setShowHidden] = useState(false)
   const [menuFor, setMenuFor] = useState<string | null>(null)
@@ -655,6 +658,7 @@ export function PropertyPanel({
           </PopoverContent>
         )}
       </Popover>
+      {footer && <div data-panel-footer="" className="mt-4">{footer}</div>}
       {type && settingsFor && (
         <PropertySettings
           typeId={type.id}

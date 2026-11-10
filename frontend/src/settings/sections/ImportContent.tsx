@@ -9,8 +9,9 @@ import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
 import { Button } from '@/components/ui/button'
-import type { ImportBatch, ImportSourceKind } from '@/api/types'
+import type { ImportBatch, ImportResult, ImportSourceKind } from '@/api/types'
 import { AGENT_TEXT } from '@/import/agent/text'
+import { BatchPanel } from '@/import/BatchPanel'
 import { useImportDialog } from '@/import/useImportDialog'
 import { useSettings } from '@/settings/useSettings'
 import { useSettingsModal } from '../useSettingsModal'
@@ -71,8 +72,36 @@ function sourceName(path: string): string {
   return parts[parts.length - 1] ?? path
 }
 
+/** A batch record (`batch.json`) as the result BatchPanel reads. */
+function batchAsResult(b: ImportBatch): ImportResult {
+  const n = (k: string) => b.counts[k] ?? 0
+  return {
+    targetPath: '',
+    spaceName: '',
+    objects: n('imported'),
+    types: 0,
+    attachments: 0,
+    tags: 0,
+    skipped: 0,
+    reportPath: b.reportPath ?? null,
+    cancelled: false,
+    batch: b.id,
+    updated: n('updated'),
+    unchanged: n('unchanged'),
+    // What is still waiting, once some were resolved; the count at the import otherwise.
+    changedInBoth: b.counts.pending ?? n('changedInBoth'),
+    removed: n('removed'),
+    leftOut: n('leftOut'),
+    failed: n('failed'),
+    notWritten: n('notWritten'),
+    sourceItems: n('sourceItems'),
+  }
+}
+
 function ImportHistory() {
   const [batches, setBatches] = useState<ImportBatch[] | null>(null)
+  /** Batches moved to the Trash from here: nothing left to review. */
+  const [trashed, setTrashed] = useState<Set<string>>(() => new Set())
   useEffect(() => {
     let alive = true
     api
@@ -94,25 +123,36 @@ function ImportHistory() {
             const name = sourceName(b.source.path)
             const when = (b.finishedAt || b.startedAt || '').slice(0, 16).replace('T', ' ')
             return (
-              <li key={b.id} data-import-batch={b.id} className="flex items-center justify-between gap-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-[14px] font-semibold text-fg" title={b.source.path}>
-                    {name}
-                  </p>
-                  <p className="text-[13px] text-fg-muted">
-                    {[when, T.historyObjects(b.counts.imported ?? 0)].filter(Boolean).join(' · ')}
-                  </p>
+              <li key={b.id} data-import-batch={b.id} className="flex flex-col gap-2 py-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-[14px] font-semibold text-fg" title={b.source.path}>
+                      {name}
+                    </p>
+                    <p className="text-[13px] text-fg-muted">
+                      {[when, T.historyObjects(b.counts.imported ?? 0)].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                  {!trashed.has(b.id) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      aria-label={T.reviewLabel(name)}
+                      onClick={() => reviewImport(b.id)}
+                    >
+                      {T.review}
+                    </Button>
+                  )}
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  aria-label={T.reviewLabel(name)}
-                  onClick={() => reviewImport(b.id)}
-                >
-                  {T.review}
-                </Button>
+                {/* The finish step's batch actions (Move batch to Trash, Changed in both), here too. */}
+                <BatchPanel
+                  result={batchAsResult(b)}
+                  inOpenSpace
+                  actionsOnly
+                  onMoved={() => setTrashed((s) => new Set(s).add(b.id))}
+                />
               </li>
             )
           })}

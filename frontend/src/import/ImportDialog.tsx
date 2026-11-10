@@ -480,7 +480,9 @@ export function ImportDialog() {
         onInteractOutside={(e) => {
           if (running) e.preventDefault()
         }}
-        className="max-h-[85vh] overflow-y-auto border-line bg-raised-2 text-fg sm:max-w-[640px]"
+        // One column that may shrink below its content: a long path (truncated, or a long word in
+        // a message) never widens the dialog past its width, so nothing scrolls sideways.
+        className="max-h-[85vh] grid-cols-[minmax(0,1fr)] overflow-y-auto border-line bg-raised-2 text-fg [overflow-wrap:anywhere] sm:max-w-[640px]"
       >
         <DialogHeader>
           <DialogTitle className="text-[18px]">{T.title}</DialogTitle>
