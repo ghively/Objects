@@ -206,7 +206,7 @@ class RuleRequest(BaseModel):
 class PreviewRequest(BaseModel):
     path: str
     kind: str = "auto"
-    target: str = "newSpace"
+    target: dict[str, Any] | str = "newSpace"  # as StartRequest's: {"kind": ...}, or the kind alone
     leaveOut: list[str] = []
     keepAsSources: bool | None = None  # M30: absent, on (as the start)
 
@@ -649,7 +649,8 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         refused = refuse_space_source(req.path)
         if refused is not None:
             return refused
-        target = req.target if req.target in ("newSpace", "currentSpace") else "newSpace"
+        kind = req.target.get("kind") if isinstance(req.target, dict) else req.target
+        target = kind if kind in ("newSpace", "currentSpace") else "newSpace"
         status, body = _call(
             next(rt for rt in imports.routes if getattr(rt, "path", "") == "/import/preview"),
             {"source": {"path": req.path, "kind": req.kind}, "target": target, "leaveOut": req.leaveOut,

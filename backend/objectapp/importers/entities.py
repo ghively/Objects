@@ -2,8 +2,8 @@
 sections 5 and 5a; plan ``2026-11-09-m30-entity-extraction.md``, Contract and Task 3).
 
 `resolve` joins the candidates of a batch's filing results into entities: names and aliases that
-normalise the same (`norm_name`) within a type, the agent's merges, then Gene's review (merges, then
-splits). Per entity it picks the values from all its Sources (`distill.pick_values`: the newest
+normalise the same (`norm_name`) within a type, the agent's merges, then Gene's review (his merges
+and splits, in the order he made them). Per entity it picks the values from all its Sources (`distill.pick_values`: the newest
 Source wins, conflicts kept), assembles the summary lines, and applies **the entity rule**: a
 candidate becomes an object when a page is mainly about it (``"own"``), more than one page mentions
 it (``"pages"``, `entitycheck.MIN_PAGES`) or it has properties of its own (``"properties"``);
@@ -14,7 +14,13 @@ tag) is never an entity. The resolved list is **computed** on every read from ``
 Gene's review, ``.object/imports/<batch>/entities-review.json`` (`EntitiesReview`)::
 
     {"decisions": {entityId: {"status": "accepted"|"renamed"|"rejected", "name"?: str}},
-     "merges": [[entityId, ...]], "splits": [{"id": entityId, "names": [str]}], "revision"?: str}
+     "merges": [[entityId, ...]], "splits": [{"id": entityId, "names": [str]}],
+     "order"?: ["merge"|"split", ...], "revision"?: str}
+
+``order`` is the sequence Gene made his merges and splits in (each ``"merge"`` takes the next of
+``merges``, each ``"split"`` the next of ``splits``). A review stored without it (or with one that
+doesn't match the two lists) applies its merges, then its splits. The wizard sends the two lists
+only; `save_review` keeps the stored order and puts the operations a save adds after it.
 
 `view` answers the wizard's ``EntitiesView`` (frontend ``api/types.ts``).
 """
@@ -162,7 +168,7 @@ class _Group:
 
 class _Built:
     """The candidates of a batch's results joined into groups: names and aliases, the agent's merges,
-    then the review's merges and splits (strict: a bad operation raises `ReviewInvalid`)."""
+    then the review's merges and splits in their order (strict: a bad operation raises `ReviewInvalid`)."""
 
     def __init__(self, results: dict[str, dict[str, Any]]) -> None:
         self.pages: list[str] = []
@@ -248,10 +254,24 @@ class _Built:
         self.groups = [g for g in self.groups if g.keys]
         self.seenIds.update(g.id for g in self.groups)
 
+    def name(self, g: _Group) -> str:
+        """The group's name as its entity shows it (its most-named key, first seen on a tie)."""
+        info = {k: self.keys[(g.typeId, k)] for k in g.keys}
+        return info[min(g.keys, key=lambda k: (-info[k].names, info[k].first))].text()
+
+    def gone(self, gid: Any) -> str:
+        """Why ``gid`` names no entity now, in Gene's words (never the id itself)."""
+        tid, _, key = str(gid).partition(":")
+        g = next((g for g in self.groups if g.typeId == tid and key in g.keys), None)
+        if g is None:
+            return "That entity isn't in this import."
+        text, into = self.keys[(tid, key)].text(), self.name(g)
+        return f"{text} is now part of {into}." if text != into else f"{text} has changed since this list was shown."
+
     def _group(self, gid: Any, strict: bool) -> _Group | None:
         g = next((g for g in self.groups if g.id == gid), None)
         if g is None and strict:
-            raise ReviewInvalid(f"There is no entity {gid}.")
+            raise ReviewInvalid(self.gone(gid))
         return g
 
     def merge(self, ids: list[str], strict: bool) -> None:
@@ -289,10 +309,12 @@ class _Built:
         self._note_ids()
 
     def review(self, review: dict[str, Any], strict: bool) -> None:
-        for ids in review["merges"]:
-            self.merge(ids, strict)
-        for op in review["splits"]:
-            self.split(op, strict)
+        merges, splits = iter(review["merges"]), iter(review["splits"])
+        for kind in review.get("order") or _default_order(review):
+            if kind == "merge":
+                self.merge(next(merges), strict)
+            else:
+                self.split(next(splits), strict)
 
     def members(self) -> dict[str, list[_Cand]]:
         """Group id -> its candidates (a candidate is where its name's key is); a group with none drops out."""
@@ -425,8 +447,14 @@ def resolve(space: Space, results: dict[str, dict[str, Any]], review: dict[str, 
 # -- the review --------------------------------------------------------------------------
 
 
+def _default_order(review: dict[str, Any]) -> list[str]:
+    """The order of a review stored without one: its merges, then its splits."""
+    return ["merge"] * len(review["merges"]) + ["split"] * len(review["splits"])
+
+
 def _clean(review: Any) -> dict[str, Any]:
-    """A review in its stored shape; anything unreadable left out."""
+    """A review in its stored shape; anything unreadable left out (an ``order`` that doesn't match
+    its merges and splits too)."""
     if not isinstance(review, dict):
         return {"decisions": {}, "merges": [], "splits": []}
     decisions = review.get("decisions") if isinstance(review.get("decisions"), dict) else {}
@@ -436,6 +464,10 @@ def _clean(review: Any) -> dict[str, Any]:
         "splits": [{"id": str(s.get("id")), "names": [str(n) for n in s.get("names") or []]}
                    for s in review.get("splits") or [] if isinstance(s, dict)],
     }  # fmt: skip
+    order = review.get("order")
+    if (isinstance(order, list) and all(k in ("merge", "split") for k in order)
+            and order.count("merge") == len(out["merges"]) and order.count("split") == len(out["splits"])):  # fmt: skip
+        out["order"] = list(order)
     if isinstance(review.get("revision"), str):
         out["revision"] = review["revision"]
     return out
@@ -470,7 +502,12 @@ def save_review(space: Space, batch: str, review: dict[str, Any], results: dict[
     Decisions are keyed by the ids the entities have after the review's merges and splits. When the
     review adds a split, the part split off starts undecided and the rest keeps the decision of the
     entity it was split from (also when the split hands that id to the part split off); decisions on
-    ids that are gone are dropped, so they never come back."""
+    ids that are gone are dropped, so they never come back.
+
+    The operations apply in the order Gene made them: the stored ``order``, then (when the review
+    only adds to the stored merges and splits, as the wizard's one-op saves do) the ones it adds; a
+    review that doesn't build on the stored one, without an ``order`` of its own, applies its merges
+    and then its splits."""
     folder = batches.batch_dir(space.root, batch)
     if not folder.is_dir():
         raise KeyError(batch)
@@ -485,12 +522,16 @@ def save_review(space: Space, batch: str, review: dict[str, Any], results: dict[
             raise ReviewInvalid(f"The review's {key} can't be read.")
     asked = _clean(review)
     decisions = {k: _decision(v) for k, v in asked["decisions"].items()}
-    res, built = _build(space, results, asked, strict=True)
-
-    # decisions follow a split this review adds
     stored = load_review(space.root, batch)
     old = stored["splits"]
     added = asked["merges"][: len(stored["merges"])] == stored["merges"] and asked["splits"][: len(old)] == old
+    if "order" not in asked:
+        asked["order"] = ((stored.get("order") or _default_order(stored))
+                          + ["merge"] * (len(asked["merges"]) - len(stored["merges"]))
+                          + ["split"] * (len(asked["splits"]) - len(old))) if added else _default_order(asked)  # fmt: skip
+    res, built = _build(space, results, asked, strict=True)
+
+    # decisions follow a split this review adds
     where = {(e.typeId, k): e.id for e in [*res.entities, *res.leftOut] for k in e.keys}
     for old_id, moved, rest in built.splitLog[len(old):] if added else []:
         tid = old_id.split(":", 1)[0]
@@ -511,8 +552,9 @@ def save_review(space: Space, batch: str, review: dict[str, Any], results: dict[
         if left is not None and d["status"] != "rejected":
             raise ReviewInvalid(f"{left.name} isn't made into an object, so it can't be {d['status']}.")
         if left is None and gid not in built.seenIds:
-            raise ReviewInvalid(f"There is no entity {gid}.")
-    data: dict[str, Any] = {"decisions": out, "merges": asked["merges"], "splits": asked["splits"]}
+            raise ReviewInvalid(built.gone(gid))
+    data: dict[str, Any] = {"decisions": out, "merges": asked["merges"], "splits": asked["splits"],
+                            "order": asked["order"]}  # fmt: skip
     digest = hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
     data["revision"] = digest[:16]
     batches.write_json(folder / REVIEW_FILE, data)

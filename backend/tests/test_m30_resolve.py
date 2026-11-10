@@ -418,3 +418,98 @@ def test_view_shape_and_reads_write_nothing(tmp_path: Path) -> None:
     assert v["state"] == "written" and v["written"] == outcome
     assert v["entities"][1]["decision"] == {"status": "accepted"} and v["undecided"] == 5
     assert v["suggestedMerges"] == [{"ids": ["host:srv-db01", "host:srv db01"], "names": ["SRV-DB01", "SRV DB01"]}]
+
+
+def _clicks(sp: Space, batch: str, results: dict[str, dict[str, Any]], *ops: tuple[str, Any]) -> dict[str, Any]:
+    """Gene's clicks in the Entities step, one save each: the wizard appends the op to the review it
+    was last shown (``merges`` or ``splits``) and saves the whole review."""
+    stored: dict[str, Any] = {}
+    for kind, op in ops:
+        shown = {k: entities.load_review(sp.root, batch)[k] for k in ("decisions", "merges", "splits")}
+        key = "merges" if kind == "merge" else "splits"
+        stored = entities.save_review(sp, batch, {**shown, key: [*shown[key], op]}, results)
+    return stored
+
+
+def _host_keys(res: entities.Resolution) -> dict[str, set[str]]:
+    return {e.id: e.keys for e in _all(res) if e.typeId == "host" and e.id not in ("host:server", "host:vm")}
+
+
+def test_review_ops_apply_in_the_order_made(tmp_path: Path) -> None:
+    """D2: merge APP01 and SRV-DB01, split SRV-DB01 back out, then the suggested merge of SRV-DB01 and
+    SRV DB01: each operation applies to what the one before it left."""
+    root, paths = _source_space(tmp_path)
+    sp = Space(root)
+    results = _results(paths)
+    rack = paths["Rack notes"]
+    results[rack]["entities"] += result(rack, entities=[{"type": "Host", "name": "SRV DB01"}])["entities"]
+    for batch in ("b1", "b2", "b3"):
+        batches.batch_dir(root, batch).mkdir(parents=True)
+    app01, db = {"app01", "app01.corp.example"}, {"srv-db01"}
+
+    stored = _clicks(sp, "b1", results, ("merge", ["host:app01", "host:srv-db01"]),
+                     ("split", {"id": "host:app01", "names": ["SRV-DB01"]}))  # fmt: skip
+    res = entities.resolve(sp, results, stored)
+    assert _host_keys(res) == {"host:app01": app01, "host:srv-db01": db, "host:srv db01": {"srv db01"}}
+    assert res.suggestedMerges == [{"ids": ["host:srv-db01", "host:srv db01"], "names": ["SRV-DB01", "SRV DB01"]}]
+    stored = _clicks(sp, "b1", results, ("merge", res.suggestedMerges[0]["ids"]))
+    res = entities.resolve(sp, results, entities.load_review(root, "b1"))
+    assert _host_keys(res) == {"host:app01": app01, "host:srv db01": db | {"srv db01"}}
+    assert res.suggestedMerges == []
+    # a decision-only save keeps the order
+    entities.save_review(sp, "b1", {**stored, "decisions": {"host:app01": {"status": "accepted"}}}, results)
+    assert _host_keys(entities.resolve(sp, results, entities.load_review(root, "b1"))) == _host_keys(res)
+
+    # merge, split, then merge the same two again
+    stored = _clicks(sp, "b2", results, ("merge", ["host:app01", "host:srv-db01"]),
+                     ("split", {"id": "host:app01", "names": ["SRV-DB01"]}),
+                     ("merge", ["host:app01", "host:srv-db01"]))  # fmt: skip
+    assert _host_keys(entities.resolve(sp, results, stored)) == {"host:app01": app01 | db, "host:srv db01": {"srv db01"}}
+
+    # split the agent's merge, then merge the two parts back
+    sw = _by_name(entities.resolve(sp, results), "software", "SQL Server 2019")
+    assert sw.id == "software:sql 2019" and sw.keys == {"sql 2019", "sql server 2019"}
+    stored = _clicks(sp, "b3", results, ("split", {"id": sw.id, "names": ["SQL 2019"]}))
+    parts = sorted(e.id for e in _all(entities.resolve(sp, results, stored)) if e.typeId == "software")
+    assert parts == ["software:sql 2019", "software:sql server 2019", "software:windows server 2019"]
+    stored = _clicks(sp, "b3", results, ("merge", ["software:sql server 2019", "software:sql 2019"]))
+    back = _by_name(entities.resolve(sp, results, stored), "software", "SQL Server 2019")
+    assert back.id == "software:sql 2019" and back.keys == {"sql 2019", "sql server 2019"}
+
+
+def test_review_saved_as_two_lists_still_loads(tmp_path: Path) -> None:
+    """A review stored before the order was kept (``merges`` and ``splits`` only) applies its merges,
+    then its splits; a later save keeps that and applies its new op after them."""
+    root, paths = _source_space(tmp_path)
+    sp = Space(root)
+    results = _results(paths)
+    folder = batches.batch_dir(root, "b1")
+    folder.mkdir(parents=True)
+    old = {"decisions": {"host:app01": {"status": "accepted"}}, "merges": [["host:app01", "host:srv-db01"]],
+           "splits": [{"id": "host:app01", "names": ["SRV-DB01"]}], "revision": "0123456789abcdef"}  # fmt: skip
+    batches.write_json(folder / entities.REVIEW_FILE, old)
+    loaded = entities.load_review(root, "b1")
+    assert {k: loaded[k] for k in old} == old
+    res = entities.resolve(sp, results, loaded)
+    assert _host_keys(res) == {"host:app01": {"app01", "app01.corp.example"}, "host:srv-db01": {"srv-db01"}}
+    stored = _clicks(sp, "b1", results, ("merge", ["host:app01", "host:srv-db01"]))
+    assert _host_keys(entities.resolve(sp, results, stored)) == {"host:app01": {"app01", "app01.corp.example", "srv-db01"}}
+
+
+def test_review_refusals_name_the_entity(tmp_path: Path) -> None:
+    root, paths = _source_space(tmp_path)
+    sp = Space(root)
+    results = _results(paths)
+    batches.batch_dir(root, "b1").mkdir(parents=True)
+    merged = {"merges": [["host:app01", "host:srv-db01"]]}
+    entities.save_review(sp, "b1", merged, results)
+    asks = [
+        ({**merged, "merges": [*merged["merges"], ["host:srv-db01", "host:app01"]]}, "SRV-DB01 is now part of APP01."),
+        ({**merged, "splits": [{"id": "host:srv-db01", "names": ["SRV-DB01"]}]}, "SRV-DB01 is now part of APP01."),
+        ({**merged, "decisions": {"host:nope": {"status": "accepted"}}}, "That entity isn't in this import."),
+        ({**merged, "merges": [*merged["merges"], ["software:nope", "host:app01"]]}, "That entity isn't in this import."),
+    ]
+    for ask, text in asks:
+        with pytest.raises(entities.ReviewInvalid) as err:
+            entities.save_review(sp, "b1", ask, results)
+        assert str(err.value) == text

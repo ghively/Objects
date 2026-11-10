@@ -244,6 +244,30 @@ def test_mcp_start_import_keeps_sources_by_default(env: Env) -> None:
     assert batches.load_batch(e.root, done["result"]["batch"])[0]["keepAsSources"] is False
 
 
+def test_mcp_import_preview_takes_the_target(env: Env) -> None:
+    """A re-run into the open space, not kept as Sources: the preview plans for the open space (its
+    types), as `start_import`'s target says, so the start finds every type it maps to."""
+    e = env
+    _server, call = _mcp(e)
+    pv = call("import_preview", path=str(e.src))
+    done = wait_job(e.client, call("start_import", preview_id=pv["previewId"], target={"kind": "currentSpace"})["jobId"])
+    assert done["phase"] == "done", done
+
+    pv = call("import_preview", path=str(e.src), keep_as_sources=False, target={"kind": "currentSpace"})
+    job = call("start_import", preview_id=pv["previewId"], target={"kind": "currentSpace"}, keep_as_sources=False)
+    done = wait_job(e.client, job["jobId"])
+    assert done["phase"] == "done", done
+    assert batches.load_batch(e.root, done["result"]["batch"])[0]["keepAsSources"] is False
+
+    # the v1 route takes the target as start_import does ({"kind": ...}) or as its kind alone
+    for target in ({"kind": "currentSpace"}, "currentSpace"):
+        r = e.client.post("/api/v1/import/preview", headers=_token(e),
+                          json={"path": str(e.src), "keepAsSources": False, "target": target})
+        assert r.status_code == 200, r.text
+    r = e.client.post("/api/v1/import/preview", headers=_token(e), json={"path": str(e.src), "target": {"kind": 1}})
+    assert r.status_code == 200, r.text  # an unknown kind: a new space, as before
+
+
 def test_mcp_import_entities_is_read_only(env: Env) -> None:
     e = env
     assert "import_entities" in toolcatalog.OBJECT_READ and "import_entities" not in toolcatalog.OBJECT_WRITE
