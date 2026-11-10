@@ -2,7 +2,7 @@
 behaviour, and G3 "drop the duplicate".
 
 - The import's conventions (no look-alike types, with the offer "Use <type>, with a category";
-  categories never types; relations outside the named set stay plain links) apply in **every**
+  categories never types; relations to no known type stay plain links) apply in **every**
   space, whatever its setup: ``space-sample`` (no setup, no IT ops types) gets them too, and the
   same proposal gives the same result in a space set up as ``itops`` or ``blank``.
 - An Incident has one Resolved (its own date and time): the starter's and the gallery's Incident
@@ -29,6 +29,10 @@ from objectapp.workservice import Actor, WorkService
 NOW = datetime(2026, 11, 10, 10, 0, tzinfo=UTC)
 SERVER_PROPS = [{"name": "Cores", "kind": "number", "share": 1.0},
                 {"name": "Owner", "kind": "text", "share": 1.0}]
+PROJECT_PROPS = [{"name": n, "kind": k, "share": 1.0} for n, k in (
+    ("Budget", "number"), ("Progress", "number"), ("Done", "boolean"), ("Site", "url"), ("Time Frame", "datetime"),
+    ("Kickoff", "datetime"))] + [{"name": n, "kind": "entity", "target": "Person", "share": 1.0} for n in ("Lead", "Members")]
+"""Every specific property of ``space-sample``'s Project (by name and kind): a real look-alike (M31 fix pass)."""
 OWN = [{"name": "Hypervisor version", "kind": "text", "share": 1.0},
        {"name": "Memory", "kind": "number", "share": 1.0}]
 
@@ -58,14 +62,17 @@ def test_conventions_in_every_space(tmp_path) -> None:
     assert spaceconfig.read(root)[0].get("setup") is None
     rel = {"id": "g3", "action": "extend", "group": "Servers", "name": "Server", "documents": 10,
            "properties": [{"name": "Owner", "kind": "entity", "target": "Person", "share": 1.0},
-                          {"name": "Backs up", "kind": "entity", "target": "Server", "share": 1.0}]}
-    box, docs, ext = _save(root, _create("Box", SERVER_PROPS, "g1"), _create("Docs", OWN, "g2"), rel)
-    assert box["problems"] == ["It has the same properties as Server."]
-    assert box["offer"] == {"label": "Use Server, with a category", "typeId": "server", "category": "Box"}
+                          {"name": "Backs up", "kind": "entity", "target": "Vault", "share": 1.0}]}
+    box, docs, ext, cores = _save(root, _create("Box", PROJECT_PROPS, "g1"), _create("Docs", OWN, "g2"), rel,
+                                  _create("Rack", SERVER_PROPS, "g4"))
+    assert box["problems"] == ["It has the same properties as Project."]
+    assert box["offer"] == {"label": "Use Project, with a category", "typeId": "project", "category": "Box"}
     assert docs["problems"] == ["Docs is a category: a property value or a tag, not a type."]  # a tag
     assert [p["name"] for p in ext["properties"]] == ["Owner"]
     assert ext["dropped"] == [{"key": "backs-up", "name": "Backs up",
-                               "reason": "Not one of the named relations; it stays a plain link."}]
+                               "reason": "It points at Vault, which is neither a type in this space nor one "
+                                         "proposed here; it stays a plain link."}]
+    assert cores["problems"] == []  # two properties named like Server's are not a look-alike
 
 
 def test_setup_never_changes_the_rules(tmp_path) -> None:

@@ -693,3 +693,88 @@ def test_inbox_reasons_on_a_batch_not_kept_as_sources(env: Env) -> None:
     assert head + lines in _report(e, batch)
     rp = batches.load_batch(e.root, batch)[0]["reportPath"]
     assert head + lines in (e.root / rp).read_text(encoding="utf-8")
+
+
+# -- M31 fix pass: a worker that saved its last state is no longer running ---------------------------
+
+
+def _hold_after_last_save(e: Env) -> tuple[Any, Any]:
+    """Make the worker wait in its ``finally`` (its announce, after its last save) until ``gate`` is set:
+    the moment a request right after the poll used to meet "A filing pass is running."."""
+    import threading
+
+    gate, held = threading.Event(), threading.Event()
+    real = e.fil.announce
+
+    def slow() -> None:
+        if threading.current_thread() is e.fil._thread and not gate.is_set():
+            held.set()
+            gate.wait(30)
+        real()
+
+    e.monkeypatch.setattr(e.fil, "announce", slow)
+    return gate, held
+
+
+def test_a_worker_past_its_last_save_is_not_running(env: Env) -> None:
+    e = env
+    batch = _import(e)
+    _decide(e, batch)
+    gate, held = _hold_after_last_save(e)
+    try:
+        assert e.client.post(f"/api/import/batches/{batch}/filing/start", json={"trial": True}).status_code == 200
+        assert held.wait(30)
+        assert e.fil._thread is not None and e.fil._thread.is_alive()  # still in its finally
+        assert not e.fil.running()
+        trial = e.client.get(f"/api/import/batches/{batch}/filing").json()
+        assert trial["state"] == "trial", trial
+        for it in trial["trial"]["items"]:
+            r = e.client.post(f"/api/import/batches/{batch}/filing/mark", json={"path": it["path"], "verdict": "right"})
+            assert r.status_code == 200, r.text
+        r = e.client.post(f"/api/import/batches/{batch}/filing/continue")
+        assert r.status_code == 200, r.text
+    finally:
+        gate.set()
+    assert _wait(e, batch, {"entities", "failed"})["state"] == "entities"
+
+    _accept_all(e, batch)
+    held.clear()
+    gate.clear()
+    try:
+        e.fil.write_entities(batch)
+        assert held.wait(30)
+        assert e.fil._thread.is_alive() and not e.fil.running()
+        assert e.client.get(f"/api/import/batches/{batch}/filing").json()["state"] == "done"
+        r = e.client.post(f"/api/import/batches/{batch}/entities/write", json={})
+        assert r.status_code == 409 and r.json()["detail"] == filing.WRITTEN_ALREADY, r.text
+    finally:
+        gate.set()
+    e.fil.join()
+
+
+def test_a_running_worker_is_running(env: Env) -> None:
+    """Until its last save the worker counts as running: a second start is refused."""
+    import threading
+
+    e = env
+    batch = _import(e)
+    _decide(e, batch)
+    gate, inside = threading.Event(), threading.Event()
+    real = e.fil._pass
+
+    def waiting(*args: Any, **kwargs: Any) -> None:
+        inside.set()
+        gate.wait(30)
+        real(*args, **kwargs)
+
+    e.monkeypatch.setattr(e.fil, "_pass", waiting)
+    try:
+        assert e.client.post(f"/api/import/batches/{batch}/filing/start", json={"trial": True}).status_code == 200
+        assert inside.wait(30) and e.fil.running()
+        r = e.client.post(f"/api/import/batches/{batch}/filing/start", json={"trial": True})
+        assert r.status_code == 409 and r.json()["detail"] == "A filing pass is running.", r.text
+        assert e.client.get(f"/api/import/batches/{batch}/filing").json()["state"] == "running"
+    finally:
+        gate.set()
+    assert _wait(e, batch, {"trial", "failed"})["state"] == "trial"
+    assert not e.fil.running()

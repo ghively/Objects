@@ -70,10 +70,16 @@ OPS_LOG = "Pages/Ops log.md"
 RACK_EXTRA = "Rack 4 at HQ holds a Server and a VM. SRV DB01 sits in it too."
 RENAMED = "Microsoft SQL Server 2019"
 HOST_PROPS = [
-    {"name": "IP address", "kind": "text", "share": 1.0},
-    {"name": "FQDN", "kind": "text", "share": 0.9},
-    {"name": "Operating system", "kind": "text", "share": 0.8},
+    *({"name": n, "kind": k, "share": 1.0} for n, k in (
+        ("IP address", "text"), ("FQDN", "text"), ("Last boot", "datetime"), ("Disk free", "number"),
+        ("Reboot pending", "boolean"), ("Last seen", "datetime"))),
+    *({"name": n, "kind": "label", "share": 1.0, "options": ["X"]}
+      for n in ("Category", "Roles", "Department", "Environment", "Patch state")),
+    *({"name": n, "kind": "entity", "target": t, "share": 1.0} for n, t in (
+        ("Operating system", "Software"), ("Located at", "Location"), ("Network", "Network"), ("Owned by", "Person"))),
 ]
+"""Every specific property of Host, by name and kind (M31 fix pass: a look-alike shares most of both
+types' specific properties)."""
 
 
 # -- plumbing ------------------------------------------------------------------------------

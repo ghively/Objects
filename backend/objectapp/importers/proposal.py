@@ -15,10 +15,15 @@ item, as ``problems``, ``dropped`` and ``merged``) and again when an item is app
 - relation properties name a proposed type or an existing one.
 
 M30 (design 2026-11-09 section 5b), M31 (Gene's decision 1, "spaces never change behaviour"): in
-every space, whatever its setup, the conventions are rules too. A new type whose properties match an existing type's (`lookalike`) is refused with the
-offer "Use <type>, with a category" (``offer``); a new type named like a category (a label option
-of a type, or a tag) is refused, with the offer for the type holding that option; a relation
-property outside the named set (`named_relations`) is dropped and stays a plain link. Gene takes
+every space, whatever its setup, the conventions are rules too. A new type whose properties match an
+existing type's (`lookalike`: at least `LOOKALIKE_MIN_SHARED` specific properties in common, by name
+and kind, and `LOOKALIKE_SHARE` or more of both types' specific properties together; the common ones,
+`common_names`, left out) is refused with the offer "Use <type>, with a category" (``offer``). A new
+type named like a category (an option of a type's Category, Kind or Environment label) is refused
+when it also shares `CATEGORY_LIKE_MIN_SHARED` specific properties with that type, with the offer;
+otherwise the item carries a note (``notes``) and the offer and is not blocked. A new type named like
+a tag is refused. A relation property keeps its place when its target is an existing type or one
+proposed in the same proposal; any other relation is dropped and stays a plain link. Gene takes
 the offer with ``{status: "edited", edited: {useType, category}}``: the item becomes an extend of
 that type adding the category to its Category (else Kind) options, or a plain use.
 
@@ -52,7 +57,10 @@ if TYPE_CHECKING:
 __all__ = [
     "ABBREVIATIONS",
     "CATEGORY_LABELS",
+    "CATEGORY_LIKE_MIN_SHARED",
+    "COMMON_PROPERTIES",
     "INBOX_NAME",
+    "LOOKALIKE_MIN_SHARED",
     "LOOKALIKE_SHARE",
     "MIN_DOCUMENTS",
     "MIN_SHARE",
@@ -62,6 +70,7 @@ __all__ = [
     "apply",
     "approved_create_names",
     "category_labels",
+    "common_names",
     "effective_item",
     "load_proposal",
     "load_review",
@@ -85,7 +94,16 @@ MAX_ITEMS = 200
 MAX_PROPERTIES = 60
 MAX_OPTIONS = 100
 LOOKALIKE_SHARE = 0.8
-"""M30: a new type is a look-alike when this share of its properties (by name) are an existing type's."""
+"""M30, tuned in the M31 fix pass: a new type is a look-alike when the specific properties it shares with
+an existing type (by name and kind) are this share or more of both types' specific properties together."""
+LOOKALIKE_MIN_SHARED = 3
+"""M31 fix pass: and when it shares at least this many specific properties."""
+CATEGORY_LIKE_MIN_SHARED = 2
+"""M31 fix pass: a type named like a category is refused when it shares this many specific properties with
+the type holding the category; with fewer the category is a note, not a refusal."""
+COMMON_PROPERTIES = ("Notes", "Type", "Status", "Cover image", "Sources")
+"""M31 fix pass: names that say nothing about what a type is (with the system properties' names, `common_names`):
+left out when types are compared. Sources is M30's relation on every type that holds entities."""
 OFFER = "Use {type}, with a category"
 CATEGORY_LABELS = ("category", "kind", "environment")
 """M30: the label properties whose options are categories (by name or key, any case), on any type but Source."""
@@ -202,31 +220,57 @@ def named_relations(space: Space) -> set[str]:
     return out
 
 
-def _own_names(t: TypeDefinition) -> set[str]:
-    """A type's own properties (not the system ones), in `_squash` form."""
+def common_names() -> set[str]:
+    """The property names (`_squash` form) left out when types are compared: the system properties'
+    (Title, Description, Tags, Created at, Last updated and the rest) and `COMMON_PROPERTIES`."""
+    from ..typemodel import system_property_defs
+
+    out = {_squash(pd.name) for pd in system_property_defs(include_type=True)}
+    return (out | {_squash(n) for n in COMMON_PROPERTIES}) - {""}
+
+
+def _specific(t: TypeDefinition, common: set[str]) -> set[tuple[str, str]]:
+    """A type's specific properties as (`_squash` of the name, kind): not the system ones, not the common names."""
     return {
-        _squash(pd.name)
+        (_squash(pd.name), pd.type)
         for pd in t.propertyDefinitions
-        if pd.key not in SYSTEM_KEYS and not pd.type.startswith("entity_") and _squash(pd.name)
+        if pd.key not in SYSTEM_KEYS and not pd.type.startswith("entity_") and _squash(pd.name) not in common
+        and _squash(pd.name)
     }
 
 
+def _specific_props(props: list[dict[str, Any]], common: set[str]) -> set[tuple[str, str]]:
+    """A proposed item's specific properties, as `_specific` gives a type's."""
+    out: set[tuple[str, str]] = set()
+    for p in props:
+        if not isinstance(p, dict):
+            continue
+        name = _squash(_text(p.get("name") or p.get("key"), 100))
+        if name and name not in common and str(p.get("key") or "") not in SYSTEM_KEYS:
+            out.add((name, str(p.get("kind") or "text")))
+    return out
+
+
 def lookalike(props: list[dict[str, Any]], space: Space, *, exclude: str | None = None) -> TypeDefinition | None:
-    """The existing type a new type with ``props`` looks like: at least two properties, of which
-    `LOOKALIKE_SHARE` or more (by `_squash` of the name) are that type's own. The best share wins,
-    then the most shared properties, then the space's type order. Never the Source type, nor
-    ``exclude`` (the item's own type id)."""
-    names = {_squash(_text(p.get("name") or p.get("key"), 100)) for p in props if isinstance(p, dict)}
-    names.discard("")
-    if len(names) < 2:
+    """The existing type a new type with ``props`` looks like: they share at least
+    `LOOKALIKE_MIN_SHARED` specific properties (by `_squash` of the name and the kind; system and
+    common ones, `common_names`, left out), and those are `LOOKALIKE_SHARE` or more of both types'
+    specific properties together. The best share wins, then the most shared properties, then the
+    space's type order. Never the Source type, nor ``exclude`` (the item's own type id)."""
+    common = common_names()
+    mine = _specific_props(props, common)
+    if len(mine) < LOOKALIKE_MIN_SHARED:
         return None
     best: tuple[float, int] | None = None
     found: TypeDefinition | None = None
     for t in space.types:
         if t.id in (_SOURCE_TYPE, exclude):
             continue
-        shared = len(names & _own_names(t))
-        rank = (shared / len(names), shared)
+        theirs = _specific(t, common)
+        shared = len(mine & theirs)
+        if shared < LOOKALIKE_MIN_SHARED:
+            continue
+        rank = (shared / len(mine | theirs), shared)
         if rank[0] >= LOOKALIKE_SHARE and (best is None or rank > best):
             best, found = rank, t
     return found
@@ -251,24 +295,23 @@ def category_labels(t: TypeDefinition) -> list[Any]:
             if pd.type == "label" and (pd.key.casefold() in CATEGORY_LABELS or _text(pd.name).casefold() in CATEGORY_LABELS)]
 
 
-def _category_of(space: Space, name: str) -> tuple[bool, TypeDefinition | None]:
-    """(whether ``name`` is a category, the type to offer): an option of a type's Category, Kind or
-    Environment label (`category_labels`; the type's Category or Kind first, then any of them, in type
-    order), or a tag's title (no type to offer). Any other label's options (Host's Roles, Script's
-    Language) are not categories."""
+def _category_of(space: Space, name: str) -> tuple[list[tuple[TypeDefinition, Any]], bool]:
+    """(the types holding ``name`` as a category, each with the label holding it, whether a tag has
+    that title). A category is an option of a type's Category, Kind or Environment label
+    (`category_labels`; a type's Category or Kind first, then any of them, in type order); any other
+    label's options (Host's Roles, Script's Language) are not categories."""
     want = _squash(name)
     if not want:
-        return False, None
-    holders: list[tuple[int, TypeDefinition]] = []
-    for t in space.types:
+        return [], False
+    holders: list[tuple[int, int, TypeDefinition, Any]] = []
+    for n, t in enumerate(space.types):
         label = _category_label(t)
-        for pd in category_labels(t):
-            texts = [str(o.get("text", "")) for o in pd.options.get("set") or [] if isinstance(o, dict)]
-            if any(_squash(x) == want for x in texts):
-                holders.append((0 if pd is label else 1, t))
-    if holders:
-        return True, min(holders, key=lambda h: h[0])[1]
-    return any(_squash(s.title) == want for s in space.list("tag")), None
+        found = [(0 if pd is label else 1, n, t, pd) for pd in category_labels(t)
+                 if any(_squash(str(o.get("text", ""))) == want for o in pd.options.get("set") or [] if isinstance(o, dict))]
+        if found:
+            holders.append(min(found, key=lambda h: h[0]))
+    holders.sort(key=lambda h: (h[0], h[1]))
+    return [(t, pd) for _r, _n, t, pd in holders], any(_squash(s.title) == want for s in space.list("tag"))
 
 
 def _offer(t: TypeDefinition, group: str) -> dict[str, str]:
@@ -306,7 +349,6 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
     if not isinstance(documents, int) or isinstance(documents, bool) or documents < 0:
         raise ProposalInvalid(f"Item {index + 1} ({name}): documents is the number of documents in the group.")
     iid = _text(raw.get("id"), 64) or f"item-{index + 1}"
-    named = named_relations(space) if space is not None else set()
     problems: list[str] = []
     exists = f"A type named {name!r} already exists; use or extend it."
     type_id: str | None = None
@@ -368,15 +410,18 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
             if not options:
                 dropped.append({"key": key, "name": pname, "reason": "A label property needs the values found."})
                 continue
-        if kind == "entity" and space is not None and pname.casefold() not in named:
-            dropped.append({"key": key, "name": pname, "reason": "Not one of the named relations; it stays a plain link."})
-            continue
         if kind == "entity":
+            # M31 fix pass: a relation to an existing type, or to one proposed here, is kept; any other
+            # stays a plain link (M30's named set is for the entities' relations, not the schema).
             target = _text(p.get("target"), 100)
-            known = (space is not None and bool(space.type_by_id(space._type_id(target)))) if target else False
-            if not target or (target.casefold() not in names and not known):
+            known = (space is not None and _find_type(space, target) is not None) if target else False
+            if not target:
+                dropped.append({"key": key, "name": pname, "reason": "It points at no type; it stays a plain link."})
+                continue
+            if target.casefold() not in names and not known:
                 dropped.append({"key": key, "name": pname,
-                                "reason": f"A relation names a proposed or existing type ({target or 'none given'})."})
+                                "reason": f"It points at {target}, which is neither a type in this space nor one "
+                                          "proposed here; it stays a plain link."})
                 continue
             entry["target"] = target
         keys.add(key)
@@ -387,19 +432,31 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
         problems.append("There is nothing to add: no property passed the checks.")
     group = _text(raw.get("group"), 200) or name
     offer: dict[str, str] | None = None
+    notes: list[str] = []
     if space is not None and action == "create":
         rules: list[str] = []
         like = lookalike(props, space, exclude=type_id)
         if like is not None:
             rules.append(f"It has the same properties as {like.name}.")
             offer = _offer(like, group)
-        is_category, holder = _category_of(space, name)
-        if is_category:
+        holders, is_tag = _category_of(space, name)
+        common = common_names()
+        mine = _specific_props(props, common)
+        alike = next((t for t, _pd in holders if len(mine & _specific(t, common)) >= CATEGORY_LIKE_MIN_SHARED), None)
+        if alike is not None or is_tag:
             rules.append(f"{name} is a category: a property value or a tag, not a type.")
+            holder = alike or (holders[0][0] if holders else None)
             if offer is None and holder is not None:
                 offer = _offer(holder, group)
+        elif holders:
+            # M31 fix pass: a name that is also some type's category, on an item that doesn't look like
+            # that type, is not refused: a note and the offer, for Gene to take or leave.
+            holder, label = holders[0]
+            notes.append(f"{name} is also one of {holder.name}'s {label.name} options.")
+            if offer is None:
+                offer = _offer(holder, group)
         # The offer is what to do instead; M27's "use or extend it" would point at the wrong type.
-        problems = [*rules, *(p for p in problems if not (offer and p == exists))]
+        problems = [*rules, *(p for p in problems if not (offer and rules and p == exists))]
     examples = [_text(e, 300) for e in (raw.get("examples") or [])[:5] if _text(e, 300)]
     out = {
         "id": iid, "action": action, "group": group, "name": name,
@@ -411,6 +468,8 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
     }
     if offer is not None:
         out["offer"] = offer
+    if notes:
+        out["notes"] = notes
     return out
 
 
@@ -583,6 +642,8 @@ def _group(it: dict[str, Any]) -> dict[str, Any]:
     }
     if it.get("offer"):
         g["offer"] = it["offer"]
+    if it.get("notes"):
+        g["notes"] = it["notes"]
     if it.get("typeId"):
         g["typeId"] = it["typeId"]
     if isinstance(it.get("icon"), str):

@@ -114,6 +114,10 @@ class ReadResult:
     space_plurals: dict[str, str] | None = None
     """M31: the source is an Object space: its types' names (casefolded) -> their plural names,
     from its ``.object/types``; None for any other source."""
+    space_types: list[dict[str, Any]] | None = None
+    """M31 fix pass: the source is an Object space: its type definitions as its ``.object/types/*.json``
+    hold them (each with its ``id``, the file's name when it has none), for a remodel to carry every
+    type into the new space, empty ones included; None for any other source."""
 
 
 class SourceIndex:

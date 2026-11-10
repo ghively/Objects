@@ -14,6 +14,8 @@ M31 (remodelling a space): when the folder is an Object space (`Source.is_space`
 ``type`` names its type (``typeSource: key``, ``typeKey: type``, as for Anytype), ``createdAt`` and
 ``lastUpdated`` are its dates, and Object's own ``id``, ``template`` and ``importSource`` are left out
 (the new space gives each object its own id and provenance). Every other key is read as above.
+The space's type definitions come with the read (`space_types`; M31 fix pass), so a remodel carries
+every type into the new space, empty ones included.
 """
 
 from __future__ import annotations
@@ -70,11 +72,11 @@ def split_list(value: Any, strip_hash: bool = False) -> list[str]:
 _MAX_TYPE_FILE = 1 << 20
 
 
-def space_plurals(root: Path) -> dict[str, str]:
-    """M31: an Object space's type names (casefolded) -> plural names, read from its
-    ``.object/types/*.json`` (read only; a file that isn't a type, a link, or one over 1 MiB is
-    passed over)."""
-    out: dict[str, str] = {}
+def space_types(root: Path) -> list[dict[str, Any]]:
+    """M31 fix pass: an Object space's type definitions, read from its ``.object/types/*.json`` (read
+    only; a file that isn't a type with a name and a plural, a link, or one over 1 MiB is passed
+    over), each with its ``id`` (the file's name when it has none), in file-name order."""
+    out: list[dict[str, Any]] = []
     folder = root / ".object" / "types"
     try:
         names = sorted(os.listdir(folder))
@@ -90,7 +92,17 @@ def space_plurals(root: Path) -> dict[str, str]:
             continue
         if isinstance(data, dict) and isinstance(data.get("name"), str) and isinstance(data.get("pluralName"), str):
             if data["name"].strip() and data["pluralName"].strip():
-                out.setdefault(data["name"].strip().casefold(), data["pluralName"].strip())
+                if not isinstance(data.get("id"), str) or not data["id"]:
+                    data["id"] = name[: -len(".json")]
+                out.append(data)
+    return out
+
+
+def space_plurals(root: Path, types: list[dict[str, Any]] | None = None) -> dict[str, str]:
+    """M31: an Object space's type names (casefolded) -> plural names, from `space_types`."""
+    out: dict[str, str] = {}
+    for data in space_types(root) if types is None else types:
+        out.setdefault(data["name"].strip().casefold(), data["pluralName"].strip())
     return out
 
 
@@ -227,6 +239,7 @@ def read_markdown_folder(
             return [(index.page(target, page), target)]
         return [(None, t)]
 
+    types = space_types(Path(src.path)) if space else None
     return ReadResult(
         kind=kind,
         sourcePath=str(src.path),
@@ -244,5 +257,6 @@ def read_markdown_folder(
         defaultTypeSource="key" if space else "folder",
         defaultTypeKey="type" if space else None,
         entity_items=entity_items,
-        space_plurals=space_plurals(Path(src.path)) if space else None,
+        space_plurals=space_plurals(Path(src.path), types) if types is not None else None,
+        space_types=types,
     )

@@ -2,7 +2,10 @@
 ``2026-11-09-m30-entity-extraction.md``, Task 7; design 2026-11-09 section 5b): existing types
 first, no look-alike types ("Use <type>, with a category"), categories never types, relations
 outside the named set stay plain links. M31 (Gene's decision 1): the rules hold in every space,
-whatever its setup (`test_rules_in_every_space`).
+whatever its setup (`test_rules_in_every_space`). M31 fix pass: a look-alike shares at least three
+specific properties (by name and kind, the common ones left out) that are 80% of both types'
+specific properties together; a relation to an existing or proposed type is kept; a category name
+blocks only on an item that looks like the type holding it (else a note and the offer).
 
 ``space-sample`` (which `itops_space` copies) already has a type named Server (id ``server``,
 properties Cores and Owner). A proposed ``create "Server"`` with Host's properties is still a
@@ -25,9 +28,23 @@ from objectapp.space import Space
 HOST_PROPS = [
     {"name": "IP address", "kind": "text", "share": 1.0},
     {"name": "FQDN", "kind": "text", "share": 0.9},
-    {"name": "Operating system", "kind": "text", "share": 0.8},
+    {"name": "Operating system", "kind": "entity", "target": "Software", "share": 0.8},
     {"name": "Environment", "kind": "label", "share": 1.0, "options": ["Production", "Test"]},
+    {"name": "Category", "kind": "label", "share": 1.0, "options": ["Server"]},
+    {"name": "Roles", "kind": "label", "share": 0.5, "options": ["DHCP"]},
+    {"name": "Department", "kind": "label", "share": 0.5, "options": ["IT"]},
+    {"name": "Located at", "kind": "entity", "target": "Location", "share": 1.0},
+    {"name": "Network", "kind": "entity", "target": "Network", "share": 1.0},
+    {"name": "Owned by", "kind": "entity", "target": "Person", "share": 1.0},
+    {"name": "Last boot", "kind": "datetime", "share": 0.5},
+    {"name": "Disk free", "kind": "number", "share": 0.5},
+    {"name": "Patch state", "kind": "label", "share": 0.5, "options": ["Current"]},
+    {"name": "Reboot pending", "kind": "boolean", "share": 0.5},
+    {"name": "Last seen", "kind": "datetime", "share": 0.5},
 ]
+"""Every specific property of the IT ops Host (by name and kind): a real look-alike."""
+OWN = [{"name": "Hypervisor version", "kind": "text", "share": 1.0},
+       {"name": "Memory", "kind": "number", "share": 1.0}]
 
 
 def _create(name: str, props=None, iid: str = "g1", documents: int = 10) -> dict:
@@ -82,45 +99,54 @@ def test_lookalike_type_refused_with_offer(tmp_path) -> None:
     assert _type_files(root) == before
 
 
-def test_lookalike_needs_two_properties_and_the_share(tmp_path) -> None:
+def test_lookalike_needs_three_shared_and_the_share(tmp_path) -> None:
+    """M31 fix pass: the share is over both types' specific properties together (Host has 15)."""
     space = Space(itops_space(tmp_path))
-    other = {"name": "Rack unit", "kind": "text"}
-    assert proposal.lookalike(HOST_PROPS[:1], space) is None  # one property is not enough
-    assert proposal.lookalike([*HOST_PROPS[:3], other], space) is None  # 75%
-    assert proposal.lookalike([*HOST_PROPS, other], space).id == "host"  # 80%
-    assert proposal.lookalike([{"name": "ip-address"}, {"name": "fqdn"}], space).id == "host"  # by the squashed name
+    others = [{"name": n, "kind": "text"} for n in ("Rack unit", "Serial", "Asset tag", "Warranty")]
+    assert proposal.lookalike(HOST_PROPS[:2], space) is None  # two shared are not enough
+    assert proposal.lookalike(HOST_PROPS[:4], space) is None  # 4 of Host's 15
+    assert proposal.lookalike(HOST_PROPS[:-4], space) is None  # 11 of 15: 73%
+    assert proposal.lookalike(HOST_PROPS, space).id == "host"
+    assert proposal.lookalike([*HOST_PROPS, *others[:3]], space).id == "host"  # 15 of 18: 83%
+    assert proposal.lookalike([*HOST_PROPS, *others], space) is None  # 15 of 19: 79%
+    squashed = [{**p, "name": {"IP address": "ip-address", "FQDN": "fqdn"}.get(p["name"], p["name"])} for p in HOST_PROPS]
+    assert proposal.lookalike(squashed, space).id == "host"  # by the squashed name
     # Never the Source type (its pages are made only by an import), nor the type left out.
-    assert proposal.lookalike([{"name": "Category"}, {"name": "System"}], space) is None
+    assert proposal.lookalike([{"name": "Category", "kind": "label"}, {"name": "System", "kind": "label"}], space) is None
     assert proposal.lookalike(HOST_PROPS, space, exclude="host") is None
 
 
 def test_category_name_refused(tmp_path) -> None:
+    """A tag name is refused; an option of Host's Category is refused on an item with two of Host's
+    specific properties, and is a note with the offer on one without (M31 fix pass)."""
     root = itops_space(tmp_path)
-    own = [{"name": "Hypervisor version", "kind": "text", "share": 1.0},
-           {"name": "Memory", "kind": "number", "share": 1.0}]
-    _batch, (vm, ws, ok) = _save(root, _create("VM", own), _create("Workstation", own, iid="g2"),
-                                 _create("Kiosk", own, iid="g3"))
+    like_host = [{"name": "IP address", "kind": "text", "share": 1.0}, {"name": "FQDN", "kind": "text", "share": 1.0},
+                 *OWN]
+    _batch, (vm, ws, ok, ws2) = _save(root, _create("VM", OWN), _create("Workstation", OWN, iid="g2"),
+                                      _create("Kiosk", OWN, iid="g3"), _create("Workstation", like_host, iid="g4"))
     assert vm["problems"] == ["VM is a category: a property value or a tag, not a type."]  # a seed tag
     assert "offer" not in vm
-    assert ws["problems"] == ["Workstation is a category: a property value or a tag, not a type."]
+    assert ws["problems"] == [] and ws["notes"] == ["Workstation is also one of Host's Category options."]
     assert ws["offer"] == {"label": "Use Host, with a category", "typeId": "host", "category": "Workstation"}
-    assert ok["problems"] == [] and "offer" not in ok
+    assert ws2["problems"] == ["Workstation is a category: a property value or a tag, not a type."]
+    assert ws2["offer"] == ws["offer"] and "notes" not in ws2
+    assert ok["problems"] == [] and "offer" not in ok and "notes" not in ok
 
 
 def test_only_category_kind_and_environment_options_are_categories(tmp_path) -> None:
     """Options of other labels (Host's Roles, Script's Language, Source's Category and System) don't
     make a name a category; Environment's do."""
     root = itops_space(tmp_path)
-    own = [{"name": "Hypervisor version", "kind": "text", "share": 1.0},
-           {"name": "Memory", "kind": "number", "share": 1.0}]
     names = ["DHCP", "Python", "Ticket", "Document", "Wiki", "Production", "Rack"]
-    _batch, items = _save(root, *(_create(n, own, iid=f"g{i}") for i, n in enumerate(names, 1)))
+    _batch, items = _save(root, *(_create(n, OWN, iid=f"g{i}") for i, n in enumerate(names, 1)))
     got = dict(zip(names, items, strict=True))
     for n in ("DHCP", "Python", "Ticket", "Document", "Wiki"):
-        assert got[n]["problems"] == [] and "offer" not in got[n], n
-    assert got["Production"]["problems"] == ["Production is a category: a property value or a tag, not a type."]
+        assert got[n]["problems"] == [] and "offer" not in got[n] and "notes" not in got[n], n
+    # M31 fix pass: with none of the holder's properties, a category name is a note and the offer.
+    assert got["Production"]["problems"] == []
+    assert got["Production"]["notes"] == ["Production is also one of Host's Environment options."]
     assert got["Production"]["offer"] == {"label": "Use Host, with a category", "typeId": "host", "category": "Production"}
-    assert got["Rack"]["problems"] == ["Rack is a category: a property value or a tag, not a type."]
+    assert got["Rack"]["notes"] == ["Rack is also one of Location's Kind options."]
     assert got["Rack"]["offer"]["typeId"] == "location"  # Location's Kind
     assert [pd.key for pd in proposal.category_labels(Space(root).type_by_id("host"))] == ["category", "environment"]
     assert proposal.category_labels(Space(root).type_by_id("source")) == []
@@ -183,7 +209,9 @@ def test_offer_of_an_existing_option_adds_nothing(tmp_path) -> None:
     assert "Production" not in _options(Space(root), "host", "category")
 
 
-def test_relations_outside_named_set_dropped(tmp_path) -> None:
+def test_relations_to_known_types_kept(tmp_path) -> None:
+    """M31 fix pass: in the schema proposal a relation to an existing type (or one proposed here) is
+    kept, named or not; one to a type that is neither stays a plain link."""
     root = itops_space(tmp_path)
     named = proposal.named_relations(Space(root))
     assert {"runs on", "runs", "uses", "used by", "sources", "distilled into"} <= named
@@ -191,25 +219,27 @@ def test_relations_outside_named_set_dropped(tmp_path) -> None:
             "documents": 10, "properties": [
                 {"name": "Runs on", "kind": "entity", "target": "Host", "share": 1.0},
                 {"name": "Backs up", "kind": "entity", "target": "Host", "share": 1.0},
+                {"name": "Feeds", "kind": "entity", "target": "Pipeline", "share": 1.0},
                 {"name": "Vendor contact", "kind": "text", "share": 1.0}]}  # fmt: skip
     _batch, (ext,) = _save(root, item)
-    assert [p["name"] for p in ext["properties"]] == ["Runs on", "Vendor contact"]
-    assert ext["dropped"] == [{"key": "backs-up", "name": "Backs up",
-                               "reason": "Not one of the named relations; it stays a plain link."}]
+    assert [p["name"] for p in ext["properties"]] == ["Runs on", "Backs up", "Vendor contact"]
+    assert ext["dropped"] == [{"key": "feeds", "name": "Feeds",
+                               "reason": "It points at Pipeline, which is neither a type in this space nor one "
+                                         "proposed here; it stays a plain link."}]
     assert ext["problems"] == []
 
 
 def test_rules_in_every_space(tmp_path) -> None:
     """M31: ``space-sample`` has no setup and none of the IT ops types; the rules hold all the same.
     Server already exists (M27's advice stands, nothing looks like it); Box has Host's properties but
-    there is no Host here, so it passes; a relation outside the named set (Owner) stays a plain link."""
+    there is no Host here, so it passes (its relations to types this space lacks stay plain links); a
+    relation to an existing type (Owner) is kept, one to a type that is neither (Backs up) is not."""
     root = _sample(tmp_path)
     assert spaceconfig.read(root)[0].get("setup") is None
-    own = [{"name": "Hypervisor version", "kind": "text", "share": 1.0},
-           {"name": "Memory", "kind": "number", "share": 1.0}]
+    own = OWN
     rel = {"id": "g6", "action": "extend", "group": "Projects", "name": "Project", "documents": 10, "properties": [
         {"name": "Owner", "kind": "entity", "target": "Project", "share": 1.0},
-        {"name": "Backs up", "kind": "entity", "target": "Project", "share": 1.0}]}
+        {"name": "Backs up", "kind": "entity", "target": "Vault", "share": 1.0}]}
     _batch, items = _save(root, _create("Server"), _create("Box", iid="g2"), _create("VM", own, iid="g3"),
                           _create("Docs", own, iid="g4"), _create("Kiosk", iid="g5"), rel)
     server, box, vm, docs, kiosk, ext = items
@@ -217,7 +247,8 @@ def test_rules_in_every_space(tmp_path) -> None:
     assert box["problems"] == vm["problems"] == kiosk["problems"] == ext["problems"] == []
     assert docs["problems"] == ["Docs is a category: a property value or a tag, not a type."]  # the sample's tag
     assert not any("offer" in it for it in items)
-    assert [p["name"] for p in box["properties"]] == ["IP address", "FQDN", "Operating system", "Environment"]
+    assert [p["name"] for p in box["properties"]] == [p["name"] for p in HOST_PROPS
+                                                       if p.get("target") in (None, "Person")]
     assert [p["name"] for p in ext["properties"]] == ["Owner"]
     assert [d["name"] for d in ext["dropped"]] == ["Backs up"]
 

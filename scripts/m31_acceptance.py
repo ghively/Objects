@@ -26,16 +26,18 @@ with no back-end behaviour are Gene's hand checks in ``m31-acceptance.md``):
     two steps: ``POST /api/rows`` with the query's scope, then `queryeval.run_query`), in its
     order, an object excluded from AI aside;
  3. the import conventions in a space not set up as IT operations (``space-sample``, no setup):
-    a type with Server's properties is refused with the offer "Use Server, with a category", a
-    tag name is a category, a relation outside the named set stays a plain link; and an
+    a type with Project's properties is refused with the offer "Use Project, with a category" while
+    one with two properties named like Server's is not (the M31 fix pass's tuning), a tag name is a
+    category, a relation to a type that is neither in the space nor proposed stays a plain link; and an
     Incident (a new IT ops space's, and the type gallery's) has one Resolved;
  4. an import from a synthetic git repository: each object's ``importSource`` has the commit,
     the GitHub link at that commit, the last commit's author and date; a changed and an
     untracked file are ``uncommitted`` and in the report's Git section; the repository is
     unchanged;
  5. remodel: importing the open space's own folder (``space-itops``) into a new space keeps its
-    types and objects (each at its path, its type and links kept); the original space is byte
-    for byte the same;
+    types (every one, those with no object included, with their plurals, icons, colours,
+    properties and options) and objects (each at its path, its type and links kept); the original
+    space is byte for byte the same;
  9. definition history: a collection, a saved query and a type, each edited and restored
     through ``POST /api/history/definition/restore``; a stale revision is 409 and writes
     nothing;
@@ -80,8 +82,12 @@ NO_TRANSFORMATIONS = (
     "to our feedback board including the types you need."
 )
 TABLE = "| Name | Qty |\n| --- | --- |\n| Apple | 3 |\n| Pear \\| green | 5 |"
-OFFER = "Use Server, with a category"
-LOOKALIKE = "It has the same properties as Server."
+OFFER = "Use Project, with a category"
+LOOKALIKE = "It has the same properties as Project."
+PROJECT_PROPS = [*({"name": n, "kind": k, "share": 1.0} for n, k in (
+    ("Budget", "number"), ("Progress", "number"), ("Done", "boolean"), ("Site", "url"), ("Time Frame", "datetime"),
+    ("Kickoff", "datetime"))), *({"name": n, "kind": "entity", "target": "Person", "share": 1.0} for n in ("Lead", "Members"))]
+"""Every specific property of space-sample's Project (by name and kind): a real look-alike."""
 AUTHOR = "Ada Example"
 DATE = "2026-10-01T09:30:00+00:00"
 REMOTE = "git@github.com:acme/ops-wiki.git"
@@ -458,13 +464,15 @@ def check_conventions(run: Run, tmp: Path) -> None:
         secret = token(served, "read-write")
         items = [
             {"id": "g1", "action": "create", "group": "Box", "name": "Box", "documents": 10,
+             "examples": ["Boxes/Box 1.md"], "properties": PROJECT_PROPS},
+            {"id": "g4", "action": "create", "group": "Rack", "name": "Rack", "documents": 10,
              "examples": ["Boxes/Box 1.md"], "properties": [{"name": "Cores", "kind": "number", "share": 1.0},
                                                             {"name": "Owner", "kind": "text", "share": 1.0}]},
             {"id": "g2", "action": "create", "group": "Docs", "name": "Docs", "documents": 10,
              "examples": ["Boxes/Box 1.md"], "properties": [{"name": "Memory", "kind": "number", "share": 1.0}]},
             {"id": "g3", "action": "extend", "group": "Servers", "name": "Server", "documents": 10,
              "properties": [{"name": "Owner", "kind": "entity", "target": "Person", "share": 1.0},
-                            {"name": "Backs up", "kind": "entity", "target": "Server", "share": 1.0}]},
+                            {"name": "Backs up", "kind": "entity", "target": "Vault", "share": 1.0}]},
         ]
         types_before = {k: v for k, v in tree(root).items() if k.startswith(".object/types/")}
         code, saved = bearer(served.base, secret, "POST", "/v1/import/proposal",
@@ -472,17 +480,20 @@ def check_conventions(run: Run, tmp: Path) -> None:
         run.report(code == 200, "the agent's proposal is saved over /api/v1", f"{code} {saved}")
         code, view = served.http("GET", f"/import/batches/{batch}/proposal")
         groups = {g["id"]: g for g in view["proposal"]["groups"]} if code == 200 else {}
-        box, docs, ext = (groups.get(k, {}) for k in ("g1", "g2", "g3"))
+        box, docs, ext, rack = (groups.get(k, {}) for k in ("g1", "g2", "g3", "g4"))
         offer = box.get("offer") or {}
         run.report(LOOKALIKE in (box.get("problems") or []) and offer.get("label") == OFFER
-                   and offer.get("typeId") == "server" and offer.get("category") == "Box",
-                   f'a new "Box" with Server\'s properties: "{LOOKALIKE}" and the offer "{OFFER}"',
+                   and offer.get("typeId") == "project" and offer.get("category") == "Box",
+                   f'a new "Box" with Project\'s properties: "{LOOKALIKE}" and the offer "{OFFER}"',
                    f"problems {box.get('problems')}; offer {offer}")
+        run.report(rack.get("problems") == [] and not rack.get("offer"),
+                   'a new "Rack" with two properties named like Server\'s (Cores, Owner) is not a look-alike',
+                   f"problems {rack.get('problems')}; offer {rack.get('offer')}")
         run.report("Docs is a category: a property value or a tag, not a type." in (docs.get("problems") or []),
                    'a tag name ("Docs") is a category, not a type', f"{docs.get('problems')}")
         dropped = [d.get("name") for d in ext.get("dropped") or []]
         run.report([p.get("name") for p in ext.get("properties") or []] == ["Owner"] and dropped == ["Backs up"],
-                   'a relation outside the named set ("Backs up") stays a plain link',
+                   'a relation to a type neither in the space nor proposed ("Backs up" to Vault) stays a plain link',
                    f"properties {[p.get('name') for p in ext.get('properties') or []]}; dropped {ext.get('dropped')}")
         types_after = {k: v for k, v in tree(root).items() if k.startswith(".object/types/")}
         run.report(types_after == types_before, "the proposal writes no type")
@@ -603,12 +614,23 @@ def check_remodel(run: Run, tmp: Path) -> None:
         served.stop()
     new = out / "IT ops remodel"
     new_types = {p.stem for p in (new / ".object" / "types").glob("*.json")}
-    missing_types = sorted(used - new_types)
-    unused = sorted(type_ids - used - new_types)
-    run.report({"host", "application", "incident", "location", "software"} <= new_types and not missing_types,
-               f"the new space has every type the space's objects use ({len(used)})", f"missing {missing_types}",
-               *([f"types with no object are not carried over (an import makes types from objects): {unused}"]
-                 if unused else []))
+    missing_types = sorted(type_ids - new_types)
+    empty = sorted(type_ids - used)
+    run.report({"command", "meeting", "project", "prompt", "script", "source"} <= set(empty) and not missing_types,
+               f"the new space has every type of the space ({len(type_ids)}), the {len(empty)} with no object "
+               "included", f"missing {missing_types}", f"with no object: {empty}")
+    changed = []
+    for tid in sorted(type_ids & new_types - {"page", "tag"}):
+        a = json.loads((root / ".object" / "types" / f"{tid}.json").read_text("utf-8"))
+        b = json.loads((new / ".object" / "types" / f"{tid}.json").read_text("utf-8"))
+        props = [(p.get("key"), p.get("name"), p.get("type"), [o.get("text") for o in (p.get("options") or {}).get("set") or []])
+                 for p in a.get("propertyDefinitions") or []]
+        got = [(p.get("key"), p.get("name"), p.get("type"), [o.get("text") for o in (p.get("options") or {}).get("set") or []])
+               for p in b.get("propertyDefinitions") or []]
+        if any(a.get(k) != b.get(k) for k in ("name", "pluralName", "icon", "color")) or got != props:
+            changed.append(tid)
+    run.report(not changed, "each carried type keeps its name, plural, icon, colour, properties and options",
+               *(f"differs: {t}" for t in changed))
     missing, wrong = [], []
     for rel, o in originals.items():
         f = new / rel

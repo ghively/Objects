@@ -42,10 +42,11 @@ back-end behaviour are hand checks only):
    order, as the app's own two steps (`POST /api/rows` with the query's scope, then `queryeval.run_query`), and the
    expected list; the page excluded from AI never shows.
 3. **Conventions in every space, and one Resolved.** In a copy of `space-sample` (no setup, none of the IT ops types)
-   a draft import batch and an agent's proposal over `/api/v1/import/proposal`: a new type "Box" with Server's
-   properties shows "It has the same properties as Server." and the offer "Use Server, with a category"; "Docs" (a tag
-   name) is "a category: a property value or a tag, not a type."; the relation "Backs up" stays a plain link; no type
-   file is written. A new space made with the IT ops setup has an Incident with one Resolved (`resolved`, a date and
+   a draft import batch and an agent's proposal over `/api/v1/import/proposal`: a new type "Box" with Project's
+   properties shows "It has the same properties as Project." and the offer "Use Project, with a category", while "Rack"
+   with two properties named like Server's (Cores, Owner) is no look-alike (the fix pass's tuning); "Docs" (a tag
+   name) is "a category: a property value or a tag, not a type."; the relation "Backs up" to Vault (neither in the space
+   nor proposed) stays a plain link; no type file is written. A new space made with the IT ops setup has an Incident with one Resolved (`resolved`, a date and
    time) and no `deskResolved`; the type gallery's Incident lists Resolved once.
 4. **Git provenance.** A synthetic repository (two commits by "Ada Example", an `origin` on GitHub never fetched, one
    file changed since the commit, one never committed); its `docs` folder imported into a new space. Each object's
@@ -54,9 +55,11 @@ back-end behaviour are hand checks only):
    untracked one with no commit and a `file:` link); the report's Git section names the commit and both files; the
    repository and its `git status` are unchanged.
 5. **Remodel.** With a copy of `space-itops` open, importing its own folder into a new space: the preview reads types
-   from each object's `type`; the new space has every type the space's objects use and each of the 16 objects at its
-   own path with its type, APP-TEST-01 still Located at `[[Rack A]]` and naming where it came from; the original space
-   is byte for byte the same.
+   from each object's `type`; the new space has every type of the space, those with no object included (in
+   `space-itops`: Command, Meeting, Project, Prompt, Script, Source), each with its plural, icon, colour, properties
+   and options as the space defines it (the new space's own Page and Tag, whose properties are fixed, stay as they
+   are; templates are not carried), and each of the 16 objects at its own path with its type, APP-TEST-01 still
+   Located at `[[Rack A]]` and naming where it came from; the original space is byte for byte the same.
 9. **Definition history** (a copy of `space-m8`). A collection (renamed), a saved query and a type (their descriptions
    edited): each edit keeps the earlier version; `POST /api/history/definition/restore` with the revision from before
    the edit is 409 with the current revision and writes nothing (no file change, no new version); with the current
@@ -88,11 +91,9 @@ first; `objectapp-mcp` through the `uv` shim where a script starts it):
 | M28 acceptance | `... scripts/m28_acceptance.py` | RESULT: PASS |
 | M25 acceptance (provenance and re-runs) | `cd backend && PYTHONPATH=../scripts:. ../.venv/bin/python ../scripts/m25_acceptance.py` | RESULT: PASS |
 
-No check failed because of a product bug. One thing the run shows, for Gene: a remodel makes the types the space's
-objects use; a type with no objects (in `space-itops`: Command, Meeting, Project, Prompt, Script, Source) is not
-carried into the new space, since the import makes types from the objects it reads. The script says so in a note under
-check 5. Adding them by hand afterwards (the type gallery) works; carrying empty types over would be a change to the
-import.
+No check failed because of a product bug. The fix pass changed one thing check 5 shows: a remodel used to make only
+the types the space's objects use, so a type with no objects was not carried over; it now carries every type of the
+space from its `.object/types`, empty ones included, and the check lists them in a note.
 
 The full back-end and front-end suites, `tsc`, lint and the build run in the gate after the review.
 
@@ -125,7 +126,7 @@ On a copy of a space (synthetic pages only), in the app:
 **Remodel this space (item 5)**
 
 - [ ] Settings > Import Content > "Remodel this space…" opens the import dialog with this space's folder as the source and "A new space" as the only target (named "<space> (remodelled)"), and the note that the space is only read.
-- [ ] After the import the new space has your objects in their types and folders, with their links; the original space is unchanged.
+- [ ] After the import the new space has your objects in their types and folders, with their links, and every type of your space (one with no objects too) with its icon, colour and properties; the original space is unchanged.
 
 **Explore panel (item 6)**
 

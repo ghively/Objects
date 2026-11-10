@@ -79,3 +79,20 @@ in, marked "(M31)". Each item has tests that fail first; one commit per item.
 
 Then one whole-milestone review, one fix pass, the full gate (both suites, `tsc`, lint, build, the 56-run
 acceptance sweep) and `scripts/m31_acceptance.py` with `m31-acceptance.md` (Gene's hand checks).
+
+## Our calls
+
+- **Fix pass, lane A: the import conventions tuned** (Gene's rule 1 stays: the conventions apply in every space).
+  Applied everywhere, the look-alike rule refused ordinary types on a fresh `basic` space ([Notes, Type] and [Genre,
+  Rating] were "the same properties as Book", [Status, Notes] and [Status, Location] "as Project"). Now types are
+  compared on their **specific** properties: the system properties and Notes, Type, Status, Cover image and Sources
+  (`proposal.COMMON_PROPERTIES`) are left out, and a property counts as shared only with the same name (case, spacing
+  and punctuation aside) and the same kind. A look-alike shares **at least 3** specific properties, and those are
+  **80% or more of both types' specific properties together** (the union, not the new type's own list). In the schema
+  proposal a relation whose target is an existing type, or a type proposed in the same proposal, is kept (a Notion-style
+  "Author" to a proposed Writer); only a relation to neither stays a plain link ("It points at Vault, which is neither a
+  type in this space nor one proposed here; it stays a plain link."); the named set stays the rule for the entities'
+  relations (M30). A proposed name that is an option of a Category, Kind or Environment label is refused only when the
+  item also shares 2 specific properties with the type holding it; otherwise it gets a note ("Workstation is also one
+  of Host's Category options.") and the offer "Use <type>, with a category", and Apply is not blocked. A tag name is
+  still refused.
