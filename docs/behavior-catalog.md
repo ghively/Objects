@@ -76,6 +76,16 @@ Object has no accounts.
   Bulk import "Start importing" (upload files, review mappings).
 - Full Export: Automated Full Exports (desktop app only); Manual Full Export with Spaces (All Spaces) and
   options Include media, Links as wikilinks (`[[title]]`), Add the title as a top heading; "Export All Spaces".
+  Built (M31; `fullexport.py`, `api_fullexport.py`, `settings/sections/FullExport.tsx`, after Import Content): Spaces
+  (This space | All Spaces), the three options, a Folder (a full path outside every space), "Export" and "Export All
+  Spaces" run in the background with "Exporting… n of m files" and "Exported n objects and m media files to <folder>";
+  Automated Full Exports (a switch, How often Daily | Weekly, Last export, Next export, and why a run is skipped: the
+  folder unset, missing or inside a space) use the same spaces, options and folder, checked every minute from server
+  start, last run kept in the state dir (`full-export.json`), never two exports at once. Each run writes a new folder
+  `Object export <space> <YYYY-MM-DD HHMM>` (`All Spaces` for every space) holding one folder per space, each object at
+  its own path with the single-object Markdown export's bytes; with Include media every attachment, referenced file and
+  whiteboard sidecar. Our calls: `.object/`, caches, the trash and templates are left out; objects excluded from AI are
+  exported; nothing is written in any space; the catalog's "(desktop app only)" doesn't apply (Object always runs here).
 
 **Space**
 - Space Settings: Icon, Name, Description, Delete space.
