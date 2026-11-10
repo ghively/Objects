@@ -164,7 +164,7 @@ AI features need the [Claude Code](https://docs.claude.com/en/docs/claude-code/o
 
 Object has a local API for programs on the same computer, and an MCP server on top of it, so an assistant such as Claude Code or Claude Desktop can search, query and read your notes, and (with a read-write token) make careful edits.
 
-1. Start Object, then open **Settings > Integrations** and create a token. Pick "Read only" unless the assistant should change notes. The token is shown once.
+1. Start Object, then open **Settings > Integrations** and create a token. Pick "Read only" unless the assistant should change notes, or "Synced facts only" for an inventory script or agent that only fills synced properties (it reads like "Read only" and can write nothing else). The token is shown once.
 2. Copy the MCP config shown there into your client (Claude Code: `.mcp.json`; Claude Desktop: `claude_desktop_config.json`). It runs:
 
 ```sh
@@ -176,6 +176,7 @@ Object must be running: the MCP server talks to it over `http://127.0.0.1:8790/a
 - Tokens are stored as hashes in the app's state folder, never in the space.
 - Objects tagged "Exclude from AI", or with `excludeFromAI: true`, are invisible to every token.
 - Writes made through a token are listed by `GET /api/v1/changes`.
+- Synced properties (read-only in Object, such as a Host's Last boot or Disk free) are filled by `POST /api/v1/synced/{type}` or the MCP tool `sync_facts`, with a read-write or "Synced facts only" token; their values are kept in `.object/synced/`, never in the notes' files.
 - The routes are documented in `backend/objectapp/api_v1.py`.
 
 ## How it works

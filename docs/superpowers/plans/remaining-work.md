@@ -99,6 +99,21 @@ The history below is in the order it was written: the per-milestone sections new
 
 ### Done on 2026-11-10
 
+- **M29 built: synced facts and the suggested type** (T1-T11 on parallel lanes by file ownership, merged up to
+  `8ca54c02`; T12, the settings for the synced mark, name patterns and the sync token, on its own lane; T13
+  integration). A property can be marked synced (text, URL, number, checkbox, date, label): its values come only
+  from `POST /api/v1/synced/{type}` (a `read-write` token or the new `sync` scope, "Synced facts only", which reads
+  like `read` and writes only synced facts) or the new MCP write tool `sync_facts` (69 tools for a read-write token),
+  matched by title, alias or a key property; they live in `.object/synced/<typeId>.json`, never in the `.md` (an
+  id-less object gets its `id` line once), are refused on every other write path (UI, API, automations, create with
+  values, work writes), and show read-only with "<source> · Refreshed <time ago>" and "Stale" after 7 days. The
+  starter Host has five synced facts (Last boot, Disk free, Patch state, Reboot pending, Last seen; "Inventory
+  script"); Host, Network and Software carry name patterns. Every create row offers a suggested type first
+  (context, then name patterns, then the last type per space): `[[` / `@` gain "New '<q>'" and "Other types",
+  relation pickers "Create '<q>'" per allowed type. Glob patterns use a linear state-set matcher, not a regex
+  (plan "Our calls" 21). Catalog §1, §10f. `scripts/m29_acceptance.py` PASS (nine checks); `m28` and `m22`
+  acceptance PASS. Next: T12's merge, the whole-milestone review, one fix pass and the full gate, then Gene's hand
+  checks (`m29-acceptance.md`).
 - **M28 gate (Linux, 2026-11-10, after one review and one fix pass):** back end 3644 passed, 19 skipped, 0 failed;
   front end 4146 passed, 1 skipped (the icon subset was regenerated for M28's new icon); `tsc`, lint and build clean;
   `m28_acceptance.py`, `m8`, `m22` and `m2` acceptance RESULT: PASS. The review found 11 issues (the worst: a type save
@@ -114,7 +129,7 @@ The history below is in the order it was written: the per-milestone sections new
   (read-only table column, a board refuses drops); the graph labels relation edges on the hovered node. Catalog §3,
   §4, §5, §7. `scripts/m28_acceptance.py` PASS (ten checks); `m8` and `m22` acceptance PASS. Next: the
   whole-milestone review, one fix pass and the full gate, then Gene's hand checks (`m28-acceptance.md`).
-- **Next: M29** (synced facts and the type suggestion), then **M30** (entity extraction).
+- **Next: M30** (entity extraction), after M29's review and gate.
 
 ### Needs Gene
 
