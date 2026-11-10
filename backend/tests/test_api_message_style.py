@@ -61,7 +61,11 @@ DETAIL_KEYWORDS = {"detail", "message"}
 # Messages that must keep their exact text (the frontend compares against them). Each entry
 # names the file that compares; keep the list to those, so the style covers everything else.
 # None today: the 2026-11-08 sweep found no frontend comparison against a detail it changed.
-KEPT_FOR_FRONTEND: dict[str, str] = {}
+KEPT_FOR_FRONTEND: dict[str, str] = {
+    # M30 (design 5a): an imported Source's read-only reason, shown as a label on the object page
+    # ("Imported source"), so it stays a label, not a sentence.
+    "Imported source": "importers/sources.py SOURCE_READ_ONLY",
+}
 
 
 def _is_text(node: ast.AST) -> bool:

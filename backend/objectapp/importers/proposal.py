@@ -564,7 +564,7 @@ def save_review(space: Space, batch: str, items: list[dict[str, Any]]) -> dict[s
             if "useType" in edited:
                 use = edited.get("useType")
                 if not isinstance(use, str) or _find_type(space, use.strip()) is None:
-                    raise ProposalInvalid(f"There is no type named {use!r} in this space.")
+                    raise ProposalInvalid(f'There is no type named "{use}" in this space.')
                 if not isinstance(edited.get("category"), str) or not edited["category"].strip():
                     raise ProposalInvalid('"category" is the option to add to the type.')
             _check_item({**effective_item(base, {"status": "edited", "edited": edited}, space), "id": row["id"]}, 0, space,
