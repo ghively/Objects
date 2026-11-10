@@ -450,5 +450,5 @@ def test_run_saved_query(m8_space_dir: Path) -> None:
     body = res.json()
     assert body["query"] == {"id": "open-tasks", "name": "Open tasks"}
     assert body["rows"] and {r["type"] for r in body["rows"]} == {"task"}
-    assert body["unsupported"] == []
+    assert "unsupported" not in body and body["paused"] is False  # M31: every part applies
     assert c.post("/api/v1/queries/nope/run", headers=hdr, json={}).status_code == 404

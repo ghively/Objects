@@ -421,7 +421,7 @@ def test_saved_query_filters_resolve_ids_like_the_app(client: TestClient, space_
     assert w1.status_code == 201 and w2.status_code == 201, (w1.text, w2.text)
     a, b = w1.json()["path"], w2.json()["path"]
 
-    def run(name: str, element: dict) -> dict:
+    def run(name: str, element: dict) -> list[str]:
         group = {
             "type": "filterGroup",
             "operator": "and",
@@ -434,48 +434,39 @@ def test_saved_query_filters_resolve_ids_like_the_app(client: TestClient, space_
         res = c.post(f"/api/v1/queries/{q.json()['id']}/run", json={}, headers=h)
         assert res.status_code == 200, res.text
         out = res.json()
-        return {"titles": [x["title"] for x in out["rows"]], "unsupported": out["unsupported"]}
+        assert "unsupported" not in out  # M31: the app's own engine, every part applied
+        return sorted(x["title"] for x in out["rows"])
 
-    # A label filter stores the option id; the row carries the option text.
-    assert run("Done widgets", {"propertyId": "status", "option": "is", "referenceValue": "o2"}) == {
-        "titles": ["W2"],
-        "unsupported": [],
-    }
-    assert run("Done too", {"propertyId": "status", "option": "contains", "referenceValue": ["o2"]}) == {
-        "titles": ["W2"],
-        "unsupported": [],
-    }
-    assert run("Not done", {"propertyId": "status", "option": "notContains", "referenceValue": ["o2"]}) == {
-        "titles": ["W1"],
-        "unsupported": [],
-    }
+    # A label filter stores the option id; the row carries the option text. M31: "is" is not a
+    # label operator in the app (labels offer includes / does not include), so the app ignores
+    # that filter, and so does the API now.
+    assert run("Done widgets", {"propertyId": "status", "option": "is", "referenceValue": "o2"}) == ["W1", "W2"]
+    assert run("Done too", {"propertyId": "status", "option": "contains", "referenceValue": ["o2"]}) == ["W2"]
+    assert run("Not done", {"propertyId": "status", "option": "notContains", "referenceValue": ["o2"]}) == ["W1"]
     # A tag filter stores the Tag object's id; the row carries the tag's title.
     tag = c.post("/api/tags/ensure", json={"name": "Urgent"}).json()["path"]
     tag_id = c.get("/api/object", params={"path": tag}).json()["frontmatter"]["id"]
     ver = c.get("/api/object", params={"path": a}).json()["version"]
-    r = c.put("/api/object/properties", json={"path": a, "updates": {"tags": ["[[Urgent]]"]}, "baseVersion": ver})
+    # By name, as the app's tag picker writes it: the app's tag filter compares names (M31).
+    r = c.put("/api/object/properties", json={"path": a, "updates": {"tags": ["Urgent"]}, "baseVersion": ver})
     assert r.status_code == 200, r.text
-    assert run("Urgent widgets", {"propertyId": "tags", "option": "contains", "referenceValue": [tag_id]}) == {
-        "titles": ["W1"],
-        "unsupported": [],
-    }
+    assert run("Urgent widgets", {"propertyId": "tags", "option": "contains", "referenceValue": [tag_id]}) == ["W1"]
     # A relation filter stores the target object's id; the row carries the link.
     w1_id = c.get("/api/object", params={"path": a}).json()["frontmatter"]["id"]
     ver = c.get("/api/object", params={"path": b}).json()["version"]
     r = c.put("/api/object/properties", json={"path": b, "updates": {"owner": ["[[W1]]"]}, "baseVersion": ver})
     assert r.status_code == 200, r.text
-    assert run("Owned by W1", {"propertyId": "owner", "option": "contains", "referenceValue": [w1_id]}) == {
-        "titles": ["W2"],
-        "unsupported": [],
-    }
-    # An id that names nothing is reported, not silently matched against nothing.
-    assert run("Mystery", {"propertyId": "status", "option": "is", "referenceValue": "o9"}) == {
-        "titles": [],
-        "unsupported": ["status is o9"],
-    }
+    assert run("Owned by W1", {"propertyId": "owner", "option": "contains", "referenceValue": [w1_id]}) == ["W2"]
+    # An option id that names nothing matches nothing for includes and everything for does not
+    # include, the app's rule (its value is gone).
+    assert run("Mystery", {"propertyId": "status", "option": "contains", "referenceValue": ["o9"]}) == []
+    assert run("Not mystery", {"propertyId": "status", "option": "notContains", "referenceValue": ["o9"]}) == [
+        "W1",
+        "W2",
+    ]
     # The app's relative-date names are known.
     for rel in ("inOneWeek", "inOneMonth"):
         out = run(f"Before {rel}", {"propertyId": "createdAt", "option": "isBefore", "referenceValue": {"relative": rel}})
-        assert out == {"titles": ["W1", "W2"], "unsupported": []}, (rel, out)
+        assert out == ["W1", "W2"], (rel, out)
     out = run("After a month ago", {"propertyId": "createdAt", "option": "isAfter", "referenceValue": {"relative": "oneMonthAgo"}})
-    assert out == {"titles": ["W1", "W2"], "unsupported": []}
+    assert out == ["W1", "W2"]

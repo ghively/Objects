@@ -19,9 +19,13 @@ Routes (all JSON):
 - ``GET  /v1/whoami`` -> ``{name, scope, space}`` (the token's own name and scope)
 - ``GET  /v1/schema`` -> ``{types, collections, queries}``
 - ``GET  /v1/search?q=&type=&limit=&mode=`` -> ``{results, partial}``
-- ``POST /v1/query`` ``{typeIds?, collectionIds?, tags?, filterGroup?, sort?, limit?, offset?}``
-  -> ``{rows, total, unsupported}``
-- ``POST /v1/queries/{id}/run`` ``{limit?, offset?}`` -> same as ``/v1/query``
+- ``POST /v1/query`` ``{typeIds?, collectionIds?, tags?, filterGroup?, sort?, limit?, offset?,
+  search?, searchMode?, excludeTypeIds?, tagsOperator?, excludeTags?, inNoCollection?,
+  inAnyCollection?, excludeCollectionIds?}`` -> ``{rows, total, unsupported}`` (every part given
+  applies; ``unsupported`` names filter operators this engine doesn't know, which pass)
+- ``POST /v1/queries/{id}/run`` ``{limit?, offset?}`` -> ``{rows, total, paused, query}``: the
+  objects the saved query's page lists in the app, in its order (`queryeval`, M31); ``paused``
+  says a search term has paused its filters and sorts, as in the app
 - ``GET  /v1/object/peek?path=`` -> summary, values, outline, size, links, counterparts, version
 - ``GET  /v1/object?path=&section=`` -> values, body (or one section), counterparts, version
 - ``GET  /v1/object/backlinks?path=`` -> ``{backlinks}``
@@ -68,11 +72,12 @@ from .apiquery import (
     parse_since,
     read_section,
     replace_section,
-    resolve_saved_filters,
     sort_rows,
 )
 from .propvalues import InvalidValue
+from .queryeval import evaluate, row_collection_ids
 from .recurrence import week_start_of
+from .rows import check_search
 from .space import Conflict, ReadOnly
 from .synced import synced_props
 from .tokens import ActivityLog, TokenStore
@@ -145,6 +150,15 @@ class QueryRequest(BaseModel):
     sort: dict[str, Any] | None = None
     limit: int = 50
     offset: int = 0
+    # M31: the other parts a saved query has (the app's query builder), by the same names.
+    search: str | list[str] | None = None
+    searchMode: str = "auto"
+    excludeTypeIds: list[str] | None = None
+    tagsOperator: str = "or"
+    excludeTags: list[str] | None = None
+    inNoCollection: bool = False
+    inAnyCollection: bool = False
+    excludeCollectionIds: list[str] | None = None
 
 
 class RunQueryRequest(BaseModel):
@@ -347,31 +361,59 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             ]
         return {"results": results, "partial": found.get("partial", False)}
 
-    def run_query(
-        type_ids: list[str] | None,
-        collection_ids: list[str] | None,
-        tags: list[str] | None,
-        group: dict | None,
-        sort: dict | None,
-        limit: int,
-        offset: int,
-    ) -> dict[str, Any]:
-        limit = max(1, min(int(limit), MAX_ROWS))
-        offset = max(0, int(offset))
-        ids = None
-        if type_ids:
-            ids = []
-            for name in type_ids:
-                t = resolve_type(name)
-                if t is None:
-                    raise InvalidValue(f'There is no object type "{name}".')
-                ids.append(t.id)
-        rows = space.rows(ids, collection_ids or None, None, None, False)
+    def type_ids_of(names: list[str] | None) -> list[str] | None:
+        if not names:
+            return None
+        ids = []
+        for name in names:
+            t = resolve_type(name)
+            if t is None:
+                raise InvalidValue(f'There is no object type "{name}".')
+            ids.append(t.id)
+        return ids
+
+    def run_query(req: QueryRequest) -> dict[str, Any]:
+        """An ad-hoc query: every part given applies (M31 adds a saved query's other parts: search
+        terms with their mode, excluded types, all-of and left-out tags, the collection rules)."""
+        limit = max(1, min(int(req.limit), MAX_ROWS))
+        offset = max(0, int(req.offset))
+        ids = type_ids_of(req.typeIds)
+        excluded = set(type_ids_of(req.excludeTypeIds) or [])
+        if req.tagsOperator not in ("or", "and"):
+            raise InvalidValue('The field "tagsOperator" must be or or and.')
+        terms = [req.search] if isinstance(req.search, str) else list(req.search or [])
+        search = (check_search(terms, req.searchMode), req.searchMode) if terms else None
+        rows = space.rows(ids, req.collectionIds or None, None, search, False)
         hidden = hidden_paths()
-        rows = [x for x in rows if x.summary.path not in hidden]
-        if tags:
-            want = {t.casefold() for t in tags}
-            rows = [x for x in rows if want & {t.casefold() for t in x.summary.tags}]
+        rows = [x for x in rows if x.summary.path not in hidden and x.summary.type not in excluded]
+
+        def tag_names(x) -> set[str]:
+            return {t.casefold() for t in x.summary.tags}
+
+        if req.tags:
+            want = {t.casefold() for t in req.tags}
+            every = req.tagsOperator == "and"
+            rows = [x for x in rows if (want <= tag_names(x) if every else want & tag_names(x))]
+        if req.excludeTags:
+            out = {t.casefold() for t in req.excludeTags}
+            rows = [x for x in rows if not out & tag_names(x)]
+        if req.inNoCollection or req.inAnyCollection or req.excludeCollectionIds:
+            collections = [
+                {"id": c.id, "name": c.name, "formerNames": list(c.formerNames)}
+                for c in space.list_collections()
+            ]
+            left_out = set(req.excludeCollectionIds or [])
+
+            def passes(x) -> bool:
+                have = row_collection_ids({"summary": {"collections": x.summary.collections}}, collections)
+                if req.inNoCollection and have:
+                    return False
+                if req.inAnyCollection and not have:
+                    return False
+                return not left_out & set(have)
+
+            rows = [x for x in rows if passes(x)]
+        group, sort = req.filterGroup, req.sort
         matcher = Matcher(group, space.clock().astimezone(space.tz).date(), week_start_of(space.root))
         rows = [x for x in rows if matcher.matches(x.values)]
         if sort and isinstance(sort.get("propertyId"), str):
@@ -393,10 +435,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
     def query(req: QueryRequest, request: Request):
         auth(request)
         try:
-            out = run_query(
-                req.typeIds, req.collectionIds, req.tags, req.filterGroup, req.sort,
-                req.limit, req.offset,
-            )
+            out = run_query(req)
         except InvalidValue as exc:
             return _error(422, str(exc))
         return SafeJSONResponse(json.loads(json.dumps(out, default=str)))
@@ -409,51 +448,26 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         q = next((x for x in space.list_queries() if x.id == query_id), None)
         if q is None:
             return _error(404, f'There is no query "{query_id}".')
-        d = q.definition or {}
-        type_entries = [s for s in d.get("types") or [] if isinstance(s, dict)]
-        type_ids = [s["id"] for s in type_entries if isinstance(s.get("id"), str)] or None
-        collection_ids = sorted(
-            {c for s in type_entries for c in s.get("collectionIds") or [] if isinstance(c, str)}
-        ) or None
-        sorts = [s for s in d.get("sorts") or [] if isinstance(s, dict)]
-        sort = (
-            {"propertyId": sorts[0].get("propertyId"),
-             "descending": str(sorts[0].get("option", "")).startswith("descending")}
-            if sorts else None
-        )
-        # The app stores a label filter's option id, a tag filter's Tag object id and a
-        # relation filter's object id; the rows carry texts, so resolve them first as the
-        # app's engine does (sweep 2026-11-08).
-        types = [t for t in (space.type_by_id(i) for i in type_ids or []) if t is not None] or list(
-            space.types
-        )
-        summaries = space.list()
-        group, unresolved = resolve_saved_filters(
-            d.get("filterGroup"),
-            types,
-            {s.id: s.title for s in summaries if s.id and s.type == "tag"},
-            {s.id: s.path for s in summaries if s.id},
-        )
+        # M31: the app's own evaluation (`queryeval`, a port of `queries/runQuery.ts`): every
+        # part of the query applies, and the rows come in the order the query page lists them.
         try:
-            out = run_query(type_ids, collection_ids, None, group, sort, req.limit, req.offset)
+            run = evaluate(space, q.definition or {})
         except InvalidValue as exc:
             return _error(422, str(exc))
-        # Parts of a saved query this engine doesn't apply yet; the app's own view does.
-        skipped = [
-            key
-            for key, present in (
-                ("search", bool((d.get("search") or {}).get("searchTerms"))),
-                ("tags", bool((d.get("tags") or {}).get("ids"))),
-                ("excludeTypeIds", bool(d.get("excludeTypeIds"))),
-                ("typeCollectionRules", any(
-                    s.get("inNoCollection") or s.get("inAnyCollection") or s.get("excludeCollectionIds")
-                    for s in type_entries
-                )),
-            )
-            if present
-        ]
-        out["unsupported"] = sorted({*out["unsupported"], *skipped, *unresolved})
-        out["query"] = {"id": q.id, "name": q.name}
+        hidden = hidden_paths()
+        rows = [x for x in run.rows if x.summary.path not in hidden]
+        limit = max(1, min(int(req.limit), MAX_ROWS))
+        offset = max(0, int(req.offset))
+        out = {
+            "rows": [
+                {**summary_out(x.summary), "version": x.version,
+                 "values": without_hidden(x.values, hidden), **synced_at(x)}
+                for x in rows[offset : offset + limit]
+            ],
+            "total": len(rows),
+            "paused": run.paused,
+            "query": {"id": q.id, "name": q.name},
+        }
         return SafeJSONResponse(json.loads(json.dumps(out, default=str)))
 
     def read_visible(path: str):
