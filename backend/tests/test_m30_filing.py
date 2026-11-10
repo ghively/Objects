@@ -345,6 +345,38 @@ def test_batch_not_kept_as_sources_runs_as_m27(env: Env) -> None:
         e.fil.entities_view("no-such-batch")
 
 
+def test_rerun_not_kept_as_sources_leaves_its_sources_alone(env: Env) -> None:
+    """A re-run that asks for ``keepAsSources: false`` keeps the pages Sources (call 6), so its M27
+    pass may read none of them: none is eligible, the pass finishes, and no Source is written."""
+    e = env
+    _import(e, keep=True)
+    (e.src / "Hosts" / "APP01.md").write_bytes(b"APP01 is the Payroll server at HQ. IP address: 10.0.0.9.\n")
+    batch = _import(e, keep=False)
+    paths = _paths(e, batch)
+    assert {e.space.get(p).type for p in paths.values()} == {"source"}
+    before = {p: (e.root / p).read_bytes() for p in paths.values()}
+    assert e.fil.eligible(batch) == []
+
+    def edit(title: str, d: dict[str, Any]) -> None:
+        d.update(type="Host", tags=[{"value": "HQ", "quote": "at HQ"}])
+
+    _decide(e, batch, edit)
+    assert e.client.post(f"/api/import/batches/{batch}/filing/start", json={"trial": True}).status_code == 200
+    e.fil.join()
+    s = _wait(e, batch, {"trial", "failed", "done"})
+    assert s["state"] == "trial" and s["error"] is None, s
+    assert s["trial"]["items"] == []
+    assert {p: (e.root / p).read_bytes() for p in paths.values()} == before
+    assert not any(c.name == "Import inbox" for c in e.space.list_collections())
+    # M27's apply never writes a Source, even one it is handed
+    dec = {"path": paths["APP01"], "confidence": "high", "type": "Host",
+           "tags": [{"value": "HQ", "quote": "at HQ"}], "values": []}  # fmt: skip
+    res = filing.apply_decision(e.space, dec, allowed={paths["APP01"]}, type_names=None)
+    assert res["rejected"] is True and res["inbox"] is False
+    assert res["notes"] == [filing.SOURCE_NOT_FILED]
+    assert {p: (e.root / p).read_bytes() for p in paths.values()} == before
+
+
 # -- re-runs and the Trash -------------------------------------------------------------------------
 
 
