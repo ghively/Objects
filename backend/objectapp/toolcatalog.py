@@ -80,6 +80,8 @@ OBJECT_WRITE: tuple[str, ...] = (
     "update_floor_item",
     # M27
     "save_import_proposal", "save_import_decisions",
+    # M29
+    "sync_facts",
 )
 """The write tools of ``objectapp-mcp`` (short names)."""
 

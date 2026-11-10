@@ -12,7 +12,9 @@ Configuration (environment):
 
 ``--read-only`` (or a ``read`` token) registers only the read tools. A ``read-write``
 token gets the write tools too; each write needs the ``version`` the agent last read, so
-an edit made meanwhile in the app answers a conflict instead of being overwritten.
+an edit made meanwhile in the app answers a conflict instead of being overwritten. A ``sync``
+token (M29) gets the read tools and `sync_facts` only, which fills synced properties and never
+changes the objects' files.
 
 Example client config (Claude Code ``.mcp.json`` or Claude Desktop)::
 
@@ -64,7 +66,11 @@ an earlier version; nothing here deletes for good.
 A work item (a Task or Project with a `steps` property) is changed with the work tools:
 `step_action` and `edit_steps` check the step rules and log Activity; set_properties can't
 change steps. Read the item first: each step has an `id` and a `rev`, and a stale `rev` is
-refused with "This step changed. Look again.\""""
+refused with "This step changed. Look again."
+
+`sync_facts` fills a type's synced properties (read-only in the app, shown with their source)
+from an inventory or monitoring script's results, matched by title, alias or a key property;
+it never changes the objects' files."""
 
 
 class ApiError(ToolError):
@@ -148,9 +154,12 @@ WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHin
 REPLACE = ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False)
 
 
-def build_server(client: ObjectClient, write: bool = True) -> MCPServer:
-    """The MCP server with the read tools, and the write tools when `write`."""
+def build_server(client: ObjectClient, write: bool = True, sync: bool | None = None) -> MCPServer:
+    """The MCP server with the read tools, the write tools when `write`, and `sync_facts` when
+    `sync` (M29; None means `write`: a ``sync`` token gets it without the other write tools)."""
     server = MCPServer(name="object", instructions=INSTRUCTIONS)
+    if sync is None:
+        sync = write
 
     # -- read -----------------------------------------------------------------------
 
@@ -345,6 +354,15 @@ def build_server(client: ObjectClient, write: bool = True) -> MCPServer:
         """One work item in full: its steps (each with `id`, `rev` and the actions open to
         the user), lists, floor items, Activity, Work notes and `version`."""
         return client.get("/work/item", plain=True, path=path)
+
+    if sync:
+
+        @server.tool(annotations=WRITE)
+        def sync_facts(type: str, items: list[dict]) -> dict:
+            """Fill synced properties (read-only in Object) of objects of a type, matched by title, alias
+            or a key property: items = [{"match": {"by": "title"|"alias"|"key", "value": "...", "key"?: "fqdn"},
+            "values": {"lastBoot": "...", ...}}]. Never changes the objects' files."""
+            return client.post(f"/synced/{_seg(type)}", {"items": items})
 
     if not write:
         return server
@@ -721,14 +739,16 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(2)
     url = _check_url(args.url or os.environ.get("OBJECT_API_URL") or DEFAULT_URL)
     client = ObjectClient(url, token)
-    write = not args.read_only
+    write = sync = not args.read_only
     if write:
         try:
-            write = client.get("/whoami").get("scope") == "read-write"
+            scope = client.get("/whoami").get("scope")
+            write = scope == "read-write"
+            sync = scope in ("read-write", "sync")  # M29: a sync token gets `sync_facts` only
         except ApiError as exc:
             # The app may start after the agent: keep the write tools, each call reports.
             print(f"objectapp-mcp: {exc}", file=sys.stderr)
-    build_server(client, write=write).run(transport="stdio")
+    build_server(client, write=write, sync=sync).run(transport="stdio")
 
 
 if __name__ == "__main__":

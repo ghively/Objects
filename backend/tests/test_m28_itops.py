@@ -120,11 +120,14 @@ def test_host_properties():
     assert _own_keys(host) == [
         "category", "roles", "ipAddress", "fqdn", "department", "environment",
         "operatingSystem", "locatedAt", "network", "ownedBy", "sources", "notes",
+        # M29: the synced facts (test_m29_starter.py)
+        "lastBoot", "diskFree", "patchState", "rebootPending", "lastSeen",
     ]
     names = [p.name for p in _own(host)]
     assert names == [
         "Category", "Roles", "IP address", "FQDN", "Department", "Environment",
         "Operating system", "Located at", "Network", "Owned by", "Sources", "Notes",
+        "Last boot", "Disk free", "Patch state", "Reboot pending", "Last seen",
     ]
     category = host.prop("category")
     assert category.type == "label" and category.options["isArray"] is False
@@ -580,11 +583,20 @@ def _without_ids(data: dict) -> dict:
     return data
 
 
+def _without_m29(data: dict) -> dict:
+    """The starter's type JSON as M28 wrote it: M29's synced facts and name patterns left out."""
+    data = json.loads(json.dumps(data))
+    data.pop("namePatterns", None)
+    data["propertyDefinitions"] = [p for p in data["propertyDefinitions"] if "synced" not in p]
+    return data
+
+
 def test_fixture_types_match():
+    # The fixture is an M28-era space: M29 never tops its types up (M29 plan, "Our calls" 19).
     for t in itops_types():
         path = FIXTURE / ".object" / "types" / f"{t.id}.json"
         got = TypeDefinition.from_json(json.loads(path.read_text("utf-8")))
-        assert _without_ids(got.to_json()) == _without_ids(t.to_json()), t.id
+        assert _without_ids(got.to_json()) == _without_ids(_without_m29(t.to_json())), t.id
         if t.id != "source":
             assert got.templates["defaultTemplateId"] == got.templates["ids"][0]
 
