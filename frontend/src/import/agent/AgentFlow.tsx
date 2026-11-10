@@ -38,13 +38,27 @@ export function AgentFlow({ batch, onClose, initial = 'proposal' }: { batch: str
       )}
       {stage === 'entities' && <EntitiesStep batch={batch} onDone={toNormalise} />}
       {stage === 'normalise' && <NormaliseStep batch={batch} suggestions={merges} onDone={() => setStage('done')} />}
-      {stage === 'done' && <InboxStep onClose={onClose} />}
+      {stage === 'done' && <InboxStep batch={batch} onClose={onClose} />}
     </div>
   )
 }
 
-function InboxStep({ onClose }: { onClose: () => void }) {
+type InboxRow = NonNullable<FilingStatus['inbox']>[number]
+
+function InboxStep({ batch, onClose }: { batch: string; onClose: () => void }) {
   const [inbox, setInbox] = useState<{ id: string; count: number } | null | undefined>(undefined)
+  // This batch's rows and why each went there (from the filing status; none when it cannot say).
+  const [rows, setRows] = useState<InboxRow[]>([])
+  useEffect(() => {
+    let alive = true
+    api
+      .filingStatus(batch)
+      .then((s) => alive && setRows(Array.isArray(s?.inbox) ? s.inbox : []))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [batch])
   useEffect(() => {
     let alive = true
     void (async () => {
@@ -77,6 +91,13 @@ function InboxStep({ onClose }: { onClose: () => void }) {
         <p role="status" className="text-[14px]">
           {inbox && inbox.count > 0 ? T.inboxCount(inbox.count) : T.inboxEmpty}
         </p>
+      )}
+      {rows.length > 0 && (
+        <ul aria-label={T.doneHeading} className="flex flex-col gap-1 text-[13px] text-fg-muted">
+          {rows.map((r) => (
+            <li key={`${r.path}\n${r.reason}`}>{T.inboxReason(r.title, r.reason)}</li>
+          ))}
+        </ul>
       )}
       <div className="flex justify-end gap-2">
         <Button type="button" variant={inbox ? 'ghost' : 'default'} onClick={onClose}>

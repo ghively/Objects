@@ -3040,6 +3040,8 @@ export interface FilingStatus {
   normalise: FilingMergeSuggestion[]
   /** M30: the batch kept its pages as Sources (its pass ends in `entities`). */
   keepAsSources: boolean
+  /** M30 hands-on: the batch's Import inbox rows, each with why it went there (`[]` before any). */
+  inbox?: { path: string; title: string; reason: string; suggestedType: string | null }[]
 }
 
 // ---- M30 entity extraction and distillation (plan 2026-11-09-m30-entity-extraction.md) ----

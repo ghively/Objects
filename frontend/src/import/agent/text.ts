@@ -119,6 +119,8 @@ export const AGENT_TEXT = {
   doneHeading: 'Import inbox',
   inboxCount: (n: number) => `${pl(n, 'object', 'objects')} in the Import inbox for you to look at.`,
   inboxEmpty: 'The Import inbox is empty.',
+  // One of this batch's Import inbox rows and why it went there.
+  inboxReason: (title: string, reason: string) => `${title}: ${reason}`,
   openInbox: 'Open Import inbox',
   inboxName: 'Import inbox',
   close: 'Close',

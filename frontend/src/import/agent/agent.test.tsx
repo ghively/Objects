@@ -326,6 +326,19 @@ describe('AgentFlow finish', () => {
     expect(open).toHaveBeenCalledWith({ kind: 'collection', id: 'inbox' })
   })
 
+  test("the finish lists each of the batch's Import inbox rows with its reason (M30 hands-on)", async () => {
+    m.collections.mockResolvedValue([{ id: 'inbox', name: 'Import inbox' } as never])
+    m.rows.mockResolvedValue([{}] as never)
+    const reason = 'Link not written (low confidence): "runs on" APP01'
+    m.filingStatus.mockResolvedValue({
+      ...trialStatus({ state: 'done' }),
+      inbox: [{ path: 'Sources/Runbook.md', title: 'Runbook', reason, suggestedType: null }],
+    })
+    render(<AgentFlow batch="b7" initial="done" onClose={vi.fn()} />)
+    expect(await screen.findByText(T.inboxReason('Runbook', reason))).toBeInTheDocument()
+    expect(m.filingStatus).toHaveBeenCalledWith('b7')
+  })
+
   test('walks proposal, trial, normalise, done', async () => {
     m.importProposal.mockResolvedValue({ proposal: { groups: [PROPOSAL.groups[1]] }, review: { items: [{ id: 'g2', status: 'accepted' }] } })
     m.applyProposal.mockResolvedValue({ created: [], extended: [] })
