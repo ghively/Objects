@@ -9,7 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
-import { api } from '@/api/client'
+import { api, ApiError } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { BASIC_TYPE_INFO } from '@/properties/AddPropertyMenu'
 import { TypeSettings } from './TypeSettings'
@@ -121,6 +121,17 @@ describe('TypeSettings', () => {
     expect(screen.getByRole('textbox', { name: 'Description' })).toBeDisabled()
     expect(screen.getByRole('combobox', { name: 'Font' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Delete object type' })).toBeDisabled()
+  })
+
+  test('a failed name-pattern save shows its error once (M29 review #10)', async () => {
+    const user = userEvent.setup()
+    const detail = 'A type can have at most 20 name patterns.'
+    mocked.saveType.mockRejectedValueOnce(new ApiError(422, detail))
+    render(<TypeSettings typeId="project" />)
+    await user.type(screen.getByRole('textbox', { name: 'Name patterns' }), 'SRV-*')
+    await user.tab()
+    await waitFor(() => expect(screen.getAllByText(detail)).toHaveLength(1))
+    expect(screen.getAllByRole('alert').filter((a) => a.textContent === detail)).toHaveLength(1)
   })
 
   test('layout settings save at once', async () => {

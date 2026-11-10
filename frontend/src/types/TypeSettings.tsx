@@ -504,7 +504,8 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
           </Section>
 
           <Section title={NAME_PATTERNS_TEXT.title}>
-            <NamePatternsSection type={type} editor={editor} />
+            {/* The page shows editor.error above, so the section doesn't repeat it. */}
+            <NamePatternsSection type={type} editor={editor} disabled={readOnly} showError={false} />
           </Section>
 
           <Section title={WORK_FIELDS_TEXT.heading}>
