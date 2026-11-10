@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ObjectDetail } from '@/api/types'
 import { ReviewedButton } from '@/calendar/DayHeader'
 import { useCalendar } from '@/calendar/useCalendar'
+import { CollectionPeek } from '@/collections/CollectionPeek'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Icon } from '@/components/Icon'
 import { stemOf, summaryOf, typeOf, useLinkIndex } from '@/links/linkIndex'
@@ -99,7 +100,11 @@ function Pager() {
   )
 }
 
-/** The object "peek": a large modal over the current page, with a pager through the list it came from. */
+/**
+ * The object "peek": a large modal over the current page, with a pager through the list it came from.
+ * M31: the collection peek (`CollectionPeek`) is mounted here beside it, so an object opened from a
+ * collection's peek shows over it.
+ */
 export function ObjectPeek() {
   const path = usePeek((s) => s.path)
   const close = usePeek((s) => s.close)
@@ -113,50 +118,53 @@ export function ObjectPeek() {
   const [note, setNote] = useState<DailyNote | null>(null)
 
   return (
-    <Dialog open={path !== null} onOpenChange={(open) => !open && close()}>
-      <DialogContent
-        showCloseButton={false}
-        className="flex h-[min(850px,calc(100vh-48px))] w-[min(1240px,calc(100vw-48px))] max-w-none gap-0 overflow-hidden rounded-2xl border-line bg-panel p-0 sm:max-w-none"
-      >
-        <DialogTitle className="sr-only">{title}</DialogTitle>
-        <DialogDescription className="sr-only">Object preview</DialogDescription>
-        {path &&
-          (whiteboard ? (
-            <WhiteboardPageLazy
-              key={path}
+    <>
+      <CollectionPeek />
+      <Dialog open={path !== null} onOpenChange={(open) => !open && close()}>
+        <DialogContent
+          showCloseButton={false}
+          className="flex h-[min(850px,calc(100vh-48px))] w-[min(1240px,calc(100vw-48px))] max-w-none gap-0 overflow-hidden rounded-2xl border-line bg-panel p-0 sm:max-w-none"
+        >
+          <DialogTitle className="sr-only">{title}</DialogTitle>
+          <DialogDescription className="sr-only">Object preview</DialogDescription>
+          {path &&
+            (whiteboard ? (
+              <WhiteboardPageLazy
+                key={path}
+                path={path}
+                mode="peek"
+                onExpand={() => {
+                  useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
+                  close()
+                }}
+                onDismiss={close}
+                footer={<Pager />}
+              />
+            ) : (
+              <ObjectView
+                key={path}
+                path={path}
+                mode="peek"
+                onVersion={(v) => setVersion({ path, version: v })}
+                onDetail={(d) => setNote(dailyNoteOf(d))}
+                onExpand={() => {
+                  useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
+                  close()
+                }}
+                onDismiss={close}
+                footer={<Pager />}
+              />
+            ))}
+          {path && dailyNote && !whiteboard && (
+            <DailyNoteControls
               path={path}
-              mode="peek"
-              onExpand={() => {
-                useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
-                close()
-              }}
+              note={note?.path === path ? note : null}
+              version={version?.path === path ? version.version : undefined}
               onDismiss={close}
-              footer={<Pager />}
             />
-          ) : (
-            <ObjectView
-              key={path}
-              path={path}
-              mode="peek"
-              onVersion={(v) => setVersion({ path, version: v })}
-              onDetail={(d) => setNote(dailyNoteOf(d))}
-              onExpand={() => {
-                useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
-                close()
-              }}
-              onDismiss={close}
-              footer={<Pager />}
-            />
-          ))}
-        {path && dailyNote && !whiteboard && (
-          <DailyNoteControls
-            path={path}
-            note={note?.path === path ? note : null}
-            version={version?.path === path ? version.version : undefined}
-            onDismiss={close}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

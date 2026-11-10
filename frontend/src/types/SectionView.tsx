@@ -3,13 +3,13 @@
 // Used for Overview sections and, full width, for the section header tabs. Filters, sorts and
 // grouping are session-only; only the view definition (layout, table and card settings) is saved
 // with the section, through `onViewDefinition`.
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { Collection, DataViewDefinition, Layout, Query, Row, TypeDef, ViewState } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useRecent } from '@/nav/recent'
-import { useTabs } from '@/nav/tabs'
+import { useCollectionPeek, useTabs } from '@/nav/tabs'
 import { DataView, type Pipeline } from '@/views/DataView'
 import { applyFilters } from '@/views/filter'
 import { FULL_VIEW_LAYOUTS, defaultViewState, emptyFilterGroup } from '@/views/model'
@@ -134,7 +134,7 @@ function DefinitionCard({
   fallback: string
   name: string
   description?: string
-  onClick(): void
+  onClick(e: MouseEvent): void
 }) {
   return (
     <button
@@ -250,7 +250,17 @@ export function SectionView({ type, section, search, heading, onCreateCollection
                   fallback={COLLECTION_ICON}
                   name={c.name}
                   description={c.description}
-                  onClick={() => open({ kind: 'collection', id: c.id })}
+                  onClick={(e) =>
+                    // M31: a collection opens in a peek that steps through the type's collections;
+                    // Ctrl or Cmd opens its page in a new tab.
+                    e.ctrlKey || e.metaKey
+                      ? useTabs.getState().open({ kind: 'collection', id: c.id }, { newTab: true })
+                      : useCollectionPeek.getState().peek(
+                          c.id,
+                          mine.map((x) => x.id),
+                          type.id,
+                        )
+                  }
                 />
               ))}
             </CardGrid>

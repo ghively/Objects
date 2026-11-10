@@ -356,6 +356,12 @@ Each starter template pre-fills the new type's properties.
 - **Explore** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
   (objects related to the page you are on) with "Find More". Toggled with Ctrl+Shift+Right; the tooltip reads
   "Hide sidepanel".
+- **Explore panel, as built** (M31): an empty side-panel entry (Ctrl+Shift+Right with nothing open, "New Sidepanel
+  Tab") shows the tabs "Explore" (first) and "Relevant Content". Explore: the cards "AI Chat" (hidden with "Hide AI
+  features") and "Search" (the Search page, in the entry), then Graph View and Backlinks as small buttons (Object's
+  own: kept so neither is lost). Relevant Content: up to 20 objects related to the main view's object (the same
+  list as the AI chat's), and "Find More" (the search palette); "Open a page to see content related to it." when the
+  main view shows no object.
 - **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback. Object's own
   section is local only: Keyboard shortcuts, Getting started, Markdown reference and **How-to guides** (Gene's
   decision D1). How-to guides opens a read-only list (People, Meetings, Projects, Books — one per basic-setup type —
@@ -465,6 +471,12 @@ Each starter template pre-fills the new type's properties.
 - **Collection page**: opens in a peek: collection icon + name, the full view toolbar (count, Filter, Sort,
   Group, layout, Customize), search, `...`, a split New button, expand; under the header a chip of the parent
   type ("Projects"); the cards; a "+ New object" row; a stepper through the type's collections ("1 / 3").
+- **Collection peek, as built** (M31): a click on a collection tile in a type's Overview opens the peek (Ctrl or Cmd
+  opens the page in a new tab); the sidebar, pins, a type tab's "Open" and links still open the page. The peek shows
+  the collection's All view (its saved layout; the header's toolbar changes it as on the page) with the header icon,
+  name, view toolbar, "Search title...", `...` (the page's menu, plus "Add existing"), New (split when the type has
+  templates) and "Open as page" (expand: the tab page); the type chip opens the type's page. "+ New object" opens the
+  new object in the object peek over the collection's. The peek closes when the main view goes elsewhere.
 - **Outline popover** (hover the dash column at the right edge, in a peek or full page): tabs "Outline" and
   "Stats" and a pin button. Outline lists headings indented by level with an active marker on the left; click
   scrolls. Stats: Words, Sentences, Paragraphs, Characters, Created At, Last Updated.
