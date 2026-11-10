@@ -139,28 +139,32 @@ _NOT_A_TABLE = (
 )
 
 
+# A cell that reads as a separator cell (``---``, ``:-:``): written with a leading ``\``.
+_SEP_CELL_RE = re.compile(r"^:?-+:?$")
+# GFM backslash escapes: a ``\`` before ASCII punctuation shows that character.
+_ESCAPED_PUNCT_RE = re.compile(r"\\([!-/:-@\[-`{-~])")
+
+
+def _unescape_cell(raw: str) -> str:
+    """A cell's text as GFM shows it: ``\\|`` is ``|``, then ``\\`` before punctuation drops."""
+    return _ESCAPED_PUNCT_RE.sub(r"\1", raw.strip().replace("\\|", "|"))
+
+
 def _split_row(line: str) -> list[str]:
+    """A row's cells. As in GFM, a ``|`` right after a ``\\`` is part of the cell."""
     s = line.strip()
     if s.startswith("|"):
         s = s[1:]
     if s.endswith("|") and not s.endswith("\\|"):
         s = s[:-1]
     cells: list[str] = []
-    cur = ""
-    i = 0
-    while i < len(s):
-        if s[i] == "\\" and s[i + 1 : i + 2] == "|":
-            cur += "|"
-            i += 2
-            continue
-        if s[i] == "|":
-            cells.append(cur.strip())
-            cur = ""
-        else:
-            cur += s[i]
-        i += 1
-    cells.append(cur.strip())
-    return cells
+    start = 0
+    for i, ch in enumerate(s):
+        if ch == "|" and (i == 0 or s[i - 1] != "\\"):
+            cells.append(s[start:i])
+            start = i + 1
+    cells.append(s[start:])
+    return [_unescape_cell(c) for c in cells]
 
 
 def _table_lines(text: str) -> list[str]:
@@ -168,28 +172,31 @@ def _table_lines(text: str) -> list[str]:
 
 
 def _is_table(text: str) -> bool:
-    """A GFM table: a header line, a separator line, then rows; every line starts with ``|``."""
+    """A GFM table: a header line, a separator line, then rows; every line starts with ``|``.
+
+    Only line 2 is the separator: a later line of dashes is a row (GFM reads it so too).
+    """
     lines = _table_lines(text)
     return (
         len(lines) >= 2
         and all(line.lstrip().startswith("|") for line in lines)
         and bool(_TABLE_SEP_RE.match(lines[1]))
-        and not any(_TABLE_SEP_RE.match(line) for line in lines[2:])
     )
 
 
 def table_rows(text: str | None) -> list[list[str]]:
     """The cells of a GFM table, header row first, every row padded to the widest.
 
-    ``[]`` when ``text`` has no separator row (it is not a table). The frontend's
-    ``parseGfmTable`` reads the same way.
+    ``[]`` when ``text`` has no separator row (it is not a table). Only line 2 is the
+    separator; cells are unescaped as GFM shows them. The frontend's ``parseGfmTable``
+    reads the same way.
     """
     if not text or not isinstance(text, str):
         return []
     lines = _table_lines(text)
     if len(lines) < 2 or not _TABLE_SEP_RE.match(lines[1]):
         return []
-    rows = [_split_row(line) for line in lines if not _TABLE_SEP_RE.match(line)]
+    rows = [_split_row(line) for i, line in enumerate(lines) if i != 1]
     width = max(len(r) for r in rows)
     return [r + [""] * (width - len(r)) for r in rows]
 
@@ -198,14 +205,21 @@ def _one_line_cell(cell: str) -> str:
     return " ".join(cell.replace("\r\n", "\n").split("\n")).strip()
 
 
+def _escape_cell(cell: str) -> str:
+    """A cell for a GFM row: ``\\`` and ``|`` escaped, and a cell of dashes (``-``, ``:--:``)
+    escaped so it can't read as a separator; GFM shows each as typed."""
+    out = _one_line_cell(cell).replace("\\", "\\\\").replace("|", "\\|")
+    return "\\" + out if _SEP_CELL_RE.match(out) else out
+
+
 def table_markdown(rows: list[list[str]]) -> str:
-    """Rows as a GFM table: the first row is the header, ``|`` in a cell is escaped."""
+    """Rows as a GFM table: the first row is the header; cells escaped (`_escape_cell`)."""
     if not rows:
         return ""
     width = max(len(r) for r in rows)
 
     def line(r: list[str]) -> str:
-        cells = [_one_line_cell(c).replace("|", "\\|") for c in r + [""] * (width - len(r))]
+        cells = [_escape_cell(c) for c in r + [""] * (width - len(r))]
         return "| " + " | ".join(cells) + " |"
 
     sep = "| " + " | ".join(["---"] * width) + " |"

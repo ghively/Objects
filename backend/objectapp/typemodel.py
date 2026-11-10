@@ -481,7 +481,8 @@ def option_shape_problems(options: Any) -> list[str]:
     for key in ("allowedTypes", "fixedSet"):
         if key in options and not _str_list(options[key]):
             bad.append(key)
-    for key in ("isArray", "hasFixedSet"):
+    # M31: `headerColumn` (a Table property: "First column is a header"; display only).
+    for key in ("isArray", "hasFixedSet", "headerColumn"):
         if key in options and not isinstance(options[key], bool):
             bad.append(key)
     if "set" in options and not (

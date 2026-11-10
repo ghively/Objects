@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { KIND_TRANSFORMS, type PropertyDef } from '@/api/types'
 import { allowedKindChanges } from '../typeEdits'
-import { SimpleTableCell, tableSummary } from './SimpleTableCell'
+import { parseGfmTable, serializeGfmTable, SimpleTableCell, tableSummary } from './SimpleTableCell'
 
 const def: PropertyDef = {
   id: 'sizes',
@@ -94,5 +94,61 @@ describe('Table property (M31)', () => {
     expect(allowedKindChanges('text')).toContain('simpleTableBlock')
     expect(allowedKindChanges('textBlock')).toContain('simpleTableBlock')
     expect(allowedKindChanges('number')).not.toContain('simpleTableBlock')
+  })
+})
+
+// M31 fix pass, finding 8: only line 2 is the separator; a dash-only cell is escaped on write
+// (`\-`, which GFM shows as "-") and read back as typed; `|` and `\` in cells round-trip.
+describe('Table cells that look like Markdown (M31 fix)', () => {
+  const STEPS = [['Step'], ['Boil'], ['-'], ['Serve']]
+  const STEPS_MD = '| Step |\n| --- |\n| Boil |\n| \\- |\n| Serve |'
+
+  test('a dash-only cell is escaped on write and kept on read, also with CRLF and a BOM', () => {
+    expect(serializeGfmTable(STEPS)).toBe(STEPS_MD)
+    expect(parseGfmTable(STEPS_MD)).toEqual(STEPS)
+    expect(parseGfmTable(STEPS_MD.replace(/\n/g, '\r\n'))).toEqual(STEPS)
+    expect(parseGfmTable('\uFEFF' + STEPS_MD.replace(/\n/g, '\r\n'))).toEqual(STEPS)
+    const rows = [
+      ['A', 'B'],
+      ['---', ':-:'],
+      [':--', '--:'],
+    ]
+    const md = serializeGfmTable(rows)
+    expect(md).toBe('| A | B |\n| --- | --- |\n| \\--- | \\:-: |\n| \\:-- | \\--: |')
+    expect(parseGfmTable(md)).toEqual(rows)
+    // A hand-written later line of dashes is a row, not a second separator.
+    expect(parseGfmTable('| Step |\n|---|\n| Boil |\n| - |\n|:--:|')).toEqual([['Step'], ['Boil'], ['-'], [':--:']])
+  })
+
+  test('pipes and backslashes in cells round-trip, as the backend writes them', () => {
+    const rows = [
+      ['a|b', 'c\\d'],
+      ['\\', 'x\\|y'],
+      ['|', 'end\\'],
+      ['\\-', '\\\\'],
+    ]
+    const md = serializeGfmTable(rows)
+    expect(md).toBe('| a\\|b | c\\\\d |\n| --- | --- |\n| \\\\ | x\\\\\\|y |\n| \\| | end\\\\ |\n| \\\\- | \\\\\\\\ |')
+    expect(parseGfmTable(md)).toEqual(rows)
+    expect(parseGfmTable(md.replace(/\n/g, '\r\n'))).toEqual(rows)
+    expect(parseGfmTable('| Path |\n| --- |\n| C:\\temp |')).toEqual([['Path'], ['C:\\temp']])
+  })
+
+  test('typing "-" in a cell saves the escaped table and the row stays', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const { rerender } = render(
+      <SimpleTableCell def={def} value={'| Step |\n| --- |\n| Boil |\n| x |\n| Serve |'} onChange={onChange} />,
+    )
+    const cell = screen.getByDisplayValue('x')
+    await user.clear(cell)
+    await user.type(cell, '-')
+    await user.tab()
+    expect(onChange).toHaveBeenLastCalledWith(STEPS_MD)
+    rerender(<SimpleTableCell def={def} value={STEPS_MD} onChange={onChange} />)
+    expect(screen.getByDisplayValue('-')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Serve')).toBeInTheDocument()
+    rerender(<SimpleTableCell def={def} value={STEPS_MD} density="table" inTable onChange={onChange} />)
+    expect(screen.getByRole('button', { name: '3 rows' })).toBeInTheDocument()
   })
 })

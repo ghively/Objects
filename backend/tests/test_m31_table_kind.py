@@ -32,7 +32,12 @@ from objectapp.propvalues import (
 from objectapp.searchtext import SEARCHABLE_KINDS, property_text
 from objectapp.server import create_app
 from objectapp.space import NO_TRANSFORMATIONS, Space
-from objectapp.typemodel import PropertyDefinition, TypeDefinition, type_revision
+from objectapp.typemodel import (
+    PropertyDefinition,
+    TypeDefinition,
+    option_shape_problems,
+    type_revision,
+)
 
 TABLE = "| Name | Qty |\n| --- | --- |\n| Apple | 3 |\n| Pear \\| green | 5 |"
 
@@ -231,3 +236,110 @@ def test_a_table_property_can_be_added_to_a_type(tmp_path: Path):
         assert r.status_code == 200, r.text
     stored = json.loads((root / ".object" / "types" / "fruit.json").read_text("utf-8"))
     assert stored["propertyDefinitions"][-1]["type"] == "simpleTableBlock"
+
+
+# -- M31 fix pass: dash-only cells, pipes and backslashes (finding 8) -----------------------
+
+STEPS = [["Step"], ["Boil"], ["-"], ["Serve"]]
+STEPS_MD = "| Step |\n| --- |\n| Boil |\n| \\- |\n| Serve |"
+
+
+def test_a_dash_only_cell_is_escaped_on_write_and_kept_on_read():
+    # Only line 2 is the separator: a cell of dashes is a cell, escaped so it can't read as one.
+    assert table_markdown(STEPS) == STEPS_MD
+    assert table_rows(STEPS_MD) == STEPS
+    p = _pd()
+    assert encode_value(p, STEPS) == STEPS_MD
+    assert encode_value(p, STEPS_MD) == STEPS_MD
+    # Every separator-like cell is escaped (alignment colons too) and reads back as typed.
+    rows = [["A", "B"], ["---", ":-:"], [":--", "--:"]]
+    md = table_markdown(rows)
+    assert md == "| A | B |\n| --- | --- |\n| \\--- | \\:-: |\n| \\:-- | \\--: |"
+    assert table_rows(md) == rows and encode_value(p, md) == md
+    # A hand-written table whose later line looks like a separator: that line is a row.
+    hand = "| Step |\n|---|\n| Boil |\n| - |\n|:--:|"
+    assert table_rows(hand) == [["Step"], ["Boil"], ["-"], [":--:"]]
+    assert encode_value(p, hand) == hand
+    # CRLF reads the same.
+    assert table_rows(STEPS_MD.replace("\n", "\r\n")) == STEPS
+    assert table_rows(hand.replace("\n", "\r\n")) == [["Step"], ["Boil"], ["-"], [":--:"]]
+
+
+def test_pipes_and_backslashes_in_cells_round_trip():
+    rows = [["a|b", "c\\d"], ["\\", "x\\|y"], ["|", "end\\"], ["\\-", "\\\\"]]
+    md = table_markdown(rows)
+    assert md == (
+        "| a\\|b | c\\\\d |\n| --- | --- |\n| \\\\ | x\\\\\\|y |\n| \\| | end\\\\ |\n"
+        "| \\\\- | \\\\\\\\ |"
+    )
+    assert table_rows(md) == rows
+    assert table_rows(md.replace("\n", "\r\n")) == rows
+    assert encode_value(_pd(), rows) == md and encode_value(_pd(), md) == md
+    # A backslash before a letter is kept as typed (C:\temp in a hand-written table).
+    assert table_rows("| Path |\n| --- |\n| C:\\temp |") == [["Path"], ["C:\\temp"]]
+
+
+def test_a_dash_cell_saves_reads_searches_and_exports_with_crlf_and_bom(tmp_path: Path):
+    root = _space_dir(tmp_path)
+    path = root / "Fruits" / "Apple.md"
+    head = b"\xef\xbb\xbf---\r\nid: 01J00000000000000000000000\r\ntype: Fruit\r\ntitle: Apple\r\n"
+    path.write_bytes(head + b"lastUpdated: 2026-01-01T00:00:00.000Z\r\n---\r\nBody line\r\n")
+    space = Space(root)
+    with TestClient(create_app(space, None, watch=False)) as c:
+        version = c.get("/api/object", params={"path": "Fruits/Apple.md"}).json()["version"]
+        r = c.put("/api/object/properties", json={
+            "path": "Fruits/Apple.md", "updates": {"sizes": STEPS_MD}, "remove": [],
+            "baseVersion": version})
+        assert r.status_code == 200, r.text
+        after = path.read_bytes()
+        assert after.startswith(head)
+        assert (
+            b"sizes: |-\r\n  | Step |\r\n  | --- |\r\n  | Boil |\r\n  | \\- |\r\n  | Serve |\r\n"
+            b"---\r\nBody line\r\n"
+        ) in after
+        row = next(x for x in space.rows(paths=["Fruits/Apple.md"]))
+        assert row.values["sizes"] == STEPS_MD
+    doc = build_doc(space, "Fruits/Apple.md", ExportOptions(format="html"))
+    assert ("Sizes", "Step; Boil; -; Serve") in doc.properties
+    t = space.type_by_id("fruit")
+    assert property_text(t, {"sizes": STEPS_MD}, lambda s: s) == "Sizes: Step Boil - Serve"
+
+
+# -- M31 fix pass: "First column is a header" (finding 13b) ---------------------------------
+
+
+def test_the_header_column_option_is_kept_and_checked():
+    p = _pd(options={"headerColumn": True})
+    assert p.options["headerColumn"] is True
+    assert p.to_json()["options"]["headerColumn"] is True
+    # Storage ignores it: the Markdown table is the same.
+    assert encode_value(p, TABLE) == encode_value(_pd(), TABLE) == TABLE
+    assert option_shape_problems({"headerColumn": False}) == []
+    assert option_shape_problems({"headerColumn": "yes"}) == ["headerColumn"]
+    # A hand-edited bad value is dropped on read.
+    assert "headerColumn" not in _pd(options={"headerColumn": "yes"}).options
+
+
+def test_a_type_save_keeps_the_header_column_and_refuses_a_bad_one(tmp_path: Path):
+    root = _space_dir(tmp_path)
+    path = root / "Fruits" / "Apple.md"
+    src = "---\ntype: Fruit\ntitle: Apple\nsizes: |-\n  | Name | Qty |\n  | --- | --- |\n  | Apple | 3 |\n---\n"
+    path.write_text(src, "utf-8")
+    space = Space(root)
+    with TestClient(create_app(space, None, watch=False)) as c:
+        t = next(x for x in c.get("/api/space").json()["types"] if x["id"] == "fruit")
+        sizes = next(d for d in t["propertyDefinitions"] if d["key"] == "sizes")
+        sizes["options"] = {**sizes.get("options", {}), "headerColumn": "yes"}
+        r = c.put("/api/types/fruit", json={"type": t, "baseRevision": t["revision"]})
+        assert r.status_code == 422
+        assert r.json()["detail"] == "The options of Sizes are not valid: headerColumn."
+        sizes["options"]["headerColumn"] = True
+        r = c.put("/api/types/fruit", json={"type": t, "baseRevision": t["revision"]})
+        assert r.status_code == 200, r.text
+        t = next(x for x in c.get("/api/space").json()["types"] if x["id"] == "fruit")
+        sizes = next(d for d in t["propertyDefinitions"] if d["key"] == "sizes")
+        assert sizes["options"]["headerColumn"] is True
+    stored = json.loads((root / ".object" / "types" / "fruit.json").read_text("utf-8"))
+    stored_sizes = next(d for d in stored["propertyDefinitions"] if d["key"] == "sizes")
+    assert stored_sizes["options"]["headerColumn"] is True
+    assert path.read_text("utf-8") == src
