@@ -36,7 +36,7 @@ from ..typemodel import (
     label_options,
 )
 from ..whiteboardfile import BOARD_SUFFIX, INK_SUFFIX
-from . import kinds
+from . import gitprov, kinds
 from .model import (
     IMPORT_KINDS,
     ImportCounts,
@@ -915,7 +915,7 @@ def plan(
         objects=objects,
         attachments=attachments,
         skipped=skipped,
-        warnings=list(read.warnings),
+        warnings=[*read.warnings, *filter(None, [gitprov.note_for_read(read)])],  # M31 fix pass: git refused
         frontmatterKeys=dict(read.frontmatterKeys),
         folders=dict(read.folders),
     )

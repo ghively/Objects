@@ -747,7 +747,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   its last commit's. A file that differs from the commit (changed, staged or never committed) gets `uncommitted: true`
   and is listed in the report's **Git** section ("Imported at commit <sha>.", "<file>: has changes not committed to
   git; imported as it is on disk"). The Source line shows "commit <first 7>" and "has uncommitted changes". An earlier
-  import of the same folder made as `markdown` or `obsidian` is still matched on a re-run (our calls).
+  import of the same folder made as `markdown` or `obsidian` is still matched on a re-run (our calls). Git's check of
+  who owns the repository is never switched off (M31 fix pass): a repository git refuses (another user's) is imported
+  as a plain folder, and the preview's warnings and the report say "This folder's git repository belongs to another
+  user, so its commits were not read."
 - **Links between imported pages**: a source link names a page by path or by name; when several pages share the name
   (Books/Dune and Movies/Dune) the one nearest the linking page wins (its own folder, then the deepest shared folder,
   then the shortest path), and the written link is the title only when the space resolves it to that object, else its

@@ -6,8 +6,11 @@ file's last commit's).
 `repo_of` answers a `GitRepo` for a source folder inside a repository whose HEAD is a commit, else
 None (no git, no repository, no commit yet, or git refused). It runs a handful of read-only git
 commands once per source (`vcs.run` with ``read_only``: ``GIT_OPTIONAL_LOCKS=0`` so ``git status``
-never writes the index; ``safe.directory`` set to that repository only; ``core.fsmonitor`` off so no
-hook program starts); none touches the network and none changes the repository.
+never writes the index; ``core.fsmonitor`` off so no hook program starts); none touches the network
+and none changes the repository. Git's own ownership check stays on (M31 fix pass): a repository
+that belongs to another user is refused by git (it could name filter programs that ``git status``
+would run), and the folder is then imported as a plain folder, with `OTHER_OWNER` in the preview's
+warnings and the report (`refused`, `note_for_read`).
 
 - The commit is the repository's HEAD sha.
 - `web_link` builds the link for an ``origin`` remote on GitHub, GitLab, Bitbucket or Azure DevOps
@@ -29,7 +32,11 @@ from urllib.parse import quote, urlsplit
 if TYPE_CHECKING:
     from .readmodel import ReadResult
 
-__all__ = ["GitRepo", "find_top", "repo_of", "repo_for_read", "web_link"]
+__all__ = ["OTHER_OWNER", "GitRepo", "find_top", "note_for_read", "refused", "repo_for_read", "repo_of", "web_link"]
+
+OTHER_OWNER = "This folder's git repository belongs to another user, so its commits were not read."
+"""M31 fix pass: the preview's warning and the report's line when git refuses the repository (our string)."""
+_DUBIOUS = re.compile(r"dubious ownership|safe\.directory", re.IGNORECASE)
 
 
 _LOG_TIMEOUT = 120.0
@@ -85,8 +92,8 @@ def find_top(folder: Path) -> Path | None:
     return None
 
 
-def _config(top: Path) -> list[str]:
-    return [f"safe.directory={top.as_posix()}", "core.fsmonitor=false"]
+_CONFIG = ["core.fsmonitor=false"]
+"""No ``safe.directory``: git's check of who owns the repository is never switched off."""
 
 
 def _unquote(path: str) -> str:
@@ -97,12 +104,22 @@ def _unquote(path: str) -> str:
 
 def repo_of(folder: str | Path) -> GitRepo | None:
     """The repository ``folder`` is in, read once (see the module doc), or None."""
+    return _read(folder)[0]
+
+
+def refused(folder: str | Path) -> bool:
+    """Whether git refused the repository ``folder`` is in because another user owns it."""
+    return _read(folder)[1]
+
+
+def _read(folder: str | Path) -> tuple[GitRepo | None, bool]:
+    """(the repository, or None; whether git refused it as another user's)."""
     from .. import vcs
 
     top = find_top(Path(folder))
     if top is None or not vcs.available():
-        return None
-    cfg = _config(top)
+        return None, False
+    cfg = list(_CONFIG)
 
     def git(args: list[str], timeout: float = vcs.DEFAULT_TIMEOUT):
         return vcs.run(top, args, read_only=True, check=False, config=cfg, timeout=timeout)
@@ -110,19 +127,18 @@ def repo_of(folder: str | Path) -> GitRepo | None:
     try:
         res = git(["rev-parse", "--show-toplevel"])
         if res.code != 0:
-            return None
+            return None, bool(_DUBIOUS.search(res.err or ""))
         shown = vcs._text(res.out).strip()
         if shown:
             top = Path(shown).resolve()
-            cfg = _config(top)
         res = git(["rev-parse", "--verify", "-q", "HEAD"])
         head = vcs._text(res.out).strip()
         if res.code != 0 or not re.fullmatch(r"[0-9a-f]{40}([0-9a-f]{24})?", head):
-            return None
+            return None, bool(_DUBIOUS.search(res.err or ""))
         try:
             prefix = Path(folder).resolve().relative_to(top).as_posix()
         except ValueError:
-            return None
+            return None, False
         prefix = "" if prefix == "." else prefix
         spec = ["--", prefix] if prefix else []
         res = git(["config", "--get", "remote.origin.url"])
@@ -146,21 +162,30 @@ def repo_of(folder: str | Path) -> GitRepo | None:
                     current = (author.strip(), date.strip())
                 elif line and current is not None:
                     repo.last.setdefault(_unquote(line), current)
-        return repo
+        return repo, False
     except (vcs.GitMissing, vcs.GitFailed, OSError):
-        return None
+        return None, False
+
+
+def _for_read(read: ReadResult) -> tuple[GitRepo | None, bool]:
+    if read.container != "folder":
+        return None, False
+    cache = read.__dict__.get("_git_repo")
+    if cache is not None and cache[0] == str(read.sourcePath):
+        return cache[1], cache[2]
+    got = _read(read.sourcePath) if os.path.isdir(str(read.sourcePath)) else (None, False)
+    read.__dict__["_git_repo"] = (str(read.sourcePath), *got)
+    return got
 
 
 def repo_for_read(read: ReadResult) -> GitRepo | None:
     """`repo_of` for a folder source (cached on the read), None for a zip."""
-    if read.container != "folder":
-        return None
-    cache = read.__dict__.get("_git_repo")
-    if cache is not None and cache[0] == str(read.sourcePath):
-        return cache[1]
-    repo = repo_of(read.sourcePath) if os.path.isdir(str(read.sourcePath)) else None
-    read.__dict__["_git_repo"] = (str(read.sourcePath), repo)
-    return repo
+    return _for_read(read)[0]
+
+
+def note_for_read(read: ReadResult) -> str | None:
+    """`OTHER_OWNER` when git refused the folder source's repository as another user's, else None."""
+    return OTHER_OWNER if _for_read(read)[1] else None
 
 
 # -- the web link -----------------------------------------------------------------------------
