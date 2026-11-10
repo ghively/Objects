@@ -92,8 +92,8 @@ what it mentions, each name, alias, value and line with its quote:
   main entity.
 The entity rule: a candidate becomes an object when it exists on its own (a page is mainly about it), or
 more than one page mentions it, or it has properties of its own (a value that passed its check). Otherwise
-it stays text. Categories (Server, VM, Production: a label option of a type in the space, or a tag) become
-property values or tags, never entities. Pages stay read-only Sources; entities are distilled from all the
+it stays text. Categories (Server, VM, Production: an option of a type's Category, Kind or Environment
+property, or a tag) become property values or tags, never entities. Pages stay read-only Sources; entities are distilled from all the
 Sources that mention them, and the newest Source wins when they disagree.
 
 ## 6. Bulk pass, normalise, links

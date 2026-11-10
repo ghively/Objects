@@ -297,7 +297,7 @@ def test_skill_states_the_rules() -> None:
     text = importskill.TEXT
     for words in ("Keep pages as Sources", "exists on its own", "more than one page", "properties of its own",
                   "never entities", "read-only Sources", "newest Source wins", "Use", "with a category",
-                  "import_entities(batch)"):
+                  "import_entities(batch)", "an option of a type's Category, Kind or Environment"):
         assert words in text, words
 
 
