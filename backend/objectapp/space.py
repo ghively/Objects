@@ -76,6 +76,9 @@ from .queries import DEFAULT_NAME as DEFAULT_QUERY_NAME
 from .queries import LIMIT_SIZES, MAX_SEARCH_TERMS, QueryDef, query_type_ids
 from .objfile import ObjectFile, join_object, split_object
 from .computed import COMPUTED_KINDS, check_type, rename_in_formulas
+from .counterparts import GONE, NO_COUNTERPART, WRONG_TYPE, CounterpartRow, specs_for
+from .counterparts import check_type as check_counterparts
+from .counterparts import counterpart_defs as _counterpart_defs
 from .rows import member_of
 from .propvalues import (
     GATED_KINDS,
@@ -528,6 +531,16 @@ class Skip:
 
     path: str
     reason: str
+
+
+@dataclass
+class CounterpartEdit:
+    """What `Space.edit_counterpart` did (M28): the other objects written (path, new version),
+    the ones it could not write, and the target's counterpart rows afterwards."""
+
+    written: list[tuple[str, str]]
+    skipped: list[Skip]
+    counterparts: list[CounterpartRow]
 
 
 @dataclass
@@ -4870,7 +4883,13 @@ class Space:
             if tpl is not None:
                 from .typetemplates import build_template
 
-                custom = build_template(tpl.key, self.types)
+                # The new type stands in for its own gallery key first, so a relation to that key
+                # (Location's "Part of") points at the new type, not at any type (M28).
+                itself = TypeDefinition(
+                    id=type_id, name=name, pluralName=plural, folder=safe_filename(plural),
+                    icon=parsed, color=color, extra={"templateKey": tpl.key},
+                )
+                custom = build_template(tpl.key, [itself, *self.types])
             else:
                 custom = [
                     PropertyDefinition(
@@ -5063,6 +5082,11 @@ class Space:
             new.readOnlyReason = None
             new.name = " ".join(str(new.name or "").split())
             new.pluralName = " ".join(str(new.pluralName or "").split())
+            # M28: a counterpart must be well shaped, on a relation that doesn't sync both ways,
+            # with a key no explicit target type holds (checked with `new` in place).
+            problem = check_counterparts(new, [new if x.id == new.id else x for x in self.types])
+            if problem is not None:
+                raise InvalidValue(problem)
 
             ops, deletes_property = self._plan_type_ops(old, new)
 
@@ -5970,6 +5994,137 @@ class Space:
     def outgoing(self, path: str) -> list[str]:
         """The objects ``path`` links to, sorted by path."""
         return sorted(self._links.outgoing(self._rel(path)))
+
+    # -- counterparts (M28) ---------------------------------------------------
+
+    def counterparts(self, path: str) -> list[CounterpartRow]:
+        """The computed other sides of ``path`` (`LinkIndex.counterparts`); never stored."""
+        return self._links.counterparts(self._rel(path))
+
+    def counterpart_defs(self, type_id: str) -> list[PropertyDefinition]:
+        """The virtual definitions of ``type_id``'s counterpart rows (`counterparts.counterpart_defs`)."""
+        return _counterpart_defs(type_id, self.types)
+
+    def type_api(self, t: TypeDefinition, revision: str) -> dict[str, Any]:
+        """A type as the window gets it: its API JSON (`TypeDefinition.to_api`) with its computed
+        other sides (``counterparts``, API only, never saved)."""
+        return {**t.to_api(revision), "counterparts": [d.to_json() for d in self.counterpart_defs(t.id)]}
+
+    def types_api(self) -> list[dict[str, Any]]:
+        """The type list the window gets (``GET /api/space``), each as `type_api`."""
+        return [self.type_api(t, rev) for t, rev in self.types_with_revisions()]
+
+    def edit_counterpart(
+        self,
+        path: str,
+        key: str,
+        source_type_id: str,
+        add: Iterable[str] = (),
+        remove: Iterable[str] = (),
+    ) -> CounterpartEdit:
+        """Add or remove other objects on ``path``'s counterpart row ``key`` from ``source_type_id``.
+
+        The target is never written: each other object gets one ordinary `update_properties`
+        of the stored property (only its lines and ``lastUpdated`` change). An added object
+        already linking here, or a removed one that doesn't, writes nothing; a single-valued
+        source gets exactly the new link (replaced, not appended). Every other object is checked
+        before anything is written: a missing one goes to ``skipped`` (`GONE`); one of another
+        type (or a template) raises `InvalidValue` (`WRONG_TYPE`). A key the target's type has
+        no row for from that source raises `InvalidValue` (`NO_COUNTERPART`); a missing target
+        raises `KeyError`. A conflict is retried once; write failures go to ``skipped``.
+        """
+        rel = self._rel(path)
+        adds = [self._rel(p) for p in add]
+        removes = [self._rel(p) for p in remove]
+        with self._lock:
+            summary = self._summaries.get(rel)
+        if summary is None and (self.root / rel).is_file():
+            self.rescan_file(rel)
+            with self._lock:
+                summary = self._summaries.get(rel)
+        if summary is None:
+            raise KeyError(rel)
+        source = self.type_by_id(source_type_id)
+        source_name = source.name if source is not None else source_type_id
+        spec = next(
+            (
+                s
+                for s in specs_for(summary.type, self.types)
+                if s.key == key and s.source_type_id == source_type_id
+            ),
+            None,
+        )
+        pdef = source.prop(spec.source_key) if spec is not None and source is not None else None
+        if summary.template is not None or pdef is None:
+            raise InvalidValue(NO_COUNTERPART.format(key=key, type=source_name))
+
+        both = set(adds) & set(removes)  # asked to add and remove: nothing to do
+        wanted = {p: True for p in adds if p not in both}
+        wanted.update({p: False for p in removes if p not in both})
+        wanted.pop(rel, None)  # a self link never counts
+        skipped: list[Skip] = []
+        todo: list[tuple[str, bool]] = []
+        for other in sorted(wanted):
+            with self._lock:
+                s = self._summaries.get(other)
+            if s is None and (self.root / other).is_file():
+                self.rescan_file(other)
+                with self._lock:
+                    s = self._summaries.get(other)
+            if s is None:
+                skipped.append(Skip(other, GONE))
+                continue
+            if s.type != source_type_id or s.template is not None:
+                raise InvalidValue(WRONG_TYPE.format(title=s.title, type=source_name))
+            todo.append((other, wanted[other]))
+
+        written: list[tuple[str, str]] = []
+        for other, adding in todo:
+            done = self._edit_counterpart_one(rel, other, pdef, adding)
+            if isinstance(done, Skip):
+                skipped.append(done)
+            elif done is not None:
+                written.append((other, done))
+        return CounterpartEdit(written=written, skipped=skipped, counterparts=self.counterparts(rel))
+
+    def _edit_counterpart_one(
+        self, target: str, other: str, pdef: PropertyDefinition, adding: bool
+    ) -> str | Skip | None:
+        """Link (or unlink) ``target`` in ``other``'s ``pdef`` value: the new version, a `Skip`,
+        or None when nothing needed writing."""
+        for attempt in range(2):
+            try:
+                _of, fm, version = self.read(other)
+                refs = [
+                    {"target": r["target"], "path": None}
+                    for r in decode_value(pdef, fm.get(pdef.key))
+                ]
+                hits = [self.resolve(r["target"], other) == target for r in refs]
+                if adding:
+                    if any(hits):
+                        return None
+                    new = {"target": self._link_text(target, other), "path": None}
+                    refs = [*refs, new] if _is_multi(pdef) else [new]
+                else:
+                    if not any(hits):
+                        return None
+                    refs = [r for r, hit in zip(refs, hits, strict=True) if not hit]
+                result = self.update_properties(other, {pdef.key: refs}, version)
+                return result.version if result.version != version else None
+            except Conflict:
+                if attempt:
+                    return Skip(other, "The file changed on disk while it was being updated")
+            except ReadOnly as exc:
+                return Skip(other, exc.reason)
+            except (KeyError, FileNotFoundError):
+                return Skip(other, GONE)
+            except InvalidValue as exc:
+                return Skip(other, str(exc))
+            except PermissionError as exc:  # e.g. locked by another program
+                return Skip(other, f"The file could not be written: {exc.strerror or exc}")
+            except FrontmatterError:
+                return Skip(other, "The file's frontmatter could not be rewritten")
+        raise AssertionError("unreachable")
 
     def _current_resolver(self) -> Resolver:
         r = self._resolver

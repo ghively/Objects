@@ -18,8 +18,8 @@ Routes (all JSON):
 - ``POST /v1/query`` ``{typeIds?, collectionIds?, tags?, filterGroup?, sort?, limit?, offset?}``
   -> ``{rows, total, unsupported}``
 - ``POST /v1/queries/{id}/run`` ``{limit?, offset?}`` -> same as ``/v1/query``
-- ``GET  /v1/object/peek?path=`` -> summary, values, outline, size, links, version
-- ``GET  /v1/object?path=&section=`` -> values, body (or one section), version
+- ``GET  /v1/object/peek?path=`` -> summary, values, outline, size, links, counterparts, version
+- ``GET  /v1/object?path=&section=`` -> values, body (or one section), counterparts, version
 - ``GET  /v1/object/backlinks?path=`` -> ``{backlinks}``
 - ``GET  /v1/daily-note?date=`` -> ``{path}`` or 404
 - ``GET  /v1/changes?since=`` -> ``{objects, activity}``
@@ -98,6 +98,11 @@ def without_hidden(values: dict[str, Any], hidden: set[str]) -> dict[str, Any]:
             value = None
         out[key] = value
     return out
+
+
+def counterparts_without_hidden(rows: list[dict[str, Any]], hidden: set[str]) -> list[dict[str, Any]]:
+    """M28: counterpart rows (`Space.counterparts`) without the paths of hidden objects."""
+    return [{**r, "paths": [p for p in r["paths"] if p not in hidden]} for r in rows]
 
 
 def links_hidden(values: dict[str, Any], hidden: set[str]) -> bool:
@@ -470,6 +475,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
                         "outline": outline(body),
                         "size": {"characters": len(body), "words": len(body.split())},
                         "links": links,
+                        "counterparts": counterparts_without_hidden(space.counterparts(rel), hidden),
                     },
                     default=str,
                 )
@@ -487,6 +493,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         except (KeyError, FileNotFoundError):
             return _error(404, f'There is no object at "{path}".')
         body = of.body
+        hidden = hidden_paths()
         if section is not None:
             found = read_section(body, section)
             if found is None:
@@ -496,7 +503,8 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             json.loads(
                 json.dumps(
                     {**summary_out(space.get(rel)), "version": version,
-                     "values": without_hidden(values, hidden_paths()), "body": body},
+                     "values": without_hidden(values, hidden), "body": body,
+                     "counterparts": counterparts_without_hidden(space.counterparts(rel), hidden)},
                     default=str,
                 )
             )

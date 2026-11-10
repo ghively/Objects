@@ -252,6 +252,7 @@ from .media import (
 from .notify import FileNotifier, system_notifier
 from .formula import FormulaError
 from .formula import parse as parse_formula
+from .counterparts import CounterpartEditRequest
 from .propvalues import InvalidValue
 from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
@@ -1077,7 +1078,7 @@ def create_app(
         return {
             "name": fields["name"],
             "root": str(space.root),
-            "types": [t.to_api(rev) for t, rev in space.types_with_revisions()],
+            "types": space.types_api(),  # M28: with each type's computed other sides
             "icon": fields["icon"],
             "description": fields["description"],
             "hideTaskManagement": fields["hideTaskManagement"],
@@ -1250,6 +1251,7 @@ def create_app(
                 "links": space.links_of(path, fm),
                 "backlinks": space.backlinks(summary.path),
                 "computed": computed_of(summary, fm),
+                "counterparts": space.counterparts(summary.path),  # M28: computed, never stored
             }
         )
 
@@ -1413,6 +1415,33 @@ def create_app(
         if result.task is not None:  # only when a Task's status changed category
             out["task"] = result.task.to_api()
         return _display_safe(out)
+
+    @api.post("/object/counterpart")
+    def post_counterpart(req: CounterpartEditRequest):
+        """M28: add or remove other objects on a computed other side; each is written on its
+        stored side (`Space.edit_counterpart`), the object at ``path`` never."""
+        try:
+            result = space.edit_counterpart(
+                req.path, req.key, req.sourceTypeId, add=req.add, remove=req.remove
+            )
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        except InvalidValue as exc:
+            return _error(422, str(exc))
+        except ValueError as exc:
+            return _error(400, str(exc))
+        except (KeyError, FileNotFoundError):
+            return _error(404, f'There is no object at "{req.path}".')
+        for path, version in result.written:
+            # The first event carries `linked` (the target among them: its counterparts changed).
+            announce(ChangeEvent("changed", path, version, origin=req.clientId))
+        return _display_safe(
+            {
+                "counterparts": result.counterparts,
+                "written": [{"path": p, "version": v} for p, v in result.written],
+                "skipped": [asdict(s) for s in result.skipped],
+            }
+        )
 
     @api.post("/object/ensure-id")
     def ensure_id(req: EnsureIdRequest):
