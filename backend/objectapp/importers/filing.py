@@ -596,7 +596,18 @@ class Filing:
         marked = [v for p, v in d["verdicts"].items() if p in d["trialPaths"]]
         share = (marked.count("right") / len(marked)) if marked else None
         return {"state": shown, "trial": {"items": items, "rightShare": share}, "normalise": d["normalise"],
-                "error": d["error"], "keepAsSources": as_sources}
+                "error": d["error"], "keepAsSources": as_sources, "inbox": self.inbox_rows(batch)}
+
+    def inbox_rows(self, batch: str) -> list[dict[str, Any]]:
+        """The batch's ``inbox.json`` rows (``{path, title, reason, suggestedType}``): what it put in the
+        Import inbox and why. Empty before the pass (or Write) records any. Reads only."""
+        try:
+            rows = json.loads((batches.batch_dir(self.space.root, batch) / INBOX_FILE).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        return [{"path": r.get("path"), "title": r.get("title"), "reason": r.get("reason") or "",
+                 "suggestedType": r.get("suggestedType")}
+                for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []  # fmt: skip
 
     def _state(self, d: dict[str, Any], alive: bool) -> tuple[str, str | None]:
         """The recorded state and error, a pass or write that no thread runs any more read as ``failed``.
@@ -1180,6 +1191,8 @@ class Filing:
             lines.append(f"- Trial: {a['trial']} objects; marked {a['right'] + a['wrong']} ({a['right']} right, {a['wrong']} wrong): {share}")
         filed = sum(1 for r in results if not r.get("inbox") and not r.get("rejected"))
         lines.append(f"- Filed: {filed}; in the Import inbox: {sum(1 for r in results if r.get('inbox'))}")
+        inbox = sorted((r for r in results if r.get("inbox")), key=lambda r: str(r.get("title") or "").casefold())
+        lines += [_inbox_line(r.get("title"), "; ".join(r.get("notes") or [])) for r in inbox]
         refused = sum(1 for r in results for v in r["values"] if not v["ok"])
         lines.append(f"- Values that did not pass their check: {refused}")
         for conf in CONFIDENCE:
@@ -1227,6 +1240,11 @@ def _replace_section(md: Path, section: str, heading: str = AI_HEADING) -> None:
     atomic_write(md, _swap(text, section, heading).encode("utf-8"))
 
 
+def _inbox_line(title: Any, reason: str) -> str:
+    """One Import inbox row of the report, under the line that counts them: its title and why."""
+    return f"  - {title}: {reason}" if reason else f"  - {title}"
+
+
 def _value_text(value: Any) -> str:
     if isinstance(value, list):
         return ", ".join(_value_text(v) for v in value)
@@ -1249,6 +1267,7 @@ def _entities_section(res: Any, chosen: list[Any], turned_down: int, out: dict[s
          f"space), {turned_down} turned down, {len(res.leftOut)} not made into objects"),
         (f"- Links written: {out.get('relations', 0)}; plain links: {out.get('plainLinks', 0)}; "
          f"to the Import inbox: {out.get('relationsInbox', 0)}"),
+        *[_inbox_line(link.get("title"), str(link.get("reason") or "")) for link in out.get("inboxLinks") or []],
         (f"- From sources sections: {out.get('sections', 0)} written, {out.get('sectionsLeft', 0)} left as they are "
          "(edited by you)"),
     ]  # fmt: skip

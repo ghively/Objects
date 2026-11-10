@@ -643,3 +643,53 @@ def test_reopened_step_shows_a_failed_write(env: Env) -> None:
     d2 = e.fil._load(batch2)
     e.fil._save(batch2, {**d2, "state": "failed", "mode": "bulk", "error": "The agent run failed."})
     assert e.fil.entities_view(batch2)["writeError"] is None
+
+
+# -- why each row is in the Import inbox -------------------------------------------------------------
+
+
+def _inbox_rows(e: Env, batch: str) -> list[dict[str, Any]]:
+    return json.loads((batches.batch_dir(e.root, batch) / filing.INBOX_FILE).read_text(encoding="utf-8"))
+
+
+def test_inbox_reasons_in_the_report_and_the_status(env: Env) -> None:
+    """The low-confidence link's reason is in report.md, the report page and the filing status."""
+    e = env
+    batch = _import(e)
+    _decide(e, batch)
+    _trial_and_bulk(e, batch)
+    assert e.client.get(f"/api/import/batches/{batch}/filing").json()["inbox"] == []
+    _accept_all(e, batch)
+    _write(e, batch)
+
+    runbook = _of_type(e, "runbook", "Restart Payroll")
+    reason = "Link not written (low confidence): Restart Payroll Covers APP01"
+    status = e.client.get(f"/api/import/batches/{batch}/filing").json()
+    assert status["inbox"] == [{"path": runbook[0], "title": "Restart Payroll", "reason": reason, "suggestedType": None}]
+    assert status["inbox"] == _inbox_rows(e, batch)
+
+    line = f"  - Restart Payroll: {reason}"
+    report = _report(e, batch)
+    assert f"; to the Import inbox: 1\n{line}\n" in report
+    rp = batches.load_batch(e.root, batch)[0]["reportPath"]
+    assert f"; to the Import inbox: 1\n{line}\n" in (e.root / rp).read_text(encoding="utf-8")
+
+
+def test_inbox_reasons_on_a_batch_not_kept_as_sources(env: Env) -> None:
+    """M27's inbox rows are listed under the AI filing section's count, each with its reason."""
+    e = env
+    batch = _import(e, keep=False)
+    _decide(e, batch)
+    assert e.client.post(f"/api/import/batches/{batch}/filing/start", json={"trial": True}).status_code == 200
+    assert _wait(e, batch, {"trial", "failed"})["state"] == "trial"
+    assert e.client.post(f"/api/import/batches/{batch}/filing/continue").status_code == 200
+    s = _wait(e, batch, {"done", "failed"})
+    assert s["state"] == "done", s
+    rows = _inbox_rows(e, batch)
+    assert len(rows) > 1 and all(r["reason"] for r in rows)
+    assert s["inbox"] == rows
+    lines = "".join(f"  - {r['title']}: {r['reason']}\n" for r in sorted(rows, key=lambda r: r["title"].casefold()))
+    head = f"; in the Import inbox: {len(rows)}\n"
+    assert head + lines in _report(e, batch)
+    rp = batches.load_batch(e.root, batch)[0]["reportPath"]
+    assert head + lines in (e.root / rp).read_text(encoding="utf-8")
