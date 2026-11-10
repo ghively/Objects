@@ -502,7 +502,8 @@ def effective_item(item: dict[str, Any], decision: dict[str, Any] | None, space:
 
     M30: an edit with ``useType`` (the offer "Use <type>, with a category") makes the item an
     extend of that type adding ``category`` to its Category (else Kind) options; a type with
-    neither label (or no ``space`` to look it up in) makes it a plain use."""
+    neither label (or no ``space`` to look it up in), or a ``category`` that is already an option
+    of one of the type's labels (Production in Host's Environment), makes it a plain use."""
     if not decision or decision.get("status") != "edited" or not isinstance(decision.get("edited"), dict):
         return item
     e = decision["edited"]
@@ -513,6 +514,12 @@ def effective_item(item: dict[str, Any], decision: dict[str, Any] | None, space:
         category = _text(e.get("category"), 100) if isinstance(e.get("category"), str) else ""
         label = _category_label(t) if t is not None else None
         out.update({"typeId": t.id if t else use, "name": t.name if t else out["name"], "action": "use", "properties": []})
+        if t is not None and category and any(
+            _squash(str(o.get("text", ""))) == _squash(category)
+            for pd in t.propertyDefinitions if pd.type == "label"
+            for o in pd.options.get("set") or [] if isinstance(o, dict)
+        ):  # fmt: skip
+            return out  # already one of the type's options: nothing to add
         if label is not None and category:
             out["action"] = "extend"
             out["properties"] = [{"key": label.key, "name": label.name, "kind": "label",

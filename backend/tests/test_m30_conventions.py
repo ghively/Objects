@@ -160,6 +160,28 @@ def test_offer_applied(tmp_path) -> None:
     assert eff["action"] == "use" and eff["typeId"] == "person" and eff["properties"] == []
 
 
+def test_offer_of_an_existing_option_adds_nothing(tmp_path) -> None:
+    """``create "Production"``: Production is already an option of Host's Environment, so the offer
+    taken is a plain use of Host (nothing added to its Category or anywhere); the same for a name
+    already in Host's Category."""
+    root = itops_space(tmp_path)
+    own = [{"name": "Owner team", "kind": "text", "share": 1.0}, {"name": "Change window", "kind": "text", "share": 1.0}]
+    batch, (prod, ws) = _save(root, _create("Production", own), _create("Workstation", own, iid="g2"))
+    assert prod["offer"] == {"label": "Use Host, with a category", "typeId": "host", "category": "Production"}
+    assert ws["offer"] == {"label": "Use Host, with a category", "typeId": "host", "category": "Workstation"}
+    space = Space(root)
+    for it in (prod, ws):
+        eff = proposal.effective_item(it, {"status": "edited", "edited": {"useType": "host", "category": it["name"]}}, space)
+        assert eff["action"] == "use" and eff["typeId"] == "host" and eff["properties"] == [], it["name"]
+    before = _type_files(root)
+    proposal.save_review(space, batch, [{"id": it["id"], "status": "edited",
+                                         "edited": {"useType": "host", "category": it["name"]}} for it in (prod, ws)])
+    out = proposal.apply(Space(root), batch)
+    assert out["created"] == [] and out["extended"] == [] and out["skipped"] == []
+    assert _type_files(root) == before
+    assert "Production" not in _options(Space(root), "host", "category")
+
+
 def test_relations_outside_named_set_dropped(tmp_path) -> None:
     root = itops_space(tmp_path)
     named = proposal.named_relations(Space(root))
