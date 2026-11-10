@@ -95,6 +95,7 @@ class ChangeEvent:
         "work",
         "workQueue",
         "settings",
+        "synced",
     ]
     path: str
     """Space-relative POSIX path of the object file (for ``types``: the type id; for
@@ -106,7 +107,9 @@ class ChangeEvent:
     ``version``; M19: for ``mcpServers`` the server id, or ``secrets``; M23: for ``work``
     ``floor`` (the general floor list, with its revision as ``version``); for ``workQueue``,
     announced by M24 on every agent queue change, the queue entry id; for ``settings`` (fix pass H)
-    ``settings.json``, the device settings, with their revision as ``version``)."""
+    ``settings.json``, the device settings, with their revision as ``version``; M29: for ``synced``
+    the type id whose ``.object/synced/<typeId>.json`` changed, with the store revision as
+    ``version``)."""
     version: str | None
     """The new file version (sha256 of its bytes); ``None`` when deleted."""
     origin: str | None = None

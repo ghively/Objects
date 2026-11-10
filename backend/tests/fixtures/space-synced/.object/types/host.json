@@ -1,0 +1,298 @@
+{
+  "schemaVersion": 2,
+  "id": "host",
+  "name": "Host",
+  "pluralName": "Hosts",
+  "folder": "Hosts",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-hard-drives"
+  },
+  "color": "blue",
+  "description": "A server, workstation or network device: what runs on it and where it is.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The name of the object, shown wherever it appears",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "The collections this object belongs to",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "A short summary of what the object is about",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "When the object was made",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "When the object last changed",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "Tags attached to the object",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "An emoji or icon shown beside the title",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Other names the object goes by",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "01KM2900000000000000000P01",
+      "key": "ipAddress",
+      "name": "IP address",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "01KM2900000000000000000P02",
+      "key": "fqdn",
+      "name": "FQDN",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastBoot",
+      "key": "lastBoot",
+      "name": "Last boot",
+      "type": "datetime",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "time",
+          "endTimeSettings": "notAllowed"
+        }
+      },
+      "synced": {
+        "source": "Inventory script",
+        "staleAfterDays": 7
+      }
+    },
+    {
+      "id": "diskFree",
+      "key": "diskFree",
+      "name": "Disk free",
+      "type": "number",
+      "description": "Free disk space, in GB",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-hash"
+      },
+      "visibility": "alwaysShow",
+      "options": {},
+      "synced": {
+        "source": "Inventory script",
+        "staleAfterDays": 7
+      }
+    },
+    {
+      "id": "patchState",
+      "key": "patchState",
+      "name": "Patch state",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "current",
+            "text": "Current",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "pending",
+            "text": "Pending",
+            "icon": null,
+            "color": "amber"
+          },
+          {
+            "id": "failed",
+            "text": "Failed",
+            "icon": null,
+            "color": "red"
+          },
+          {
+            "id": "unknown",
+            "text": "Unknown",
+            "icon": null,
+            "color": "gray"
+          }
+        ]
+      },
+      "synced": {
+        "source": "Inventory script",
+        "staleAfterDays": 7
+      }
+    },
+    {
+      "id": "rebootPending",
+      "key": "rebootPending",
+      "name": "Reboot pending",
+      "type": "boolean",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-check-square"
+      },
+      "visibility": "alwaysShow",
+      "options": {},
+      "synced": {
+        "source": "Inventory script",
+        "staleAfterDays": 7
+      }
+    },
+    {
+      "id": "lastSeen",
+      "key": "lastSeen",
+      "name": "Last seen",
+      "type": "datetime",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "time",
+          "endTimeSettings": "notAllowed"
+        }
+      },
+      "synced": {
+        "source": "Inventory script",
+        "staleAfterDays": 7
+      }
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [
+      "01KM29000000000000000000T1"
+    ],
+    "defaultTemplateId": "01KM29000000000000000000T1"
+  },
+  "namePatterns": [
+    "{ip}",
+    "{fqdn}",
+    "SRV-*",
+    "@@##",
+    "@@@##",
+    "@@@@##",
+    "@*-##"
+  ]
+}

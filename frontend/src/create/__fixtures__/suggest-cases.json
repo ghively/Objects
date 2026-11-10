@@ -1,0 +1,800 @@
+{
+  "types": [
+    {
+      "id": "host",
+      "namePatterns": [
+        "{ip}",
+        "{fqdn}",
+        "SRV-*",
+        "@@##",
+        "@@@##",
+        "@@@@##",
+        "@*-##"
+      ]
+    },
+    {
+      "id": "network",
+      "namePatterns": [
+        "{cidr}"
+      ]
+    },
+    {
+      "id": "software",
+      "namePatterns": [
+        "{version}"
+      ]
+    },
+    {
+      "id": "application",
+      "namePatterns": []
+    },
+    {
+      "id": "printer",
+      "namePatterns": [
+        "PRN-*"
+      ]
+    },
+    {
+      "id": "ticket",
+      "namePatterns": [
+        "{foo}",
+        5,
+        null,
+        "INC#####",
+        "a{ip}",
+        "abc\\"
+      ]
+    },
+    {
+      "id": "runbook",
+      "namePatterns": []
+    },
+    {
+      "id": "page",
+      "namePatterns": []
+    }
+  ],
+  "cases": [
+    {
+      "name": "APP01",
+      "ctx": {},
+      "expect": [
+        "host"
+      ]
+    },
+    {
+      "name": "SRV-02",
+      "ctx": {},
+      "expect": [
+        "host"
+      ]
+    },
+    {
+      "name": "SRV-web",
+      "ctx": {},
+      "expect": [
+        "host"
+      ]
+    },
+    {
+      "name": "10.20.0.5",
+      "ctx": {},
+      "expect": [
+        "host"
+      ]
+    },
+    {
+      "name": "fe80::1",
+      "ctx": {},
+      "expect": [
+        "host"
+      ]
+    },
+    {
+      "name": "app01.example.test",
+      "ctx": {},
+      "expect": [
+        "host"
+      ]
+    },
+    {
+      "name": "PRN-TEST-01",
+      "ctx": {},
+      "expect": [
+        "host",
+        "printer"
+      ]
+    },
+    {
+      "name": "10.20.0.0/24",
+      "ctx": {},
+      "expect": [
+        "network"
+      ]
+    },
+    {
+      "name": "fe80::/64",
+      "ctx": {},
+      "expect": [
+        "network"
+      ]
+    },
+    {
+      "name": "SQL Server 2019",
+      "ctx": {},
+      "expect": [
+        "software"
+      ]
+    },
+    {
+      "name": "Python 3.12",
+      "ctx": {},
+      "expect": [
+        "software"
+      ]
+    },
+    {
+      "name": "7-Zip 23.01",
+      "ctx": {},
+      "expect": [
+        "software"
+      ]
+    },
+    {
+      "name": "Notepad++ v8.6",
+      "ctx": {},
+      "expect": [
+        "software"
+      ]
+    },
+    {
+      "name": "sql server 2019",
+      "ctx": {},
+      "expect": [
+        "software"
+      ]
+    },
+    {
+      "name": "Python  3.12",
+      "ctx": {},
+      "expect": [
+        "software"
+      ]
+    },
+    {
+      "name": "INC12345",
+      "ctx": {},
+      "expect": [
+        "ticket"
+      ]
+    },
+    {
+      "name": "AB12",
+      "ctx": {},
+      "expect": [
+        "host"
+      ]
+    },
+    {
+      "name": "  app01 ",
+      "ctx": {},
+      "expect": [
+        "host"
+      ]
+    },
+    {
+      "name": "srv-02",
+      "ctx": {},
+      "expect": [
+        "host"
+      ]
+    },
+    {
+      "name": "Line 3 printer",
+      "ctx": {},
+      "expect": []
+    },
+    {
+      "name": "README.md",
+      "ctx": {},
+      "expect": []
+    },
+    {
+      "name": "example.test",
+      "ctx": {},
+      "expect": []
+    },
+    {
+      "name": "Office365",
+      "ctx": {},
+      "expect": []
+    },
+    {
+      "name": "Meeting 2026-11-09",
+      "ctx": {},
+      "expect": []
+    },
+    {
+      "name": "INC1234",
+      "ctx": {},
+      "expect": []
+    },
+    {
+      "name": "256.1.1.1",
+      "ctx": {},
+      "expect": []
+    },
+    {
+      "name": "10.20.0.0/33",
+      "ctx": {},
+      "expect": []
+    },
+    {
+      "name": "ABCDE12",
+      "ctx": {},
+      "expect": []
+    },
+    {
+      "name": "v1.2",
+      "ctx": {},
+      "expect": []
+    },
+    {
+      "name": "Payroll",
+      "ctx": {},
+      "expect": []
+    },
+    {
+      "name": "Payroll",
+      "ctx": {
+        "last": "runbook"
+      },
+      "expect": [
+        "runbook"
+      ]
+    },
+    {
+      "name": "APP01",
+      "ctx": {
+        "last": "runbook"
+      },
+      "expect": [
+        "host",
+        "runbook"
+      ]
+    },
+    {
+      "name": "APP01",
+      "ctx": {
+        "last": "host"
+      },
+      "expect": [
+        "host"
+      ]
+    },
+    {
+      "name": "Payroll",
+      "ctx": {
+        "last": "deleted"
+      },
+      "expect": []
+    },
+    {
+      "name": "Payroll",
+      "ctx": {
+        "last": null
+      },
+      "expect": []
+    },
+    {
+      "name": "10.20.0.5",
+      "ctx": {
+        "allowed": [],
+        "scope": [],
+        "last": "network"
+      },
+      "expect": [
+        "host",
+        "network"
+      ]
+    },
+    {
+      "name": "APP01",
+      "ctx": {
+        "allowed": [
+          "software"
+        ]
+      },
+      "expect": [
+        "software"
+      ]
+    },
+    {
+      "name": "APP01",
+      "ctx": {
+        "allowed": [
+          "host",
+          "application"
+        ]
+      },
+      "expect": [
+        "host",
+        "application"
+      ]
+    },
+    {
+      "name": "Payroll",
+      "ctx": {
+        "allowed": [
+          "host",
+          "application"
+        ]
+      },
+      "expect": [
+        "host",
+        "application"
+      ]
+    },
+    {
+      "name": "APP01",
+      "ctx": {
+        "allowed": [
+          "application",
+          "host"
+        ]
+      },
+      "expect": [
+        "host",
+        "application"
+      ]
+    },
+    {
+      "name": "Python 3.12",
+      "ctx": {
+        "allowed": [
+          "host",
+          "application",
+          "software"
+        ]
+      },
+      "expect": [
+        "software",
+        "host",
+        "application"
+      ]
+    },
+    {
+      "name": "APP01",
+      "ctx": {
+        "scope": [
+          "network"
+        ]
+      },
+      "expect": [
+        "network"
+      ]
+    },
+    {
+      "name": "APP01",
+      "ctx": {
+        "allowed": [
+          "software"
+        ],
+        "scope": [
+          "network"
+        ]
+      },
+      "expect": [
+        "software"
+      ]
+    },
+    {
+      "name": "APP01",
+      "ctx": {
+        "allowed": [
+          "ghost",
+          "software"
+        ]
+      },
+      "expect": [
+        "software"
+      ]
+    },
+    {
+      "name": "APP01",
+      "ctx": {
+        "allowed": [
+          "ghost"
+        ],
+        "scope": [
+          "network"
+        ],
+        "last": "runbook"
+      },
+      "expect": [
+        "host",
+        "runbook"
+      ]
+    },
+    {
+      "name": "Payroll",
+      "ctx": {
+        "scope": [
+          "application",
+          "runbook"
+        ],
+        "last": "host"
+      },
+      "expect": [
+        "application",
+        "runbook"
+      ]
+    },
+    {
+      "name": "PRN-TEST-01",
+      "ctx": {
+        "scope": [
+          "printer",
+          "host"
+        ]
+      },
+      "expect": [
+        "printer",
+        "host"
+      ]
+    },
+    {
+      "name": "app01.example.test",
+      "ctx": {
+        "scope": [
+          "host"
+        ]
+      },
+      "expect": [
+        "host"
+      ]
+    },
+    {
+      "name": "Payroll",
+      "ctx": {
+        "allowed": [
+          "page"
+        ]
+      },
+      "expect": [
+        "page"
+      ]
+    },
+    {
+      "name": "SRV-02",
+      "ctx": {
+        "allowed": [
+          "application"
+        ],
+        "last": "host"
+      },
+      "expect": [
+        "application"
+      ]
+    }
+  ],
+  "patterns": [
+    {
+      "pattern": "{ip}",
+      "valid": true,
+      "matches": [
+        "10.20.0.5",
+        "0.0.0.0",
+        "255.255.255.255",
+        "fe80::1",
+        "FE80::1",
+        " 10.20.0.5 "
+      ],
+      "misses": [
+        "256.1.1.1",
+        "10.20.0",
+        "10.20.0.5/24",
+        "10.20.0.05x",
+        "app01",
+        "fe80:1",
+        "10.20.0.5."
+      ]
+    },
+    {
+      "pattern": "{cidr}",
+      "valid": true,
+      "matches": [
+        "10.20.0.0/24",
+        "10.0.0.0/8",
+        "0.0.0.0/0",
+        "10.20.0.0/32",
+        "fe80::/64",
+        "fe80::/128"
+      ],
+      "misses": [
+        "10.20.0.0",
+        "10.20.0.0/33",
+        "fe80::/129",
+        "10.20.0.0/",
+        "subnet/24",
+        "300.20.0.0/24"
+      ]
+    },
+    {
+      "pattern": "{fqdn}",
+      "valid": true,
+      "matches": [
+        "app01.example.test",
+        "a.b.cd",
+        "web-01.lab.example.test",
+        "APP01.EXAMPLE.TEST"
+      ],
+      "misses": [
+        "example.test",
+        "app01",
+        "app01.example.t",
+        "-app.example.test",
+        "app-.example.test",
+        "app01.example.test1",
+        "app01.example.test.",
+        "10.20.0.5",
+        "app 01.example.test"
+      ]
+    },
+    {
+      "pattern": "{version}",
+      "valid": true,
+      "matches": [
+        "SQL Server 2019",
+        "Python 3.12",
+        "7-Zip 23.01",
+        "Notepad++ v8.6",
+        "Java 21",
+        "Tool 1.2.3b",
+        "PYTHON V3"
+      ],
+      "misses": [
+        "Python",
+        "Python3.12",
+        "Meeting 2026-11-09",
+        "Line 3 printer",
+        "v1.2",
+        "Tool 1.2.3beta",
+        "Tool 1..2"
+      ]
+    },
+    {
+      "pattern": "SRV-*",
+      "valid": true,
+      "matches": [
+        "SRV-02",
+        "srv-web",
+        "SRV-"
+      ],
+      "misses": [
+        "SRV02",
+        "SRV-0 2",
+        "XSRV-02"
+      ]
+    },
+    {
+      "pattern": "@@##",
+      "valid": true,
+      "matches": [
+        "AB12",
+        "ab12"
+      ],
+      "misses": [
+        "A12",
+        "AB123",
+        "1B12",
+        "AB1"
+      ]
+    },
+    {
+      "pattern": "@@@##",
+      "valid": true,
+      "matches": [
+        "APP01",
+        "app01",
+        "Srv02"
+      ],
+      "misses": [
+        "APP1",
+        "APP001",
+        "AP01",
+        "AP-01"
+      ]
+    },
+    {
+      "pattern": "@*-##",
+      "valid": true,
+      "matches": [
+        "PRN-TEST-01",
+        "A-01",
+        "web-db-99"
+      ],
+      "misses": [
+        "1A-01",
+        "PRN TEST-01",
+        "PRN-TEST-1"
+      ]
+    },
+    {
+      "pattern": "?#",
+      "valid": true,
+      "matches": [
+        "a1",
+        "-9"
+      ],
+      "misses": [
+        "a",
+        "ab",
+        "a12",
+        " 1"
+      ]
+    },
+    {
+      "pattern": "*",
+      "valid": true,
+      "matches": [
+        "APP01",
+        "x"
+      ],
+      "misses": [
+        "two words"
+      ]
+    },
+    {
+      "pattern": "\\##",
+      "valid": true,
+      "matches": [
+        "#5"
+      ],
+      "misses": [
+        "55",
+        "#a",
+        "\\55"
+      ]
+    },
+    {
+      "pattern": "a\\*b",
+      "valid": true,
+      "matches": [
+        "a*b",
+        "A*B"
+      ],
+      "misses": [
+        "axb",
+        "ab",
+        "a\\*b"
+      ]
+    },
+    {
+      "pattern": "web.?",
+      "valid": true,
+      "matches": [
+        "web.1",
+        "WEB.a"
+      ],
+      "misses": [
+        "webx1",
+        "web.12"
+      ]
+    },
+    {
+      "pattern": "(a+)+$",
+      "valid": true,
+      "matches": [
+        "(a+)+$"
+      ],
+      "misses": [
+        "aaa",
+        "a"
+      ]
+    },
+    {
+      "pattern": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "valid": true,
+      "matches": [
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      ],
+      "misses": [
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      ]
+    },
+    {
+      "pattern": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "valid": false,
+      "matches": [],
+      "misses": [
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      ]
+    },
+    {
+      "pattern": "{foo}",
+      "valid": false,
+      "matches": [],
+      "misses": [
+        "{foo}",
+        "foo"
+      ]
+    },
+    {
+      "pattern": "a{ip}",
+      "valid": false,
+      "matches": [],
+      "misses": [
+        "a10.20.0.5",
+        "a{ip}"
+      ]
+    },
+    {
+      "pattern": "{ip}x",
+      "valid": false,
+      "matches": [],
+      "misses": [
+        "10.20.0.5x"
+      ]
+    },
+    {
+      "pattern": "{ip}{cidr}",
+      "valid": false,
+      "matches": [],
+      "misses": [
+        "10.20.0.5"
+      ]
+    },
+    {
+      "pattern": "\\{ip\\}",
+      "valid": false,
+      "matches": [],
+      "misses": [
+        "{ip}"
+      ]
+    },
+    {
+      "pattern": "}",
+      "valid": false,
+      "matches": [],
+      "misses": [
+        "}"
+      ]
+    },
+    {
+      "pattern": "",
+      "valid": false,
+      "matches": [],
+      "misses": [
+        "x"
+      ]
+    },
+    {
+      "pattern": "abc\\",
+      "valid": false,
+      "matches": [],
+      "misses": [
+        "abc\\",
+        "abc"
+      ]
+    },
+    {
+      "pattern": 5,
+      "valid": false,
+      "matches": [],
+      "misses": [
+        "5"
+      ]
+    },
+    {
+      "pattern": null,
+      "valid": false,
+      "matches": [],
+      "misses": [
+        "None",
+        "null"
+      ]
+    }
+  ]
+}
