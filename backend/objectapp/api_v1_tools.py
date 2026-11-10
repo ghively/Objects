@@ -47,13 +47,16 @@ Routes (all JSON; ``read`` scope for the GETs and the import preview, ``read-wri
   ``DELETE /v1/queries/{id}``
 - ``POST /v1/whiteboards`` ``{title?}``; ``PUT /v1/whiteboard`` ``{path, revision, board}``
 - ``POST /v1/automations`` ``{rule}`` -> 201; ``POST /v1/automations/{id}/run`` ``{path}``
-- ``POST /v1/import/start`` ``{previewId, target, mapping?, batch?, scan?}`` -> 202 ``{jobId, targetPath}``
-  (M27: ``422`` when the mapping makes a type no approved proposal makes)
+- ``POST /v1/import/start`` ``{previewId, target, mapping?, batch?, scan?, keepAsSources?}`` -> 202
+  ``{jobId, targetPath}`` (M27: ``422`` when the mapping makes a type no approved proposal makes; M30:
+  ``keepAsSources`` absent is on)
 - M27: ``POST /v1/import/scan`` ``{path, leaveOut?, batch?}`` -> ``{batch, scan}`` (the scan names kinds and
   lines, never values; with a ``read-write`` token it is kept in a draft batch);
   ``GET /v1/import/proposal?batch=`` -> ``{proposal, decisions, applied}``;
   ``POST /v1/import/proposal`` ``{batch, proposal, revision?}``; ``POST /v1/import/decisions``
   ``{batch, decisions}``; ``GET /v1/import/report?batch=`` -> ``{report, batch, filing}``
+- M30: ``GET /v1/import/entities?batch=`` -> ``EntitiesView`` (``409`` when the batch didn't keep its
+  pages as Sources); accepting and writing entities stay in the app
 - ``POST /v1/trash/{id}/restore``; ``POST /v1/history/restore`` ``{path, versionId, version}``
 
 M22: on a work item, ``/v1/object/duplicate`` and ``/v1/history/restore`` answer ``422`` ("Steps
@@ -212,6 +215,7 @@ class StartRequest(BaseModel):
     mapping: dict[str, Any] | None = None
     batch: str | None = None
     scan: dict[str, Any] | None = None
+    keepAsSources: bool | None = None  # M30: absent, on (every page kept as a read-only Source)
 
 
 class ScanRequest(BaseModel):
@@ -695,6 +699,20 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         return JSONResponse({"report": text, "batch": data, "filing": {
             "state": filing_state["state"], "rightShare": filing_state["trial"]["rightShare"]}})
 
+    @r.get("/v1/import/entities")
+    @run
+    def import_entities(batch: str, request: Request):
+        from .importers import filing
+
+        auth(request)
+        try:
+            view = imports.filing.entities_view(batch)  # type: ignore[attr-defined]
+        except KeyError:
+            return error(404, "No such import batch.")
+        except filing.NotAllowed as exc:
+            return error(409, str(exc))
+        return SafeJSONResponse(_jsonable(view))
+
     @r.get("/v1/import/jobs/{job_id}")
     @run
     def import_status(job_id: str, request: Request):
@@ -1142,7 +1160,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         status, body = _call(
             next(rt for rt in imports.routes if getattr(rt, "path", "") == "/import/start"),
             {"previewId": req.previewId, "mapping": mapping, "target": target, "clientId": origin(token),
-             "batch": req.batch, "scan": req.scan, "requireApproved": True},
+             "batch": req.batch, "scan": req.scan, "requireApproved": True, "keepAsSources": req.keepAsSources},
         )
         if status >= 400:
             return _failed(status, body)
