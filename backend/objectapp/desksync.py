@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 from . import agentschedules, spaceconfig
 from .propvalues import InvalidValue
 from .workagentmodel import QueueRefused
-from .workfields import TICKET_KEYS
+from .workfields import TICKET_KEYS, resolved_key
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -81,17 +81,31 @@ def purpose_for(space: Space, rule_id_: str) -> str:
 
 def apply_ticket_fields(service: WorkService, path: str, version: str, values: dict[str, Any],
                         actor: Actor) -> dict:
-    """Set ticket fields only (never ``status`` or a work field), through the work service."""
+    """Set ticket fields only (never ``status`` or a work field), through the work service.
+
+    M31 (G3): on a type without ``deskResolved`` whose own Resolved is a date (the Incident),
+    ``deskResolved`` is written into that Resolved, with its time when the value has one."""
     if not isinstance(values, dict) or not values:
         raise InvalidValue("Say which ticket fields to set.")
+    resolved = None
+    if "deskResolved" in values:
+        resolved = resolved_key(service.space.type_by_id(service.space.get(path).type))
     clean: dict[str, Any] = {}
+    own: list[str] = []
     for key, value in values.items():
         if key not in TICKET_KEYS:
             raise InvalidValue(f'The field "{key}" isn'"'"'t a ticket field.')
+        if key == "deskResolved" and resolved == "resolved":
+            if isinstance(value, str):
+                text = value.strip()
+                value = {"start": text[:10], "resolution": "day"} if len(text) <= 10 else {"start": text}
+            clean["resolved"] = value
+            own.append("resolved")
+            continue
         if key in _DAY_KEYS and isinstance(value, str):
             value = {"start": value.strip()[:10], "resolution": "day"}
         clean[key] = value
-    return service.fields(path, version, clean, [], actor)
+    return service.fields(path, version, clean, [], actor, own=own)
 
 
 def _listed_marked(space: Space, read_tools: list[str]) -> int:

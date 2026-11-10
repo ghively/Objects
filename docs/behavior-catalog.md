@@ -201,7 +201,8 @@ Each starter template pre-fills the new type's properties.
   (`POST /api/space/setup`): "Start with basic setup", "IT operations" ("Includes hosts, software, applications,
   runbooks and incidents."; Object's own, M28) and "Empty space". IT operations writes the 17 IT ops types (Host,
   Software, Application, Container, Configuration, Location, Network, Person, Vendor, Script, Command, Runbook,
-  Prompt, Source, Project, Incident, Meeting), a default template for each but Source, and 30 seed Tags; a type,
+  Prompt, Source, Project, Incident, Meeting; an Incident has one Resolved, its own date and time, which Desk sync
+  fills, M31), a default template for each but Source, and 30 seed Tags; a type,
   template or Tag already there is kept as it is. Nothing is written before a pick; closing asks again next
   time. The pick is recorded as `space.json` `setup` (`basic`, `itops` or `blank`; Create space records it too).
 - Main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant (Gene's 2026-11-08 redesign;
@@ -707,11 +708,13 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   group. An item the rules will skip says so before Apply ("Apply will skip this: <reason>"), properties the rules left
   out are listed under **Left out** with their reason, and the Apply summary names each skipped item and why
   ("Skipped: Memo (…)"; items the user turned down are not repeated). Only the app applies a proposal; no MCP tool can.
-  In an IT ops space (setup `itops`, or one with the Host, Software and Application types; M30, design 5b) the rules
-  also say: existing types first; a new type with at least two properties, 80% or more of them by name also an existing
+  In every space, whatever its setup (M30, design 5b; M31, Gene's 2026-11-10 decision "spaces never change
+  behaviour": the setup is only the starting set of types) the rules also say: existing types first; a new type with at least two properties, 80% or more of them by name also an existing
   type's, is refused ("It has the same properties as Host.") and offers **Use Host, with a category**, which turns the
   item into an extend of Host that adds the group's name to its Category (else Kind) options; a category name (Server,
-  Workstation, VM, Production) is never a type ("Server is a category: a property value or a tag, not a type.").
+  Workstation, VM, Production) is never a type ("Server is a category: a property value or a tag, not a type."); a
+  relation property outside the space's named relations is left out ("Not one of the named relations; it stays a plain
+  link.") (M31).
 - **Trial on the first 50 objects**: **Start trial**; each result shows a confidence (High, Medium, Low), the value
   and its **Quote**, the **Tags** and **Collections** it adds (each with its quote), and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
   failed the app's check says **Did not pass the check**. **Continue with the rest** starts the bulk pass (40 objects

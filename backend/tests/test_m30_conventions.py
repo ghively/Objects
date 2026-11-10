@@ -1,7 +1,8 @@
 """M30 Task 7: the IT ops conventions as hard rules in M27's schema proposal (plan
 ``2026-11-09-m30-entity-extraction.md``, Task 7; design 2026-11-09 section 5b): existing types
 first, no look-alike types ("Use <type>, with a category"), categories never types, relations
-outside the named set stay plain links. Outside an IT ops space M27's rules are unchanged.
+outside the named set stay plain links. M31 (Gene's decision 1): the rules hold in every space,
+whatever its setup (`test_rules_in_every_space`).
 
 ``space-sample`` (which `itops_space` copies) already has a type named Server (id ``server``,
 properties Cores and Owner). A proposed ``create "Server"`` with Host's properties is still a
@@ -198,31 +199,34 @@ def test_relations_outside_named_set_dropped(tmp_path) -> None:
     assert ext["problems"] == []
 
 
-def test_rules_off_outside_itops(tmp_path) -> None:
+def test_rules_in_every_space(tmp_path) -> None:
+    """M31: ``space-sample`` has no setup and none of the IT ops types; the rules hold all the same.
+    Server already exists (M27's advice stands, nothing looks like it); Box has Host's properties but
+    there is no Host here, so it passes; a relation outside the named set (Owner) stays a plain link."""
     root = _sample(tmp_path)
-    space = Space(root)
-    assert not proposal.is_itops_space(space)
+    assert spaceconfig.read(root)[0].get("setup") is None
     own = [{"name": "Hypervisor version", "kind": "text", "share": 1.0},
            {"name": "Memory", "kind": "number", "share": 1.0}]
     rel = {"id": "g6", "action": "extend", "group": "Projects", "name": "Project", "documents": 10, "properties": [
-        {"name": "Runs on", "kind": "entity", "target": "Project", "share": 1.0},
+        {"name": "Owner", "kind": "entity", "target": "Project", "share": 1.0},
         {"name": "Backs up", "kind": "entity", "target": "Project", "share": 1.0}]}
     _batch, items = _save(root, _create("Server"), _create("Box", iid="g2"), _create("VM", own, iid="g3"),
-                          _create("Workstation", own, iid="g4"), _create("Kiosk", iid="g5"), rel)
-    server, box, vm, ws, kiosk, ext = items
+                          _create("Docs", own, iid="g4"), _create("Kiosk", iid="g5"), rel)
+    server, box, vm, docs, kiosk, ext = items
     assert server["problems"] == ["A type named 'Server' already exists; use or extend it."]
-    assert box["problems"] == vm["problems"] == ws["problems"] == kiosk["problems"] == ext["problems"] == []
+    assert box["problems"] == vm["problems"] == kiosk["problems"] == ext["problems"] == []
+    assert docs["problems"] == ["Docs is a category: a property value or a tag, not a type."]  # the sample's tag
     assert not any("offer" in it for it in items)
     assert [p["name"] for p in box["properties"]] == ["IP address", "FQDN", "Operating system", "Environment"]
-    assert [p["name"] for p in ext["properties"]] == ["Runs on", "Backs up"] and ext["dropped"] == []
+    assert [p["name"] for p in ext["properties"]] == ["Owner"]
+    assert [d["name"] for d in ext["dropped"]] == ["Backs up"]
 
 
-def test_is_itops_space(tmp_path) -> None:
+def test_setup_is_not_a_switch(tmp_path) -> None:
+    """M31: the space's ``setup`` changes nothing; ``is_itops_space`` is gone."""
     root = itops_space(tmp_path)
-    assert proposal.is_itops_space(Space(root))
+    _batch, first = _save(root, _create("Server"), _create("Workstation", iid="g2"))
     spaceconfig.set_internal(root, "setup", "blank")
-    assert proposal.is_itops_space(Space(root))  # the Host, Software and Application types are there
-    sample = _sample(tmp_path)
-    assert not proposal.is_itops_space(Space(sample))
-    spaceconfig.set_internal(sample, "setup", "itops")
-    assert proposal.is_itops_space(Space(sample))
+    _batch, second = _save(root, _create("Server"), _create("Workstation", iid="g2"))
+    assert first == second and first[0]["offer"]["typeId"] == "host"
+    assert not hasattr(proposal, "is_itops_space")

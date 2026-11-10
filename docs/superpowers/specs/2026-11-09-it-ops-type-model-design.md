@@ -161,9 +161,9 @@ The import keeps the source data and distils what is relevant into the right obj
 - **Links both ways**: every entity links to the Sources it was distilled from ("Sources", counterpart "Distilled into" on the Source), so a Source shows what was built from it.
 - **When sources disagree** (two IPs for APP01), the value from the most recently modified Source wins; the conflict is listed in the import report and on the entity, with both values and their Sources, for Gene to settle.
 
-### 5b. Conventions are rules in an IT ops space (Gene, 2026-11-09)
+### 5b. Conventions are rules in every space (Gene, 2026-11-09; every space since 2026-11-10)
 
-When the target space has the IT ops types, the schema proposal and the entity review enforce the conventions; a proposal that breaks one can't be applied:
+In every space, whatever its setup (Gene, 2026-11-10: "Everything should be universal for any space"; IT operations is only a starting set of types), the schema proposal and the entity review enforce the conventions; a proposal that breaks one can't be applied:
 
 - **Existing types first**: a group of documents maps onto an existing type when one fits; a new type is proposed only when none does (and the import design's 10-document and own-properties rules hold).
 - **No look-alike types**: a proposed type whose properties match an existing type's is refused, with "Use <type>, with a category" offered instead.
@@ -192,7 +192,7 @@ When the target space has the IT ops types, the schema proposal and the entity r
 - Fast-changing Host facts are synced, read-only fields with a refreshed time.
 - Creating an object suggests the type, and the type's template fills it.
 - Named two-way relations: runs on / runs, installed on / uses, applies to / covers, located at / owned by.
-- (Superseded the same day, see 5a) ~~A page's own text becomes its main entity's notes.~~ Every imported page is kept as a read-only Source; entities are distilled from all their Sources with citations, a summary section the import owns and Gene's own notes kept apart; the newest Source wins a conflict, which is listed. In an IT ops space the conventions are hard rules (5b). Gene reviews the entity list and merges; links are written without asking.
+- (Superseded the same day, see 5a) ~~A page's own text becomes its main entity's notes.~~ Every imported page is kept as a read-only Source; entities are distilled from all their Sources with citations, a summary section the import owns and Gene's own notes kept apart; the newest Source wins a conflict, which is listed. In every space the conventions are hard rules (5b). Gene reviews the entity list and merges; links are written without asking.
 - New spaces get an IT ops starter. Its vocabulary comes from his older export, names only.
 
 ## Our calls (for Gene to check while reading)
