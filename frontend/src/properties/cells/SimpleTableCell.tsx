@@ -7,41 +7,61 @@ import type { CellProps } from './types'
 
 const SEPARATOR_ROW = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/
 
+/** A cell's text as GFM shows it: `\|` is `|`, then a `\` before ASCII punctuation drops. */
+const unescapeCell = (raw: string) =>
+  raw
+    .trim()
+    .replace(/\\\|/g, '|')
+    .replace(/\\([!-/:-@[-`{-~])/g, '$1')
+
+/** A row's cells. As in GFM, a `|` right after a `\` is part of the cell. */
 function splitRow(line: string): string[] {
   let s = line.trim()
   if (s.startsWith('|')) s = s.slice(1)
   if (s.endsWith('|') && !s.endsWith('\\|')) s = s.slice(0, -1)
   const cells: string[] = []
-  let cur = ''
+  let start = 0
   for (let i = 0; i < s.length; i++) {
-    if (s[i] === '\\' && s[i + 1] === '|') {
-      cur += '|'
-      i++
-    } else if (s[i] === '|') {
-      cells.push(cur.trim())
-      cur = ''
-    } else cur += s[i]
+    if (s[i] === '|' && s[i - 1] !== '\\') {
+      cells.push(s.slice(start, i))
+      start = i + 1
+    }
   }
-  cells.push(cur.trim())
-  return cells
+  cells.push(s.slice(start))
+  return cells.map(unescapeCell)
 }
 
-/** A GFM table's cells, header row first, every row padded to the widest; `[]` for no table. */
+/**
+ * A GFM table's cells, header row first, every row padded to the widest; `[]` for no table. Only
+ * line 2 is the separator (a later line of dashes is a row); cells are unescaped as GFM shows them.
+ * The backend's `table_rows` reads the same way.
+ */
 export function parseGfmTable(md: string | null | undefined): string[][] {
   if (!md) return []
-  const rows = md
+  const lines = md
+    .replace(/^\uFEFF/, '')
     .split(/\r?\n/)
-    .filter((l) => l.trim() !== '' && !SEPARATOR_ROW.test(l))
-    .map(splitRow)
+    .filter((l) => l.trim() !== '')
+  const rows = lines.filter((l, i) => i !== 1 || !SEPARATOR_ROW.test(l)).map(splitRow)
   const width = Math.max(0, ...rows.map((r) => r.length))
   return rows.map((r) => [...r, ...Array<string>(width - r.length).fill('')])
 }
 
-/** Cells as a GFM table: the first row is the header, `|` in a cell is escaped. */
+/**
+ * A cell for a GFM row: `\` and `|` escaped, and a cell of dashes (`-`, `:--:`) escaped (`\-`) so
+ * it can't read as a separator; GFM shows each as typed. The backend's `table_markdown` matches.
+ */
+const escapeCell = (c: string) =>
+  c
+    .replace(/\r?\n/g, ' ')
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|')
+    .replace(/^(\s*)(:?-+:?\s*)$/, '$1\\$2')
+
+/** Cells as a GFM table: the first row is the header; cells escaped (`escapeCell`). */
 export function serializeGfmTable(rows: string[][]): string {
   if (!rows.length || !rows[0].length) return ''
-  const line = (r: string[]) =>
-    `| ${r.map((c) => c.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|')).join(' | ')} |`
+  const line = (r: string[]) => `| ${r.map(escapeCell).join(' | ')} |`
   const width = rows[0].length
   return [line(rows[0]), `| ${Array<string>(width).fill('---').join(' | ')} |`, ...rows.slice(1).map(line)].join(
     '\n',
