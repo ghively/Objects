@@ -30,6 +30,7 @@ import { QueryBuilder } from './QueryBuilder'
 import { PAUSED_HINT, isQueryReady, isSearching, queryScope, runQuery } from './runQuery'
 import { collectionHasQuery, editQuery, removeQuery, setQueryOnCollection, setQueryOnType, viewsHaveQuery } from './useQueries'
 import { QUERY_ICON } from '@/lib/defIcons'
+import { DEV_INFO_TEXT, DevInfo } from '@/settings/DevInfo'
 
 export const QUERY_TEXT = {
   edit: 'Edit query',
@@ -293,6 +294,7 @@ export function QueryPage({ id }: { id: string }) {
         </DropdownMenu>
       </header>
       {tickets && <p className="px-4 pb-2 text-[13px] text-fg-muted">{TICKETS_NOTE}</p>}
+      <DevInfo className="mx-4 mb-2 max-w-md" rows={[{ label: DEV_INFO_TEXT.queryId, value: q.id }]} />
       {readOnly && (
         <p role="status" className="px-4 pb-2 text-[13px] text-fg-muted">
           {`This query's file couldn't be read, so it opens read-only. Fix the file to edit it.`}

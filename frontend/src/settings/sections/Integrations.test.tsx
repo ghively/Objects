@@ -93,4 +93,28 @@ describe('Integrations', () => {
     expect(INTEGRATIONS_SEARCH).toContain(MCP_TEXT.secretVariables)
     expect(INTEGRATIONS_SEARCH).toContain('MCP')
   })
+
+  test('test the button reads "New API token"', async () => {
+    render(<IntegrationsSection />)
+    expect(T.newToken).toBe('New API token')
+    expect(await screen.findByRole('heading', { name: 'New API token' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'New token' })).toBeNull()
+  })
+
+  test('test developer settings: "Show developer information" is a device setting, last', async () => {
+    const user = userEvent.setup()
+    render(<IntegrationsSection />)
+    await screen.findByText(T.empty)
+    const group = screen.getByRole('region', { name: 'Developer settings' })
+    expect(within(group).getByRole('heading', { name: 'Developer settings' })).toBeInTheDocument()
+    const sw = screen.getByRole('switch', { name: 'Show developer information' })
+    expect(sw).not.toBeChecked()
+    expect(screen.getByText(T.devInfoHelp)).toBeInTheDocument()
+    await user.click(sw)
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ showDeveloperInfo: true }, { baseRevision: 'r0' })
+    expect(useSettings.getState().settings.showDeveloperInfo).toBe(true)
+    const titles = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
+    expect(titles.indexOf('Developer settings')).toBeGreaterThan(titles.indexOf(MCP_TEXT.heading))
+    expect(INTEGRATIONS_SEARCH).toContain('Show developer information')
+  })
 })

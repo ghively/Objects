@@ -97,6 +97,11 @@ Object has no accounts.
 - Calendar Integrations; Task actions.
 - API: scoped API tokens per space (name, masked token, space, last used, Delete) and "New API token";
   Developer settings: "Show developer information" (IDs and developer details in the UI).
+  Developer information (M31; device setting `showDeveloperInfo`, off by default): while on, a small read-only
+  "Developer information" box with a copy button per value shows an object's id and file path under its
+  properties, a type's id, folder and each property's key in type settings, a property's key and id in property
+  settings, a query's id on its page, and a collection's id and the open view's key on its page. Views have no
+  ids of their own (they live inside their type, collection or query).
   A token's scope is "Read only", "Read and write" or "Synced facts only" (Object's own, M29: reads, and fills synced
   properties; section 10f).
 - Web Extension: Chrome, Edge, Safari, Firefox capture extension; Web Highlights.

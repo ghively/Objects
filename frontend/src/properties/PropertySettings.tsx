@@ -30,6 +30,7 @@ import {
   updateProperty,
 } from './typeEdits'
 import { ButtonSettingsSection } from './settings/ButtonSettings'
+import { DEV_INFO_TEXT, DevInfo } from '@/settings/DevInfo'
 
 // The property settings texts.
 const TEXT = {
@@ -928,6 +929,14 @@ export function PropertySettings({
               </p>
             )}
           </fieldset>
+        )}
+        {def && (
+          <DevInfo
+            rows={[
+              { label: DEV_INFO_TEXT.propertyKey, value: def.key },
+              { label: DEV_INFO_TEXT.propertyId, value: def.id },
+            ]}
+          />
         )}
         {!editor && own.dialog}
       </DialogContent>
