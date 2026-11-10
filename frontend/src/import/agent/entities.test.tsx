@@ -261,6 +261,22 @@ describe('EntitiesStep', () => {
     expect(within(host).getByText(T.entityStatus.accepted)).toBeInTheDocument()
   })
 
+  test('a step reopened after a failed write shows it and offers Write again', async () => {
+    const base = view({ entities: ENTITIES.map((e) => ({ ...e, decision: { status: 'accepted' as const } })), undecided: 0, writeError: 'disk full' })
+    m.importEntities.mockResolvedValue(base)
+    render(<EntitiesStep batch="b1" onDone={vi.fn()} />)
+    expect(await screen.findByText(T.writeFailed)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: T.write })).toBeEnabled()
+    expect(m.filingStatus).not.toHaveBeenCalled()
+  })
+
+  test('a step opened with no write error shows no failure', async () => {
+    m.importEntities.mockResolvedValue(view({ writeError: null }))
+    render(<EntitiesStep batch="b1" onDone={vi.fn()} />)
+    await screen.findByRole('group', { name: 'APP01' })
+    expect(screen.queryByText(T.writeFailed)).not.toBeInTheDocument()
+  })
+
   test('write waits for every decision', async () => {
     const base = view({
       entities: [{ ...HOST, decision: { status: 'accepted' } }, { ...SQL, decision: { status: 'renamed', name: 'SQL Server 2019 Std' } }, SQLX],

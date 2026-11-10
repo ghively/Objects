@@ -3125,4 +3125,6 @@ export interface EntitiesView {
   review: EntitiesReview
   undecided: number
   written: EntitiesWritten | null
+  /** The last Write's error text when it failed; null (or absent) otherwise. */
+  writeError?: string | null
 }

@@ -46,6 +46,8 @@ export function EntitiesStep({ batch, onDone }: { batch: string; onDone: (status
       latest.current = v
       setView(v)
       setError(null)
+      // Reopened after a Write that failed: say so, with Write offered again.
+      if (v.writeError) setFailed(true)
       // Opened (or read again) while Write runs: follow it until it ends.
       if (v.state === 'writing') {
         setWriting(true)
