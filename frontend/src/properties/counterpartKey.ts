@@ -2,23 +2,51 @@
 // ("Used by" → `usedBy`). The server checks the shape (`^[A-Za-z][A-Za-z0-9]{0,59}$`, not a
 // system key); this picks one that passes and isn't a stored key on the target types.
 
-/** Keys an other side can never take (the server's system keys). */
+/**
+ * Keys an other side can never take. Mirrors the server's `_COUNTERPART_RESERVED` in
+ * backend/objectapp/typemodel.py (`valid_counterpart`): `SYSTEM_KEYS` from
+ * backend/objectapp/typedefs.py plus backlinks, title, type, tags, aliases and id. Keep the two in step.
+ */
 const RESERVED = new Set([
+  // typedefs.SYSTEM_KEYS
   'id',
   'type',
   'template',
   'title',
-  'tags',
-  'aliases',
-  'backlinks',
-  'collections',
-  'description',
-  'createdAt',
-  'lastUpdated',
   'icon',
   'iconColor',
+  'description',
+  'aliases',
+  'tags',
+  'collections',
+  'createdAt',
+  'lastUpdated',
   'coverImage',
   'color',
+  // basic media fields
+  'url',
+  'domain',
+  'iframeUrl',
+  'previewImage',
+  'mimeType',
+  'fileSize',
+  'width',
+  'height',
+  'source',
+  // DailyNote
+  'date',
+  'reviewed',
+  // M9 per-object layout and page view
+  'wideLayoutMode',
+  'wideCoverImage',
+  'coverImageOffset',
+  'defaultPageViewId',
+  // the property-pane toggle
+  'hideProperties',
+  // M25 import provenance
+  'importSource',
+  // typemodel._COUNTERPART_RESERVED's own additions
+  'backlinks',
 ])
 
 const MAX = 60

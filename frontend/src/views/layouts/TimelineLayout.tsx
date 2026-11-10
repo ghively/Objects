@@ -915,7 +915,11 @@ export function TimelineSettings({ types, state, onState }: TimelineSettingsProp
   const start = resolveStart(config, types)
   const end = resolveEnd(config, types, start)
   const deps = !!state.viewDefinition.dependenciesConfig
-  const columnChoices = propertyChoices(types).filter((c) => c.kind !== 'entity_title' && c.kind !== 'blocks' && c.kind !== 'entity_backlinks')
+  // M28: not the computed other sides (`counterpartOf`): the table builds its columns from the
+  // stored definitions only.
+  const columnChoices = propertyChoices(types).filter(
+    (c) => c.kind !== 'entity_title' && c.kind !== 'blocks' && c.kind !== 'entity_backlinks' && !c.def.options?.counterpartOf,
+  )
   const row = (label: string, control: ReactNode) => (
     <div className="flex items-center gap-2 px-2">
       <span className="w-24 shrink-0 text-[13px] text-fg-muted">{label}</span>

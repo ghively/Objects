@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { Row, UpdateResult, ViewState } from '@/api/types'
-import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
+import { counterpartDef, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 
 let dragEnd: ((e: unknown) => void) | undefined
 vi.mock('@dnd-kit/core', async (orig) => {
@@ -266,5 +266,40 @@ describe('KanbanLayout', () => {
     const done = columns().find((c) => within(c).queryByText('Done'))!
     await user.click(within(done).getByRole('button', { name: /Add to Done/ }))
     await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', { values: { done: true, status: ['Done'] } }))
+  })
+
+  test('a board grouped by a counterpart takes no drops and its "+" creates without it (M28 review #2)', async () => {
+    const user = userEvent.setup()
+    const runs = counterpartDef({
+      key: 'runs',
+      name: 'Runs',
+      options: { allowedTypes: ['application'], counterpartOf: [{ typeId: 'application', key: 'runsOn' }] },
+    })
+    const host = typeDef({
+      id: 'host',
+      name: 'Host',
+      pluralName: 'Hosts',
+      propertyDefinitions: [propertyDef({ id: 'title', type: 'entity_title', name: 'Title' })],
+      counterparts: [runs],
+    })
+    const inv = 'Applications/Inventory app.md'
+    const hosts = [
+      row({
+        summary: objectSummary({ path: 'Hosts/H1.md', title: 'H1', type: 'host' }),
+        values: { runs: [{ target: 'Inventory app', path: inv }] },
+        links: { runs: [inv] },
+      }),
+      row({ summary: objectSummary({ path: 'Hosts/H2.md', title: 'H2', type: 'host' }), values: { runs: [] }, links: { runs: [] } }),
+    ]
+    function Board() {
+      const [state, setState] = useState(kanban({ groupBy: { groups: [{ propertyId: 'runs', option: 'default' }] } }))
+      return <DataView rows={hosts} types={[host]} scope={{ typeIds: ['host'] }} state={state} onState={setState} layouts={['list', 'kanban']} />
+    }
+    render(<Board />)
+    expect(columns().length).toBeGreaterThan(1)
+    for (const c of columns()) expect(c.getAttribute('data-droppable')).toBe('false')
+    const col = columns().find((c) => within(c).queryByText('Inventory app'))!
+    await user.click(within(col).getByRole('button', { name: /Add to Inventory app/ }))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('host', { values: {} }))
   })
 })

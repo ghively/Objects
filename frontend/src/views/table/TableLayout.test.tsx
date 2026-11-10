@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { Row, TypeDef, ViewState } from '@/api/types'
-import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
+import { counterpartDef, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
@@ -309,6 +309,35 @@ describe('TableLayout', () => {
     render(<Harness rows={[ro]} />)
     expect(screen.getByLabelText('Note')).toHaveAttribute('readonly')
     expect(screen.getByLabelText(/^Title of /)).toHaveAttribute('readonly')
+  })
+
+  // M28 review #9: a computed other side is a relation column (its kind, its chips), read-only.
+  test('a counterpart column shows the linked objects as read-only relation chips', () => {
+    const runs = counterpartDef({
+      key: 'runs',
+      name: 'Runs',
+      options: { allowedTypes: ['application'], counterpartOf: [{ typeId: 'application', key: 'runsOn' }] },
+    })
+    const host = typeDef({
+      id: 'host',
+      name: 'Host',
+      pluralName: 'Hosts',
+      propertyDefinitions: [propertyDef({ id: 'title', type: 'entity_title', name: 'Title' })],
+      counterparts: [runs],
+    })
+    const inv = 'Applications/Inventory app.md'
+    const pay = 'Applications/Payroll.md'
+    const h = row({
+      summary: objectSummary({ path: 'Hosts/H1.md', title: 'H1', type: 'host' }),
+      values: { runs: [{ target: 'Inventory app', path: inv }, { target: 'Payroll', path: pay }] },
+      links: { runs: [inv, pay] },
+    })
+    const { container } = render(<Harness types={[host]} rows={[h]} init={base({ tableConfigs: { host: { wrapAllContent: false, properties: [] } } })} />)
+    const cell = container.querySelector('[role="row"][data-path="Hosts/H1.md"] [role="cell"][data-col="runs"]') as HTMLElement
+    // The chips themselves, not a Backlinks count, even in a one-line cell.
+    expect(within(cell).getByText('Inventory app')).toBeInTheDocument()
+    expect(within(cell).getByText('Payroll')).toBeInTheDocument()
+    expect(within(cell).queryByRole('button', { name: 'Edit Runs' })).not.toBeInTheDocument()
   })
 })
 

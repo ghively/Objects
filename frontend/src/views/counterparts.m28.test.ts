@@ -5,7 +5,7 @@ import { describe, expect, test } from 'vitest'
 import type { Row, TypeDef } from '@/api/types'
 import { counterpartDef, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 import { applyFilters, type FilterCtx } from './filter'
-import { canDropRow, groupRows } from './group'
+import { canDropRow, groupRows, valueForGroup } from './group'
 import { propertyChoices } from './properties'
 import { applySorts } from './sort'
 import { normalizeTableConfig, tableDefs } from './table/tableConfig'
@@ -87,15 +87,26 @@ describe('test M28 counterparts in views', () => {
     expect(groups.find((g) => g.isOther)?.rows.map((r) => r.summary.title)).toEqual(['DB-TEST-01'])
     // A board grouped by it never writes the counterpart on the dropped row.
     expect(canDropRow(rows[1], { propertyId: 'runs', option: 'default' }, runs, [host])).toBe(false)
+    // Nor does a column's "+" or a drop get a value for it (review #2: the server refuses it).
+    const by = { groups: [{ propertyId: 'runs', option: 'default' as const }] }
+    const inv = groups.find((g) => g.label === 'Inventory app')!
+    expect(valueForGroup(by, inv, runs)).toBeNull()
+    expect(valueForGroup(by, inv, runs, { row: rows[1], from: groups.find((g) => g.isOther) })).toBeNull()
   })
 
   test('test the table offers the counterpart as a read-only column', () => {
     const defs = tableDefs(host)
     expect(defs.map((d) => d.key)).toEqual(['title', 'fqdn', 'runs'])
     const col = defs.find((d) => d.key === 'runs')!
-    // A read-only relation cell (the chips of the linked objects): never written on this row.
-    expect(col.type).toBe('entity_backlinks')
+    // A relation column (review #9: its kind, not Backlinks, also in a saved table config); the
+    // table renders it read-only from `options.counterpartOf`, so it is never written on this row.
+    expect(col.type).toBe('entity')
+    expect(col.options.counterpartOf).toEqual(runs.options.counterpartOf)
     expect(col.name).toBe('Runs')
-    expect(normalizeTableConfig(host).properties.map((c) => c.id)).toEqual(['title', 'fqdn', 'runs'])
+    const cols = normalizeTableConfig(host).properties
+    expect(cols.map((c) => c.id)).toEqual(['title', 'fqdn', 'runs'])
+    expect(cols.find((c) => c.id === 'runs')?.type).toBe('entity')
+    // A config saved while it was a Backlinks column takes the relation kind again.
+    expect(normalizeTableConfig(host, { wrapAllContent: true, properties: [{ id: 'runs', type: 'entity_backlinks', isHidden: false, wrapContent: false, colWidth: 12 }] }).properties.find((c) => c.id === 'runs')?.type).toBe('entity')
   })
 })

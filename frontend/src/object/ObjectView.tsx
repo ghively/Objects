@@ -661,7 +661,10 @@ export function ObjectView({
       // object may be one a rollup reads (a related object, or its title), or may have gained or
       // lost a link to this one (the Backlinks property; fix pass H, M5#5; M28: a counterpart row).
       if (e.path === path || !OBJECT_EVENT_KINDS.has(e.kind)) return
-      if (typeHas(typeId, (k) => k === 'rollup' || k === 'entity_backlinks') || typeHasCounterparts(typeId)) refreshComputed()
+      // A type that only receives other sides from "any type" sources (Command or Runbook "Covers")
+      // has no `counterparts` of its own, so the object's own rows count too.
+      const hasCounterparts = typeHasCounterparts(typeId) || (detailRef.current?.counterparts?.length ?? 0) > 0
+      if (typeHas(typeId, (k) => k === 'rollup' || k === 'entity_backlinks') || hasCounterparts) refreshComputed()
     })
   }, [path, refreshComputed])
 
