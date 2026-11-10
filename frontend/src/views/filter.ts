@@ -258,6 +258,9 @@ export function defIn(type: TypeDef | undefined, propertyId: string): DefLike | 
   if (!type) return undefined
   const d = type.propertyDefinitions.find((p) => p.key === propertyId || p.id === propertyId)
   if (d) return d
+  // M28: a computed other side ("Runs" on a Host) filters, sorts and groups as a relation.
+  const c = type.counterparts?.find((p) => p.key === propertyId)
+  if (c) return c
   const kind = BUILTIN_KINDS[propertyId]
   return kind ? { type: kind, options: {} } : undefined
 }

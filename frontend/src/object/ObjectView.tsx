@@ -4,7 +4,7 @@
  * calendar's daily note) renders only the body editor and its autosave.
  */
 import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
-import { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { api, ConflictError, isResync } from '@/api/client'
 import { openAiChat, useAiHidden } from '@/ai/store'
@@ -67,6 +67,7 @@ import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, HeaderTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
 import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
 import { ImportSourceLine } from './ImportSourceLine'
+import { counterpartEditor } from './CounterpartRows'
 import { PropertyPanel } from './PropertyPanel'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
@@ -279,6 +280,11 @@ function typeHas(typeId: string | null | undefined, test: (kind: PropertyType) =
   return !!typeOf(typeId)?.propertyDefinitions.some((d) => test(d.type))
 }
 
+/** M28: whether objects of the type can have computed other sides (`TypeDef.counterparts`). */
+function typeHasCounterparts(typeId: string | null | undefined): boolean {
+  return (typeOf(typeId)?.counterparts?.length ?? 0) > 0
+}
+
 /** M22: the keys of a work type's `steps` and `floorItems` properties (decoded by the server). */
 function workKeysOf(type: TypeDef | undefined): string[] {
   if (!isWorkType(type)) return []
@@ -489,7 +495,9 @@ export function ObjectView({
         .then((fresh) => {
           if (n !== computedSeq.current) return
           setDetail((d) =>
-            d && d.summary.path === fresh.summary.path ? { ...d, computed: fresh.computed, backlinks: fresh.backlinks } : d,
+            d && d.summary.path === fresh.summary.path
+              ? { ...d, computed: fresh.computed, backlinks: fresh.backlinks, counterparts: fresh.counterparts }
+              : d,
           )
         })
         .catch(() => undefined)
@@ -501,6 +509,17 @@ export function ObjectView({
       computedTimer.current = null
       computedSeq.current++
     },
+    [path],
+  )
+
+  // M28: a counterpart edit writes the other objects' stored side; the answer's rows replace ours.
+  const onEditCounterpart = useMemo(
+    () =>
+      counterpartEditor(
+        path,
+        () => detailRef.current?.counterparts ?? [],
+        (rows) => setDetail((d) => (d && d.summary.path === path ? { ...d, counterparts: rows } : d)),
+      ),
     [path],
   )
 
@@ -640,9 +659,9 @@ export function ObjectView({
       }
       // This object's own changes reload it (or are our writes, refreshed above). Any other
       // object may be one a rollup reads (a related object, or its title), or may have gained or
-      // lost a link to this one (the Backlinks property; fix pass H, M5#5).
+      // lost a link to this one (the Backlinks property; fix pass H, M5#5; M28: a counterpart row).
       if (e.path === path || !OBJECT_EVENT_KINDS.has(e.kind)) return
-      if (typeHas(typeId, (k) => k === 'rollup' || k === 'entity_backlinks')) refreshComputed()
+      if (typeHas(typeId, (k) => k === 'rollup' || k === 'entity_backlinks') || typeHasCounterparts(typeId)) refreshComputed()
     })
   }, [path, refreshComputed])
 
@@ -1019,6 +1038,8 @@ export function ObjectView({
         summary={detail.summary}
         backlinks={detail.backlinks ?? []}
         computed={detail.computed}
+        counterparts={detail.counterparts ?? []}
+        onEditCounterpart={onEditCounterpart}
         readOnly={propsReadOnly}
         onChange={(key, value) => writeProperties({ [key]: value })}
         onChangeMany={(u, r) => void writes.updateProperties(u, r)}
