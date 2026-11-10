@@ -1,5 +1,7 @@
 // The graph toolbar: "Find a note in this graph" (Enter focuses the best visible match),
 // "Fit graph to view", "Export view as PNG", and the "Customize" popover passed in by the page.
+// M31: the global graph keeps only the search field here (its other controls sit over the canvas,
+// `GraphControls`); the local graph panel keeps all of them.
 import { useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 
@@ -12,7 +14,8 @@ export const TOOLBAR_TEXT = {
 export interface GraphToolbarProps {
   /** Enter in the search field. */
   onSearch(query: string): void
-  onFit(): void
+  /** "Fit graph to view"; the button shows only when given. */
+  onFit?(): void
   /** "Export view as PNG"; the button shows only when given. */
   onExport?(): void
   /** The `GraphCustomization` popover. */
@@ -44,15 +47,17 @@ export function GraphToolbar({ onSearch, onFit, onExport, customize, compact }: 
           className="h-8 w-full rounded-lg border border-line bg-raised pr-2 pl-7 text-[14px] outline-none placeholder:text-fg-muted focus:border-fg-muted"
         />
       </label>
-      <button
-        type="button"
-        onClick={onFit}
-        title={TOOLBAR_TEXT.fit}
-        aria-label={TOOLBAR_TEXT.fit}
-        className="flex size-8 items-center justify-center rounded-lg border border-line bg-raised hover:bg-hover"
-      >
-        <Icon name="ph-arrows-in-simple" size={14} />
-      </button>
+      {onFit && (
+        <button
+          type="button"
+          onClick={onFit}
+          title={TOOLBAR_TEXT.fit}
+          aria-label={TOOLBAR_TEXT.fit}
+          className="flex size-8 items-center justify-center rounded-lg border border-line bg-raised hover:bg-hover"
+        >
+          <Icon name="ph-arrows-in-simple" size={14} />
+        </button>
+      )}
       {onExport && (
         // The icon is our choice.
         <button

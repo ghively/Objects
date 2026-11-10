@@ -1,12 +1,12 @@
 // Test doubles for sigma and the ForceAtlas2 worker (jsdom has no WebGL or workers). Used with
 // `vi.mock('sigma', () => sigmaModule())` and `vi.mock('graphology-layout-forceatlas2/worker', () => fa2Module())`.
-import { vi } from 'vitest'
+import { vi, type Mock } from 'vitest'
 
 export interface FakeSigma {
   graph: { order: number; size: number; hasNode(k: string): boolean; getNodeAttribute(k: string, a: string): unknown; forEachNode(cb: (k: string, a: Record<string, unknown>) => void): void }
   settings: Record<string, unknown>
   handlers: Record<string, (payload: unknown) => void>
-  camera: { animate: ReturnType<typeof vi.fn>; animatedReset: ReturnType<typeof vi.fn> }
+  camera: FakeCamera
   killed: boolean
   /** Times `refresh()` ran. */
   refreshes: number
@@ -20,6 +20,33 @@ export interface FakeSigma {
 
 export const sigmaInstances: FakeSigma[] = []
 
+export interface FakeCamera {
+  ratio: number
+  animate: Mock<(state: { x?: number; y?: number; ratio?: number }, opts?: unknown) => Promise<void>>
+  animatedReset: Mock<(opts?: unknown) => Promise<void>>
+  on(event: string, fn: (state: { ratio: number }) => void): FakeCamera
+}
+
+function makeCamera(): FakeCamera {
+  const listeners: ((state: { ratio: number }) => void)[] = []
+  const camera: FakeCamera = {
+    ratio: 1,
+    animate: vi.fn(async (state: { x?: number; y?: number; ratio?: number }, _opts?: unknown) => {
+      if (typeof state?.ratio === 'number') camera.ratio = state.ratio
+      for (const fn of listeners) fn({ ratio: camera.ratio })
+    }),
+    animatedReset: vi.fn(async (_opts?: unknown) => {
+      camera.ratio = 1
+      for (const fn of listeners) fn({ ratio: camera.ratio })
+    }),
+    on(event, fn) {
+      if (event === 'updated') listeners.push(fn)
+      return camera
+    },
+  }
+  return camera
+}
+
 type Reducer = (key: string, attrs: Record<string, unknown>) => unknown
 interface EdgeWalk {
   forEachEdge(cb: (key: string, attrs: Record<string, unknown>) => void): void
@@ -30,7 +57,8 @@ export function sigmaModule() {
     graph: FakeSigma['graph']
     settings: Record<string, unknown>
     handlers: Record<string, (payload: unknown) => void> = {}
-    camera = { animate: vi.fn(async () => undefined), animatedReset: vi.fn(async () => undefined) }
+    // The camera keeps its ratio and tells its `updated` listeners, as sigma's does (M31 zoom).
+    camera = makeCamera()
     killed = false
     refreshes = 0
     graphsSet = 0

@@ -29,6 +29,8 @@ export interface GraphCustomizationProps {
   types: TypeDef[]
   /** `showSpaceTagsNetwork` on the global graph; `showTagsNetwork` on a Tag's local graph. Omit to hide the switch. */
   tagsNetworkKey?: 'showSpaceTagsNetwork' | 'showTagsNetwork'
+  /** M31: an icon button (the graph page's bottom-right controls), named "Customize" by its label. */
+  iconOnly?: boolean
 }
 
 function TypeList({
@@ -102,7 +104,7 @@ function SwitchRow({ label, tooltip, checked, onChange }: { label: string; toolt
   )
 }
 
-export function GraphCustomization({ custom, onPatch, types, tagsNetworkKey }: GraphCustomizationProps) {
+export function GraphCustomization({ custom, onPatch, types, tagsNetworkKey, iconOnly }: GraphCustomizationProps) {
   const t = CUSTOMIZATION_TEXT
   // Catalog order (section 7): Show tags network, Filter object types, Exclude object types, Show completed
   // tasks, Hide ..., Hide dates, Hide indirect links; "Show simplified graph" is Object's own and goes last.
@@ -116,15 +118,26 @@ export function GraphCustomization({ custom, onPatch, types, tagsNetworkKey }: G
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[14px] hover:bg-hover"
-        >
-          <Icon name="ph-sliders-horizontal" size={14} />
-          {t.customize}
-        </button>
+        {iconOnly ? (
+          <button
+            type="button"
+            aria-label={t.customize}
+            title={t.customize}
+            className="flex size-8 items-center justify-center rounded-lg border border-line bg-raised hover:bg-hover"
+          >
+            <Icon name="ph-sliders-horizontal" size={14} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[14px] hover:bg-hover"
+          >
+            <Icon name="ph-sliders-horizontal" size={14} />
+            {t.customize}
+          </button>
+        )}
       </PopoverTrigger>
-      <PopoverContent align="end" className="flex w-72 flex-col gap-3 p-2" aria-label={t.customize}>
+      <PopoverContent align="end" side={iconOnly ? 'top' : undefined} className="flex w-72 flex-col gap-3 p-2" aria-label={t.customize}>
         {tagsNetworkKey && (
           <div className="flex flex-col border-b border-line pb-2">
             <SwitchRow

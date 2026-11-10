@@ -336,6 +336,14 @@ Each starter template pre-fills the new type's properties.
   Bottom right: zoom out, a zoom dropdown (Page Fit, 5% ... 300%), zoom in, download (image), and a settings
   dropdown: Show tags network, Filter object types, Exclude object types, Show completed tasks, Hide heavily
   linked objects, Hide dates, Hide indirect links, Show simplified graph (Object's own, last).
+- **Graph controls** (M31; what the two icons do is our call): the count pill shows the objects shown after the
+  filters ("N objects shown" on hover). The document icon, "Open as list", lists those objects by title; a pick peeks
+  it with the list as the pager (Ctrl/Cmd+click opens a tab). The history icon, "Recently opened", lists the objects
+  opened lately (newest first, up to 10) that the graph shows; a pick finds it on the graph. The zoom menu's steps are
+  Page Fit, 5%, 10%, 25%, 50%, 75%, 100%, 150%, 200%, 300% (100% is the whole graph in view; Page Fit also centres
+  it); zoom in and out go to the next step and the menu shows the zoom now, wheel zooms included. Download is "Export
+  view as PNG"; the settings dropdown is Customize. The search field ("Find a note in this graph", Object's own)
+  stays in the header. The local graph panel keeps its compact toolbar.
 - **Edge labels** (Object's own, M28): a link made by a relation property is labelled with the relation's name
   ("Runs on"; a pair linked by relations both ways joins the names with " · "); a link from body text only has no
   label. Labels show only on the hovered node's edges, or on the local graph centre's while nothing is hovered,
