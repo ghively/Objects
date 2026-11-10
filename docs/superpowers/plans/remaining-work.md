@@ -131,6 +131,13 @@ The history below is in the order it was written: the per-milestone sections new
   whole-milestone review, one fix pass and the full gate, then Gene's hand checks (`m28-acceptance.md`).
 - **Next: M30** (entity extraction), after M29's review and gate.
 
+- **M29 gate (Linux, 2026-11-10, after one review and one fix pass):** back end 3720 passed, 19 skipped, 0 failed;
+  front end 4242 passed, 1 skipped (one whiteboard test needed the last-type reset other create tests use); `tsc`,
+  lint and build clean; `m29`, `m28`, `m22` and `m8` acceptance RESULT: PASS. The review found 13 items (the worst: two
+  syncs of an id-less object lost one's facts; a view filtered or grouped by a synced property couldn't create; a
+  hand-typed value under a synced key showed in the calendar and search; change type and merge could write a synced
+  key); all fixed with tests. Name patterns use a linear matcher, not a regex (plan Our calls 21).
+
 ### Needs Gene
 
 1. **Hand-checks:** the list in `auto-acceptance-2026-11-08.md`, "What needs Gene by hand" (Windows and pywebview,
