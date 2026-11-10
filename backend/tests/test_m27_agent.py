@@ -284,7 +284,7 @@ def test_run_is_read_only(monkeypatch):
     rec = SimpleNamespace(purpose=importfiling.PURPOSE)
     assert importfiling.filing_write_guard(rec, SimpleNamespace(method="POST")) == importfiling.REFUSED
     assert importfiling.filing_write_guard(rec, SimpleNamespace(method="GET")) is None
-    assert toolcatalog.OBJECT_WRITE[-2:] == ("save_import_proposal", "save_import_decisions")
+    assert toolcatalog.OBJECT_WRITE[-3:-1] == ("save_import_proposal", "save_import_decisions")  # M29 after
 
 
 # -- MCP ------------------------------------------------------------------------------------------------------
