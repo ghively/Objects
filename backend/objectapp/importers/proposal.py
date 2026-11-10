@@ -52,11 +52,11 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ABBREVIATIONS",
+    "CATEGORY_LABELS",
     "INBOX_NAME",
     "LOOKALIKE_SHARE",
     "MIN_DOCUMENTS",
     "MIN_SHARE",
-    "CATEGORY_LABELS",
     "OFFER",
     "ProposalConflict",
     "ProposalInvalid",
