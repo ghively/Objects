@@ -76,11 +76,13 @@ class M15:
         return self.run.http
 
     def preview(self, path: Path, kind: str = "auto", **extra) -> tuple[int, dict]:
-        return self.http("POST", "/import/preview", {"source": {"path": str(path), "kind": kind}, **extra})
+        return self.http("POST", "/import/preview", {"source": {"path": str(path), "kind": kind}, "keepAsSources": False, **extra})
 
     def start(self, preview: dict, target: dict) -> tuple[int, dict]:
         return self.http(
-            "POST", "/import/start", {"previewId": preview["previewId"], "mapping": preview["mapping"], "target": target}
+            "POST",
+            "/import/start",
+            {"previewId": preview["previewId"], "mapping": preview["mapping"], "target": target, "keepAsSources": False},
         )
 
     def wait(self, job_id: str) -> dict:
