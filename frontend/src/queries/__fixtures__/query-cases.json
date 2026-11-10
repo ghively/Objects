@@ -177,7 +177,8 @@
   "Pages/Untitled.md": "",
   "Servers/web-01.md": "web-01",
   "Servers/web-02.md": "web-02",
-  "Servers/db 1.md": "db 1"
+  "Servers/db 1.md": "db 1",
+  "Pages/Linked tags.md": "Linked tags"
  },
  "rng": [
   0.99,
@@ -576,6 +577,33 @@
    "preview": "",
    "values": {},
    "links": {}
+  },
+  {
+   "summary": {
+    "path": "Pages/Linked tags.md",
+    "id": null,
+    "type": "page",
+    "title": "Linked tags",
+    "icon": null,
+    "iconColor": null,
+    "description": null,
+    "aliases": [],
+    "createdAt": "2026-10-20T09:00:00.000Z",
+    "lastUpdated": null,
+    "tags": [
+     "[[gamma|g]]",
+     "[[Tags/alpha]]"
+    ],
+    "template": null,
+    "color": null,
+    "coverImage": null,
+    "readOnly": false,
+    "collections": []
+   },
+   "version": "v1",
+   "preview": "",
+   "values": {},
+   "links": {}
   }
  ],
  "cases": [
@@ -647,6 +675,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Servers/web-02.md",
     "Pages/item 2.md",
     "Pages/Éclair.md",
@@ -678,6 +707,7 @@
    },
    "scope": {},
    "matches": [
+    "Pages/Linked tags.md",
     "People/Ann.md",
     "Pages/Éclair.md",
     "Servers/web-01.md",
@@ -706,6 +736,7 @@
    },
    "scope": {},
    "matches": [
+    "Pages/Linked tags.md",
     "People/Ann.md",
     "Servers/web-02.md",
     "Pages/item 2.md",
@@ -794,6 +825,7 @@
    },
    "scope": {},
    "matches": [
+    "Pages/Linked tags.md",
     "People/Ann.md",
     "Servers/web-01.md",
     "Pages/Item 10.md",
@@ -827,6 +859,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Pages/item 2.md",
     "Pages/Éclair.md",
     "Pages/Item 10.md",
@@ -918,6 +951,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Pages/Éclair.md",
     "Pages/Item 10.md",
     "Pages/Untitled.md"
@@ -1057,6 +1091,7 @@
     }
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Pages/item 2.md",
     "Pages/Éclair.md",
     "Pages/Item 10.md",
@@ -1123,6 +1158,7 @@
     }
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Pages/item 2.md",
     "Pages/Éclair.md",
     "Pages/Item 10.md",
@@ -1154,6 +1190,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Pages/eclair b.md",
     "Pages/_draft.md"
    ]
@@ -1249,6 +1286,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Servers/web-02.md",
     "Pages/Item 10.md",
     "Pages/Untitled.md",
@@ -1286,6 +1324,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Servers/web-01.md",
     "Servers/db 1.md",
     "Pages/eclair b.md",
@@ -1356,6 +1395,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Pages/item 2.md",
     "Pages/Éclair.md",
     "Pages/Item 10.md",
@@ -1532,6 +1572,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Pages/Untitled.md",
     "Pages/eclair b.md",
     "Pages/_draft.md"
@@ -1660,6 +1701,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Pages/item 2.md",
     "Pages/Éclair.md",
     "Pages/Untitled.md",
@@ -1735,6 +1777,7 @@
     "Pages/eclair b.md",
     "Pages/item 2.md",
     "Pages/Item 10.md",
+    "Pages/Linked tags.md",
     "Pages/Untitled.md"
    ]
   },
@@ -1772,6 +1815,7 @@
     "Servers/web-02.md",
     "Servers/web-01.md",
     "Pages/Untitled.md",
+    "Pages/Linked tags.md",
     "Pages/Item 10.md",
     "Pages/item 2.md",
     "Pages/eclair b.md",
@@ -1817,6 +1861,7 @@
     "Pages/eclair b.md",
     "Pages/Item 10.md",
     "Servers/web-01.md",
+    "Pages/Linked tags.md",
     "Pages/Éclair.md",
     "Servers/db 1.md",
     "Pages/Untitled.md"
@@ -1865,6 +1910,7 @@
     "Pages/_draft.md",
     "Servers/db 1.md",
     "Pages/Éclair.md",
+    "Pages/Linked tags.md",
     "Pages/Untitled.md"
    ]
   },
@@ -1899,6 +1945,7 @@
     "Pages/Éclair.md",
     "Pages/eclair b.md",
     "Pages/Item 10.md",
+    "Pages/Linked tags.md",
     "Pages/Untitled.md",
     "Pages/_draft.md"
    ]
@@ -1933,6 +1980,7 @@
     "Pages/Éclair.md",
     "Pages/item 2.md",
     "Pages/Item 10.md",
+    "Pages/Linked tags.md",
     "Pages/Untitled.md",
     "Pages/eclair b.md",
     "Pages/_draft.md"
@@ -1968,6 +2016,7 @@
     "Pages/Item 10.md",
     "Pages/item 2.md",
     "Pages/Éclair.md",
+    "Pages/Linked tags.md",
     "Pages/Untitled.md",
     "Pages/eclair b.md",
     "Pages/_draft.md"
@@ -2000,6 +2049,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Pages/Untitled.md",
     "Pages/eclair b.md",
     "Pages/_draft.md",
@@ -2038,6 +2088,7 @@
     "Pages/item 2.md",
     "Pages/Éclair.md",
     "Pages/Item 10.md",
+    "Pages/Linked tags.md",
     "Pages/Untitled.md",
     "Pages/eclair b.md",
     "Pages/_draft.md"
@@ -2073,6 +2124,7 @@
     "Pages/item 2.md",
     "Pages/Item 10.md",
     "Pages/Éclair.md",
+    "Pages/Linked tags.md",
     "Pages/Untitled.md",
     "Pages/eclair b.md",
     "Pages/_draft.md"
@@ -2108,6 +2160,7 @@
     "Pages/item 2.md",
     "Pages/Item 10.md",
     "Pages/Éclair.md",
+    "Pages/Linked tags.md",
     "Pages/Untitled.md",
     "Pages/eclair b.md",
     "Pages/_draft.md"
@@ -2144,6 +2197,7 @@
     "Pages/Éclair.md",
     "Pages/eclair b.md",
     "Pages/Item 10.md",
+    "Pages/Linked tags.md",
     "Pages/Untitled.md",
     "Pages/_draft.md"
    ]
@@ -2186,6 +2240,7 @@
     "Servers/web-01.md",
     "Pages/Item 10.md",
     "Pages/Untitled.md",
+    "Pages/Linked tags.md",
     "Servers/db 1.md",
     "Pages/_draft.md"
    ]
@@ -2228,6 +2283,7 @@
     "Pages/Item 10.md",
     "Pages/Untitled.md",
     "Pages/eclair b.md",
+    "Pages/Linked tags.md",
     "Servers/web-02.md",
     "Pages/_draft.md"
    ]
@@ -2271,6 +2327,7 @@
     "Pages/item 2.md",
     "Pages/Éclair.md",
     "Servers/web-02.md",
+    "Pages/Linked tags.md",
     "Pages/_draft.md"
    ]
   },
@@ -2308,6 +2365,7 @@
    "matches": [
     "Servers/web-02.md",
     "Servers/web-01.md",
+    "Pages/Linked tags.md",
     "Pages/item 2.md",
     "Pages/Éclair.md",
     "Servers/db 1.md",
@@ -2348,6 +2406,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Servers/web-02.md",
     "Pages/item 2.md",
     "Pages/Éclair.md",
@@ -2386,6 +2445,7 @@
     ]
    },
    "matches": [
+    "Pages/Linked tags.md",
     "Pages/item 2.md",
     "Pages/Éclair.md",
     "Pages/Item 10.md",
@@ -2503,6 +2563,7 @@
     "Pages/eclair b.md",
     "Pages/item 2.md",
     "Pages/Item 10.md",
+    "Pages/Linked tags.md",
     "Pages/Untitled.md"
    ]
   },
@@ -2601,6 +2662,87 @@
     "Servers/web-01.md",
     "Pages/Item 10.md",
     "Pages/item 2.md"
+   ]
+  },
+  {
+   "name": "tags written as links (any of)",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "tags": {
+     "ids": [
+      "tag-c"
+     ],
+     "operator": "or"
+    }
+   },
+   "scope": {},
+   "matches": [
+    "Pages/Linked tags.md",
+    "Servers/web-02.md",
+    "Pages/eclair b.md"
+   ]
+  },
+  {
+   "name": "a tag written as the Tag's path (all of)",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "tags": {
+     "ids": [
+      "tag-a",
+      "tag-c"
+     ],
+     "operator": "and"
+    }
+   },
+   "scope": {},
+   "matches": [
+    "Pages/Linked tags.md"
+   ]
+  },
+  {
+   "name": "left-out tags written as links",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "tags": {
+     "ids": [
+      "tag-a"
+     ],
+     "operator": "or"
+    },
+    "excludeTags": {
+     "ids": [
+      "tag-c"
+     ]
+    }
+   },
+   "scope": {},
+   "matches": [
+    "People/Ann.md",
+    "Pages/Éclair.md",
+    "Servers/web-01.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md"
    ]
   }
  ]

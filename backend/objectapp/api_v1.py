@@ -74,6 +74,7 @@ from .apiquery import (
     replace_section,
     sort_rows,
 )
+from .automation_filter import tag_names
 from .propvalues import InvalidValue
 from .queryeval import evaluate, row_collection_ids
 from .recurrence import week_start_of
@@ -387,16 +388,20 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         hidden = hidden_paths()
         rows = [x for x in rows if x.summary.path not in hidden and x.summary.type not in excluded]
 
-        def tag_names(x) -> set[str]:
-            return {t.casefold() for t in x.summary.tags}
+        def names(tags) -> set[str]:
+            # A tag written as a link (``[[Work]]``, ``[[Work|alias]]``, ``[[Tags/Work]]``) is "Work".
+            return {n.casefold() for t in tags for n in tag_names(t)}
+
+        def wanted(tags) -> set[str]:
+            return {tag_names(t)[-1].casefold() for t in tags}
 
         if req.tags:
-            want = {t.casefold() for t in req.tags}
+            want = wanted(req.tags)
             every = req.tagsOperator == "and"
-            rows = [x for x in rows if (want <= tag_names(x) if every else want & tag_names(x))]
+            rows = [x for x in rows if (want <= names(x.summary.tags) if every else want & names(x.summary.tags))]
         if req.excludeTags:
-            out = {t.casefold() for t in req.excludeTags}
-            rows = [x for x in rows if not out & tag_names(x)]
+            out = wanted(req.excludeTags)
+            rows = [x for x in rows if not out & names(x.summary.tags)]
         if req.inNoCollection or req.inAnyCollection or req.excludeCollectionIds:
             collections = [
                 {"id": c.id, "name": c.name, "formerNames": list(c.formerNames)}

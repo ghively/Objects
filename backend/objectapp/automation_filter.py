@@ -12,8 +12,9 @@ options}]}``, a collection ``{id, name, formerNames}``. Relative dates ("today",
 week"...) resolve against ``ctx.now`` in ``ctx.tz``; a week starts on the space's "Start of the
 week" setting (``ctx.week_start``, ``ui.json`` ``calendar.weekStart``, Monday by default), as
 ``views/dates.ts`` resolves it, so a rule's "this week" is the one the views and the calendar
-show. Tag references are Tag object ids (``ctx.tag_titles``), entity references object ids
-(``ctx.paths_by_id``).
+show. Tag references are Tag object ids (``ctx.tag_titles``), matched against the names a row's
+tags stand for (`tag_names`: a tag written as a link, ``[[Work]]``, names "Work"); entity
+references are object ids (``ctx.paths_by_id``).
 
 Parity with ``filter.ts`` is tested: ``frontend/src/views/__fixtures__/filter-cases.json``
 is run by ``test_m14_filter_parity.py`` and by ``views/filter.parity.test.ts``.
@@ -39,6 +40,7 @@ __all__ = [
     "filter_options_for",
     "match_filter",
     "match_group",
+    "tag_names",
     "type_json",
 ]
 
@@ -233,6 +235,33 @@ def _row_value(row: Mapping[str, Any], pid: str) -> Any:
                "coverImage"):  # fmt: skip
         return s.get(pid)
     return _values(row).get(pid)
+
+
+def tag_names(value: str) -> list[str]:
+    """The names a ``tags:`` value stands for, which a Tag's title is matched against.
+
+    A plain value is its own name. A link, ``[[Work]]`` or ``[[Work|alias]]``, names its target
+    (the alias dropped). A path to the Tag (a link holding a ``/``, ``[[Tags/Work]]``, or a value
+    ending ``.md``, ``Tags/Work.md``) also names the file's stem, ``Work``: links reach a Tag by
+    its path as by its title (`resolver.link_candidates`). ``views/filter.ts`` ``tagNames``.
+    """
+    text = value.strip()
+    link = text.startswith("[[") and text.endswith("]]")
+    if link:
+        text = text[2:-2].split("|", 1)[0].strip()
+    out = [text]
+    is_file = text.lower().endswith(".md")
+    if is_file or (link and "/" in text):
+        stem = text.rsplit("/", 1)[-1]
+        stem = (stem[:-3] if is_file else stem).strip()
+        if stem and stem != text:
+            out.append(stem)
+    return out
+
+
+def _tag_values(row: Mapping[str, Any]) -> list[str]:
+    """Every name the row's tags stand for (`tag_names` of each)."""
+    return [n for t in _summary(row).get("tags") or [] if isinstance(t, str) for n in tag_names(t)]
 
 
 def _display_title(row: Mapping[str, Any]) -> str:
@@ -595,7 +624,7 @@ def _match_kind(
         case "entity_tags":
             ids = _ref_ids(f)
             want = [t for t in (ctx.tag_titles.get(i) for i in ids) if t]
-            return _match_set(list(s.get("tags") or []), want, f, len(ids))
+            return _match_set(_tag_values(row), want, f, len(ids))
         case "entity_collections":
             return _match_set(_collection_ids(row, ctx.collections), _ref_ids(f), f)
         case "entity_type":

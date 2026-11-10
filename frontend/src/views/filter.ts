@@ -213,6 +213,26 @@ const BUILTIN_KINDS: Record<string, PropertyType> = {
 export const UNTITLED = 'Untitled'
 export const displayTitle = (row: Row): string => (row.summary.title?.trim() ? row.summary.title : UNTITLED)
 
+/**
+ * The names a `tags:` value stands for, which a Tag's title is matched against. A plain value is
+ * its own name; a link, `[[Work]]` or `[[Work|alias]]`, names its target (the alias dropped); a
+ * path to the Tag (a link holding a `/`, `[[Tags/Work]]`, or a value ending `.md`) also names the
+ * file's stem, `Work`. `automation_filter.py` `tag_names` is its server port.
+ */
+export function tagNames(value: string): string[] {
+  let text = value.trim()
+  const link = text.startsWith('[[') && text.endsWith(']]')
+  if (link) text = text.slice(2, -2).split('|', 1)[0].trim()
+  const out = [text]
+  const isFile = text.toLowerCase().endsWith('.md')
+  if (isFile || (link && text.includes('/'))) {
+    const last = text.slice(text.lastIndexOf('/') + 1)
+    const stem = (isFile ? last.slice(0, -3) : last).trim()
+    if (stem && stem !== text) out.push(stem)
+  }
+  return out
+}
+
 /** A row's value for a property id: system ids read the summary, the rest the decoded values. */
 export function rowValue(row: Row, propertyId: string): unknown {
   const s = row.summary
@@ -602,7 +622,7 @@ function matchKind(row: Row, f: Filter, def: DefLike, has: boolean, ctx: FilterC
     case 'entity_tags': {
       const ids = refIds(f)
       const want = ids.map((id) => ctx.tagIdsToTitles[id]).filter((t): t is string => !!t)
-      return matchSet(row.summary.tags ?? [], want, f, ids.length)
+      return matchSet((row.summary.tags ?? []).flatMap(tagNames), want, f, ids.length)
     }
     case 'entity_collections':
       return matchSet(collectionIds(row, ctx.collections), refIds(f), f)
