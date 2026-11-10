@@ -14,6 +14,14 @@ item, as ``problems``, ``dropped`` and ``merged``) and again when an item is app
   and the merge is shown (``merged``);
 - relation properties name a proposed type or an existing one.
 
+M30 (design 2026-11-09 section 5b): in an IT ops space (`is_itops_space`) the conventions are
+rules too. A new type whose properties match an existing type's (`lookalike`) is refused with the
+offer "Use <type>, with a category" (``offer``); a new type named like a category (a label option
+of a type, or a tag) is refused, with the offer for the type holding that option; a relation
+property outside the named set (`named_relations`) is dropped and stays a plain link. Gene takes
+the offer with ``{status: "edited", edited: {useType, category}}``: the item becomes an extend of
+that type adding the category to its Category (else Kind) options, or a plain use.
+
 Item shape (input; the stored form adds what the checks found)::
 
     {id?, action: "use"|"extend"|"create", group, name, pluralName?, icon?, color?, typeId?,
@@ -31,6 +39,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from .. import spaceconfig
 from ..ids import new_ulid
 from ..typedefs import SYSTEM_KEYS, slug
 from ..typemodel import PROPERTY_ICONS, Icon, PropertyDefinition, label_options
@@ -39,20 +48,26 @@ from .model import IMPORT_KINDS
 
 if TYPE_CHECKING:
     from ..space import Space
+    from ..typemodel import TypeDefinition
 
 __all__ = [
     "ABBREVIATIONS",
     "INBOX_NAME",
+    "LOOKALIKE_SHARE",
     "MIN_DOCUMENTS",
     "MIN_SHARE",
+    "OFFER",
     "ProposalConflict",
     "ProposalInvalid",
     "apply",
     "approved_create_names",
     "effective_item",
+    "is_itops_space",
     "load_proposal",
     "load_review",
+    "lookalike",
     "merge_options",
+    "named_relations",
     "near_duplicates",
     "save_proposal",
     "save_review",
@@ -69,6 +84,9 @@ STATUSES = ("accepted", "edited", "rejected")
 MAX_ITEMS = 200
 MAX_PROPERTIES = 60
 MAX_OPTIONS = 100
+LOOKALIKE_SHARE = 0.8
+"""M30: a new type is a look-alike when this share of its properties (by name) are an existing type's."""
+OFFER = "Use {type}, with a category"
 
 ABBREVIATIONS: dict[str, str] = {
     "prod": "production", "prd": "production", "dev": "development", "stg": "staging",
@@ -160,6 +178,105 @@ def merge_options(options: list[Any]) -> tuple[list[str], list[dict[str, Any]]]:
     return out[:MAX_OPTIONS], [{"values": g["values"], "to": g["suggested"]} for g in merged]
 
 
+# -- the IT ops conventions (M30, design 5b) ---------------------------------------------------
+
+
+ITOPS_TYPES = ("host", "software", "application")
+_SOURCE_TYPE = "source"
+"""M30's Source type (`sources.SOURCE_TYPE_ID`): made by imports only, so never offered."""
+
+
+def is_itops_space(space: Space) -> bool:
+    """The space's setup is ``itops``, or it has the Host, Software and Application types."""
+    if spaceconfig.read(space.root)[0].get("setup") == "itops":
+        return True
+    return all(space.type_by_id(t) is not None for t in ITOPS_TYPES)
+
+
+def named_relations(space: Space) -> set[str]:
+    """The casefolded names of every relation property of the space's types and of their counterparts."""
+    out: set[str] = set()
+    for t in space.types:
+        for pd in t.propertyDefinitions:
+            if pd.type != "entity":
+                continue
+            out.add(_text(pd.name).casefold())
+            cp = pd.options.get("counterpart")
+            if isinstance(cp, dict) and _text(cp.get("name")):
+                out.add(_text(cp.get("name")).casefold())
+    out.discard("")
+    return out
+
+
+def _own_names(t: TypeDefinition) -> set[str]:
+    """A type's own properties (not the system ones), in `_squash` form."""
+    return {
+        _squash(pd.name)
+        for pd in t.propertyDefinitions
+        if pd.key not in SYSTEM_KEYS and not pd.type.startswith("entity_") and _squash(pd.name)
+    }
+
+
+def lookalike(props: list[dict[str, Any]], space: Space, *, exclude: str | None = None) -> TypeDefinition | None:
+    """The existing type a new type with ``props`` looks like: at least two properties, of which
+    `LOOKALIKE_SHARE` or more (by `_squash` of the name) are that type's own. The best share wins,
+    then the most shared properties, then the space's type order. Never the Source type, nor
+    ``exclude`` (the item's own type id)."""
+    names = {_squash(_text(p.get("name") or p.get("key"), 100)) for p in props if isinstance(p, dict)}
+    names.discard("")
+    if len(names) < 2:
+        return None
+    best: tuple[float, int] | None = None
+    found: TypeDefinition | None = None
+    for t in space.types:
+        if t.id in (_SOURCE_TYPE, exclude):
+            continue
+        shared = len(names & _own_names(t))
+        rank = (shared / len(names), shared)
+        if rank[0] >= LOOKALIKE_SHARE and (best is None or rank > best):
+            best, found = rank, t
+    return found
+
+
+def _category_label(t: TypeDefinition) -> Any:
+    """The type's Category label property, else its Kind; None when it has neither."""
+    for word in ("category", "kind"):
+        for pd in t.propertyDefinitions:
+            if pd.type == "label" and (pd.key.casefold() == word or _text(pd.name).casefold() == word):
+                return pd
+    return None
+
+
+def _category_of(space: Space, name: str) -> tuple[bool, TypeDefinition | None]:
+    """(whether ``name`` is a category, the type to offer): a label option of a type in the space
+    (a Category or Kind option first, then any label, in type order; the Source type counts as a
+    category but is never offered), or a tag's title (no type to offer)."""
+    want = _squash(name)
+    if not want:
+        return False, None
+    holders: list[tuple[int, TypeDefinition]] = []
+    category = False
+    for t in space.types:
+        label = _category_label(t)
+        for pd in t.propertyDefinitions:
+            if pd.type != "label":
+                continue
+            texts = [str(o.get("text", "")) for o in pd.options.get("set") or [] if isinstance(o, dict)]
+            if any(_squash(x) == want for x in texts):
+                category = True
+                if t.id != _SOURCE_TYPE:
+                    holders.append((0 if pd is label else 1, t))
+    if holders:
+        return True, min(holders, key=lambda h: h[0])[1]
+    if category:
+        return True, None
+    return any(_squash(s.title) == want for s in space.list("tag")), None
+
+
+def _offer(t: TypeDefinition, group: str) -> dict[str, str]:
+    return {"label": OFFER.format(type=t.name), "typeId": t.id, "category": group}
+
+
 # -- normalising and checking an item ------------------------------------------------------------
 
 
@@ -191,7 +308,10 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
     if not isinstance(documents, int) or isinstance(documents, bool) or documents < 0:
         raise ProposalInvalid(f"Item {index + 1} ({name}): documents is the number of documents in the group.")
     iid = _text(raw.get("id"), 64) or f"item-{index + 1}"
+    itops = space is not None and is_itops_space(space)
+    named = named_relations(space) if itops and space is not None else set()
     problems: list[str] = []
+    exists = f"A type named {name!r} already exists; use or extend it."
     type_id: str | None = None
     if space is not None:
         wanted = _text(raw.get("typeId"), 100) or name
@@ -208,7 +328,7 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
                 "make the group a tag or a collection on an existing type."
             )
         if type_id is not None and space is not None:
-            problems.append(f"A type named {name!r} already exists; use or extend it.")
+            problems.append(exists)
     props_in = raw.get("properties") or []
     if not isinstance(props_in, list):
         raise ProposalInvalid(f"Item {index + 1} ({name}): properties is a list.")
@@ -251,6 +371,9 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
             if not options:
                 dropped.append({"key": key, "name": pname, "reason": "A label property needs the values found."})
                 continue
+        if kind == "entity" and itops and pname.casefold() not in named:
+            dropped.append({"key": key, "name": pname, "reason": "Not one of the named relations; it stays a plain link."})
+            continue
         if kind == "entity":
             target = _text(p.get("target"), 100)
             known = (space is not None and bool(space.type_by_id(space._type_id(target)))) if target else False
@@ -265,15 +388,32 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
         problems.append("A new type needs properties of its own.")
     if action == "extend" and not props:
         problems.append("There is nothing to add: no property passed the checks.")
+    group = _text(raw.get("group"), 200) or name
+    offer: dict[str, str] | None = None
+    if itops and space is not None and action == "create":
+        rules: list[str] = []
+        like = lookalike(props, space, exclude=type_id)
+        if like is not None:
+            rules.append(f"It has the same properties as {like.name}.")
+            offer = _offer(like, group)
+        is_category, holder = _category_of(space, name)
+        if is_category:
+            rules.append(f"{name} is a category: a property value or a tag, not a type.")
+            if offer is None and holder is not None:
+                offer = _offer(holder, group)
+        # The offer is what to do instead; M27's "use or extend it" would point at the wrong type.
+        problems = [*rules, *(p for p in problems if not (offer and p == exists))]
     examples = [_text(e, 300) for e in (raw.get("examples") or [])[:5] if _text(e, 300)]
     out = {
-        "id": iid, "action": action, "group": _text(raw.get("group"), 200) or name, "name": name,
+        "id": iid, "action": action, "group": group, "name": name,
         "pluralName": _text(raw.get("pluralName"), 100) or (name if name.endswith("s") else name + "s"),
         "icon": raw.get("icon") if isinstance(raw.get("icon"), (str, dict)) else None,
         "color": _text(raw.get("color"), 30) or None,
         "typeId": type_id, "documents": documents, "examples": examples,
         "properties": props, "dropped": dropped, "problems": problems,
     }
+    if offer is not None:
+        out["offer"] = offer
     return out
 
 
@@ -343,12 +483,33 @@ def save_proposal(
     return stored
 
 
+def _find_type(space: Space | None, wanted: str) -> TypeDefinition | None:
+    if space is None or not wanted:
+        return None
+    return space.type_by_id(wanted) or space.type_by_id(space._type_id(wanted))
+
+
 def effective_item(item: dict[str, Any], decision: dict[str, Any] | None, space: Space | None) -> dict[str, Any]:
-    """The item as Gene left it: his edits (``name``, ``plural``, ``dropProperties``) laid over it."""
+    """The item as Gene left it: his edits (``name``, ``plural``, ``dropProperties``) laid over it.
+
+    M30: an edit with ``useType`` (the offer "Use <type>, with a category") makes the item an
+    extend of that type adding ``category`` to its Category (else Kind) options; a type with
+    neither label (or no ``space`` to look it up in) makes it a plain use."""
     if not decision or decision.get("status") != "edited" or not isinstance(decision.get("edited"), dict):
         return item
     e = decision["edited"]
     out = dict(item)
+    use = _text(e.get("useType"), 100) if isinstance(e.get("useType"), str) else ""
+    if use:
+        t = _find_type(space, use)
+        category = _text(e.get("category"), 100) if isinstance(e.get("category"), str) else ""
+        label = _category_label(t) if t is not None else None
+        out.update({"typeId": t.id if t else use, "name": t.name if t else out["name"], "action": "use", "properties": []})
+        if label is not None and category:
+            out["action"] = "extend"
+            out["properties"] = [{"key": label.key, "name": label.name, "kind": "label",
+                                  "isArray": bool(label.options.get("isArray")), "share": 1.0, "options": [category]}]
+        return out
     if isinstance(e.get("name"), str) and e["name"].strip():
         out["name"] = e["name"]
     plural = e.get("plural", e.get("pluralName"))
@@ -385,7 +546,13 @@ def save_review(space: Space, batch: str, items: list[dict[str, Any]]) -> dict[s
             base = next(i for i in proposal["items"] if i["id"] == row["id"])
             if not isinstance(edited.get("dropProperties", []), list):
                 raise ProposalInvalid('"dropProperties" is a list of property keys.')
-            _check_item({**effective_item(base, {"status": "edited", "edited": edited}, None), "id": row["id"]}, 0, space,
+            if "useType" in edited:
+                use = edited.get("useType")
+                if not isinstance(use, str) or _find_type(space, use.strip()) is None:
+                    raise ProposalInvalid(f"There is no type named {use!r} in this space.")
+                if not isinstance(edited.get("category"), str) or not edited["category"].strip():
+                    raise ProposalInvalid('"category" is the option to add to the type.')
+            _check_item({**effective_item(base, {"status": "edited", "edited": edited}, space), "id": row["id"]}, 0, space,
                         {i["name"].casefold() for i in proposal["items"]})
             entry["edited"] = edited
         decided[row["id"]] = entry
@@ -410,6 +577,8 @@ def _group(it: dict[str, Any]) -> dict[str, Any]:
         "documentCount": it["documents"], "examples": it["examples"], "properties": props,
         "group": it["group"], "problems": it["problems"], "dropped": it["dropped"],
     }
+    if it.get("offer"):
+        g["offer"] = it["offer"]
     if it.get("typeId"):
         g["typeId"] = it["typeId"]
     if isinstance(it.get("icon"), str):
@@ -537,7 +706,7 @@ def apply(space: Space, batch: str) -> dict[str, Any]:
         if not d or d.get("status") not in ("accepted", "edited"):
             skipped.append({"id": it["id"], "reason": "Not approved." if not d else "Turned down."})
             continue
-        eff = _check_item(effective_item(it, d, None), 0, space, names)
+        eff = _check_item(effective_item(it, d, space), 0, space, names)
         eff["id"] = it["id"]
         if eff["action"] == "create" and eff["typeId"] is not None:
             # made by an earlier Apply (or by hand): the work is done
