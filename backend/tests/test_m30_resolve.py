@@ -13,17 +13,12 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
-from m30_helpers import MODIFIED, PAGES, decisions, itops_space, result, use_simple_distill
+from m30_helpers import MODIFIED, PAGES, decisions, itops_space, result
 
 from objectapp.importers import batches, entities
 from objectapp.space import Space
 
 IMPORTED_AT = "2026-11-09T10:00:00.000Z"
-
-
-@pytest.fixture(autouse=True)
-def _distill(monkeypatch: pytest.MonkeyPatch) -> None:
-    use_simple_distill(monkeypatch)
 
 
 def _when(day: str) -> str:

@@ -11,7 +11,6 @@ import os
 import typing
 from datetime import UTC, datetime
 
-import pytest
 from m30_helpers import (
     MODIFIED,
     PAGES,
@@ -20,9 +19,6 @@ from m30_helpers import (
     itops_space,
     make_itops_source,
     result,
-    simple_lines,
-    simple_pick,
-    t4_landed,
 )
 
 from objectapp.importers import distill, entities, entitycheck, entitywrite, sources
@@ -122,31 +118,6 @@ def test_decisions_and_result_shapes() -> None:
     assert result("x.md", confidence="low", entities=[{"type": "Software", "name": "SQL 2019"}])["entities"][0]["confidence"] == "low"
 
 
-def test_simple_pick_reference() -> None:
-    found = {
-        "ipAddress": [
-            {"value": "10.0.0.6", "quote": "IP address: 10.0.0.6", "page": "S/Old.md", "modified": "2025-06-01T00:00:00Z"},
-            {"value": "10.0.0.5", "quote": "IP address: 10.0.0.5", "page": "S/APP01.md", "modified": "2026-10-01T00:00:00Z"},
-        ],
-        "fqdn": [
-            {"value": "app01.corp.example", "quote": "q1", "page": "S/APP01.md", "modified": "2026-10-01T00:00:00Z"},
-            {"value": "APP01.corp.example", "quote": "q2", "page": "S/B.md", "modified": None},
-        ],
-    }
-    picked = simple_pick(found, {"S/APP01.md"})
-    assert picked["ipAddress"]["value"] == "10.0.0.5"
-    assert picked["ipAddress"]["conflict"] == [{"value": "10.0.0.6", "sources": [
-        {"path": "S/Old.md", "quote": "IP address: 10.0.0.6", "modified": "2025-06-01T00:00:00Z"}]}]
-    assert picked["fqdn"]["conflict"] is None and len(picked["fqdn"]["sources"]) == 2
-    tie = simple_pick({"k": [{"value": "a", "quote": "", "page": "S/Z.md", "modified": None},
-                             {"value": "b", "quote": "", "page": "S/Y.md", "modified": None}]}, {"S/Z.md"})
-    assert tie["k"]["value"] == "a"
-    lines = simple_lines([{"text": "Runs Payroll.", "quote": "q", "page": "S/B.md", "modified": None},
-                          {"text": "runs payroll", "quote": "q", "page": "S/A.md", "modified": None}], set())
-    assert len(lines) == 1 and [s["path"] for s in lines[0]["sources"]] == ["S/A.md", "S/B.md"]
-
-
-@pytest.mark.xfail(not t4_landed(), reason="Keep pages as Sources lands in M30 Task 4", strict=True)
 def test_import_as_sources(tmp_path) -> None:
     root = itops_space(tmp_path)
     batch = import_as_sources(root, make_itops_source(tmp_path))
