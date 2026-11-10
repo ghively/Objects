@@ -1,8 +1,8 @@
 # M31 acceptance: completion (everything specified and not yet built)
 
 Status (2026-11-10): built 2026-11-10 (the contract `34cd1954`, then lanes A, B, C, D1, D2, E1, E2 and F by file
-ownership, all merged at `4d08f8ef`), integrated here; the acceptance script passes. The whole-milestone review, its
-fix pass and the full gate come next. Gene's hand checks below are unticked.
+ownership, all merged at `4d08f8ef`), integrated here; then one whole-milestone review, one fix pass (lanes A-D, 20 commits) and the full gate:
+back end 4148 passed, 19 skipped, 0 failed; front end 4476 passed, 1 skipped; `tsc`, lint (0 errors) and build clean; the acceptance sweep 57 of 57 PASS (the 56 runs plus `m31_acceptance.py`, 68 checks). Gene's hand checks below are unticked.
 
 Plan: `2026-11-10-m31-completion.md` (Gene's decisions of 2026-11-10, the item table, the contract). The bar is the
 behaviour catalog's wording (`docs/behavior-catalog.md`, the lines marked "(M31)").

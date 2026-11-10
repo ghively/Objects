@@ -1,6 +1,6 @@
 # Object: remaining work
 
-Status as of 2026-11-10: **M1-M30 are built, gated and on `master`** (M28-M30, the IT ops type model, on 2026-11-10), and **M31 (completion: everything the audit listed as not built) is built and integrated** (its review, fix pass and gate next; `m31-acceptance.md`); a full milestone audit the same day is `milestone-audit-2026-11-10.md`, whose "Remaining work" is the current to-do list. Earlier status, 2026-11-09: **M1-M27 and everything built on 2026-11-08 and 2026-11-09 are on `master`**, the only live branch (`integrate/2026-11-08` was merged on 2026-11-09; Gene wants everything on `master`). That day: the sidebar redesign, the Tasks dashboard, git-backed spaces, the decisions memo (`decisions-memo-2026-11-08.md`, approved by Gene) built, live checks of the real CLI, OCR and MCP, and an automated run of all 435 acceptance boxes (`auto-acceptance-2026-11-08.md`). The current list is "What remains" below; the history follows it.
+Status as of 2026-11-10: **M1-M31 are built, gated and on `master`** (M28-M30, the IT ops type model, and M31, completion: everything the audit listed as not built, all on 2026-11-10; `m31-acceptance.md`); a full milestone audit the same day is `milestone-audit-2026-11-10.md`, whose "Remaining work" is the current to-do list. Earlier status, 2026-11-09: **M1-M27 and everything built on 2026-11-08 and 2026-11-09 are on `master`**, the only live branch (`integrate/2026-11-08` was merged on 2026-11-09; Gene wants everything on `master`). That day: the sidebar redesign, the Tasks dashboard, git-backed spaces, the decisions memo (`decisions-memo-2026-11-08.md`, approved by Gene) built, live checks of the real CLI, OCR and MCP, and an automated run of all 435 acceptance boxes (`auto-acceptance-2026-11-08.md`). The current list is "What remains" below; the history follows it.
 
 **Gate on `integrate/2026-11-08` (Linux, 2026-11-09, after lanes A-F, G1-G5, H1-H3 and the acceptance fixes; vitest and pytest run one after the other):** back end 3391 passed, 16 skipped, 3 xpassed, 0 failed; front end 4074 passed, 1 skipped (537 files); lint 0 errors; `npm run build` clean. One frontend timing flake under load (`BrainDumpBar` "M23 seam") was fixed by waiting for the refusal text instead of one flush.
 
@@ -108,8 +108,15 @@ The history below is in the order it was written: the per-milestone sections new
   `#tag` chips; page shortcuts; "Hide App Menu"; the Table property kind; the Page link view; App icon, "Show developer
   information", "New API token" and the Offline & Sync local rows; the unreachable 501 branch removed and decisions A-1
   and English-only recorded (`workseams.py`'s M24-era fallbacks are still there). `scripts/m31_acceptance.py` RESULT:
-  PASS (66 checks); `m30`, `m29`, `m28` and `m25` RESULT: PASS. Next: the whole-milestone review, one fix pass and the
-  full gate, then Gene's hand checks (`m31-acceptance.md`).
+  PASS (66 checks); `m30`, `m29`, `m28` and `m25` RESULT: PASS. Then the whole-milestone review, one fix pass and
+  the full gate (below); next, Gene's hand checks (`m31-acceptance.md`).
+- **M31 gate (Linux, 2026-11-10, after one review and one fix pass):** back end 4148 passed, 19 skipped, 0 failed; front end 4476 passed, 1 skipped; `tsc`, lint (0 errors) and build clean; the acceptance sweep 57 of 57 PASS (the 56 runs plus `m31_acceptance.py`, 68 checks). The review found 15 items, all fixed
+  with tests (the worst: the import's look-alike refusals fired on generic names in ordinary spaces; page keys acted
+  on a view behind a dialog; git provenance turned off git's ownership check; tags written as `[[Tag]]` missed tag
+  filters; AltGr characters were swallowed; "Required only" and the media token covered editor blocks only; Full
+  Export held every space in memory at once). Also: a remodel carries every type of the space, empty ones too; a
+  Table cell keeps dashes and pipes; "First column is a header". One open question for Gene: G3 for Incident types
+  made before M31 (they keep the ticket Resolved beside their own).
 
 - **M30 built: entity extraction and distillation** (T1 contract; T2-T12 on parallel lanes by file ownership, merged
   up to `2befd1ad` on top of all of M28 and M29; T13 integration). Every import has the option **Keep pages as

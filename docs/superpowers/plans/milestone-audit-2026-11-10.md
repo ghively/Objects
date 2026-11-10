@@ -102,7 +102,8 @@ dropped, so each needs a decision: build, or drop on purpose.
 
 **Update, 2026-11-10 (M31):** Gene decided every item the same day (the decisions are at the top of
 `2026-11-10-m31-completion.md`) and M31 built them; `m31-acceptance.md` has the script's result and his hand checks.
-What is left from this list: only `workseams.py`'s M24-era fallbacks (see Housekeeping) and the hand checks.
+After its review, fix pass and gate (back end 4148 passed, 19 skipped, 0 failed; front end 4476 passed, 1 skipped; `tsc`, lint (0 errors) and build clean; the acceptance sweep 57 of 57 PASS (the 56 runs plus `m31_acceptance.py`, 68 checks)), M31 is on `master`; the fix pass also removed `workseams.py`'s
+M24-era fallbacks. What is left from this list is the hand checks.
 
 1. **Full Export**: **built in M31** (item 1, Gene's decision 6: manual and automated). Settings > Full Export:
    this space or All Spaces, the three options, a folder outside every space, "Export" and "Export All Spaces";
@@ -122,8 +123,8 @@ What is left from this list: only `workseams.py`'s M24-era fallbacks (see Housek
    The interface Language list: **decided by Gene** (decision 7): English only; the list sets date and number formats
    (recorded in the catalog, not built).
 6. **Remodelling an existing space**: **built in M31** (item 5): Settings > Import Content > "Remodel this space…"
-   imports the open space's folder into a new space; the original is never changed. (Types with no objects are not
-   carried over, since the import makes types from objects; see `m31-acceptance.md`.)
+   imports the open space's folder into a new space; the original is never changed. Every type of the space is carried over, empty ones too
+   (the fix pass); Page and Tag stay as the new space makes them, since a basic type's properties are fixed.
 7. **Decision A-1**: **decided by Gene** (decision 5): superseded; Find files and Search in files stay ordinary
    switches beside the shell (recorded in the catalog and the decisions memo).
 
@@ -136,7 +137,7 @@ kept (decision 4).
 
 ### Needs Gene
 
-1. **Hands-on checks**: 476 boxes in `mN-acceptance.md`. The automated runs covered what a headless harness can;
+1. **Hands-on checks**: 509 boxes in `mN-acceptance.md` (476 for M1-M30, 33 for M31). The automated runs covered what a headless harness can;
    what needs him is the look in the four themes and at his window size, the pywebview desktop window, Windows,
    the Wacom pen and touch, toasts, microphone and clipboard prompts, the OS file manager, real data at scale, and a
    real model's wording (try the trial and the Entities step once with the real `claude`).
@@ -169,8 +170,8 @@ migrating `C:\Git\wiki` (M25-M30 are its tooling); Object Team.
 
 ## Housekeeping
 
-- `CLAUDE.md` still says "M1-M27 are all built"; it should say M1-M30 (left for Gene: it is his project file).
+- `CLAUDE.md`'s status line now says M1-M31 (updated with M31).
 - Remote branches to delete by hand (this session can't): the 20 listed in the session plus `m30-int` and the
   session branch; `master` holds everything.
-- Small leftovers: `workseams.py` keeps M24-era fallbacks (still there after M31); the unreachable 501 branch in
+- Small leftovers: none. `workseams.py`'s M24-era fallbacks went in M31's fix pass; the unreachable 501 branch in
   `server.py` was removed in M31.
