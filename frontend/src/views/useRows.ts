@@ -4,7 +4,10 @@
 // call and merged in. Other kinds (queries, views, ui) are ignored. M12: when the scope holds a
 // type with a rollup, a change to an object that isn't a row of such a type (a related Member of
 // a Project, say) reloads everything too, since any rollup may read it. With `backlinks`, a change
-// outside the rows refetches the rows its `linked` names (see `UseRowsOptions`).
+// outside the rows refetches the rows its `linked` names (see `UseRowsOptions`). M29: a `synced`
+// event (a type's synced facts changed; `path` is the type id) refetches the rows of that type, in
+// the same window and call; with no such row here, a rollup in the scope may read them, so it
+// reloads everything then, and otherwise it is ignored.
 //
 // Rows load without previews (`preview: false`; audit 2026-11-01 P2): the pipeline runs over
 // every row, but only a card layout's visible page shows a preview, and `DataView` fetches those
@@ -26,6 +29,11 @@ export interface UseRows {
 
 function hasRollup(typeId: string | null | undefined): boolean {
   return !!typeOf(typeId)?.propertyDefinitions.some((d) => d.type === 'rollup')
+}
+
+/** Whether any type in the scope or among the rows has a rollup. */
+function anyRollup(scope: RowsScope, rows: Row[]): boolean {
+  return (scope.typeIds ?? []).some(hasRollup) || rows.some((r) => hasRollup(r.summary.type))
 }
 
 /** Whether a change to `changed` may alter a rollup shown in `rows` (beyond those rows' own refetch). */
@@ -135,7 +143,18 @@ export function useRows(scope: RowsScope, options: UseRowsOptions = {}): UseRows
     }
     const off = api.onChange((e: ChangeEvent) => {
       if (RELOAD_KINDS.has(e.kind)) full = true
-      else if (e.kind === 'changed') {
+      else if (e.kind === 'synced') {
+        // A sync changes no file and no link: the type's rows are refetched like changed ones.
+        const own = rowsRef.current.filter((r) => r.summary.type === e.path).map((r) => r.summary.path)
+        if (own.length === 0) {
+          if (!anyRollup(scopeRef.current, rowsRef.current)) return
+          full = true
+        }
+        for (const p of own) {
+          paths.add(p)
+          if (!linked.has(p)) linked.set(p, new Set())
+        }
+      } else if (e.kind === 'changed') {
         paths.add(e.path)
         // Several changes to one path in the window: the union of their `linked`, unknown if any is.
         const known = linked.get(e.path)

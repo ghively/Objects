@@ -512,6 +512,26 @@ export function ObjectView({
     [path],
   )
 
+  // M29: a sync of this object's type changes no file: read the object again and take only its
+  // `synced` block (and `computed`, which is computed from the synced values too).
+  const syncedSeq = useRef(0)
+  const refreshSynced = useCallback(() => {
+    const n = ++syncedSeq.current
+    api
+      .object(path)
+      .then((fresh) => {
+        if (n !== syncedSeq.current) return
+        setDetail((d) => (d && d.summary.path === fresh.summary.path ? { ...d, synced: fresh.synced, computed: fresh.computed } : d))
+      })
+      .catch(() => undefined)
+  }, [path])
+  useEffect(
+    () => () => {
+      syncedSeq.current++
+    },
+    [path],
+  )
+
   // M28: a counterpart edit writes the other objects' stored side; the answer's rows replace ours.
   const onEditCounterpart = useMemo(
     () =>
@@ -651,6 +671,12 @@ export function ObjectView({
     return api.onChange((e) => {
       const typeId = typeIdRef.current
       if (!typeId || deletedRef.current) return
+      if (e.kind === 'synced') {
+        if (e.path === typeId) refreshSynced()
+        // Another type's facts: a rollup of this type may read them.
+        else if (typeHas(typeId, (k) => k === 'rollup')) refreshComputed()
+        return
+      }
       if (e.kind === 'types') {
         // This type's formulas or rollups may have changed; a rollup also reads other types.
         const own = e.path === typeId || isResync(e, 'types')
@@ -666,7 +692,7 @@ export function ObjectView({
       const hasCounterparts = typeHasCounterparts(typeId) || (detailRef.current?.counterparts?.length ?? 0) > 0
       if (typeHas(typeId, (k) => k === 'rollup' || k === 'entity_backlinks') || hasCounterparts) refreshComputed()
     })
-  }, [path, refreshComputed])
+  }, [path, refreshComputed, refreshSynced])
 
   const keepMine = () => {
     const h = editorRef.current
@@ -1042,6 +1068,7 @@ export function ObjectView({
         backlinks={detail.backlinks ?? []}
         computed={detail.computed}
         counterparts={detail.counterparts ?? []}
+        synced={detail.synced}
         onEditCounterpart={onEditCounterpart}
         readOnly={propsReadOnly}
         onChange={(key, value) => writeProperties({ [key]: value })}

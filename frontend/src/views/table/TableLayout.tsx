@@ -16,6 +16,7 @@ import { useTabs } from '@/nav/tabs'
 import { cellForDef } from '@/properties/cellFor'
 import { kindIcon } from '@/properties/kinds'
 import { PropertySettings } from '@/properties/PropertySettings'
+import { isSynced, syncedStale } from '@/properties/synced'
 import { cn } from '@/lib/utils'
 import type { LayoutProps } from '../DataView'
 import { createRowWrites } from '../rowWrites'
@@ -295,17 +296,23 @@ const TableRow = memo(function TableRow({ row, index, mainContent, pinned, colum
         const def = defs[c.id]
         const wrapped = isWrapped(config, c.id)
         const Cell = def ? cellForDef(def) : null
+        // M29: a synced value is filled only through the API (read-only), muted once stale.
+        const synced = isSynced(def)
+        const stale = !!def && synced && syncedStale(def, row.syncedAt)
         return (
           <div
             key={c.id}
             role="cell"
             data-col={c.id}
             data-wrap={wrapped ? 'wrap' : 'nowrap'}
+            data-synced={synced ? '' : undefined}
+            data-stale={stale ? '' : undefined}
             style={{ ...cellStyle(c), minHeight: TABLE_ROW_HEIGHT }}
             className={cn(
               'flex shrink-0 items-center border-r border-line bg-app px-1.5 py-1.5',
               wrapped ? 'whitespace-normal break-words' : 'overflow-hidden whitespace-nowrap',
               !wrapped && 'h-9',
+              stale && 'text-fg-muted opacity-60',
             )}
           >
             {def?.type === 'entity_title' ? (
@@ -322,7 +329,7 @@ const TableRow = memo(function TableRow({ row, index, mainContent, pinned, colum
                 <Cell
                   def={def}
                   value={valueFor(def, row)}
-                  readOnly={row.summary.readOnly || isCounterpartDef(def)}
+                  readOnly={row.summary.readOnly || isCounterpartDef(def) || synced}
                   density={wrapped ? 'panel' : 'table'}
                   inTable
                   onChange={(next: unknown) => commit(row, def, next)}
