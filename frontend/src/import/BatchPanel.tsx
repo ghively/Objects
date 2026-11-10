@@ -12,7 +12,21 @@ function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-export function BatchPanel({ result, inOpenSpace }: { result: ImportResult; inOpenSpace: boolean }) {
+/**
+ * `actionsOnly` (Import history): the actions without the counts, which the history row sums up.
+ * `onMoved` is told once the batch's objects went to the Trash.
+ */
+export function BatchPanel({
+  result,
+  inOpenSpace,
+  actionsOnly = false,
+  onMoved,
+}: {
+  result: ImportResult
+  inOpenSpace: boolean
+  actionsOnly?: boolean
+  onMoved?: (trashed: number) => void
+}) {
   const batch = result.batch ?? null
   const [pending, setPending] = useState<ImportBatchItem[]>([])
   const [confirming, setConfirming] = useState(false)
@@ -53,6 +67,7 @@ export function BatchPanel({ result, inOpenSpace }: { result: ImportResult; inOp
       announceResync()
       setMoved(r.trashed)
       setConfirming(false)
+      onMoved?.(r.trashed)
     } catch (err) {
       setError(message(err))
     } finally {
@@ -62,8 +77,10 @@ export function BatchPanel({ result, inOpenSpace }: { result: ImportResult; inOp
 
   return (
     <div className="flex flex-col gap-3" data-testid="batch-panel">
-      <p className="text-[13px]">{T.accountedFor({ ...result, sourceItems: result.sourceItems ?? 0 })}</p>
-      {(result.removed ?? 0) > 0 && <p className="text-[13px] text-fg-muted">{T.removedAtSource(result.removed ?? 0)}</p>}
+      {!actionsOnly && <p className="text-[13px]">{T.accountedFor({ ...result, sourceItems: result.sourceItems ?? 0 })}</p>}
+      {!actionsOnly && (result.removed ?? 0) > 0 && (
+        <p className="text-[13px] text-fg-muted">{T.removedAtSource(result.removed ?? 0)}</p>
+      )}
 
       {inOpenSpace && pending.length > 0 && (
         <section aria-labelledby="import-both-heading" className="flex flex-col gap-2">
