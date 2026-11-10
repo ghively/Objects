@@ -57,6 +57,7 @@ from m2_acceptance import (
     HOST, Http, Run, changed_paths, check_migration, commit, free_port, git, remove_tree, snapshot,
 )
 from objectapp.__main__ import SpaceHost
+from objectapp.uikey import HEADER as UI_KEY_HEADER
 from objectapp.appstate import state_dir
 from objectapp.server import create_app
 from objectapp.space import Space
@@ -352,7 +353,8 @@ def check_spaces(run: Run, tmp: Path) -> None:
     host = SpaceHost(port, static_dir=None)
     thread = threading.Thread(target=host.run, args=(run.root,), daemon=True)
     thread.start()
-    http = Http(f"http://{HOST}:{port}/api")
+    # A launched app answers /api only with its per-launch key (decision S6, 2026-11-08).
+    http = Http(f"http://{HOST}:{port}/api", headers={UI_KEY_HEADER: host.ui_key.secret})
     try:
         wait_up(http)
         first = http("GET", "/space")[1].get("root")

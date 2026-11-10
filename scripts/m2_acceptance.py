@@ -94,14 +94,17 @@ def free_port() -> int:
 
 
 class Http:
-    def __init__(self, base: str) -> None:
+    def __init__(self, base: str, headers: dict[str, str] | None = None) -> None:
         self.base = base
+        self.headers = dict(headers or {})  # e.g. a launched app's per-launch key (decision S6)
 
     def __call__(self, method: str, route: str, payload: Any = None, **query: Any) -> tuple[int, Any]:
         q = {k: v for k, v in query.items() if v is not None}
         url = self.base + route + ("?" + urllib.parse.urlencode(q) if q else "")
         data = json.dumps(payload).encode() if payload is not None else None
         req = urllib.request.Request(url, data=data, method=method)
+        for k, v in self.headers.items():
+            req.add_header(k, v)
         if data is not None:
             req.add_header("Content-Type", "application/json")
         try:

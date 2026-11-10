@@ -70,7 +70,7 @@ from m2_acceptance import (
     snapshot,
 )
 from m7_acceptance import PNG, raw
-from m8_acceptance import Served, diff_keys, extra_state, fm_of, set_clock, state_files
+from m8_acceptance import Served, diff_keys, fm_of, set_clock, state_files, state_tree, state_writes
 from objectapp.appstate import state_dir
 from objectapp.spaces import Registry
 
@@ -224,6 +224,7 @@ class M9:
     def reads(self, label: str, base: str) -> None:
         before = snapshot(self.root)
         state_before = state_files()
+        tree_before = state_tree()
         codes: dict[str, set[int]] = {}
 
         def call(name: str, code: int) -> None:
@@ -240,7 +241,7 @@ class M9:
         diff = changed_paths(before, snapshot(self.root))
         status = git(self.root, "status", "--porcelain", "-uall").strip()
         names = state_files()
-        extra = extra_state(names, {"spaces.json"})
+        extra = state_writes(tree_before, state_tree())
         bad = {k: sorted(v) for k, v in codes.items() if v != {200}}
         self.run.report(not diff and not status and not extra and not bad,
                         f"{label}: {len(codes)} reads twice; statuses {bad or 'all 200'}; {len(diff)} files changed; "

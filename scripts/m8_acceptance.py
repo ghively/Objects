@@ -185,6 +185,23 @@ def extra_state(names: list[str], allowed: set[str]) -> list[str]:
     return [n for n in names if n not in allowed and not (n.startswith("reminders-") and n.endswith(".json"))]
 
 
+def state_tree() -> dict[str, bytes]:
+    """Every file under the state dir (relative path -> bytes), for "reading writes nothing" checks.
+    (2026-11-10: the top-level name list missed writes inside `history/`, and flagged `history/`
+    itself although the run's own setup writes made it before any read.)"""
+    folder = state_dir()
+    if not folder.is_dir():
+        return {}
+    return {p.relative_to(folder).as_posix(): p.read_bytes() for p in sorted(folder.rglob("*")) if p.is_file()}
+
+
+def state_writes(before: dict[str, bytes], after: dict[str, bytes]) -> list[str]:
+    """State files the reads between `before` and `after` added, changed or removed; M4's reminder
+    ledger (``reminders-*.json``) is the reminder service's own bookkeeping and is allowed."""
+    changed = sorted(k for k in before.keys() | after.keys() if before.get(k) != after.get(k))
+    return [k for k in changed if not (k.startswith("reminders-") and k.endswith(".json"))]
+
+
 def type_names(root: Path) -> set[str]:
     out = set()
     for f in (root / ".object" / "types").glob("*.json"):
@@ -321,6 +338,7 @@ class M8:
     def reads(self, label: str) -> None:
         before = snapshot(self.root)
         state_before = state_files()
+        tree_before = state_tree()
         ref = block_ref(self.root)
         codes: dict[str, set[int]] = {}
 
@@ -342,7 +360,7 @@ class M8:
         diff = changed_paths(before, snapshot(self.root))
         status = git(self.root, "status", "--porcelain", "-uall").strip()
         names = state_files()
-        extra = extra_state(names, {"spaces.json"})
+        extra = state_writes(tree_before, state_tree())
         bad = {k: sorted(v) for k, v in codes.items() if v != ({404} if "404" in k else {200})}
         self.run.report(
             not diff and not status and not extra and not bad and bool(ref),
