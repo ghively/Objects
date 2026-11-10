@@ -60,6 +60,20 @@ async function mounted(data: GraphData, highlightPath?: string): Promise<FakeSig
 }
 
 describe('graph edge labels', () => {
+  test('sigma starts over a labelled graph, whose reducers run while it is being constructed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      // Real sigma renders inside its constructor (the fake does too), before `new` returns: a
+      // reducer that reads the graph through the sigma instance then would throw, and the graph
+      // would stay blank.
+      const sigma = await mounted(labelled(true), 'b')
+      expect(warn).not.toHaveBeenCalledWith('Could not start the graph renderer:', expect.anything())
+      expect(shownLabels(sigma)).toEqual({ '0-1': 'Runs on', '1-2': '' })
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
   test('hovering a node shows the labels of its edges only', async () => {
     const sigma = await mounted(labelled(true))
     expect(sigma.settings.renderEdgeLabels).toBe(true)

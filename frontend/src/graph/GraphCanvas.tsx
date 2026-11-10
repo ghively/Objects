@@ -186,9 +186,10 @@ export function GraphCanvas({
   function start(SigmaClass: typeof Sigma, el: HTMLElement, initial: CanvasGraph): Sigma<NodeAttrs, EdgeAttrs> | null {
     const colors = canvasColors()
     colorsRef.current = colors
-    let sigma: Sigma<NodeAttrs, EdgeAttrs>
-    // The reducers read the graph sigma draws (a rebuild replaces it).
-    const shown = (): CanvasGraph => sigma.getGraph()
+    let sigma: Sigma<NodeAttrs, EdgeAttrs> | undefined
+    // The reducers read the graph sigma draws (a rebuild replaces it). sigma renders inside its
+    // constructor, before `sigma` is set: the graph it draws then is `initial`.
+    const shown = (): CanvasGraph => sigma?.getGraph() ?? initial
     try {
       sigma = new SigmaClass<NodeAttrs, EdgeAttrs>(initial, el, {
         allowInvalidContainer: true,
