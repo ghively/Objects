@@ -257,8 +257,46 @@ def write_import(planned: Planned, space: Space, state: WriteState, src: Source 
 # -- types and tags --------------------------------------------------------------------
 
 
+def _carry_types(planned: Planned, space: Space, state: WriteState) -> dict[str, str]:
+    """M31 fix pass (remodel): a space read as the source of an import into a new space brings every
+    one of its types, empty ones included: name, plural, folder, icon, colour, description and
+    properties (options and relations) as its ``.object/types`` defines them, with the same id. Its
+    templates are not objects and stay behind, so a carried type has no default template. A type the
+    new space has already (its own Page and Tag, whose properties are fixed) is kept as it is.
+    Answers casefolded name -> type id."""
+    from ..typemodel import TypeDefinition
+
+    out: dict[str, str] = {}
+    if planned.target != "newSpace" or not planned.read.space_types:
+        return out
+    for data in planned.read.space_types:
+        _check(state)
+        tid = str(data.get("id") or "")
+        try:
+            t = TypeDefinition.from_json(data, fallback_id=tid or None)
+        except Exception:  # noqa: BLE001 - a type that can't be read is listed, the rest carry on
+            state.skipped.append(SkippedItem(path=f".object/types/{tid}.json", reason="damaged",
+                                             detail="The type couldn't be read"))
+            continue
+        have = space.type_by_id(t.id) or next((x for x in space.types if x.name.casefold() == t.name.casefold()), None)
+        if have is not None:
+            out[t.name.casefold()] = have.id
+            continue
+        t.templates = {**t.templates, "ids": [], "defaultTemplateId": None}
+        try:
+            made = space.add_type(t)
+        except InvalidValue:
+            state.skipped.append(SkippedItem(path=f".object/types/{tid}.json", reason="damaged",
+                                             detail="The type couldn't be made"))
+            continue
+        state.types += 1
+        out[made.name.casefold()] = made.id
+    return out
+
+
 def _types(planned: Planned, space: Space, state: WriteState) -> None:
     state.progress("types", state.done, state.total, None)
+    carried = _carry_types(planned, space, state)
     used = {w.obj.typeKey for w in planned.writes}
     databases = {pt.key for pt in planned.plan.types if pt.origin == "database"}
     for pt in planned.plan.types:
@@ -274,6 +312,13 @@ def _types(planned: Planned, space: Space, state: WriteState) -> None:
             continue
         if tw.existingTypeId is None and tw.basic:
             state.type_names[pt.key] = tw.name  # the space's own Page type
+            continue
+        carried_type = space.type_by_id(carried[tw.name.casefold()]) if tw.name.casefold() in carried else None
+        if tw.existingTypeId is None and carried_type is not None:
+            # M31 fix pass: the remodel's own type; only properties it doesn't define are added
+            state.type_names[pt.key] = carried_type.name
+            if tw.new_props and not carried_type.basic:
+                _save_props(space, carried_type.id, tw.new_props, {})
             continue
         if tw.existingTypeId is None:
             name, n = tw.name, 2

@@ -8,6 +8,8 @@
 2. Git provenance never overrides git's ownership check: a repository git refuses (another user's)
    is imported as a plain folder, with a line in the preview and the report; reading provenance
    never writes ``.git/index``.
+5. A remodel carries every type of the space into the new space, those with no object included, as
+   the space defines them; the space is unchanged.
 """
 
 from __future__ import annotations
@@ -274,3 +276,56 @@ def test_write_state_docstrings_follow_their_fields() -> None:
     assert stray == []
     assert docs["losses"].startswith("(source path, what the conversion lost")
     assert docs["uncommitted"].startswith("M31: source paths whose file differs from its git commit")
+
+
+# -- 5. a remodel carries every type ------------------------------------------------------------
+
+
+def _type_shape(t) -> dict:
+    """What a remodel keeps of a type: its name, plural, icon, colour and properties (key, name,
+    kind, label options)."""
+    props = [(p.key, p.name, p.type, [str(o.get("text")) for o in p.options.get("set") or [] if isinstance(o, dict)])
+             for p in t.propertyDefinitions]
+    return {"plural": t.pluralName, "icon": t.icon.to_json() if t.icon else None, "color": t.color, "props": props}
+
+
+def test_remodel_carries_every_type(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """space-itops has types with no objects (Command, Meeting, Project, Prompt, Script, Source): the
+    new space has every type of the space, as the space defines it."""
+    from m15_helpers import FIXTURES, snapshot
+
+    monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setenv("OBJECT_CACHE_DIR", str(tmp_path / "cache"))
+    root = tmp_path / "IT ops test"
+    shutil.copytree(FIXTURES / "space-itops", root)
+    source = Space(root)
+    used = {s.type for s in source.list()}
+    empty = {t.name for t in source.types if t.id not in used}
+    assert {"Command", "Meeting", "Project", "Prompt", "Script", "Source"} <= empty
+    before = snapshot(root)
+    with TestClient(create_app(source, watch=False)) as client:
+        r = client.post("/api/import/preview", json={"source": {"path": str(root)}, "target": "newSpace",
+                                                      "keepAsSources": False})
+        assert r.status_code == 200, r.text
+        pv = r.json()
+        (tmp_path / "out").mkdir()
+        r = client.post("/api/import/start", json={
+            "previewId": pv["previewId"], "mapping": pv["mapping"], "keepAsSources": False,
+            "target": {"kind": "newSpace", "name": "IT ops remodel", "location": str(tmp_path / "out")}})
+        assert r.status_code == 202, r.text
+        job = wait_job(client, r.json()["jobId"])
+        assert job["phase"] == "done", job
+    new = Space(tmp_path / "out" / "IT ops remodel")
+    by_name = {t.name: t for t in new.types}
+    for t in Space(root).types:
+        got = by_name.get(t.name)
+        assert got is not None, t.name
+        if t.basic:
+            continue  # the new space's own Page and Tag (a basic type's properties are fixed)
+        want, have = _type_shape(t), _type_shape(got)
+        assert have["plural"] == want["plural"] and have["icon"] == want["icon"] and have["color"] == want["color"], t.name
+        assert have["props"] == want["props"], t.name
+    # a relation still points at the carried type
+    assert by_name["Host"].prop("locatedAt").options["allowedTypes"] == Space(root).type_by_id("host").prop(
+        "locatedAt").options["allowedTypes"]
+    assert snapshot(root) == before

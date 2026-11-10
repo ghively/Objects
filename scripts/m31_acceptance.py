@@ -35,8 +35,9 @@ with no back-end behaviour are Gene's hand checks in ``m31-acceptance.md``):
     untracked file are ``uncommitted`` and in the report's Git section; the repository is
     unchanged;
  5. remodel: importing the open space's own folder (``space-itops``) into a new space keeps its
-    types and objects (each at its path, its type and links kept); the original space is byte
-    for byte the same;
+    types (every one, those with no object included, with their plurals, icons, colours,
+    properties and options) and objects (each at its path, its type and links kept); the original
+    space is byte for byte the same;
  9. definition history: a collection, a saved query and a type, each edited and restored
     through ``POST /api/history/definition/restore``; a stale revision is 409 and writes
     nothing;
@@ -613,12 +614,23 @@ def check_remodel(run: Run, tmp: Path) -> None:
         served.stop()
     new = out / "IT ops remodel"
     new_types = {p.stem for p in (new / ".object" / "types").glob("*.json")}
-    missing_types = sorted(used - new_types)
-    unused = sorted(type_ids - used - new_types)
-    run.report({"host", "application", "incident", "location", "software"} <= new_types and not missing_types,
-               f"the new space has every type the space's objects use ({len(used)})", f"missing {missing_types}",
-               *([f"types with no object are not carried over (an import makes types from objects): {unused}"]
-                 if unused else []))
+    missing_types = sorted(type_ids - new_types)
+    empty = sorted(type_ids - used)
+    run.report({"command", "meeting", "project", "prompt", "script", "source"} <= set(empty) and not missing_types,
+               f"the new space has every type of the space ({len(type_ids)}), the {len(empty)} with no object "
+               "included", f"missing {missing_types}", f"with no object: {empty}")
+    changed = []
+    for tid in sorted(type_ids & new_types - {"page", "tag"}):
+        a = json.loads((root / ".object" / "types" / f"{tid}.json").read_text("utf-8"))
+        b = json.loads((new / ".object" / "types" / f"{tid}.json").read_text("utf-8"))
+        props = [(p.get("key"), p.get("name"), p.get("type"), [o.get("text") for o in (p.get("options") or {}).get("set") or []])
+                 for p in a.get("propertyDefinitions") or []]
+        got = [(p.get("key"), p.get("name"), p.get("type"), [o.get("text") for o in (p.get("options") or {}).get("set") or []])
+               for p in b.get("propertyDefinitions") or []]
+        if any(a.get(k) != b.get(k) for k in ("name", "pluralName", "icon", "color")) or got != props:
+            changed.append(tid)
+    run.report(not changed, "each carried type keeps its name, plural, icon, colour, properties and options",
+               *(f"differs: {t}" for t in changed))
     missing, wrong = [], []
     for rel, o in originals.items():
         f = new / rel
