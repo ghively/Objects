@@ -659,7 +659,8 @@ export function CollectionPage({ id, mode = 'page', typeId, onExpand, footer }: 
         className="mx-4 mb-2 max-w-md"
         rows={[
           { label: DEV_INFO_TEXT.collectionId, value: c.id },
-          { label: DEV_INFO_TEXT.view, value: tab },
+          // The peek always shows All, whatever tab the page saved.
+          { label: DEV_INFO_TEXT.view, value: peek ? 'all' : tab },
         ]}
       />
       {readOnly && (

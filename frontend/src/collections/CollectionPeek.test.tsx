@@ -15,6 +15,8 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, useCollectionPeek, usePeek, useTabs } from '@/nav/tabs'
+import { DEV_INFO_TEXT } from '@/settings/DevInfo'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { TypePage } from '@/types/TypePage'
 import { useDefs } from '@/types/useDefinitions'
 import { CollectionPeek, COLLECTION_PEEK_TEXT } from './CollectionPeek'
@@ -164,5 +166,19 @@ describe('CollectionPeek (M31)', () => {
     expect(useCollectionPeek.getState().id).toBeNull()
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'collection', id: 'active' })
     expect(useTabs.getState().tabs).toHaveLength(2)
+  })
+
+  test("test developer information's View row in the peek reads all, the view the peek shows, not the page's saved tab (M31 fix)", async () => {
+    useSettings.setState({ settings: { ...settingsDefaults, showDeveloperInfo: true }, revision: 'r0', loaded: true })
+    const saved = { ...ACTIVE, views: { ...ACTIVE.views, activeTab: 'overview' } as Views }
+    mocked.collections.mockResolvedValue([saved, ARCHIVE])
+    useTabs.getState().open({ kind: 'type', typeId: 'project' })
+    useCollectionPeek.getState().peek('active', ['active', 'archive'], 'project')
+    render(<CollectionPeek />)
+    const box = await within(dialog()).findByRole('region', { name: DEV_INFO_TEXT.heading })
+    const viewRow = within(box).getByText(DEV_INFO_TEXT.view).parentElement!
+    expect(within(viewRow).getByText('all')).toBeInTheDocument()
+    expect(within(box).queryByText('overview')).toBeNull()
+    useSettings.setState({ settings: settingsDefaults })
   })
 })
