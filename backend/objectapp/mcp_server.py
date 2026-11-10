@@ -188,6 +188,14 @@ def build_server(client: ObjectClient, write: bool = True, sync: bool | None = N
         descending: bool = False,
         limit: int = 50,
         offset: int = 0,
+        search: list[str] | None = None,
+        search_mode: str = "auto",
+        exclude_types: list[str] | None = None,
+        all_tags: bool = False,
+        exclude_tags: list[str] | None = None,
+        in_no_collection: bool = False,
+        in_any_collection: bool = False,
+        exclude_collections: list[str] | None = None,
     ) -> dict:
         """List objects with their property values, like a database view.
 
@@ -196,7 +204,13 @@ def build_server(client: ObjectClient, write: bool = True, sync: bool | None = N
         "referenceValue": "Done"}, ...]}. Options include is, isNot, contains, notContains,
         isEmpty, isNotEmpty, isChecked, greater, smaller, isBefore, isAfter; a date
         referenceValue may be {"relative": "today"|"thisWeek"|"overdue"|...} or
-        {"exactDate": "2026-11-05"}. Unknown options are skipped and listed in `unsupported`."""
+        {"exactDate": "2026-11-05"}. Unknown options are skipped and listed in `unsupported`.
+
+        The parts of the app's query builder: `search` terms (two or more characters, at most
+        five; an object matches one) in titles, aliases, descriptions and text, or titles only with
+        `search_mode` "title"; `tags` match any of them, or all with `all_tags`; `exclude_tags`,
+        `exclude_types` (names or ids), `in_no_collection`, `in_any_collection` and
+        `exclude_collections` (collection ids) leave objects out. Every part given applies."""
         return client.post(
             "/query",
             {
@@ -207,12 +221,24 @@ def build_server(client: ObjectClient, write: bool = True, sync: bool | None = N
                 "sort": {"propertyId": sort_by, "descending": descending} if sort_by else None,
                 "limit": limit,
                 "offset": offset,
+                "search": search,
+                "searchMode": search_mode,
+                "excludeTypeIds": exclude_types,
+                "tagsOperator": "and" if all_tags else "or",
+                "excludeTags": exclude_tags,
+                "inNoCollection": in_no_collection,
+                "inAnyCollection": in_any_collection,
+                "excludeCollectionIds": exclude_collections,
             },
         )
 
     @server.tool(annotations=READ)
     def run_saved_query(query_id: str, limit: int = 50, offset: int = 0) -> dict:
-        """Run one of the user's saved queries (ids from `schema`)."""
+        """Run one of the user's saved queries (ids from `schema`): the objects its page lists in
+        the app, in the same order. Every part of the query applies: its types and their collection
+        rules, search terms, tags (any or all), left-out tags and types, filters, sorts and its own
+        limit. As in the app, a query with a search term pauses its filters and sorts (`paused`),
+        and one with no type, tag or search term lists nothing. `limit`/`offset` page the answer."""
         return client.post(f"/queries/{query_id}/run", {"limit": limit, "offset": offset})
 
     @server.tool(annotations=READ)

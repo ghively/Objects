@@ -1,0 +1,2607 @@
+{
+ "about": "Shared saved-query cases (M31): queries/runQuery.parity.test.ts runs the app's queryScope and runQuery on them and backend/tests/test_m31_query_parity.py runs the server's port (objectapp/queryeval.py). `matches` is the app's answer in its order. Rows are those the scope's types fetch (search terms are matched by the server's /api/rows, tested in test_m31_query_api.py). A random limit draws from `rng` in turn.",
+ "timeZone": "America/Chicago",
+ "now": "2026-11-04T18:00:00.000Z",
+ "types": [
+  {
+   "id": "page",
+   "name": "Page",
+   "propertyDefinitions": [
+    {
+     "id": "title",
+     "key": "title",
+     "name": "title",
+     "type": "entity_title",
+     "options": {}
+    },
+    {
+     "id": "status",
+     "key": "status",
+     "name": "status",
+     "type": "label",
+     "options": {
+      "set": [
+       {
+        "id": "s-todo",
+        "text": "To Do"
+       },
+       {
+        "id": "s-doing",
+        "text": "Doing"
+       },
+       {
+        "id": "s-done",
+        "text": "Done"
+       }
+      ]
+     }
+    },
+    {
+     "id": "estimate",
+     "key": "estimate",
+     "name": "estimate",
+     "type": "number",
+     "options": {}
+    },
+    {
+     "id": "due",
+     "key": "due",
+     "name": "due",
+     "type": "datetime",
+     "options": {}
+    },
+    {
+     "id": "owner",
+     "key": "owner",
+     "name": "owner",
+     "type": "entity",
+     "options": {
+      "isArray": true
+     }
+    },
+    {
+     "id": "score",
+     "key": "score",
+     "name": "score",
+     "type": "formula",
+     "options": {}
+    },
+    {
+     "id": "ticket",
+     "key": "ticket",
+     "name": "ticket",
+     "type": "uniqueId",
+     "options": {}
+    },
+    {
+     "id": "contact",
+     "key": "contact",
+     "name": "contact",
+     "type": "email",
+     "options": {}
+    },
+    {
+     "id": "flagged",
+     "key": "flagged",
+     "name": "flagged",
+     "type": "boolean",
+     "options": {}
+    }
+   ]
+  },
+  {
+   "id": "server",
+   "name": "Server",
+   "propertyDefinitions": [
+    {
+     "id": "title",
+     "key": "title",
+     "name": "title",
+     "type": "entity_title",
+     "options": {}
+    },
+    {
+     "id": "rack",
+     "key": "rack",
+     "name": "rack",
+     "type": "text",
+     "options": {}
+    },
+    {
+     "id": "estimate",
+     "key": "estimate",
+     "name": "estimate",
+     "type": "number",
+     "options": {}
+    }
+   ],
+   "counterparts": [
+    {
+     "id": "counterpart:runs",
+     "key": "runs",
+     "name": "Runs",
+     "type": "entity",
+     "options": {
+      "isArray": true
+     }
+    }
+   ]
+  },
+  {
+   "id": "person",
+   "name": "Person",
+   "propertyDefinitions": [
+    {
+     "id": "title",
+     "key": "title",
+     "name": "title",
+     "type": "entity_title",
+     "options": {}
+    }
+   ]
+  }
+ ],
+ "collections": [
+  {
+   "id": "tooling",
+   "name": "Tooling",
+   "formerNames": [
+    "Gear"
+   ]
+  },
+  {
+   "id": "ops",
+   "name": "Ops",
+   "formerNames": []
+  }
+ ],
+ "tagIdsToTitles": {
+  "tag-a": "alpha",
+  "tag-b": "beta",
+  "tag-c": "gamma"
+ },
+ "pathsById": {
+  "p-ann": "People/Ann.md",
+  "p-bob": "People/bob.md",
+  "p-zoe": "People/Zoë.md"
+ },
+ "entityTitles": {
+  "People/Ann.md": "Ann",
+  "People/bob.md": "bob",
+  "People/Zoë.md": "Zoë",
+  "Pages/Item 10.md": "Item 10",
+  "Pages/item 2.md": "item 2",
+  "Pages/Éclair.md": "Éclair",
+  "Pages/eclair b.md": "eclair b",
+  "Pages/_draft.md": "_draft",
+  "Pages/Untitled.md": "",
+  "Servers/web-01.md": "web-01",
+  "Servers/web-02.md": "web-02",
+  "Servers/db 1.md": "db 1"
+ },
+ "rng": [
+  0.99,
+  0,
+  0.5,
+  0.25
+ ],
+ "allTypeIds": [
+  "page",
+  "server",
+  "person"
+ ],
+ "rows": [
+  {
+   "summary": {
+    "path": "Pages/Item 10.md",
+    "id": null,
+    "type": "page",
+    "title": "Item 10",
+    "icon": null,
+    "iconColor": null,
+    "description": null,
+    "aliases": [],
+    "createdAt": "2026-01-03T00:00:00Z",
+    "lastUpdated": null,
+    "tags": [
+     "alpha"
+    ],
+    "template": null,
+    "color": null,
+    "coverImage": null,
+    "readOnly": false,
+    "collections": [
+     "Tooling"
+    ]
+   },
+   "version": "v1",
+   "preview": "",
+   "values": {
+    "status": [
+     "Done"
+    ],
+    "estimate": 5,
+    "due": {
+     "start": "2026-11-03",
+     "resolution": "day"
+    },
+    "owner": [
+     {
+      "target": "bob",
+      "path": "People/bob.md"
+     }
+    ],
+    "score": {
+     "type": "number",
+     "value": 10
+    },
+    "ticket": "PG-10",
+    "contact": "ten@example.org",
+    "flagged": true
+   },
+   "links": {
+    "owner": [
+     "People/bob.md"
+    ]
+   }
+  },
+  {
+   "summary": {
+    "path": "Pages/item 2.md",
+    "id": null,
+    "type": "page",
+    "title": "item 2",
+    "icon": null,
+    "iconColor": null,
+    "description": null,
+    "aliases": [],
+    "createdAt": "2026-01-05T00:00:00Z",
+    "lastUpdated": null,
+    "tags": [
+     "beta"
+    ],
+    "template": null,
+    "color": null,
+    "coverImage": null,
+    "readOnly": false,
+    "collections": [
+     "Gear",
+     "Ops"
+    ]
+   },
+   "version": "v1",
+   "preview": "",
+   "values": {
+    "status": [
+     "To Do"
+    ],
+    "estimate": 2,
+    "due": {
+     "start": "2026-11-02T23:30:00Z",
+     "resolution": "time"
+    },
+    "owner": [
+     {
+      "target": "Ann",
+      "path": "People/Ann.md"
+     }
+    ],
+    "score": {
+     "type": "number",
+     "value": 2.5
+    },
+    "ticket": "PG-2",
+    "contact": "two@example.com"
+   },
+   "links": {
+    "owner": [
+     "People/Ann.md"
+    ]
+   }
+  },
+  {
+   "summary": {
+    "path": "Pages/Éclair.md",
+    "id": null,
+    "type": "page",
+    "title": "Éclair",
+    "icon": null,
+    "iconColor": null,
+    "description": null,
+    "aliases": [],
+    "createdAt": "2026-01-05T00:00:00Z",
+    "lastUpdated": null,
+    "tags": [
+     "alpha",
+     "beta"
+    ],
+    "template": null,
+    "color": null,
+    "coverImage": null,
+    "readOnly": false,
+    "collections": [
+     "Ops"
+    ]
+   },
+   "version": "v1",
+   "preview": "",
+   "values": {
+    "status": [
+     "Doing"
+    ],
+    "due": {
+     "start": "2026-11-02",
+     "resolution": "day"
+    },
+    "owner": [
+     {
+      "target": "Zoë",
+      "path": "People/Zoë.md"
+     }
+    ],
+    "score": {
+     "type": "text",
+     "value": "high"
+    },
+    "ticket": 7
+   },
+   "links": {
+    "owner": [
+     "People/Zoë.md"
+    ]
+   }
+  },
+  {
+   "summary": {
+    "path": "Pages/eclair b.md",
+    "id": null,
+    "type": "page",
+    "title": "eclair b",
+    "icon": null,
+    "iconColor": null,
+    "description": null,
+    "aliases": [],
+    "createdAt": "2026-01-01T00:00:00Z",
+    "lastUpdated": null,
+    "tags": [
+     "gamma"
+    ],
+    "template": null,
+    "color": null,
+    "coverImage": null,
+    "readOnly": false,
+    "collections": [
+     "Unknown"
+    ]
+   },
+   "version": "v1",
+   "preview": "",
+   "values": {
+    "status": [
+     "Done",
+     "To Do"
+    ],
+    "estimate": 2,
+    "score": {
+     "type": "error",
+     "value": "Bad"
+    },
+    "ticket": "PG-9"
+   },
+   "links": {}
+  },
+  {
+   "summary": {
+    "path": "Pages/_draft.md",
+    "id": null,
+    "type": "page",
+    "title": "_draft",
+    "icon": null,
+    "iconColor": null,
+    "description": null,
+    "aliases": [],
+    "createdAt": null,
+    "lastUpdated": null,
+    "tags": [],
+    "template": null,
+    "color": null,
+    "coverImage": null,
+    "readOnly": false,
+    "collections": []
+   },
+   "version": "v1",
+   "preview": "",
+   "values": {
+    "estimate": 0,
+    "score": {
+     "type": "empty",
+     "value": null
+    }
+   },
+   "links": {}
+  },
+  {
+   "summary": {
+    "path": "Pages/Untitled.md",
+    "id": null,
+    "type": "page",
+    "title": "",
+    "icon": null,
+    "iconColor": null,
+    "description": null,
+    "aliases": [],
+    "createdAt": "2026-01-02T00:00:00Z",
+    "lastUpdated": null,
+    "tags": [
+     "alpha"
+    ],
+    "template": null,
+    "color": null,
+    "coverImage": null,
+    "readOnly": false,
+    "collections": [
+     "Tooling"
+    ]
+   },
+   "version": "v1",
+   "preview": "",
+   "values": {
+    "status": [],
+    "flagged": false
+   },
+   "links": {}
+  },
+  {
+   "summary": {
+    "path": "Servers/web-01.md",
+    "id": null,
+    "type": "server",
+    "title": "web-01",
+    "icon": null,
+    "iconColor": null,
+    "description": null,
+    "aliases": [],
+    "createdAt": "2026-01-04T00:00:00Z",
+    "lastUpdated": null,
+    "tags": [
+     "alpha"
+    ],
+    "template": null,
+    "color": null,
+    "coverImage": null,
+    "readOnly": false,
+    "collections": [
+     "Tooling",
+     "Ops"
+    ]
+   },
+   "version": "v1",
+   "preview": "",
+   "values": {
+    "rack": "R2",
+    "estimate": 7,
+    "runs": [
+     {
+      "target": "Item 10",
+      "path": "Pages/Item 10.md"
+     }
+    ]
+   },
+   "links": {
+    "runs": [
+     "Pages/Item 10.md"
+    ]
+   }
+  },
+  {
+   "summary": {
+    "path": "Servers/web-02.md",
+    "id": null,
+    "type": "server",
+    "title": "web-02",
+    "icon": null,
+    "iconColor": null,
+    "description": null,
+    "aliases": [],
+    "createdAt": "2026-01-06T00:00:00Z",
+    "lastUpdated": null,
+    "tags": [
+     "beta",
+     "gamma"
+    ],
+    "template": null,
+    "color": null,
+    "coverImage": null,
+    "readOnly": false,
+    "collections": []
+   },
+   "version": "v1",
+   "preview": "",
+   "values": {
+    "rack": "R10",
+    "estimate": 1
+   },
+   "links": {}
+  },
+  {
+   "summary": {
+    "path": "Servers/db 1.md",
+    "id": null,
+    "type": "server",
+    "title": "db 1",
+    "icon": null,
+    "iconColor": null,
+    "description": null,
+    "aliases": [],
+    "createdAt": "2026-01-04T00:00:00Z",
+    "lastUpdated": null,
+    "tags": [],
+    "template": null,
+    "color": null,
+    "coverImage": null,
+    "readOnly": false,
+    "collections": [
+     "Ops"
+    ]
+   },
+   "version": "v1",
+   "preview": "",
+   "values": {
+    "rack": ""
+   },
+   "links": {}
+  },
+  {
+   "summary": {
+    "path": "People/Ann.md",
+    "id": "p-ann",
+    "type": "person",
+    "title": "Ann",
+    "icon": null,
+    "iconColor": null,
+    "description": null,
+    "aliases": [],
+    "createdAt": "2026-01-07T00:00:00Z",
+    "lastUpdated": null,
+    "tags": [
+     "alpha"
+    ],
+    "template": null,
+    "color": null,
+    "coverImage": null,
+    "readOnly": false,
+    "collections": []
+   },
+   "version": "v1",
+   "preview": "",
+   "values": {},
+   "links": {}
+  }
+ ],
+ "cases": [
+  {
+   "name": "not ready: nothing",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": []
+   },
+   "matches": []
+  },
+  {
+   "name": "not ready: a one-letter term",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "search": {
+     "searchTerms": [
+      {
+       "text": "x"
+      }
+     ],
+     "searchMode": "auto"
+    }
+   },
+   "scope": {
+    "typeIds": []
+   },
+   "matches": []
+  },
+  {
+   "name": "types only: newest first",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     },
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Servers/web-02.md",
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Servers/web-01.md",
+    "Servers/db 1.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "all types with a tag",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "tags": {
+     "ids": [
+      "tag-a"
+     ],
+     "operator": "or"
+    }
+   },
+   "scope": {},
+   "matches": [
+    "People/Ann.md",
+    "Pages/Éclair.md",
+    "Servers/web-01.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md"
+   ]
+  },
+  {
+   "name": "tags any of",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "tags": {
+     "ids": [
+      "tag-a",
+      "tag-b"
+     ],
+     "operator": "or"
+    }
+   },
+   "scope": {},
+   "matches": [
+    "People/Ann.md",
+    "Servers/web-02.md",
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Servers/web-01.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md"
+   ]
+  },
+  {
+   "name": "tags all of",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "tags": {
+     "ids": [
+      "tag-a",
+      "tag-b"
+     ],
+     "operator": "and"
+    }
+   },
+   "scope": {},
+   "matches": [
+    "Pages/Éclair.md"
+   ]
+  },
+  {
+   "name": "a tag id that names nothing",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "tags": {
+     "ids": [
+      "tag-zz"
+     ],
+     "operator": "or"
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": []
+  },
+  {
+   "name": "left-out tags with an included tag",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "tags": {
+     "ids": [
+      "tag-a",
+      "tag-b"
+     ],
+     "operator": "or"
+    },
+    "excludeTags": {
+     "ids": [
+      "tag-b"
+     ]
+    }
+   },
+   "scope": {},
+   "matches": [
+    "People/Ann.md",
+    "Servers/web-01.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md"
+   ]
+  },
+  {
+   "name": "left-out tags ignored without search or tag",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "excludeTags": {
+     "ids": [
+      "tag-a"
+     ]
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "excluded types ignored without search or tag",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "excludeTypeIds": [
+     "page"
+    ]
+   },
+   "scope": {
+    "typeIds": []
+   },
+   "matches": []
+  },
+  {
+   "name": "excluded types with a tag",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "excludeTypeIds": [
+     "page"
+    ],
+    "tags": {
+     "ids": [
+      "tag-a"
+     ],
+     "operator": "or"
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "server",
+     "person"
+    ]
+   },
+   "matches": [
+    "People/Ann.md",
+    "Servers/web-01.md"
+   ]
+  },
+  {
+   "name": "excluded types ignored while types are picked",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "excludeTypeIds": [
+     "page"
+    ],
+    "tags": {
+     "ids": [
+      "tag-a"
+     ],
+     "operator": "or"
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/Éclair.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md"
+   ]
+  },
+  {
+   "name": "excluded types with a search",
+   "definition": {
+    "types": [],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "excludeTypeIds": [
+     "page",
+     "person"
+    ],
+    "search": {
+     "searchTerms": [
+      {
+       "text": "we"
+      },
+      {
+       "text": "zz"
+      }
+     ],
+     "searchMode": "auto"
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "server"
+    ],
+    "search": {
+     "terms": [
+      "we",
+      "zz"
+     ],
+     "mode": "auto"
+    }
+   },
+   "matches": [
+    "Servers/web-02.md",
+    "Servers/web-01.md",
+    "Servers/db 1.md"
+   ]
+  },
+  {
+   "name": "search with the title mode",
+   "definition": {
+    "types": [
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "search": {
+     "searchTerms": [
+      {
+       "text": "db"
+      }
+     ],
+     "searchMode": "title"
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "server"
+    ],
+    "search": {
+     "terms": [
+      "db"
+     ],
+     "mode": "title"
+    }
+   },
+   "matches": [
+    "Servers/web-02.md",
+    "Servers/web-01.md",
+    "Servers/db 1.md"
+   ]
+  },
+  {
+   "name": "search pauses filters and sorts",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "estimate",
+       "option": "greater",
+       "referenceValue": 3
+      }
+     ]
+    },
+    "sorts": [
+     {
+      "propertyId": "title",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null,
+    "search": {
+     "searchTerms": [
+      {
+       "text": "it"
+      }
+     ],
+     "searchMode": "auto"
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ],
+    "search": {
+     "terms": [
+      "it"
+     ],
+     "mode": "auto"
+    }
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "search terms: trimmed, short ones dropped, five kept",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null,
+    "search": {
+     "searchTerms": [
+      {
+       "text": " ab "
+      },
+      {
+       "text": "c"
+      },
+      {
+       "text": "de"
+      },
+      {
+       "text": "fg"
+      },
+      {
+       "text": "hi"
+      },
+      {
+       "text": "jk"
+      },
+      {
+       "text": "lm"
+      }
+     ],
+     "searchMode": "auto"
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ],
+    "search": {
+     "terms": [
+      "ab",
+      "de",
+      "fg",
+      "hi",
+      "jk"
+     ],
+     "mode": "auto"
+    }
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "in no collection",
+   "definition": {
+    "types": [
+     {
+      "id": "page",
+      "inNoCollection": true
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "in any collection",
+   "definition": {
+    "types": [
+     {
+      "id": "page",
+      "inAnyCollection": true
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md"
+   ]
+  },
+  {
+   "name": "these collections (by former name too)",
+   "definition": {
+    "types": [
+     {
+      "id": "page",
+      "collectionIds": [
+       "tooling"
+      ]
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md"
+   ]
+  },
+  {
+   "name": "not these collections",
+   "definition": {
+    "types": [
+     {
+      "id": "page",
+      "excludeCollectionIds": [
+       "ops"
+      ]
+     },
+     {
+      "id": "server",
+      "excludeCollectionIds": [
+       "ops"
+      ]
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Servers/web-02.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "per type entry rules",
+   "definition": {
+    "types": [
+     {
+      "id": "page",
+      "inNoCollection": true
+     },
+     {
+      "id": "server",
+      "collectionIds": [
+       "ops"
+      ]
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Servers/web-01.md",
+    "Servers/db 1.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "a label filter by option id",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "status",
+       "option": "contains",
+       "referenceValue": [
+        "s-done"
+       ]
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/Item 10.md",
+    "Pages/eclair b.md"
+   ]
+  },
+  {
+   "name": "a label 'is' is not a label operator: ignored",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "status",
+       "option": "is",
+       "referenceValue": "s-done"
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "an option id that names nothing",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "status",
+       "option": "contains",
+       "referenceValue": [
+        "s-zz"
+       ]
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": []
+  },
+  {
+   "name": "relation by object id",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "or",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "owner",
+       "option": "contains",
+       "referenceValue": [
+        "p-ann"
+       ]
+      },
+      {
+       "type": "filter",
+       "propertyId": "owner",
+       "option": "contains",
+       "referenceValue": [
+        "p-zoe"
+       ]
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md"
+   ]
+  },
+  {
+   "name": "formula number greater",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "score",
+       "option": "greater",
+       "referenceValue": 2
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Item 10.md"
+   ]
+  },
+  {
+   "name": "formula text contains",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "score",
+       "option": "contains",
+       "referenceValue": "hi"
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/Éclair.md"
+   ]
+  },
+  {
+   "name": "formula empty (errors count as empty)",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "score",
+       "option": "isEmpty"
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "unique id contains a number",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "ticket",
+       "option": "contains",
+       "referenceValue": "7"
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/Éclair.md"
+   ]
+  },
+  {
+   "name": "email ends with",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "contact",
+       "option": "endsWith",
+       "referenceValue": ".org"
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/Item 10.md"
+   ]
+  },
+  {
+   "name": "counterpart row contains",
+   "definition": {
+    "types": [
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "runs",
+       "option": "isNotEmpty"
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "server"
+    ]
+   },
+   "matches": [
+    "Servers/web-01.md"
+   ]
+  },
+  {
+   "name": "checkbox",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "flagged",
+       "option": "isNotChecked"
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "date this week (Chicago, Monday weeks)",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "due",
+       "option": "is",
+       "referenceValue": {
+        "relative": "thisWeek"
+       }
+      }
+     ]
+    },
+    "sorts": [],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/Item 10.md"
+   ]
+  },
+  {
+   "name": "title ascending: case, accents, numbers, punctuation",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "title",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/_draft.md",
+    "Pages/Éclair.md",
+    "Pages/eclair b.md",
+    "Pages/item 2.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md"
+   ]
+  },
+  {
+   "name": "title descending",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     },
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "title",
+      "option": "descending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Servers/web-02.md",
+    "Servers/web-01.md",
+    "Pages/Untitled.md",
+    "Pages/Item 10.md",
+    "Pages/item 2.md",
+    "Pages/eclair b.md",
+    "Pages/Éclair.md",
+    "Servers/db 1.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "number ascending, empties last",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     },
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "estimate",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Pages/_draft.md",
+    "Servers/web-02.md",
+    "Pages/item 2.md",
+    "Pages/eclair b.md",
+    "Pages/Item 10.md",
+    "Servers/web-01.md",
+    "Pages/Éclair.md",
+    "Servers/db 1.md",
+    "Pages/Untitled.md"
+   ]
+  },
+  {
+   "name": "number descending, then title",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     },
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "estimate",
+      "option": "descending"
+     },
+     {
+      "propertyId": "title",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Servers/web-01.md",
+    "Pages/Item 10.md",
+    "Pages/eclair b.md",
+    "Pages/item 2.md",
+    "Servers/web-02.md",
+    "Pages/_draft.md",
+    "Servers/db 1.md",
+    "Pages/Éclair.md",
+    "Pages/Untitled.md"
+   ]
+  },
+  {
+   "name": "label by option order",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "status",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/eclair b.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "date: days and times in the zone",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "due",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/Éclair.md",
+    "Pages/item 2.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "date: newest first",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "due",
+      "option": "descending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/Item 10.md",
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "date: is empty first",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "due",
+      "option": "ascendingExists"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md",
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/Item 10.md"
+   ]
+  },
+  {
+   "name": "date: is empty last",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "due",
+      "option": "descendingExists"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "relation by the target's title",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "owner",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Item 10.md",
+    "Pages/Éclair.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "formula by result",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "score",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Item 10.md",
+    "Pages/Éclair.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "unique id by trailing number",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "ticket",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/eclair b.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "tags by the first tag",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     },
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "tags",
+      "option": "descending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Pages/eclair b.md",
+    "Servers/web-02.md",
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Servers/web-01.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Servers/db 1.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "collections by the first",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     },
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "collections",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Servers/db 1.md",
+    "Servers/web-01.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Servers/web-02.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "createdAt oldest first",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     },
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "createdAt",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Pages/eclair b.md",
+    "Pages/Untitled.md",
+    "Pages/Item 10.md",
+    "Servers/web-01.md",
+    "Servers/db 1.md",
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Servers/web-02.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "a sort scoped to one type",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     },
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "estimate",
+      "option": "ascending",
+      "typeId": "server"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Servers/web-02.md",
+    "Servers/web-01.md",
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Servers/db 1.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "an unsortable kind is skipped",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     },
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "type",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Servers/web-02.md",
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Servers/web-01.md",
+    "Servers/db 1.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "a sort on an unknown property is skipped",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "nope",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/item 2.md",
+    "Pages/Éclair.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md",
+    "Pages/eclair b.md",
+    "Pages/_draft.md"
+   ]
+  },
+  {
+   "name": "text property on one type",
+   "definition": {
+    "types": [
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "rack",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null
+   },
+   "scope": {
+    "typeIds": [
+     "server"
+    ]
+   },
+   "matches": [
+    "Servers/web-01.md",
+    "Servers/web-02.md",
+    "Servers/db 1.md"
+   ]
+  },
+  {
+   "name": "limit the first three",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "title",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null,
+    "limit": {
+     "size": 3
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/_draft.md",
+    "Pages/Éclair.md",
+    "Pages/eclair b.md"
+   ]
+  },
+  {
+   "name": "limit ignored while grouped",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "title",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": {
+     "groups": [
+      {
+       "propertyId": "status",
+       "option": "default"
+      }
+     ]
+    },
+    "limit": {
+     "size": 2
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/_draft.md",
+    "Pages/Éclair.md",
+    "Pages/eclair b.md",
+    "Pages/item 2.md",
+    "Pages/Item 10.md",
+    "Pages/Untitled.md"
+   ]
+  },
+  {
+   "name": "limit at random (seeded)",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "and",
+     "elements": []
+    },
+    "sorts": [
+     {
+      "propertyId": "title",
+      "option": "ascending"
+     }
+    ],
+    "groupBy": null,
+    "limit": {
+     "size": 3,
+     "random": true
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "page"
+    ]
+   },
+   "matches": [
+    "Pages/Untitled.md",
+    "Pages/_draft.md",
+    "Pages/item 2.md"
+   ]
+  },
+  {
+   "name": "filters, tags and sorts together",
+   "definition": {
+    "types": [
+     {
+      "id": "page"
+     },
+     {
+      "id": "server"
+     }
+    ],
+    "filterGroup": {
+     "type": "filterGroup",
+     "operator": "or",
+     "elements": [
+      {
+       "type": "filter",
+       "propertyId": "estimate",
+       "option": "greaterEqual",
+       "referenceValue": 5
+      },
+      {
+       "type": "filter",
+       "propertyId": "title",
+       "option": "startsWith",
+       "referenceValue": "ite"
+      }
+     ]
+    },
+    "sorts": [
+     {
+      "propertyId": "estimate",
+      "option": "descending"
+     }
+    ],
+    "groupBy": null,
+    "tags": {
+     "ids": [
+      "tag-a",
+      "tag-b"
+     ],
+     "operator": "or"
+    },
+    "excludeTags": {
+     "ids": [
+      "tag-c"
+     ]
+    }
+   },
+   "scope": {
+    "typeIds": [
+     "page",
+     "server"
+    ]
+   },
+   "matches": [
+    "Servers/web-01.md",
+    "Pages/Item 10.md",
+    "Pages/item 2.md"
+   ]
+  }
+ ]
+}

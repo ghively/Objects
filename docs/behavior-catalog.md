@@ -431,6 +431,10 @@ Each starter template pre-fills the new type's properties.
     Limit: 1, 3, 5, 10, 25, 50, No limit.
   - During a search, sorting and property filters are off: "Sorting and property filters are off during a search."
   - A query's automatic title: "Tasks, Pages tagged work …", or "All notes" with no types (`queries/autoTitle.ts`).
+  - **A saved query over the API** (M31): `POST /api/v1/queries/{id}/run` and MCP's `run_saved_query` list what the
+    query's page lists, in its order (`backend/objectapp/queryeval.py`, the server's port of `runQuery.ts`): every
+    part above applies, a search pauses filters and sorts (`paused`), and a query that isn't ready lists nothing.
+    Objects excluded from AI stay out. The ad-hoc `POST /api/v1/query` (MCP `query`) takes the same parts.
 - **Query builder search mode**: Auto | Title. Auto looks for the words in titles, aliases, descriptions and text (a
   case-folded substring); Title looks in titles only. Exact and Semantic are hidden until real full-text search exists
   (Gene's decision Q-1: they matched exactly like Auto). A saved query that uses one still runs as Auto (the
