@@ -10,11 +10,20 @@ citations in ``.object/distilled/<object id>.json``. **No step writes a Source.*
 recorded in ``.object/imports/<batch>/entities-written.json`` (`WRITTEN_FILE`)::
 
     {"placed": {entityId: path}, "done": {entityId: ["created"?, "values", "section"]},
-     "sections": {entityId: "written" | "left" | "kept"}, "outcome": EntitiesWritten | null}
+     "sections": {entityId: "written" | "left" | "kept"}, "outcome": EntitiesWritten | null,
+     "creating": {entityId: {"title", "known": [path]}}, "setting": {entityId: {key: value}}}
 
 so a retry after a failure resumes without placing anything twice (``"created"`` marks an object
 this batch made; a stored relation on an object that is no entity of the Write is recorded under
-``"object:<path>"``).
+``"object:<path>"``). ``"creating"`` is written just before an object is created (its title and
+the objects of that title already there) and ``"setting"`` just before values are written, so a
+run that dies right after either is resumed: the object it made is the entity's, the values it
+wrote are the import's. A section a run wrote but didn't record (the span's hash is the new
+text's) counts as written.
+
+The entity's `DistilledRecord` also keeps, under ``"section"``, its ``"lines"``, ``"mainPages"``
+and ``"plain"`` links, so a later Write distils it from all its Sources: what this batch's
+Sources say replaces what they said before, the rest stays (values: the newest Source wins).
 
 ``ConflictRow = {entity: {path, title}, key, name, kept: {value, sources}, others: [{value, sources}]}``.
 """
@@ -128,6 +137,8 @@ class _Writer:
             "done": {k: list(v) for k, v in (data.get("done") or {}).items() if isinstance(v, list)}
             if isinstance(data.get("done"), dict) else {},
             "sections": dict(data.get("sections") or {}) if isinstance(data.get("sections"), dict) else {},
+            "creating": dict(data.get("creating") or {}) if isinstance(data.get("creating"), dict) else {},
+            "setting": dict(data.get("setting") or {}) if isinstance(data.get("setting"), dict) else {},
             "outcome": None,
         }  # fmt: skip
 
@@ -326,6 +337,19 @@ class _Writer:
             self.items.append({"sourcePath": ident, "system": self.system, "id": ident, "title": name, "path": path,
                                "action": "created", "entity": True})  # fmt: skip
 
+    def _titled(self, type_id: str, title: str) -> list[str]:
+        """The paths of the type's objects (not templates) titled ``title``."""
+        return sorted(s.path for s in self.space.list(type_id) if s.template is None and s.title == title)
+
+    def _created_before(self, e: Entity) -> str | None:
+        """The object a run that died right after creating it made (recorded under ``"creating"``)."""
+        pending = self.rec["creating"].get(e.id)
+        if not isinstance(pending, dict):
+            return None
+        known = set(pending.get("known") or [])
+        made = [p for p in self._titled(e.typeId, str(pending.get("title") or "")) if p not in known]
+        return made[0] if made else None
+
     def place(self, e: Entity, name: str) -> str:
         placed = self.rec["placed"]
         if e.id in placed:
@@ -336,6 +360,14 @@ class _Writer:
                 return path
             del placed[e.id]  # gone since (trashed): placed again
             self.rec["done"].pop(e.id, None)
+        made = self._created_before(e)
+        if made is not None:
+            placed[e.id] = made
+            self.rec["done"][e.id] = ["created"]
+            self.rec["creating"].pop(e.id, None)
+            self._save()
+            self._finish_created(e, name, made)
+            return made
         self._ensure_sources(e.typeId)
         path = e.existing if e.existing and not self._is_source(e.existing) else None
         path = path or self._by_provenance(e, name)
@@ -344,9 +376,14 @@ class _Writer:
             placed[e.id] = path
             self._save()
             return path
+        # recorded first, so a retry after a failure right after the create finds the object
+        title = " ".join(str(name or "").split("\n")).strip()  # as `Space.create_object` writes it
+        self.rec["creating"][e.id] = {"title": title, "known": self._titled(e.typeId, title)}
+        self._save()
         path, _version = self.space.create_object(e.typeId, name)
         placed[e.id] = path
         self.rec["done"][e.id] = ["created"]
+        self.rec["creating"].pop(e.id, None)
         self._save()
         self._finish_created(e, name, path)
         return path
@@ -534,6 +571,9 @@ class _Writer:
         updates: dict[str, Any] = {}
         kept: dict[str, Any] = {}
         merged = self._merged_values(e, before)
+        # what a run that died right after writing the values meant to set (so it is the import's)
+        setting = self.rec["setting"].get(e.id)
+        setting = setting if isinstance(setting, dict) else {}
         for key in e.values:
             pv = merged[key]
             pdef = t.prop(key) if t is not None else None
@@ -541,6 +581,8 @@ class _Writer:
                 continue
             win, cur = pv["value"], current.get(key)
             prev = (before.get(key) or {}).get("setByImport") if isinstance(before.get(key), dict) else None
+            if key in setting and _has(cur) and _same(cur, setting[key]):
+                prev = setting[key]  # the interrupted run set it: still the import's
             set_by = prev  # Gene's value (or the one the import set and still holds) stays
             if not _has(cur) or (prev is not None and _same(cur, prev) and not _same(cur, win)):
                 updates[key] = win
@@ -584,10 +626,15 @@ class _Writer:
                 updates[field_] = [*cur, *add]
 
         self._relation_updates(path, current, updates)
+        intended = {k: v for k, v in updates.items() if k in kept}
+        if intended:  # recorded first, so a retry after a failure right after the write knows them
+            self.rec["setting"][e.id] = {**setting, **intended}
+            self._save()
         self._write_props(e, name, path, updates)
         record.update({"id": rid, "path": path, "batch": self.batch, "values": {**before, **kept}})
         record.setdefault("section", None)
         distill.save_record(space.root, rid, record)
+        self.rec["setting"].pop(e.id, None)
         self._mark(e.id, "values")
 
     def other_relations(self, placed_paths: set[str]) -> None:
@@ -639,14 +686,24 @@ class _Writer:
         text = distill.build_section(lines, picked, plain, lambda p: self._link(p, path), label)
         empty = not lines and not plain and not any(pv.get("conflict") for pv in picked.values())
         outcome: list[str] = ["kept"]
+        new_hash = distill.section_hash(text)
+        old_hash = sec.get("hash") if sec is not None else None
 
         def edit(of: Any, _fm: dict) -> Any:
             outcome[0] = "kept"
-            if empty and sec is None and distill.find_section(of.body) is None:
+            try:
+                span = distill.find_section(of.body)
+            except distill.SectionEdited:
+                outcome[0] = "left"
+                return None
+            if empty and sec is None and span is None:
                 outcome[0] = "empty"  # nothing to say: no empty section is added
                 return None
+            if span is not None and old_hash != new_hash and distill.section_hash(of.body[span[0] : span[1]]) == new_hash:
+                outcome[0] = "written"  # a run that died before recording it wrote this very section
+                return None
             try:
-                body = distill.replace_section(of.body, text, sec.get("hash") if sec is not None else None)
+                body = distill.replace_section(of.body, text, old_hash)
             except distill.SectionEdited:
                 outcome[0] = "left"
                 return None

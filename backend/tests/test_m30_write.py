@@ -491,3 +491,93 @@ def test_second_batch_distils_from_all_sources(tmp_path: Path, modified: str, ke
     entitywrite.write_entities(w.space, batch, "markdown", IMPORTED_AT, [(e, e.name) for e in res.entities],
                                res, results, [])  # fmt: skip
     assert (w.root / app01).read_bytes() == snap
+
+
+def test_place_resumes_a_created_renamed_entity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    w = _setup(tmp_path)
+    results = _results(w)
+    res = entities.resolve(w.space, results)
+    chosen = [(e, "Payroll app" if e.name == "Payroll" else e.name) for e in res.entities]
+    real = w.space.create_object
+
+    def dies(type_id: str, title: str = "", *a: Any, **kw: Any) -> tuple[str, str]:
+        out = real(type_id, title, *a, **kw)
+        if title == "Payroll app":
+            raise RuntimeError("power cut")  # created, but not yet recorded
+        return out
+
+    monkeypatch.setattr(w.space, "create_object", dies)
+    with pytest.raises(RuntimeError):
+        entitywrite.write_entities(w.space, w.batch, "markdown", IMPORTED_AT, chosen, res, results, w.items)
+    monkeypatch.setattr(w.space, "create_object", real)
+    out = entitywrite.write_entities(w.space, w.batch, "markdown", IMPORTED_AT, chosen, res, results, w.items)
+    hits = [s.path for s in w.space.list("application") if s.title == "Payroll app"]
+    assert len(hits) == 1, hits
+    assert w.space.read(hits[0])[1]["importSource"]["id"] == "entity:application:payroll"
+    assert len([it for it in w.items if it.get("path") == hits[0] and it.get("action") == "created"]) == 1
+    assert out["existing"] == 0 and out["created"] == len(chosen)
+
+
+def test_section_resumes_after_its_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    w = _setup(tmp_path)
+    _write(w, _results(w))
+    app01 = _path(w, "host", "APP01")
+    src = w.paths["APP01"]
+    with w.space.source_writes():
+        of, _fm, version = w.space.read(src)
+        w.space.save_body(src, of.body.rstrip("\n") + " It is patched monthly.\n", version)
+
+    def patched(title: str, d: dict[str, Any]) -> None:
+        if title == "APP01":
+            d["mainEntity"]["lines"].append({"text": "Patched monthly.", "quote": "It is patched monthly"})
+
+    real = w.space._write
+
+    def dies(path: str, *a: Any, **kw: Any) -> Any:
+        out = real(path, *a, **kw)
+        if path == app01 and "Patched monthly." in (w.root / app01).read_text(encoding="utf-8"):
+            raise RuntimeError("power cut")  # the section written, its record not yet
+        return out
+
+    monkeypatch.setattr(w.space, "_write", dies)
+    with pytest.raises(RuntimeError):
+        _write(w, _results(w, patched), batch="second", items=[])
+    monkeypatch.setattr(w.space, "_write", real)
+    out = _write(w, _results(w, patched), batch="second", items=[])
+    assert out["sectionsLeft"] == 0 and out["sectionsLeftList"] == []
+    assert out["sections"] == 1
+    section = _section(_body(w, app01))
+    assert "Patched monthly." in section
+    record = distill.load_record(w.root, w.space.read(app01)[1]["id"])
+    assert record is not None and record["section"]["hash"] == distill.section_hash(section)
+
+
+def test_values_resume_after_their_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    w = _setup(tmp_path)
+    real = entitywrite._Writer._write_props
+
+    def dies(self: Any, e: Any, name: str, path: str, updates: dict[str, Any]) -> None:
+        real(self, e, name, path, updates)
+        if e is not None and e.name == "APP01":
+            raise RuntimeError("power cut")  # the values written, their record not yet
+
+    monkeypatch.setattr(entitywrite._Writer, "_write_props", dies)
+    with pytest.raises(RuntimeError):
+        _write(w, _results(w))
+    monkeypatch.setattr(entitywrite._Writer, "_write_props", real)
+    _write(w, _results(w))
+    host = _path(w, "host", "APP01")
+    assert _values(w, host)["ipAddress"] == "10.0.0.5"
+    record = distill.load_record(w.root, w.space.read(host)[1]["id"])
+    assert record is not None and record["values"]["ipAddress"]["setByImport"] == "10.0.0.5"
+
+    # so a later Write with a newer Source still follows it
+    real_modified = entities._modified
+    old, new = w.paths["Old APP01 notes"], w.paths["APP01"]
+
+    def swapped(space: Space, page: str) -> str | None:
+        return real_modified(space, new if page == old else old if page == new else page)
+
+    monkeypatch.setattr(entities, "_modified", swapped)
+    _write(w, _results(w), batch="second", items=[])
+    assert _values(w, host)["ipAddress"] == "10.0.0.6"
