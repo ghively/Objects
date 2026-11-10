@@ -122,6 +122,8 @@ describe('TableLayout: M29 synced facts', () => {
     const columns = screen.getAllByTestId('kanban-column')
     const failed = columns.find((c) => within(c).queryByText('Failed') && within(c).queryByText('SRV-02'))
     expect(failed).toBeTruthy()
+    // The cards don't start a drag (M29 review #7).
+    for (const card of screen.getAllByTestId('kanban-card')) expect(card).toHaveAttribute('aria-disabled', 'true')
     act(() => dragEnd?.({ active: { id: APP01.summary.path }, over: { id: `col:${failed!.getAttribute('data-group')}` } }))
     await waitFor(() => expect(screen.getByText(SYNCED_TEXT.readOnly('Patch state', 'Inventory script'))).toBeInTheDocument())
     expect(mocked.updateProperties).not.toHaveBeenCalled()

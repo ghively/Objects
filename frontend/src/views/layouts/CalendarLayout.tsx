@@ -16,7 +16,7 @@ import { useZonedToday } from '@/lib/zonedShell'
 import { cn } from '@/lib/utils'
 import type { LayoutProps } from '../DataView'
 import { MenuSelect, propertyOptions } from '../MenuSelect'
-import { createRowWrites } from '../rowWrites'
+import { createRowWrites, syncedRefusal } from '../rowWrites'
 import {
   calendarConfig,
   canDragRow,
@@ -109,7 +109,14 @@ export function CalendarLayout(props: LayoutProps) {
     if (!over.startsWith('day:')) return
     const { path, from } = dragData(e)
     const row = flat.find((r) => r.summary.path === path)
-    if (!row || !from || !canDragRow(row, key, typesById)) return
+    if (!row || !from) return
+    // M29: a synced date is filled by its source only: say so, send nothing.
+    const refused = syncedRefusal(row, [key])
+    if (refused) {
+      say(refused)
+      return
+    }
+    if (!canDragRow(row, key, typesById)) return
     // The day the chip was picked up from lands on the drop day (a range moves as a whole).
     const delta = daysBetween(from, over.slice(4))
     const value = dateValueOf(row, key)

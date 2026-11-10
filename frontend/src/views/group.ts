@@ -23,6 +23,7 @@ import {
   computedText,
 } from '@/properties/computed'
 import { formatDate, formatNumber } from '@/properties/format'
+import { isSynced } from '@/properties/synced'
 import { STATUS_CATEGORIES, optionCategory } from '@/tasks/statusCategory'
 import { wallClock } from '@/lib/zonedTime'
 import { wallStart, weekStartOf, type WeekStart } from './dates'
@@ -444,13 +445,28 @@ function sameKind(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'>,
 }
 
 /**
+ * M29: whether the grouping key is synced on `row` (its own type's definition, else the grouping's
+ * `def`): a synced property is filled by its source only, so a card never moves by it.
+ */
+export function syncedOnRow(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'> & Partial<Pick<PropertyDef, 'synced'>>, types: TypeDef[]): boolean {
+  return isSynced(defIn(types.find((t) => t.id === row.summary.type), entry.propertyId) ?? def)
+}
+
+/**
  * Whether a kanban drop may write `def`'s value on `row` (see `sameKind`): a row of a type with the
  * key as another kind is refused. M28: so is a computed other side (`counterpartOf`), which is
- * never written on the row (it is edited on the object page, on the stored side).
+ * never written on the row (it is edited on the object page, on the stored side). M29: so is a
+ * synced key (`syncedOnRow`).
  */
-export function canDropRow(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'> & Partial<Pick<PropertyDef, 'options'>>, types: TypeDef[]): boolean {
+export function canDropRow(
+  row: Row,
+  entry: GroupByEntry,
+  def: Pick<PropertyDef, 'type'> & Partial<Pick<PropertyDef, 'options' | 'synced'>>,
+  types: TypeDef[],
+): boolean {
   const type = types.find((t) => t.id === row.summary.type)
   if (def.options?.counterpartOf || defIn(type, entry.propertyId)?.options.counterpartOf) return false
+  if (syncedOnRow(row, entry, def, types)) return false
   return sameKind(row, entry, def, type)
 }
 

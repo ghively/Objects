@@ -18,7 +18,7 @@ const DAY_MS = 86_400_000
 
 /** Whether the property is synced: a syncable kind carrying a synced mark with a source (as the
  *  backend's `synced.is_synced` reads it; a hand-edited `synced: "yes"` or a mark on a relation is not). */
-export function isSynced(def: PropertyDef | undefined | null): boolean {
+export function isSynced(def: Pick<PropertyDef, 'type' | 'synced'> | undefined | null): boolean {
   if (!def || !SYNCABLE_KINDS.has(def.type)) return false
   const source = (def.synced as { source?: unknown } | null | undefined)?.source
   return typeof source === 'string' && source.trim() !== ''

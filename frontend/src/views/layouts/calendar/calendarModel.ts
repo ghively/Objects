@@ -178,7 +178,8 @@ export function shiftDateValue(v: DateValue, delta: number): DateValue {
 export function canDragRow(row: Row, key: string, typesById: Record<string, TypeDef>): boolean {
   if (row.summary.readOnly || SYSTEM_DATE_KEYS.has(key)) return false
   const def = typesById[row.summary.type]?.propertyDefinitions.find((d) => d.key === key)
-  return !!def && (def.type === 'datetime' || def.type === 'datetimeSimple')
+  // M29: a synced date is filled by its source only.
+  return !!def && (def.type === 'datetime' || def.type === 'datetimeSimple') && !isSynced(def)
 }
 
 /**

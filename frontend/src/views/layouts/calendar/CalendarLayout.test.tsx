@@ -23,7 +23,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api, ConflictError } from '@/api/client'
 import { zonedWallToInstant } from '@/lib/zonedShell'
-import { resetLinkIndex } from '@/links/linkIndex'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek } from '@/nav/tabs'
 import { DataView } from '../../DataView'
 import { emptyFilterGroup } from '../../model'
@@ -248,6 +248,25 @@ describe('CalendarLayout writes', () => {
     expect(chip.hasAttribute('aria-describedby')).toBe(false)
     expect(chip.hasAttribute('aria-roledescription')).toBe(false)
     expect(chip.tagName).toBe('BUTTON')
+  })
+
+  test("a synced date's chip is not draggable, and a drop says why and sends nothing (M29 review #7)", async () => {
+    const HOST = typeDef({
+      id: 'host',
+      name: 'Host',
+      pluralName: 'Hosts',
+      propertyDefinitions: [
+        propertyDef({ id: 'title', type: 'entity_title', name: 'Title' }),
+        propertyDef({ id: 'lastBoot', type: 'datetime', name: 'Last boot', synced: { source: 'Inventory script', staleAfterDays: 7 } }),
+      ],
+    })
+    useLinkIndex.setState({ types: [HOST], loaded: true })
+    const rows = [row({ summary: objectSummary({ path: 'Hosts/APP01.md', type: 'host', title: 'APP01' }), values: { lastBoot: day('2026-11-10') } })]
+    render(<DataView rows={rows} types={[HOST]} scope={{ typeIds: ['host'] }} state={view()} onState={vi.fn()} layouts={['calendar']} />)
+    expect(screen.getByTestId('calendar-chip').getAttribute('data-draggable')).toBe('false')
+    await drop('Hosts/APP01.md', '2026-11-10', '2026-11-12')
+    expect(mocked.updateProperties).not.toHaveBeenCalled()
+    expect(screen.getByText(`"Last boot" is filled by Inventory script and can't be edited.`).getAttribute('role')).toBe('status')
   })
 
   test('a read-only row is not draggable', () => {

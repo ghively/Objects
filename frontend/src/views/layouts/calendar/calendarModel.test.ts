@@ -93,6 +93,11 @@ describe('calendarModel', () => {
     expect(canDragRow(r('a', {}), 'lastUpdated', types)).toBe(false)
   })
 
+  test("a synced date can't be dragged (M29 review #7)", () => {
+    const host = typeDef({ id: 'host', propertyDefinitions: [propertyDef({ id: 'when', type: 'datetime', synced: { source: 'Inventory script', staleAfterDays: 7 } })] })
+    expect(canDragRow(r('a', {}, 'host'), 'when', { host })).toBe(false)
+  })
+
   test('the type a day click creates', () => {
     expect(createType([NOTE, EVENT], 'when')?.id).toBe('event')
     expect(createType([NOTE, EVENT], 'nothing')?.id).toBe('note')

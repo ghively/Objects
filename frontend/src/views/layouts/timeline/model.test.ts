@@ -91,6 +91,12 @@ describe('bars', () => {
     expect(canWriteDate(r, 'due', [TYPE])).toBe(true)
     expect(canWriteDate({ ...r, summary: { ...r.summary, readOnly: true } }, 'due', [TYPE])).toBe(false)
   })
+
+  test("a synced date can't be written by a drag (M29 review #7)", () => {
+    const host = typeDef({ id: 'host', propertyDefinitions: [propertyDef({ id: 'lastBoot', type: 'datetime', synced: { source: 'Inventory script', staleAfterDays: 7 } })] })
+    const r = row({ summary: objectSummary({ path: 'Hosts/APP01.md', type: 'host' }) })
+    expect(canWriteDate(r, 'lastBoot', [host])).toBe(false)
+  })
 })
 
 describe('the axis', () => {

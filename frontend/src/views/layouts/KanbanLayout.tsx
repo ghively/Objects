@@ -12,11 +12,11 @@ import { isSynced } from '@/properties/synced'
 import { cn } from '@/lib/utils'
 import type { LayoutProps } from '../DataView'
 import { findDef, rowValue } from '../filter'
-import { canDropRow, groupRows, hasLaterParagraphs, valueForGroup, type Group } from '../group'
+import { canDropRow, groupRows, hasLaterParagraphs, syncedOnRow, valueForGroup, type Group } from '../group'
 import { matchingValues } from '../matching'
 import { LOAD_PAGE } from '../model'
 import { propertyChoices } from '../properties'
-import { createRowWrites } from '../rowWrites'
+import { createRowWrites, syncedRefusal } from '../rowWrites'
 import { CardItem } from './CardItem'
 
 /** Said when a drop is refused: the card's type can't take the column's value, or the value can't be set. */
@@ -132,9 +132,14 @@ export function KanbanLayout(props: LayoutProps) {
     [flat, groupBy, state.viewDefinition.groupByConfig, ctx],
   )
   const update = (g: Group) => (groupBy && groupDef ? valueForGroup(groupBy, g, groupDef) : null)
-  // A card whose own value can't be written by a drop (a long text past its first paragraph) never
-  // starts a drag, so no column lights up for it.
-  const canMove = (g: Group, row: Row) => !!groupBy && !!groupDef && valueForGroup(groupBy, g, groupDef, { row, from: g }) !== null
+  // A card whose own value can't be written by a drop (a long text past its first paragraph, or a
+  // synced value) never starts a drag, so no column lights up for it.
+  const canMove = (g: Group, row: Row) =>
+    !!groupBy &&
+    !!entry &&
+    !!groupDef &&
+    !syncedOnRow(row, entry, groupDef, props.types) &&
+    valueForGroup(groupBy, g, groupDef, { row, from: g }) !== null
   const hide = entry ? [entry.propertyId] : []
   // How many cards each column shows (`LOAD_PAGE` until its "Load more").
   const [shown, setShown] = useState<Record<string, number>>({})
@@ -173,6 +178,12 @@ export function KanbanLayout(props: LayoutProps) {
     const row = flat.find((r) => r.summary.path === path)
     const target = groups.find((g) => `col:${g.id}` === e.over?.id)
     if (!row || !target || target.rows.some((r) => r.summary.path === row.summary.path)) return
+    // M29: a synced value is filled by its source only: say so, send nothing.
+    const refused = entry ? syncedRefusal(row, [entry.propertyId]) : null
+    if (refused) {
+      say(refused)
+      return
+    }
     // A row whose type has the key as another kind (text under a label grouping) can't take the value.
     if (!entry || !groupDef || !canDropRow(row, entry, groupDef, props.types)) {
       say(CANT_MOVE)

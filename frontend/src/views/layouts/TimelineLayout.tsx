@@ -20,7 +20,7 @@ import type { LayoutProps } from '../DataView'
 import { dayReader } from '../dates'
 import { MenuSelect, propertyOptions } from '../MenuSelect'
 import { propertyChoices } from '../properties'
-import { createRowWrites } from '../rowWrites'
+import { createRowWrites, syncedRefusal } from '../rowWrites'
 import { buildRowTree, flattenTree, visibleTreeRows, type TreeRow } from '../subItems'
 import { CalcFooter } from '../table/CalcFooter'
 import {
@@ -339,7 +339,11 @@ export function TimelineLayout(props: LayoutProps) {
     const from = spanOf(row)
     if (!from || delta === 0) return
     const to = dragSpan(from, mode, delta)
-    if (Object.keys(dragUpdates(row, startKey, endKey, from, to)).length === 0) return
+    const keys = Object.keys(dragUpdates(row, startKey, endKey, from, to))
+    if (keys.length === 0) return
+    // M29: a synced date is filled by its source only: say so, send nothing.
+    const refused = syncedRefusal(row, keys)
+    if (refused) return say(refused)
     const path = row.summary.path
     setPending((p) => ({ ...p, [path]: { version: row.version, span: to } }))
     try {
@@ -358,6 +362,8 @@ export function TimelineLayout(props: LayoutProps) {
 
   /** Give an undated row the dropped day as its start. */
   const writeStart = async (row: Row, day: number) => {
+    const refused = syncedRefusal(row, [startKey])
+    if (refused) return say(refused)
     const path = row.summary.path
     setPending((p) => ({ ...p, [path]: { version: row.version, span: { start: day, end: day } } }))
     try {
@@ -373,6 +379,8 @@ export function TimelineLayout(props: LayoutProps) {
   /** `target` becomes blocked by `source` (syncing fills the source's other side). */
   const writeDependency = async (source: Row, target: Row) => {
     if (!blockedKey || !addBlocker(target, source, blockedKey)) return
+    const refused = syncedRefusal(target, [blockedKey])
+    if (refused) return say(refused)
     try {
       const result: UpdateResult = await writes.run(target, (version, cur) =>
         api.updateProperties(target.summary.path, { [blockedKey]: addBlocker(cur, source, blockedKey) ?? relationRefs(cur, blockedKey) }, version),

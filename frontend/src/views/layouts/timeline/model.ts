@@ -5,6 +5,7 @@ import type { DataViewDefinition, DateValue, EntityRef, PropertyType, Row, Timel
 import { addDays, isDay } from '@/calendar/dates'
 import { zonedWallToInstant } from '@/lib/zonedShell'
 import { zonedParts } from '@/lib/zonedTime'
+import { isSynced } from '@/properties/synced'
 import { dayOfInstant } from '../../dates'
 import { findDef, rowValue } from '../../filter'
 import { propertyChoices, type PropChoice } from '../../properties'
@@ -368,11 +369,14 @@ export function dragUpdates(row: Row, startKey: string, endKey: string | null, f
   return out
 }
 
-/** Whether a drag can write `key` on this row (a date property of its own type, and the file isn't read-only). */
+/**
+ * Whether a drag can write `key` on this row (a date property of its own type, not synced (M29: filled
+ * by its source only), and the file isn't read-only).
+ */
 export function canWriteDate(row: Row, key: string, types: TypeDef[]): boolean {
   if (row.summary.readOnly) return false
   const def = findDef(types, key, row.summary.type)
-  return !!def && WRITABLE_DATE_KINDS.has(def.type)
+  return !!def && WRITABLE_DATE_KINDS.has(def.type) && !isSynced(def)
 }
 
 // -- dependencies ---------------------------------------------------------------------------
