@@ -243,6 +243,29 @@ def test_a_key_match_detail_names_the_property(root: Path) -> None:
     ]
 
 
+# -- finding 13b: a name over NAME_MAX characters matches no pattern -------------------------
+
+
+def test_a_name_over_name_max_matches_no_pattern() -> None:
+    from objectapp.typemodel import TypeDefinition
+    from objectapp.typesuggest import NAME_MAX, SuggestContext, matches, suggest_type
+
+    assert NAME_MAX == 300
+    at_cap = "SRV-" + "x" * (NAME_MAX - 4)
+    over = at_cap + "x"
+    assert len(at_cap) == NAME_MAX
+    assert matches(at_cap, ["SRV-*"])
+    assert not matches(over, ["SRV-*"])
+    assert not matches("srv-" + "é" * NAME_MAX, ["SRV-*"])  # counted in characters
+    host = TypeDefinition.from_json(
+        {"id": "host", "name": "Host", "pluralName": "Hosts", "namePatterns": ["SRV-*"]}
+    )
+    page = TypeDefinition.from_json({"id": "page", "name": "Page", "pluralName": "Pages"})
+    ctx = SuggestContext(types=[page, host], last="page")
+    assert suggest_type(at_cap, ctx) == ["host", "page"]
+    assert suggest_type(over, ctx) == ["page"]
+
+
 # -- finding 3: a hand-typed value under a synced key never shows ---------------------------
 
 
