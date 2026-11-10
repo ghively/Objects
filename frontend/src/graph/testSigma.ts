@@ -20,6 +20,11 @@ export interface FakeSigma {
 
 export const sigmaInstances: FakeSigma[] = []
 
+type Reducer = (key: string, attrs: Record<string, unknown>) => unknown
+interface EdgeWalk {
+  forEachEdge(cb: (key: string, attrs: Record<string, unknown>) => void): void
+}
+
 export function sigmaModule() {
   class Sigma {
     graph: FakeSigma['graph']
@@ -41,7 +46,18 @@ export function sigmaModule() {
     constructor(graph: FakeSigma['graph'], _container: HTMLElement, settings: Record<string, unknown>) {
       this.graph = graph
       this.settings = { ...settings }
+      // Real sigma processes (runs the reducers over) the graph inside its constructor, before
+      // the caller has the instance; a reducer that reaches for it then throws, as it does here.
+      this.process()
       sigmaInstances.push(this as unknown as FakeSigma)
+    }
+    /** Run the node and edge reducers over the graph, as sigma does on every render. */
+    process() {
+      const g = this.graph as FakeSigma['graph'] & Partial<EdgeWalk>
+      const nodeReducer = this.settings.nodeReducer as Reducer | undefined
+      const edgeReducer = this.settings.edgeReducer as Reducer | undefined
+      if (nodeReducer) g.forEachNode((k, a) => nodeReducer(k, a))
+      if (edgeReducer) g.forEachEdge?.((k, a) => edgeReducer(k, a))
     }
     on(event: string, fn: (payload: unknown) => void) {
       this.handlers[event] = fn
@@ -56,12 +72,14 @@ export function sigmaModule() {
     setGraph(graph: FakeSigma['graph']) {
       this.graph = graph
       this.graphsSet++
+      this.process()
     }
     setSetting(key: string, value: unknown) {
       this.settings[key] = value
     }
     refresh() {
       this.refreshes++
+      this.process()
     }
     getCanvases() {
       return this.canvases
