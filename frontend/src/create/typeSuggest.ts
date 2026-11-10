@@ -1,13 +1,19 @@
 /**
  * M29: the suggested type of a create row, ported 1:1 from `backend/objectapp/typesuggest.py`
- * (both run the parity fixture `__fixtures__/suggest-cases.json`). Context and name patterns only:
- * no AI, no network, nothing sent anywhere; it runs per keystroke.
+ * (both run the parity fixture `__fixtures__/suggest-cases.json`; the Python module's docstring
+ * states the algorithm step by step). Context and name patterns only: no AI, no network, nothing
+ * sent anywhere; it runs per keystroke.
  *
- * Pattern syntax (the whole name must match, case-insensitive, after trimming): a pattern that is
- * exactly one token `{ip}`, `{cidr}`, `{fqdn}` or `{version}`, or else a glob where `*` is any run of
- * non-space characters (or none), `?` one non-space character, `#` one digit, `@` one letter a-z and
- * `\` makes the next character literal. A glob is matched by a state-set simulation over its tokens
- * (never a backtracking regex), so matching is linear in the name's length whatever the pattern.
+ * - Whitespace is JavaScript's `\s` set; a character is a code point (`for...of`).
+ * - The name is normalised once: `trim()`, then `toLowerCase()`; inner spaces are kept.
+ * - A pattern is valid when it is a string of 1-100 characters and either exactly one token
+ *   (`{ip}`, `{cidr}`, `{fqdn}`, `{version}`; case-sensitive) or a glob with no `{` or `}` anywhere
+ *   and no trailing unpaired `\`.
+ * - Tokens test the whole normalised name with linear regexes (ASCII `[0-9]`, `[a-z]`).
+ * - A glob (`*` any run of non-whitespace, `?` one non-whitespace character, `#` a digit 0-9, `@`
+ *   a letter a-z, `\` escapes, anything else literal; tokenised on the lowercased pattern) is never
+ *   compiled to a backtracking regex: it is matched by a state-set simulation, linear in the name's
+ *   length times the pattern's.
  */
 import type { TypeDef } from '@/api/types'
 
@@ -28,189 +34,168 @@ export interface SuggestContext {
   last?: string | null
 }
 
-/** A compiled name pattern: `test(name)` is whether the whole (trimmed) name matches. */
+/**
+ * A compiled name pattern (the Python module's `NamePattern`): `source` is the pattern as written,
+ * `test(name)` takes a name as typed (it is normalised here). Not a `RegExp`: a glob is matched by
+ * the state-set simulation, never by a backtracking regex.
+ */
 export interface CompiledPattern {
+  source: string
   test(name: string): boolean
 }
 
-// --- the four whole tokens -------------------------------------------------------------------
+const WS = /\s/
 
-const IPV4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/
-const IPV6_CHARS = /^[0-9a-f:]+$/i
-const V4_PREFIX = /^(3[0-2]|[12]?\d)$/
-const V6_PREFIX = /^(12[0-8]|1[01]\d|[1-9]?\d)$/
-const FQDN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.){2,}[a-z]{2,63}$/i
-const VERSION_TAIL = /^v?\d+(\.\d+)*[a-z]?$/i
-const LINE_BREAK = /[\n\r\u2028\u2029]/
-
-/** `^(?=.*:.*:)[0-9a-f:]+$`, without the lookahead's backtracking. */
-function isIpv6(s: string): boolean {
-  if (!IPV6_CHARS.test(s)) return false
-  const first = s.indexOf(':')
-  return first >= 0 && s.indexOf(':', first + 1) >= 0
+/** The name as patterns see it: trimmed, lowercased. */
+export function normalizeName(name: string): string {
+  return name.trim().toLowerCase()
 }
 
-function isIp(s: string): boolean {
-  return IPV4.test(s) || isIpv6(s)
-}
+// --- the four whole tokens (on the normalised name) ------------------------------------------
+
+const OCTET = '(?:25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])'
+const IPV4 = new RegExp(`^${OCTET}(?:\\.${OCTET}){3}$`)
+const IPV6 = /^[0-9a-f:]+$/
+const V4_PREFIX = /^(?:[0-9]|[12][0-9]|3[0-2])$/
+const V6_PREFIX = /^(?:[0-9]|[1-9][0-9]|1[01][0-9]|12[0-8])$/
+const FQDN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.){2,}[a-z]{2,63}$/
+const VERSION = /^[^\s][\s\S]*\sv?[0-9]+(?:\.[0-9]+)*[a-z]?$/
+
+const isIpv4 = (s: string) => IPV4.test(s)
+const isIpv6 = (s: string) => IPV6.test(s) && s.split(':').length - 1 >= 2
 
 function isCidr(s: string): boolean {
   const slash = s.lastIndexOf('/')
   if (slash < 0) return false
   const addr = s.slice(0, slash)
   const prefix = s.slice(slash + 1)
-  if (IPV4.test(addr)) return V4_PREFIX.test(prefix)
+  if (isIpv4(addr)) return V4_PREFIX.test(prefix)
   if (isIpv6(addr)) return V6_PREFIX.test(prefix)
   return false
 }
 
-/**
- * `^\S.*\s+v?\d+(\.\d+)*[a-z]?$`, in linear time: the version is what follows the last whitespace
- * run, and what comes before that run (after the first character) holds no line break.
- */
-function isVersion(s: string): boolean {
-  let end = s.length - 1
-  while (end >= 0 && !/\s/.test(s[end])) end--
-  if (end < 1) return false
-  if (!VERSION_TAIL.test(s.slice(end + 1))) return false
-  let start = end
-  while (start > 0 && /\s/.test(s[start - 1])) start--
-  if (start < 1 || /\s/.test(s[0])) return false
-  return !LINE_BREAK.test(s.slice(1, start))
-}
-
-const TOKEN_TESTS: Record<(typeof TOKENS)[number], (s: string) => boolean> = {
-  '{ip}': isIp,
-  '{cidr}': isCidr,
-  '{fqdn}': (s) => FQDN.test(s),
-  '{version}': isVersion,
-}
+const TOKEN_TESTS = new Map<string, (s: string) => boolean>([
+  ['{ip}', (s) => isIpv4(s) || isIpv6(s)],
+  ['{cidr}', isCidr],
+  ['{fqdn}', (s) => FQDN.test(s)],
+  ['{version}', (s) => VERSION.test(s)],
+])
 
 // --- globs -----------------------------------------------------------------------------------
 
-type GlobToken =
-  | { kind: 'star' }
-  | { kind: 'one' }
-  | { kind: 'digit' }
-  | { kind: 'letter' }
-  | { kind: 'literal'; lower: string; upper: string }
+type GlobToken = { kind: 'star' | 'any' | 'digit' | 'letter' } | { kind: 'lit'; c: string }
 
-const SPACE = /\s/
-const LETTER = /^[a-z]$/i
-const DIGIT = /^[0-9]$/
-
-function stepMatches(t: GlobToken, c: string): boolean {
-  switch (t.kind) {
-    case 'one':
-      return !SPACE.test(c)
-    case 'digit':
-      return DIGIT.test(c)
-    case 'letter':
-      return LETTER.test(c)
-    case 'literal':
-      return c.toLowerCase() === t.lower || c.toUpperCase() === t.upper
-    default:
-      return false
-  }
-}
-
-/** Parse a glob into tokens; null when it is invalid (a brace anywhere, a trailing `\`). */
-function parseGlob(chars: string[]): GlobToken[] | null {
-  const tokens: GlobToken[] = []
+/** The tokens of a glob, or null when it is invalid (a brace anywhere, a trailing `\`). */
+function globTokens(pattern: string): GlobToken[] | null {
+  if (pattern.includes('{') || pattern.includes('}')) return null
+  const chars = Array.from(pattern.toLowerCase())
+  const out: GlobToken[] = []
   for (let i = 0; i < chars.length; i++) {
     const c = chars[i]
-    if (c === '{' || c === '}') return null
     if (c === '\\') {
+      if (i + 1 >= chars.length) return null
+      out.push({ kind: 'lit', c: chars[i + 1] })
       i++
-      if (i >= chars.length) return null
-      const next = chars[i]
-      if (next === '{' || next === '}') return null
-      tokens.push({ kind: 'literal', lower: next.toLowerCase(), upper: next.toUpperCase() })
-    } else if (c === '*') tokens.push({ kind: 'star' })
-    else if (c === '?') tokens.push({ kind: 'one' })
-    else if (c === '#') tokens.push({ kind: 'digit' })
-    else if (c === '@') tokens.push({ kind: 'letter' })
-    else tokens.push({ kind: 'literal', lower: c.toLowerCase(), upper: c.toUpperCase() })
+    } else if (c === '*') out.push({ kind: 'star' })
+    else if (c === '?') out.push({ kind: 'any' })
+    else if (c === '#') out.push({ kind: 'digit' })
+    else if (c === '@') out.push({ kind: 'letter' })
+    else out.push({ kind: 'lit', c })
   }
-  return tokens
+  return out
 }
 
 /**
- * Whether `name` (already trimmed) matches the glob: a set of pattern positions advanced one
- * character at a time; a `*` position loops on any non-space character and also lets the next
- * position start. O(name length × pattern length), never exponential.
+ * The state-set simulation: state `i` means `t[0..i-1]` are matched. A STAR state loops on any
+ * non-whitespace character and (closure) also lets the next state start.
  */
-function globMatch(tokens: GlobToken[], name: string): boolean {
-  const m = tokens.length
-  let active = new Uint8Array(m + 1)
-  const close = (set: Uint8Array) => {
-    for (let p = 0; p < m; p++) if (set[p] && tokens[p].kind === 'star') set[p + 1] = 1
+function globMatcher(t: GlobToken[]): (name: string) => boolean {
+  const m = t.length
+  const closure = (s: Uint8Array) => {
+    for (let i = 0; i < m; i++) if (s[i] && t[i].kind === 'star') s[i + 1] = 1
+    return s
   }
-  active[0] = 1
-  close(active)
-  for (const c of name) {
-    const next = new Uint8Array(m + 1)
-    let any = false
-    for (let p = 0; p < m; p++) {
-      if (!active[p]) continue
-      const t = tokens[p]
-      if (t.kind === 'star') {
-        if (!SPACE.test(c)) {
-          next[p] = 1
+  const start = closure(Object.assign(new Uint8Array(m + 1), { 0: 1 }))
+  return (name) => {
+    let s = start
+    for (const c of name) {
+      const ws = WS.test(c)
+      const next = new Uint8Array(m + 1)
+      let any = false
+      for (let i = 0; i < m; i++) {
+        if (!s[i]) continue
+        const tok = t[i]
+        let advance = false
+        if (tok.kind === 'star') {
+          if (!ws) {
+            next[i] = 1
+            any = true
+          }
+        } else if (tok.kind === 'any') advance = !ws
+        else if (tok.kind === 'digit') advance = c >= '0' && c <= '9'
+        else if (tok.kind === 'letter') advance = c >= 'a' && c <= 'z'
+        else if (tok.kind === 'lit') advance = tok.c === c
+        if (advance) {
+          next[i + 1] = 1
           any = true
         }
-      } else if (stepMatches(t, c)) {
-        next[p + 1] = 1
-        any = true
       }
+      if (!any) return false
+      s = closure(next)
     }
-    if (!any) return false
-    close(next)
-    active = next
+    return s[m] === 1
   }
-  return active[m] === 1
 }
 
 // --- compile, match, suggest -----------------------------------------------------------------
 
+/** Tests a normalised name. */
+type NormTest = (normalized: string) => boolean
+
 const MEMO_LIMIT = 512
-const memo = new Map<string, CompiledPattern | null>()
+const memo = new Map<string, { pattern: CompiledPattern; norm: NormTest } | null>()
 
-function compileUncached(pattern: string): CompiledPattern | null {
-  if ((TOKENS as readonly string[]).includes(pattern)) {
-    const test = TOKEN_TESTS[pattern as (typeof TOKENS)[number]]
-    return { test: (name) => test(name.trim()) }
-  }
-  const chars = Array.from(pattern)
-  if (chars.length === 0 || chars.length > MAX_PATTERN) return null
-  const tokens = parseGlob(chars)
-  if (!tokens) return null
-  return { test: (name) => globMatch(tokens, name.trim()) }
-}
-
-/** The matcher of one name pattern, or null when the pattern is invalid. Memoised (512 kept). */
-export function compilePattern(pattern: string): CompiledPattern | null {
-  if (typeof pattern !== 'string') return null
+function compileEntry(pattern: string): { pattern: CompiledPattern; norm: NormTest } | null {
   const hit = memo.get(pattern)
   if (hit !== undefined) return hit
-  const compiled = compileUncached(pattern)
+  let entry: { pattern: CompiledPattern; norm: NormTest } | null = null
+  const length = Array.from(pattern).length
+  if (length >= 1 && length <= MAX_PATTERN) {
+    let norm: NormTest | null = TOKEN_TESTS.get(pattern) ?? null
+    if (!norm) {
+      const tokens = globTokens(pattern)
+      norm = tokens ? globMatcher(tokens) : null
+    }
+    if (norm) entry = { pattern: { source: pattern, test: (name) => norm(normalizeName(name)) }, norm }
+  }
   if (memo.size >= MEMO_LIMIT) {
     const oldest = memo.keys().next().value
     if (oldest !== undefined) memo.delete(oldest)
   }
-  memo.set(pattern, compiled)
-  return compiled
+  memo.set(pattern, entry)
+  return entry
+}
+
+/** The compiled `pattern`, or null when it is invalid. Memoised (512 kept). */
+export function compilePattern(pattern: string): CompiledPattern | null {
+  if (typeof pattern !== 'string') return null
+  return compileEntry(pattern)?.pattern ?? null
 }
 
 /** Whether `name` matches any valid pattern; invalid and non-string entries are ignored. */
 export function matches(name: string, patterns: readonly unknown[]): boolean {
-  if (!Array.isArray(patterns)) return false
+  if (!Array.isArray(patterns) || typeof name !== 'string') return false
+  const norm = normalizeName(name)
   for (const p of patterns) {
     if (typeof p !== 'string') continue
-    const compiled = compilePattern(p)
-    if (compiled && compiled.test(name)) return true
+    const entry = compileEntry(p)
+    if (entry && entry.norm(norm)) return true
   }
   return false
+}
+
+function unique(ids: Iterable<string>): string[] {
+  return [...new Set(ids)]
 }
 
 /**
@@ -220,12 +205,12 @@ export function matches(name: string, patterns: readonly unknown[]): boolean {
  */
 export function suggestType(name: string, ctx: SuggestContext): string[] {
   const offered = new Set(ctx.types.map((t) => t.id))
-  const patternIds = ctx.types
-    .filter((t) => matches(name, (t.namePatterns ?? []) as readonly unknown[]))
-    .map((t) => t.id)
+  const patternIds = unique(
+    ctx.types.filter((t) => matches(name, (t.namePatterns ?? []) as readonly unknown[])).map((t) => t.id),
+  )
   const allowed = ctx.allowed ?? []
   const source = allowed.length > 0 ? allowed : (ctx.scope ?? [])
-  const ctxIds = source.filter((i) => offered.has(i))
+  const ctxIds = unique(source.filter((i) => offered.has(i)))
   if (ctxIds.length > 0) {
     return [...ctxIds.filter((i) => patternIds.includes(i)), ...ctxIds.filter((i) => !patternIds.includes(i))]
   }

@@ -48,6 +48,20 @@ describe('type suggestion (TS port)', () => {
     expect(performance.now() - t2).toBeLessThan(50)
   })
 
+  test("follows the Python reference's edge rules", () => {
+    expect(compilePattern('SRV-*')?.source).toBe('SRV-*')
+    expect(compilePattern('{IP}')).toBeNull() // tokens are case-sensitive
+    expect(compilePattern('constructor')?.test('Constructor')).toBe(true) // a plain glob
+    expect(compilePattern('x'.repeat(99) + '😀')).not.toBeNull() // code points, not UTF-16 units
+    expect(matches('😀1', ['?#'])).toBe(true)
+    expect(matches('SQL\nServer 2019', ['{version}'])).toBe(true)
+    expect(matches(' APP01　', ['@@@##'])).toBe(true) // trim() whitespace
+    expect(matches('ÄB12', ['@@##'])).toBe(false) // @ is ASCII a-z
+    expect(matches('٣٤', ['##'])).toBe(false) // # is ASCII 0-9
+    const host = typeDef({ id: 'host', namePatterns: ['@@@##'] })
+    expect(suggestType('APP01', { types: [host], allowed: ['host', 'host'] })).toEqual(['host'])
+  })
+
   test('ignores non-string patterns', () => {
     expect(matches('APP01', ['{foo}', 5, null, undefined, {}, '@@@##'])).toBe(true)
     expect(matches('APP01', [5, null])).toBe(false)
