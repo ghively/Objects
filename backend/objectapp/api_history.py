@@ -23,7 +23,7 @@ from pydantic import BaseModel
 
 from .apictx import ApiContext
 from .history import HistoryStore, VersionNotFound
-from .space import Conflict
+from .space import Conflict, ReadOnly
 from .watcher import ChangeEvent
 
 __all__ = ["router"]
@@ -116,7 +116,7 @@ def router(ctx: ApiContext) -> APIRouter:
             return _error(404, f'There is no object at "{req.path}".')
         except Conflict as exc:
             return JSONResponse({"currentVersion": exc.current_version}, status_code=409)
-        except BoardReadOnly as exc:
+        except (BoardReadOnly, ReadOnly) as exc:  # ReadOnly: an imported Source (M30)
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         except NotAWhiteboard as exc:
             return _error(422, str(exc))

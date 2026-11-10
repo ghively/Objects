@@ -306,7 +306,7 @@ def router(ctx: ApiContext, service: VcsService) -> APIRouter:
     @r.post("/file-restore")
     def post_file_restore(req: FileRestoreRequest):
         from .history import keep_identity
-        from .space import version_of
+        from .space import ReadOnly, version_of
 
         try:
             rel = object_rel(req.path)
@@ -314,6 +314,13 @@ def router(ctx: ApiContext, service: VcsService) -> APIRouter:
             return _error(400, str(exc))
         except KeyError:
             return _error(404, f'There is no object at "{req.path}".')
+        try:
+            with space._lock:
+                known = space._raw.get(rel)
+                if known is not None:  # M30: an imported Source, refused before anything is committed
+                    space._refuse_source(known)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         try:
             t = need(TARGET_SPACE)
             full, old = source_bytes(t, req.sha, rel, req.sourcePath)
@@ -335,6 +342,8 @@ def router(ctx: ApiContext, service: VcsService) -> APIRouter:
                 commit = service.commit_file(t, rel, f'Object: restore "{title}" to {short} ({vcs.short_date(at)})\n')
         except (VcsRefused, vcs.GitFailed, vcs.GitMissing) as exc:
             return refused(exc)
+        except ReadOnly as exc:
+            return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         ctx.announce(ChangeEvent("changed", rel, version, origin=req.clientId))
         return {"version": version, "commit": commit}
 

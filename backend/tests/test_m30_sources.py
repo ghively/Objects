@@ -435,3 +435,83 @@ def test_rerun_writes_the_new_source_bytes_exactly(tmp_path, app_on) -> None:
     assert fm["type"] == "Source" and fm["category"] == "Note"
     assert space.get(rel).readOnlyReason == READ_ONLY
     assert any("Line two" in t for t in _history_texts(client, rel))
+
+
+def _mcp_call(client: TestClient, tool: str, **args):
+    """Call an MCP tool through the app (``ApiError`` with the app's answer when it refuses)."""
+    import asyncio
+
+    from mcp.server.mcpserver.exceptions import ToolError
+    from objectapp.mcp_server import ApiError, ObjectClient, build_server
+
+    secret = client.post("/api/integrations/tokens", json={"name": "mcp", "scope": "read-write"}).json()["secret"]
+    server = build_server(ObjectClient("http://testserver", secret, client))
+    try:
+        out = asyncio.run(server.call_tool(tool, args))
+    except ToolError as exc:
+        raise ApiError(str(exc)) from exc
+    if out.is_error:
+        raise ApiError(" ".join(getattr(c, "text", "") for c in out.content))
+    return out.structured_content if out.structured_content is not None else json.loads(out.content[0].text)
+
+
+def test_version_restore_of_a_source_is_refused(tmp_path, app_on) -> None:
+    from objectapp.mcp_server import ApiError
+
+    root = itops_space(tmp_path)
+    src = make_itops_source(tmp_path)
+    client, space = app_on(root)
+    batch = import_as_sources(root, src, client)
+    rel = _items(root, batch)["Hosts/APP01.md"]["path"]
+    (src / "Hosts" / "APP01.md").write_bytes(b"APP01 changed.\n")
+    import_as_sources(root, src, client)
+    versions = client.get("/api/history", params={"path": rel}).json()["versions"]
+    assert versions
+    before = (root / rel).read_bytes()
+    version = version_of(before)
+
+    r = client.post("/api/history/restore", json={"path": rel, "id": versions[-1]["id"], "baseVersion": version})
+    assert r.status_code == 423, r.text
+    assert r.json()["reason"] == READ_ONLY and r.json()["detail"]
+    assert (root / rel).read_bytes() == before
+    assert client.get("/api/history", params={"path": rel}).json()["versions"] == versions  # no entry for nothing
+
+    secret = client.post("/api/integrations/tokens", json={"name": "agent", "scope": "read-write"}).json()["secret"]
+    r = client.post("/api/v1/history/restore", json={"path": rel, "versionId": versions[-1]["id"], "version": version},
+                    headers={"Authorization": f"Bearer {secret}"})
+    assert r.status_code == 423, r.text
+    assert r.json()["reason"] == READ_ONLY
+    with pytest.raises(ApiError, match=f"423: {READ_ONLY}"):
+        _mcp_call(client, "restore_version", path=rel, version_id=versions[-1]["id"], version=version)
+    assert (root / rel).read_bytes() == before
+    assert client.get("/api/history", params={"path": rel}).json()["versions"] == versions
+
+
+def test_vcs_file_restore_of_a_source_is_refused(tmp_path, app_on, monkeypatch) -> None:
+    from objectapp import vcs
+
+    if not vcs.available():
+        pytest.skip("git is not installed")
+    cfg = tmp_path / "gitconfig"
+    cfg.write_text("")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(cfg))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.delenv(vcs.GIT_ENV, raising=False)
+    root = itops_space(tmp_path)
+    src = make_itops_source(tmp_path)
+    client, _space = app_on(root)
+    assert client.post("/api/vcs/enable", json={"target": "space"}).status_code == 200
+    batch = import_as_sources(root, src, client)
+    rel = _items(root, batch)["Hosts/APP01.md"]["path"]
+    assert client.post("/api/vcs/commit", json={"target": "space"}).status_code == 200
+    (src / "Hosts" / "APP01.md").write_bytes(b"APP01 changed.\n")
+    import_as_sources(root, src, client)
+    assert client.post("/api/vcs/commit", json={"target": "space"}).status_code == 200
+    file_versions = client.get("/api/vcs/file-log", params={"path": rel}).json()["versions"]
+    assert len(file_versions) == 2
+    before = (root / rel).read_bytes()
+    r = client.post("/api/vcs/file-restore", json={"path": rel, "sha": file_versions[-1]["sha"],
+                                                    "baseVersion": version_of(before)})
+    assert r.status_code == 423, r.text
+    assert r.json()["reason"] == READ_ONLY and r.json()["detail"]
+    assert (root / rel).read_bytes() == before

@@ -692,6 +692,7 @@ class HistoryStore:
         """Put a version back; return ``{version}`` (boards: ``{revision, version}``).
 
         Raises `KeyError` (no object), `VersionNotFound`, `Conflict` (stale ``base_version``),
+        `ReadOnly` ("Imported source", M30) for an imported Source, before anything is written,
         and for boards `BoardReadOnly` when a current sidecar can't be read.
         """
         from .space import Conflict, version_of
@@ -702,6 +703,9 @@ class HistoryStore:
             current = _read(full)
             if current is None:
                 raise KeyError(md_rel)
+            known = space._raw.get(md_rel)
+            if known is not None:  # M30: an imported Source is refused before any history entry
+                space._refuse_source(known)
             key, entry, _n = self._find(md_rel, version_id)
             if self._is_board_entry(entry):
                 return self._restore_board(space, md_rel, key, entry, current, base_version, now)
