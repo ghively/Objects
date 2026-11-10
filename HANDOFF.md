@@ -1,6 +1,6 @@
 # Handoff: pick up Object
 
-Updated 2026-11-09 (M1-M27 and everything built on 2026-11-08 and 2026-11-09 are gated and on `master`; there is no other live branch). You are continuing "Object", a local, Markdown-backed notes app with its own object model. A space keeps its metadata in `.object/` and its cache in `.object-cache/`. Read this file, then `CLAUDE.md` (rules), then `CONTINUE.md` (process). The long history and every gate's numbers live in `docs/superpowers/plans/remaining-work.md`; its "What remains" section is the current to-do list.
+Updated 2026-11-10 (M1-M30 are built, gated and on `master`, the only live branch; a full milestone audit was done the same day: `docs/superpowers/plans/milestone-audit-2026-11-10.md`). You are continuing "Object", a local, Markdown-backed notes app with its own object model. A space keeps its metadata in `.object/` and its cache in `.object-cache/`. Read this file, then `CLAUDE.md` (rules), then `CONTINUE.md` (process). The long history and every gate's numbers live in `docs/superpowers/plans/remaining-work.md`; its "What remains" section is the current to-do list.
 
 ## Where things stand
 
@@ -37,7 +37,7 @@ BROWSER=/usr/bin/true uv run objectapp --space <folder> --port 88xx --browser --
 
 ## What to do next, in order
 
-0. **M28-M30** (approved 2026-11-09): the IT ops type model (`specs/2026-11-09-it-ops-type-model-design.md`), built in order M28 (IT ops starter, two-way relations), M29 (synced facts, type suggestion), M30 (entity extraction, Sources). Plans in `docs/superpowers/plans/2026-11-09-m2{8,9}-*.md` and `2026-11-09-m30-*.md`; status in `remaining-work.md`.
+0. **Read the audit** `docs/superpowers/plans/milestone-audit-2026-11-10.md`: M1-M30 (including the IT ops type model, M28-M30, built and gated 2026-11-10) are built and reachable; its "Remaining work" section is the current to-do list, ahead of the items below.
 
 1. **Set up** (fresh clone): install `uv` and Node 22+; `uv sync`; `cd frontend && npm ci` (not `npm install`).
 2. **Gene's hands-on checks**, M1-M27 (435 boxes, none ticked: 255 for M1-M9, 37 for M10-M15, 134 for M16-M27 and 9 in `m27-ui-acceptance.md`). The automated run covered what a headless harness can; what is left for him is listed by reason in `auto-acceptance-2026-11-08.md`. Run them on a copy of his space (never his real data first), and fix what they find, one finding per commit with a regression test.

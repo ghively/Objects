@@ -1,6 +1,6 @@
 # Object: remaining work
 
-Status as of 2026-11-09: **M1-M27 and everything built on 2026-11-08 and 2026-11-09 are on `master`**, the only live branch (`integrate/2026-11-08` was merged on 2026-11-09; Gene wants everything on `master`). That day: the sidebar redesign, the Tasks dashboard, git-backed spaces, the decisions memo (`decisions-memo-2026-11-08.md`, approved by Gene) built, live checks of the real CLI, OCR and MCP, and an automated run of all 435 acceptance boxes (`auto-acceptance-2026-11-08.md`). The current list is "What remains" below; the history follows it.
+Status as of 2026-11-10: **M1-M30 are built, gated and on `master`** (M28-M30, the IT ops type model, on 2026-11-10); a full milestone audit the same day is `milestone-audit-2026-11-10.md`, whose "Remaining work" is the current to-do list. Earlier status, 2026-11-09: **M1-M27 and everything built on 2026-11-08 and 2026-11-09 are on `master`**, the only live branch (`integrate/2026-11-08` was merged on 2026-11-09; Gene wants everything on `master`). That day: the sidebar redesign, the Tasks dashboard, git-backed spaces, the decisions memo (`decisions-memo-2026-11-08.md`, approved by Gene) built, live checks of the real CLI, OCR and MCP, and an automated run of all 435 acceptance boxes (`auto-acceptance-2026-11-08.md`). The current list is "What remains" below; the history follows it.
 
 **Gate on `integrate/2026-11-08` (Linux, 2026-11-09, after lanes A-F, G1-G5, H1-H3 and the acceptance fixes; vitest and pytest run one after the other):** back end 3391 passed, 16 skipped, 3 xpassed, 0 failed; front end 4074 passed, 1 skipped (537 files); lint 0 errors; `npm run build` clean. One frontend timing flake under load (`BrainDumpBar` "M23 seam") was fixed by waiting for the refusal text instead of one flush.
 
@@ -151,7 +151,7 @@ The history below is in the order it was written: the per-milestone sections new
   (read-only table column, a board refuses drops); the graph labels relation edges on the hovered node. Catalog §3,
   §4, §5, §7. `scripts/m28_acceptance.py` PASS (ten checks); `m8` and `m22` acceptance PASS. Next: the
   whole-milestone review, one fix pass and the full gate, then Gene's hand checks (`m28-acceptance.md`).
-- **Next: M30** (entity extraction), after M29's review and gate.
+- **M28-M30 done** (gated 2026-11-10); what is left is in `milestone-audit-2026-11-10.md`, "Remaining work".
 
 - **M29 gate (Linux, 2026-11-10, after one review and one fix pass):** back end 3720 passed, 19 skipped, 0 failed;
   front end 4242 passed, 1 skipped (one whiteboard test needed the last-type reset other create tests use); `tsc`,
