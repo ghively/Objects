@@ -323,4 +323,6 @@ export interface BodyEditorHandle {
   reload(body: string, version: string): void
   /** Find in page; only the formatted editor offers it (raw mode leaves it unset). */
   find?: FindControl
+  /** M31 "Select all top-level blocks": focus the editor and select its top-level blocks (formatted editor only). */
+  selectTopLevelBlocks?: () => boolean
 }

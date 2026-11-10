@@ -6,6 +6,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'reac
 import { registerFlusher } from '@/lib/flush'
 import { useSettings } from '@/settings/useSettings'
 import { editorExtensions, loadBody, serializeBody } from './document'
+import { selectTopLevelBlocks } from './extensions/blockSelection'
 import { createFindControl, FindInPage } from './extensions/findInPage'
 import { BlockHandles } from './handles/BlockHandles'
 import { GroupBlocksKey } from './handles/groupKey'
@@ -162,6 +163,11 @@ export function Editor({
         loadedRef.current = { path, body: text }
       },
       find: editor ? createFindControl(editor) : undefined,
+      selectTopLevelBlocks: () => {
+        if (!editor || editor.isDestroyed) return false
+        editor.commands.focus(undefined, { scrollIntoView: false })
+        return selectTopLevelBlocks(editor)
+      },
     }),
     [editor, autosave, path],
   )

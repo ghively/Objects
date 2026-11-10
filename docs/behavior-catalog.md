@@ -145,6 +145,11 @@ Ctrl+Shift+G.
 Start presentation mode Ctrl+Alt+P; back one slide / next presentation slide; exit presentation mode Esc | Find in page Ctrl+F | Select all top-level blocks |
 Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down) | Scroll to top Home, bottom End,
 page up/down.
+(M31) Select all top-level blocks Ctrl+Alt+Shift+A and Copy deep link Ctrl+Alt+Shift+L (our keys; ⌃⇧⌘A / ⌃⇧⌘L on
+macOS) work in the page or the open peek, caret in the editor included: the first selects every top-level block as a
+block selection, the second copies the object's reference `[[Title]]` (as Copy > "Copy object reference"; Object has
+no URL scheme, our call) and toasts "Deep link copied". Home, End, Page Up and Page Down ("Page up", "Page down") scroll
+the page outside text fields.
 
 **Navigation**: Navigate back Ctrl+Left or Ctrl+[ | Navigate forward Ctrl+Right or Ctrl+] | Open in new tab Ctrl+Click | Open in
 side panel (Shift+Click; inline `[[links]]` too) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y (not in Object).

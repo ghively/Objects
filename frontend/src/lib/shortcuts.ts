@@ -616,6 +616,24 @@ export const SWEEP_SHORTCUTS: ShortcutDef[] = [
   def('openBlockStyling', 'block', 'Open block styling', ['Mod-Shift-e'], 'editor', V, true),
 ]
 
+/**
+ * M31, the catalog's Page group (§2): "Select all top-level blocks", "Copy deep link" and "Scroll
+ * to top Home, bottom End, page up/down". Bound by `object/pageShortcuts.ts` for the active
+ * object view (the page, or the peek while one is open). The catalog gives the two first no key:
+ * Ctrl+Alt+Shift+A and Ctrl+Alt+Shift+L are ours (⌃⇧⌘A / ⌃⇧⌘L on macOS; L beside Copy block
+ * reference's Ctrl+Alt+L), and they work with the caret in the editor. The scroll keys work
+ * outside editable fields only; "Page up" and "Page down" are our names for the catalog's
+ * "page up/down".
+ */
+export const PAGE_SHORTCUTS: ShortcutDef[] = [
+  def('selectAllTopLevelBlocks', 'page', 'Select all top-level blocks', ['Mod-AltCtrl-Shift-a'], 'global', OURS, true),
+  def('copyDeepLink', 'page', 'Copy deep link', ['Mod-AltCtrl-Shift-l'], 'global', OURS, true),
+  def('scrollToTop', 'page', 'Scroll to top', ['Home'], 'global', V, true),
+  def('scrollToBottom', 'page', 'Scroll to bottom', ['End'], 'global', V, true),
+  def('scrollPageUp', 'page', 'Page up', ['PageUp'], 'global', V, true),
+  def('scrollPageDown', 'page', 'Page down', ['PageDown'], 'global', V, true),
+]
+
 registerShortcuts(EXISTING_SHORTCUTS)
 registerShortcuts(M7_SHORTCUTS)
 registerShortcuts(M8_SHORTCUTS)
@@ -623,3 +641,4 @@ registerShortcuts(POLISH_SHORTCUTS)
 registerShortcuts(OBJECT_MENU_SHORTCUTS)
 registerShortcuts(AI_SHORTCUTS)
 registerShortcuts(SWEEP_SHORTCUTS)
+registerShortcuts(PAGE_SHORTCUTS)
