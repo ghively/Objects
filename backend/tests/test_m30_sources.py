@@ -527,3 +527,37 @@ def test_vcs_file_restore_of_a_source_is_refused(tmp_path, app_on, monkeypatch) 
     assert r.status_code == 423, r.text
     assert r.json()["reason"] == READ_ONLY and r.json()["detail"]
     assert (root / rel).read_bytes() == before
+
+
+def test_merge_refuses_an_imported_source_on_either_side(tmp_path, app_on) -> None:
+    from objectapp.merge import merge_objects
+    from objectapp.mcp_server import ApiError
+
+    root = itops_space(tmp_path)
+    src = make_itops_source(tmp_path)
+    client, space = app_on(root)
+    batch = import_as_sources(root, src, client)
+    rel = _items(root, batch)["Hosts/APP01.md"]["path"]
+    host, _hv = space.create_object("host", "APP01 host")
+    secret = client.post("/api/integrations/tokens", json={"name": "agent", "scope": "read-write"}).json()["secret"]
+    auth = {"Authorization": f"Bearer {secret}"}
+    before = (root / rel).read_bytes()
+    host_before = (root / host).read_bytes()
+
+    for source, target in ((rel, host), (host, rel)):
+        sv, tv = space.read(source)[2], space.read(target)[2]
+        with pytest.raises(ReadOnly, match=READ_ONLY):
+            merge_objects(space, source, target, sv, tv)
+        r = client.post("/api/object/merge", json={"source": source, "target": target, "sourceVersion": sv,
+                                                   "targetVersion": tv, "confirm": True})
+        assert r.status_code == 423, r.text
+        assert r.json()["reason"] == READ_ONLY
+        r = client.post("/api/v1/object/merge", json={"source": source, "target": target, "sourceVersion": sv,
+                                                      "targetVersion": tv}, headers=auth)
+        assert r.status_code == 423, r.text
+        assert r.json()["reason"] == READ_ONLY
+        with pytest.raises(ApiError, match=f"423: {READ_ONLY}"):
+            _mcp_call(client, "merge", source=source, target=target, source_version=sv, target_version=tv)
+        assert (root / rel).read_bytes() == before  # the Source is where it was, unchanged
+        assert (root / host).read_bytes() == host_before
+    assert client.get("/api/trash").json() == []

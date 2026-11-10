@@ -36,7 +36,7 @@ from .frontmatter import remove_items
 from .objfile import ObjectFile
 from .propvalues import GATED_KINDS, InvalidValue, _is_array, decode_value, label_lookup
 from .relink import rewrite_tag_lists
-from .space import Conflict, Skip
+from .space import Conflict, ReadOnly, Skip
 from .synced import is_synced
 
 if TYPE_CHECKING:
@@ -292,7 +292,8 @@ def merge_objects(
 
     Raises `KeyError` (no such object), `InvalidValue` (422), `Conflict` (409: either version
     is stale; nothing is written), `TooLarge` (413) and `ReadOnly` (423: the target can't be
-    saved). Links in files that can't be rewritten are reported in ``skipped``.
+    saved, or either side is an imported Source, M30). Links in files that can't be rewritten
+    are reported in ``skipped``.
     """
     src = space._rel(source)
     dst = space._rel(target)
@@ -307,6 +308,15 @@ def merge_objects(
         raise InvalidValue("A tag can only be merged into another tag.")
     if space._is_whiteboard(src) or space._is_whiteboard(dst):
         raise InvalidValue("Whiteboards can't be merged.")
+    # M30: an imported Source is never merged, either way (its text is the import's; merging one
+    # away would also put it in the Trash).
+    from .importers.sources import SOURCE_READ_ONLY, is_imported_source
+
+    with space._lock:
+        raws = [space._raw.get(src), space._raw.get(dst)]
+    for raw in raws:
+        if raw is not None and is_imported_source(space._type_id(raw.typeName), raw.fm):
+            raise ReadOnly(SOURCE_READ_ONLY)
 
     s_of, sfm, s_ver = space.read(src)
     _t_of, tfm, t_ver = space.read(dst)
