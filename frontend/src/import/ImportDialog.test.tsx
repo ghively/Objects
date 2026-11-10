@@ -361,6 +361,17 @@ describe('ImportDialog: source and preview', () => {
     )
   })
 
+  // M30 hands-on: a long source path (nowrap, truncated) set the dialog's one grid column to its
+  // full length, so every field and button ran off the right and the dialog scrolled sideways.
+  test('test a long source path never widens the dialog: one shrinkable column, the path truncated', async () => {
+    await previewVault()
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.className).toContain('grid-cols-[minmax(0,1fr)]')
+    expect(dialog.className).toContain('[overflow-wrap:anywhere]')
+    const path = screen.getByText('/home/gene/Downloads/vault.zip')
+    expect(path.className).toContain('truncate')
+  })
+
   test('test back returns to the source step with the path kept', async () => {
     const user = await previewVault()
     await user.click(screen.getByRole('button', { name: T.back }))
