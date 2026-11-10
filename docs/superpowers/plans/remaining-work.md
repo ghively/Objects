@@ -99,6 +99,12 @@ The history below is in the order it was written: the per-milestone sections new
 
 ### Done on 2026-11-10
 
+- **M28 gate (Linux, 2026-11-10, after one review and one fix pass):** back end 3644 passed, 19 skipped, 0 failed;
+  front end 4146 passed, 1 skipped (the icon subset was regenerated for M28's new icon); `tsc`, lint and build clean;
+  `m28_acceptance.py`, `m8`, `m22` and `m2` acceptance RESULT: PASS. The review found 11 issues (the worst: a type save
+  refused after a target type gained a clashing key; a board grouped by a counterpart offering drops and a "+" that
+  failed; automations offering counterparts the server ignores; an index walk racing a writer); all fixed with tests.
+
 - **M28 built: the IT ops starter and two-way relations** (T1-T10 on parallel lanes by file ownership, merged on
   `ccr-9c93c0c4-ssxqz7` up to `78a2f8af`; T11 integration). "IT operations" is the third starting point (17 types,
   16 default templates, 30 seed tags; nothing already there is replaced); the gallery's IT operations group adds the
