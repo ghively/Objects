@@ -26,6 +26,16 @@ describe('synced facts', () => {
     expect(isSynced(undefined)).toBe(false)
   })
 
+  test('isSynced agrees with the backend: a syncable kind and a mark with a source', () => {
+    // A hand-edited mark that isn't an object with a source, or a mark on a kind that can't be
+    // synced, is not synced (the backend's `synced.is_synced` reads it the same way).
+    expect(isSynced(propertyDef({ id: 'a', type: 'text', synced: 'yes' as never }))).toBe(false)
+    expect(isSynced(propertyDef({ id: 'b', type: 'text', synced: { source: '  ', staleAfterDays: 7 } }))).toBe(false)
+    expect(isSynced(propertyDef({ id: 'c', type: 'text', synced: { staleAfterDays: 7 } as never }))).toBe(false)
+    expect(isSynced(propertyDef({ id: 'd', type: 'entity', synced: { source: 'Inventory script', staleAfterDays: 7 } }))).toBe(false)
+    expect(isSynced(propertyDef({ id: 'e', type: 'label', synced: { source: 'Inventory script', staleAfterDays: 7 } }))).toBe(true)
+  })
+
   test('SyncedLine reads "Refreshed 5 minutes ago" with the source', () => {
     render(<SyncedLine def={lastBoot} refreshedAt={before(5 * 60_000)} now={NOW} />)
     expect(screen.getByText('Inventory script · Refreshed 5 minutes ago')).toBeInTheDocument()

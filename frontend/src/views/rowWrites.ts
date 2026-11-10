@@ -6,7 +6,7 @@
 import { api } from '@/api/client'
 import type { Row } from '@/api/types'
 import { typeOf } from '@/links/linkIndex'
-import { SYNCED_TEXT } from '@/properties/synced'
+import { isSynced, SYNCED_TEXT } from '@/properties/synced'
 
 export interface RowWrites {
   /**
@@ -26,7 +26,7 @@ export interface RowWrites {
 export function syncedRefusal(row: Row, keys: Iterable<string>): string | null {
   const defs = typeOf(row.summary.type)?.propertyDefinitions ?? []
   for (const key of keys) {
-    const def = defs.find((d) => d.key === key && d.synced)
+    const def = defs.find((d) => d.key === key && isSynced(d))
     if (def?.synced) return SYNCED_TEXT.readOnly(def.name, def.synced.source)
   }
   return null
@@ -39,7 +39,7 @@ export function syncedRefusal(row: Row, keys: Iterable<string>): string | null {
  * a type without synced properties runs `write` as is.
  */
 function guardSynced<T>(row: Row, write: () => Promise<T>): Promise<T> {
-  if (!typeOf(row.summary.type)?.propertyDefinitions.some((d) => d.synced)) return write()
+  if (!typeOf(row.summary.type)?.propertyDefinitions.some(isSynced)) return write()
   const real = api.updateProperties
   const guarded: typeof api.updateProperties = (path, updates, baseVersion, remove) => {
     const why = path === row.summary.path ? syncedRefusal(row, [...Object.keys(updates ?? {}), ...(remove ?? [])]) : null
