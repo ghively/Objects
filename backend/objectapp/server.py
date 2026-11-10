@@ -2418,6 +2418,8 @@ def create_app(
     # M8: each router is filled by its own task (see the plan's "Shared files").
     for module in (api_tasks, api_history, api_blocks, api_merge, api_spaces_m8):
         api.include_router(module.router(ctx))
+    from . import api_definition_history  # M31: restore a definition's version
+    api.include_router(api_definition_history.router(ctx))
     # M15: the import routes (`api_import`; the importers are in `importers/`).
     imports = api_import.router(ctx)
     api.include_router(imports)

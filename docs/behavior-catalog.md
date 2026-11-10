@@ -934,6 +934,14 @@ ssh: GitHub, GitLab, a self-hosted server).
   id (`spaceId` in `.object/space.json`, written when version control is turned on or on the next app save in a
   space that has a `space.json`), so moving or renaming the folder keeps them; older path-keyed history is moved over.
   Type, collection, query and view definitions keep a saved version before each app save too.
+- **Definition Version History** (M31; our wording and summary): "Version History" in Object type settings' header,
+  a saved query's `…` menu and a collection's `…` menu opens the definition's saved versions, newest first
+  ("Version N", the time). A picked one shows "In this version" (name, plural name and properties for a type; object
+  types for a collection; object types, search, filters, sorts for a query), "Changed since" (renamed, properties or
+  object types added, removed or renamed since) and the "Definition file" pretty-printed. "Restore this version" asks
+  "Restore this version?" and saves it back through the normal save (revision checked; what is there now is kept as
+  a version first); a type version that would remove values asks "Apply changes?" first. Views have versions but no
+  restore page.
 - **Settings > Offline & Sync > Backup**: "Back up all spaces" (version control on for every space on this device,
   with a line per space that couldn't) and the "Back up agents and settings" switch: the per-user state folder
   (agents, automations, device settings, the spaces list) in its own repository, with a remote field and "Push now".

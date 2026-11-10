@@ -6,6 +6,7 @@ import { api, ConflictError } from '@/api/client'
 import type { Collection, DashboardSectionKey, Layout, ObjectSummary, Query, Row, TypeDef, ViewState, Views } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
+import { DefinitionHistoryDialog, DEFINITION_HISTORY } from '@/history/DefinitionHistoryDialog'
 import {
   Dialog,
   DialogContent,
@@ -293,6 +294,7 @@ export function CollectionPage({ id }: { id: string }) {
   const [notice, setNotice] = useState<string | null>(null)
   const [draft, setDraft] = useState<string | null>(null)
   const [iconOpen, setIconOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [removing, setRemoving] = useState<Row | null>(null)
@@ -576,6 +578,10 @@ export function CollectionPage({ id }: { id: string }) {
             </DropdownMenuSub>
             <TemplatesMenu collection={c} types={types} />
             <PinMenuItems pin={{ kind: 'collection', id: c.id }} />
+            <DropdownMenuItem onSelect={() => setHistoryOpen(true)}>
+              <Icon name="ph-clock-counter-clockwise" size={14} />
+              {DEFINITION_HISTORY.menuItem}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" disabled={readOnly} onSelect={() => setDeleteOpen(true)}>
               <Icon name="ph-trash" size={14} />
@@ -757,6 +763,7 @@ export function CollectionPage({ id }: { id: string }) {
           void flushCollectionViews(c.id)
         }}
       />
+      <DefinitionHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} kind="collections" id={c.id} current={c} readOnly={readOnly} />
       <AddExistingDialog collection={c} open={addOpen} onOpenChange={setAddOpen} onPicked={(p) => void addExisting(p)} />
       <RemoveFromCollectionDialog
         open={removing !== null}
