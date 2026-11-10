@@ -4,7 +4,9 @@
  * sidebar and the calendar sidebar. Their keys are in `lib/shortcuts.ts`; `App`
  * binds them with `useTabShortcuts()` and `usePanelShortcuts()`. Back/forward (Ctrl+←/→, Ctrl+[/])
  * and the panel keys (Ctrl+Shift+←/→) stay out of text fields and editors, where those keys move
- * and select by word.
+ * and select by word (our call, M31: unlike Ctrl+, or Ctrl+Shift+M, which type nothing, Ctrl+Shift+→
+ * is the field's own "extend the selection by a word", so a field in the side panel keeps it; the
+ * panel closes with the key from outside the field, the top bar button or the palette).
  *
  * The General keys of the 2026-11-08 sweep (`useGeneralShortcuts()`: Create new task) ride along
  * with the tab shortcuts, so `App` binds them with the same call.
