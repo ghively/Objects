@@ -1,6 +1,8 @@
 // M25: the "Source" line under an imported object's properties (design section 1). It reads the
 // `importSource` system block and offers "Open original" (the url when it is a web link, else the
 // kept file) and "Show file" (the kept original). Hidden when the object has no block.
+// M31: a version that is a git commit sha shows as "commit <first 7>", and a file that differed from
+// its commit when imported (`uncommitted: true`) says so.
 import { api } from '@/api/client'
 import type { ImportSourceBlock } from '@/api/types'
 import { IMPORT_TEXT as T } from '@/import/text'
@@ -36,6 +38,8 @@ export function importSourceOf(value: unknown): ImportSourceBlock | null {
   }
 }
 
+const isCommit = (v: string | undefined): boolean => !!v && /^[0-9a-f]{40}([0-9a-f]{24})?$/.test(v)
+
 const isWeb = (url: string | undefined): url is string => !!url && /^https?:\/\//i.test(url)
 
 function day(iso: string | undefined): string | null {
@@ -55,7 +59,13 @@ export function ImportSourceLine({ source }: { source: unknown }) {
   const show = () => {
     if (s.original) void api.revealImportOriginal(s.original).catch(() => undefined)
   }
-  const bits = [s.author, day(s.modified) ? `modified ${day(s.modified)}` : null, s.version && !s.version.startsWith('sha256:') ? `version ${s.version}` : null]
+  const uncommitted = (source as Record<string, unknown>).uncommitted === true
+  const version = isCommit(s.version)
+    ? T.commit(s.version as string)
+    : s.version && !s.version.startsWith('sha256:')
+      ? `version ${s.version}`
+      : null
+  const bits = [s.author, day(s.modified) ? `modified ${day(s.modified)}` : null, version, uncommitted ? T.uncommitted : null]
     .filter(Boolean)
     .join(', ')
   return (

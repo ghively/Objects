@@ -174,6 +174,13 @@ def _extra_sections(extra: dict, obj: Callable[[str], str]) -> list[str]:
             lines.append("- 1 image became an Image object." if images == 1 else f"- {images:,} images became Image objects.")
         lines += [f"- {obj(p)}: over 100 MB, the original was not copied" for p in large]
         out += _section("Originals", lines)
+    git = extra.get("git")
+    if isinstance(git, dict) and git.get("commit"):
+        # M31: a source folder in a git repository (our strings).
+        lines = [f"- Imported at commit {code(git['commit'])}."]
+        lines += [f"- {obj(p)}: has changes not committed to git; imported as it is on disk"
+                  for p in git.get("uncommitted") or []]
+        out += _section("Git", lines)
     losses = extra.get("losses") or []
     if losses:
         out += _section("Conversion notes", [f"- {obj(s)}: {code(n)}" for s, n in losses])

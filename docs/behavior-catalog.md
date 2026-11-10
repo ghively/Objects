@@ -658,6 +658,14 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   file) and **Show file** (shows the kept original in the file manager). Every imported object carries the system
   frontmatter block `importSource` (system, url, id, version, author, created, modified, original, contentHash, batch,
   importedAt); it is a system field, so the property panel never lists it under External properties.
+- **Git provenance** (M31; import design section 1, the "Wiki (git)" row): a source folder inside a git repository is
+  read with read-only git (no network; the repository never changes). A Markdown or Obsidian folder there is
+  `system: wiki`; each file's `version` is the commit (HEAD's sha), `url` its web page at that commit when `origin` is on
+  GitHub, GitLab, Bitbucket or Azure DevOps (https and ssh remotes; else the `file:` link), `author` and `modified`
+  its last commit's. A file that differs from the commit (changed, staged or never committed) gets `uncommitted: true`
+  and is listed in the report's **Git** section ("Imported at commit <sha>.", "<file>: has changes not committed to
+  git; imported as it is on disk"). The Source line shows "commit <first 7>" and "has uncommitted changes". An earlier
+  import of the same folder made as `markdown` or `obsidian` is still matched on a re-run (our calls).
 - **Links between imported pages**: a source link names a page by path or by name; when several pages share the name
   (Books/Dune and Movies/Dune) the one nearest the linking page wins (its own folder, then the deepest shared folder,
   then the shortest path), and the written link is the title only when the space resolves it to that object, else its

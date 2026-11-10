@@ -169,6 +169,9 @@ export const IMPORT_TEXT = {
   openOriginal: 'Open original',
   showFile: 'Show file',
   importedFrom: (system: string) => `Imported from ${system}`,
+  /** M31: a git source's commit (our words). */
+  commit: (sha: string) => `commit ${sha.slice(0, 7)}`,
+  uncommitted: 'has uncommitted changes',
 
   // Errors.
   notFound: 'There is no file or folder at that path.',

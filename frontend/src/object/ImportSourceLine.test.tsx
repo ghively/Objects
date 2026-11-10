@@ -48,6 +48,24 @@ describe('ImportSourceLine', () => {
     open.mockRestore()
   })
 
+  test('test M31: a git source shows its commit, the uncommitted mark, and opens the web page at the commit', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    const user = userEvent.setup()
+    const sha = '0123456789abcdef0123456789abcdef01234567'
+    const url = `https://github.com/acme/wiki/blob/${sha}/Hosts/APP01.md`
+    render(
+      <ImportSourceLine
+        source={{ system: 'wiki', id: 'Hosts/APP01.md', url, version: sha, author: 'Ada Example', modified: '2026-10-01T09:30:00Z', uncommitted: true }}
+      />,
+    )
+    expect(screen.getByRole('group', { name: T.sourceHeading })).toHaveTextContent(
+      'Imported from the wiki (Ada Example, modified 2026-10-01, commit 0123456, has uncommitted changes)',
+    )
+    await user.click(screen.getByRole('button', { name: T.openOriginal }))
+    expect(open).toHaveBeenCalledWith(url, '_blank', 'noopener,noreferrer')
+    open.mockRestore()
+  })
+
   test('test without a web url Open original opens the kept file; a file: url alone has no buttons', async () => {
     const user = userEvent.setup()
     const { rerender } = render(
