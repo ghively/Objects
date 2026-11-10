@@ -97,14 +97,17 @@ property values or tags, never entities. Pages stay read-only Sources; entities 
 Sources that mention them, and the newest Source wins when they disagree.
 
 ## 6. Bulk pass, normalise, links
-After the user continues, file the rest in groups of about 40 objects. Then the user merges near-duplicate
-tags and option values ("Prod", "Production", "PRD") in Object. Links between objects are filled last,
-once every object exists.
+After the user continues, file the rest in groups of about 40 objects.
+- On a batch not kept as Sources: then the user merges near-duplicate tags and option values ("Prod",
+  "Production", "PRD") in Object. Links between objects are filled last, once every object exists.
+- On a batch kept as Sources, nothing is filed and there is no links pass (the relations you gave take its
+  place): the Entities stage comes next, then normalise.
 
-## 7. Entities  (gate: the user reviews the entity list in Object)
-On a batch kept as Sources: the user accepts, renames, merges, splits or turns down each entity and writes
-them; read it back with `import_entities(batch)`. Links from low-confidence candidates go to the Import
-inbox.
+## 7. Entities  (gate: the user reviews the entity list in Object; a batch kept as Sources only)
+This comes right after the bulk pass, before normalise. The user accepts, renames, merges, splits or turns
+down each entity and writes them; read it back with `import_entities(batch)`. The write makes the entities,
+their values, their Sources and the relations; links from low-confidence candidates go to the Import inbox.
+Then the user merges near-duplicate tags and option values of the written entities in Object.
 
 ## 8. Report and Import inbox  (gate: the user files the inbox)
 `import_report(batch)`: counts that reconcile (source items = imported + updated + unchanged + left out +
