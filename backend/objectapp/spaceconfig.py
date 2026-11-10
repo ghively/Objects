@@ -43,8 +43,8 @@ INTERNAL_KEYS = ("deskSyncRuleId", "spaceId", "setup")
 """M24: keys Object keeps in ``space.json`` for itself; never in `PATCH_KEYS`, never in `space_fields`.
 ``spaceId`` (2026-11-08): the space's stable id (`space_id`), which keys its version history and
 its version-control settings, so moving or renaming the folder keeps both.
-``setup`` (fix pass H2): M8's "Pick a starting point" answer (``basic`` / ``blank``), so a new or
-empty space is asked once (`needs_setup`)."""
+``setup`` (fix pass H2): M8's "Pick a starting point" answer (``basic`` / ``blank``; M28 adds
+``itops``, "IT operations"), so a new or empty space is asked once (`needs_setup`)."""
 _SPACE_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 MAX_JIRA_SITE_LENGTH = 300
 JIRA_SITE_PROBLEM = "The Jira site is a web address (https://…)."
@@ -216,15 +216,15 @@ def needs_setup(root: Path) -> bool:
 
     True only for a space that was never asked (no ``setup`` in ``space.json``), holds none of
     the basic-setup types (a space made with "Start with basic setup" before the marker existed)
-    and no visible file (no objects). Reading never writes.
+    nor of the IT ops types (M28), and no visible file (no objects). Reading never writes.
     """
-    from .basicsetup import BASIC_TYPE_IDS
+    from .basicsetup import BASIC_TYPE_IDS, ITOPS_TYPE_IDS
 
     data, _rev, error = read(root)
     if error is not None or data.get("setup") is not None:
         return False
     types_dir = Path(root) / ".object" / "types"
-    if any((types_dir / f"{tid}.json").exists() for tid in BASIC_TYPE_IDS):
+    if any((types_dir / f"{tid}.json").exists() for tid in (*BASIC_TYPE_IDS, *ITOPS_TYPE_IDS)):
         return False
     return not _has_visible_file(Path(root))
 

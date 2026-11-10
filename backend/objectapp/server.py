@@ -58,6 +58,9 @@ Routes (all JSON):
   `WorkService`, the M24 seams (``workseams.build_seams``) and one `AlertWatch` per app (the
   monitoring folder watch; ``workAlertFolder`` / ``workAlertIntervals`` settings). Events
   ``work`` and ``workQueue`` join the resync.
+- M28 (T3): ``POST /api/spaces`` and ``POST /api/space/setup`` take ``setup: 'itops'`` (IT
+  operations); the IT ops pick announces ``types`` ``*`` and each template and seed Tag as
+  ``created``, and ``POST /api/types`` announces the default template an IT ops gallery type gets.
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
   ``{paths, typeIds, rewritten}`` (plus ``collectionIds``, ``queryIds``, ``skipped`` for a
   collection or query entry; ``rewritten``: other files written back, announced ``changed``;
@@ -596,7 +599,7 @@ class PatchSettingsRequest(BaseModel):
 class CreateSpaceRequest(BaseModel):
     name: str = ""
     location: str = ""
-    setup: Literal["blank", "basic"] = "blank"
+    setup: Literal["blank", "basic", "itops"] = "blank"
 
 
 class SpacePathRequest(BaseModel):
@@ -1090,14 +1093,19 @@ def create_app(
     @api.post("/space/setup")
     def post_space_setup(req: SpaceSetupRequest):
         # Fix pass H2: "Pick a starting point" for a space opened as a new or empty folder.
-        if req.setup not in ("basic", "blank"):
-            return _error(422, "Pick \"basic\" or \"blank\" as the starting point.")
+        if req.setup not in ("basic", "itops", "blank"):
+            return _error(422, "Pick \"basic\", \"itops\" or \"blank\" as the starting point.")
         if not needs_setup(space.root):
             return _error(409, "This space already has a starting point.")
         try:
-            space.apply_setup(req.setup)
+            created = space.apply_setup(req.setup)
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
+        if req.setup == "itops":
+            # M28: the IT ops types, then the templates and seed Tags as created objects.
+            announce(ChangeEvent("types", "*", None))
+            for rel in created:
+                announce(ChangeEvent("created", rel, space.cached_version(rel)))
         return space_info()
 
     @api.put("/space")
@@ -1958,6 +1966,7 @@ def create_app(
 
     @api.post("/types", status_code=201)
     def create_type(req: CreateTypeRequest):
+        templates_before = space.template_versions() if req.template else {}
         try:
             t = space.create_type(
                 req.name, req.pluralName, icon=req.icon, color=req.color, template=req.template
@@ -1965,6 +1974,11 @@ def create_app(
         except InvalidValue as exc:
             return _error(422, str(exc))
         announce(ChangeEvent("types", t.id, None, origin=req.clientId))
+        if req.template:
+            # M28: an IT ops type from the gallery comes with its default template.
+            for path, version in space.template_versions().items():
+                if path not in templates_before:
+                    announce(ChangeEvent("created", path, version, origin=req.clientId))
         if req.template:
             # The template's saved query: no origin, so the creating window reloads its queries too.
             announce(ChangeEvent("queries", "*", None))

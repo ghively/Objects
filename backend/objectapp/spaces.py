@@ -263,14 +263,16 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
 
     `setup` is M8's "Pick a starting point": ``'blank'`` is the behaviour above;
     ``'basic'`` also writes the Person, Meeting, Project and Book types
-    (``.object/types/{person,meeting,project,book}.json``, see `basicsetup`).
+    (``.object/types/{person,meeting,project,book}.json``, see `basicsetup`);
+    ``'itops'`` (M28) writes the IT ops types, their default templates and the seed Tags
+    (`basicsetup.write_itops_types`, `write_itops_tags`).
 
     Raises `SpaceNameProblem` (422) for an empty or over-long name,
     `NotADirectoryError` (404) when `location` is not an existing folder,
     `FileExistsError` (409) when the target already exists (it is not touched) and
     `ValueError` for an unknown `setup` (checked before anything is made).
     """
-    if setup not in ("blank", "basic"):
+    if setup not in ("blank", "basic", "itops"):
         raise ValueError(f"Unknown space setup: {setup!r}")
     if not isinstance(name, str) or not name.strip():
         raise SpaceNameProblem("A space needs a name.")
@@ -294,6 +296,11 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
         from .basicsetup import write_basic_types
 
         write_basic_types(target)
+    elif setup == "itops":
+        from .basicsetup import write_itops_tags, write_itops_types
+
+        write_itops_types(target)
+        write_itops_tags(target)
     return target
 
 

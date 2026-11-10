@@ -4185,13 +4185,18 @@ class Space:
             }
             return self._save_templates_field(t, templates)
 
-    def create_template(self, type_id: str, name: str = "New template") -> tuple[str, str]:
+    def create_template(
+        self, type_id: str, name: str = "New template", body: str = "", default: bool = False
+    ) -> tuple[str, str]:
         """Create an empty template of the type and register it; return (path, version).
 
         The file is ``Templates/<last segment of the type's folder>/<name>.md``
         with ``id``, ``type: '<Name>'`` and ``template: <name>``; its id is
         appended to ``templates.ids``. Raises `KeyError` (unknown type),
         `TypeReadOnly` and `InvalidValue` (a type without templates).
+
+        M28: ``body`` is the new template's body (an IT ops type's sections) and ``default``
+        also makes it the type's ``defaultTemplateId``, in the same type write.
         """
         t = self.type_by_id(type_id)
         if t is None:
@@ -4209,7 +4214,7 @@ class Space:
             {"template": name},
             insert_first={"id": template_id},
         )
-        data = join_object(ObjectFile(fm_src, "", True, None)).encode("utf-8")
+        data = join_object(ObjectFile(fm_src, body, True, None)).encode("utf-8")
         version = version_of(data)
         stem = safe_filename(name)
         with self._lock:
@@ -4222,7 +4227,10 @@ class Space:
                 raise OSError(f"Could not find a free file name for {stem!r}")
             t = self.type_by_id(type_id) or t
             ids = [*(t.templates.get("ids") or []), template_id]
-            self._save_templates_field(t, {**t.templates, "ids": ids})
+            templates = {**t.templates, "ids": ids}
+            if default:
+                templates["defaultTemplateId"] = template_id
+            self._save_templates_field(t, templates)
             return rel, version
 
     def _template_edit(
@@ -4747,18 +4755,23 @@ class Space:
             return None
         return TypeDefinition.from_json(data, fallback_id=type_id) if isinstance(data, dict) else None
 
-    def apply_setup(self, setup: str) -> None:
+    def apply_setup(self, setup: str) -> list[str]:
         """Fix pass H2: apply M8's "Pick a starting point" to this (new or empty) space.
 
         ``basic`` writes the Person, Meeting, Project and Book types (`basicsetup`) and loads
-        them; ``blank`` writes nothing else. Either way ``space.json`` records the pick
-        (``setup``), so the space is asked once. Raises `ValueError` for another value.
+        them; M28: ``itops`` writes the IT ops types, their default templates and the seed Tags
+        (`basicsetup.write_itops_types`, `write_itops_tags`), never replacing a file that is
+        there (a type id the space has already is left out); ``blank`` writes nothing else.
+        Either way ``space.json`` records the pick (``setup``), so the space is asked once.
+        Returns the space-relative paths of the objects written (templates and Tags), for the
+        caller to announce. Raises `ValueError` for another value.
         """
         from . import spaceconfig
         from .basicsetup import basic_types
 
-        if setup not in ("basic", "blank"):
+        if setup not in ("basic", "blank", "itops"):
             raise ValueError(f"Unknown space setup: {setup!r}")
+        created: list[str] = []
         with self._lock:
             if setup == "basic":
                 taken = {t.id for t in self.types}
@@ -4769,7 +4782,36 @@ class Space:
                     self.types.append(t)
                     self._types_changed(t.id)
                 self._sort_types()
+            elif setup == "itops":
+                created = self._apply_itops_setup()
             spaceconfig.set_internal(self.root, "setup", setup)
+        return created
+
+    def _apply_itops_setup(self) -> list[str]:
+        """Write and load the IT ops types, templates and seed Tags; return the objects' paths."""
+        from .basicsetup import write_itops_tags, write_itops_types
+
+        taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
+        written = [*write_itops_types(self.root, skip=taken), *write_itops_tags(self.root)]
+        types_dir = self.root / ".object" / "types"
+        created: list[str] = []
+        loaded: list[str] = []
+        for full in written:
+            if full.parent == types_dir and full.suffix == ".json":
+                t = self._stored_type(full.stem)
+                if t is not None:
+                    self.types = [x for x in self.types if x.id != t.id]
+                    self.types.append(t)
+                    loaded.append(t.id)
+            else:
+                created.append(full.relative_to(self.root).as_posix())
+        self._sort_types()
+        for type_id in loaded:
+            self._types_changed(type_id)
+        # The templates and Tags after the types, so each file is read as its type's.
+        for rel in created:
+            self.rescan_file(rel)
+        return created
 
     def create_type(
         self,
@@ -4790,7 +4832,8 @@ class Space:
         Polish item 21: with ``template`` (a gallery key, `typetemplates`), the
         template's properties replace "Content", its name, plural, description,
         icon and colour fill whatever isn't given, and the key is stored as
-        ``templateKey`` (the template it was made from).
+        ``templateKey`` (the template it was made from). M28: an IT ops entry (a key in
+        `basicsetup.ITOPS_TYPE_IDS`) also gets its default template (`_add_itops_template`).
         """
         tpl = None
         if template is not None:
@@ -4858,6 +4901,9 @@ class Space:
             self.types.append(t)
             self._sort_types()
             self._types_changed(t.id)
+            if tpl is not None:
+                self._add_itops_template(t, tpl.key)
+                t = self.type_by_id(t.id) or t
             if query is not None:
                 # The template's saved query (polish item 21); a blank type gets none.
                 try:
@@ -4865,6 +4911,21 @@ class Space:
                 except Exception:  # the type exists now: never fail its creation
                     _log.warning("Could not save the query %r of type %s", query[0], t.id, exc_info=True)
             return t
+
+    def _add_itops_template(self, t: TypeDefinition, key: str) -> None:
+        """M28: an IT ops type made from the gallery (``key`` in `ITOPS_TYPE_IDS`) gets its
+        default template (named as the type, with the type's sections) as the starter writes
+        it; the older gallery entries get none. A template that can't be made never fails the
+        type's creation."""
+        from .basicsetup import ITOPS_TEMPLATE_SECTIONS, ITOPS_TYPE_IDS, itops_template
+
+        if key not in ITOPS_TYPE_IDS or key not in ITOPS_TEMPLATE_SECTIONS:
+            return
+        _name, body = itops_template(key)
+        try:
+            self.create_template(t.id, t.name, body=body, default=True)
+        except (InvalidValue, TypeReadOnly, KeyError, OSError):
+            _log.warning("Type %s is created without its default template", t.id, exc_info=True)
 
     def create_media_type(self, name: str) -> TypeDefinition:
         """Create and save the basic media type ``name`` (Image, PDF, File, ...): its media fields
