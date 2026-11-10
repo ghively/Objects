@@ -116,6 +116,9 @@ def _decide(e: Env, batch: str, edit: Callable[[str, dict[str, Any]], None] | No
 
 
 def _wait(e: Env, batch: str, states: set[str], timeout: float = 60) -> dict[str, Any]:
+    """The status once in one of ``states``. Every wait here is for the end of a worker's run, so it
+    joins the worker first: the status is read after its last save, never while it runs."""
+    e.fil.join(timeout)
     end = time.monotonic() + timeout
     s: dict[str, Any] = {}
     while time.monotonic() < end:
@@ -251,6 +254,23 @@ def test_prompt_lists_entity_types_on_a_source_batch(env: Env) -> None:
 # -- Write ---------------------------------------------------------------------------------------
 
 
+def test_view_counts_the_batch_sources(env: Env) -> None:
+    """``sources`` is the batch's Sources (its items), not the pages the pass has results for."""
+    e = env
+    batch = _import(e)
+    view = e.fil.entities_view(batch)
+    assert view["state"] == "collecting" and view["sources"] == 6 and view["entities"] == []
+    _decide(e, batch)
+    _trial_and_bulk(e, batch)
+    assert e.fil.entities_view(batch)["sources"] == 6
+    # the entities a Write creates are items of the batch too, but not Sources
+    _accept_all(e, batch)
+    _write(e, batch)
+    _data, items = batches.load_batch(e.root, batch)
+    assert any(it.get("entity") for it in items)
+    assert e.fil.entities_view(batch)["sources"] == 6
+
+
 def test_write_needs_every_entity_decided(env: Env) -> None:
     e = env
     batch = _import(e)
@@ -295,6 +315,46 @@ def test_write_needs_every_entity_decided(env: Env) -> None:
     assert inbox[0]["suggestedType"] is None
     assert "Import inbox" in _collections(e, runbook[0])
     assert not any(_collections(e, p) for p in paths.values())
+
+
+def test_status_never_reads_a_finished_pass_as_failed(env: Env) -> None:
+    """The worker saves its last state and exits between the status' read of ``filing.json`` and its
+    check of the thread: the status is the state read (``running``), never ``failed``. Deterministic:
+    the read itself finishes the worker."""
+    import threading
+
+    e = env
+    batch = _import(e)
+    for final in ("entities", "done"):
+        mode = "bulk" if final == "entities" else "entities"
+        started = "running" if final == "entities" else "writing"
+        rec = {"state": started, "mode": mode, "results": {}, "trialDone": True}
+        e.fil._save(batch, rec)
+        release = threading.Event()
+        worker = threading.Thread(target=release.wait, daemon=True)
+        worker.start()
+        e.fil._thread = worker
+        load = e.fil._load
+
+        def racing(b: str, load: Callable[[str], dict[str, Any]] = load, release: threading.Event = release,
+                   worker: threading.Thread = worker, final: str = final, mode: str = mode) -> dict[str, Any]:
+            got = load(b)
+            if not release.is_set():  # the worker saves its last state and exits right after this read
+                e.fil._save(b, {**got, "state": final, "mode": mode})
+                release.set()
+                worker.join()
+            return got
+
+        e.monkeypatch.setattr(e.fil, "_load", racing)
+        s = e.fil.status(batch)
+        assert s["state"] == started and s["error"] is None, s
+        e.monkeypatch.setattr(e.fil, "_load", load)
+        assert e.fil.status(batch)["state"] == final
+
+    e.fil._thread = None
+    e.fil._save(batch, {"state": "running", "mode": "bulk", "results": {}})
+    s = e.fil.status(batch)  # no thread runs it: interrupted
+    assert s["state"] == "failed" and s["error"] == "The pass was interrupted.", s
 
 
 def test_no_entities_still_finishes(env: Env) -> None:
@@ -343,6 +403,38 @@ def test_batch_not_kept_as_sources_runs_as_m27(env: Env) -> None:
             call()
     with pytest.raises(KeyError):
         e.fil.entities_view("no-such-batch")
+
+
+def test_rerun_not_kept_as_sources_leaves_its_sources_alone(env: Env) -> None:
+    """A re-run that asks for ``keepAsSources: false`` keeps the pages Sources (call 6), so its M27
+    pass may read none of them: none is eligible, the pass finishes, and no Source is written."""
+    e = env
+    _import(e, keep=True)
+    (e.src / "Hosts" / "APP01.md").write_bytes(b"APP01 is the Payroll server at HQ. IP address: 10.0.0.9.\n")
+    batch = _import(e, keep=False)
+    paths = _paths(e, batch)
+    assert {e.space.get(p).type for p in paths.values()} == {"source"}
+    before = {p: (e.root / p).read_bytes() for p in paths.values()}
+    assert e.fil.eligible(batch) == []
+
+    def edit(title: str, d: dict[str, Any]) -> None:
+        d.update(type="Host", tags=[{"value": "HQ", "quote": "at HQ"}])
+
+    _decide(e, batch, edit)
+    assert e.client.post(f"/api/import/batches/{batch}/filing/start", json={"trial": True}).status_code == 200
+    e.fil.join()
+    s = _wait(e, batch, {"trial", "failed", "done"})
+    assert s["state"] == "trial" and s["error"] is None, s
+    assert s["trial"]["items"] == []
+    assert {p: (e.root / p).read_bytes() for p in paths.values()} == before
+    assert not any(c.name == "Import inbox" for c in e.space.list_collections())
+    # M27's apply never writes a Source, even one it is handed
+    dec = {"path": paths["APP01"], "confidence": "high", "type": "Host",
+           "tags": [{"value": "HQ", "quote": "at HQ"}], "values": []}  # fmt: skip
+    res = filing.apply_decision(e.space, dec, allowed={paths["APP01"]}, type_names=None)
+    assert res["rejected"] is True and res["inbox"] is False
+    assert res["notes"] == [filing.SOURCE_NOT_FILED]
+    assert {p: (e.root / p).read_bytes() for p in paths.values()} == before
 
 
 # -- re-runs and the Trash -------------------------------------------------------------------------
@@ -513,3 +605,41 @@ def test_failed_write_can_run_again(env: Env) -> None:
     e.monkeypatch.setattr(entitywrite, "write_entities", real)
     _write(e, batch)
     assert e.fil.entities_view(batch)["written"]["created"] > 0
+
+
+def test_reopened_step_shows_a_failed_write(env: Env) -> None:
+    """``writeError``: the last Write's recorded error while it is failed (or interrupted), else None."""
+    e = env
+    batch = _import(e)
+    assert e.fil.entities_view(batch)["writeError"] is None  # collecting
+    _decide(e, batch)
+    _trial_and_bulk(e, batch)
+    _accept_all(e, batch)
+    assert e.fil.entities_view(batch)["writeError"] is None  # review
+    real = entitywrite.write_entities
+
+    def boom(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        raise OSError("disk full")
+
+    e.monkeypatch.setattr(entitywrite, "write_entities", boom)
+    e.fil.write_entities(batch)
+    _wait(e, batch, {"failed", "done"})
+    view = e.fil.entities_view(batch)
+    assert view["state"] == "review" and view["writeError"] == "disk full"
+
+    # a write no thread runs any more (the app stopped mid-write) reads as interrupted
+    d = e.fil._load(batch)
+    e.fil._save(batch, {**d, "state": "writing", "error": None})
+    assert e.fil.entities_view(batch)["writeError"] == filing.WRITE_INTERRUPTED
+
+    e.fil._save(batch, {**d, "state": "entities", "error": None})
+    e.monkeypatch.setattr(entitywrite, "write_entities", real)
+    _write(e, batch)
+    view = e.fil.entities_view(batch)
+    assert view["state"] == "written" and view["writeError"] is None
+
+    # a failed pass (not a write) is no write error
+    batch2 = _import(e)
+    d2 = e.fil._load(batch2)
+    e.fil._save(batch2, {**d2, "state": "failed", "mode": "bulk", "error": "The agent run failed."})
+    assert e.fil.entities_view(batch2)["writeError"] is None

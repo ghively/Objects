@@ -163,7 +163,8 @@ def load_review(root: Path | str, batch: str) -> dict                 # Entities
 def save_review(space: Space, batch: str, review: dict, results: dict[str, dict]) -> dict   # ReviewInvalid
 def accepted(res: Resolution, review: dict) -> list[tuple[Entity, str]]  # (entity, final name), accepted or renamed
 def undecided(res: Resolution, review: dict) -> list[str]                # ids of entities with no decision
-def view(space: Space, batch: str, results: dict[str, dict], state: str) -> dict   # EntitiesView
+def view(space: Space, batch: str, results: dict[str, dict], state: str,
+         write_error: str | None = None) -> dict   # EntitiesView; writeError is write_error in "failed"
 
 # sources.py (T4)
 SOURCE_TYPE_ID = "source"
@@ -322,6 +323,7 @@ export interface EntitiesView {
   review: EntitiesReview
   undecided: number
   written: EntitiesWritten | null
+  writeError?: string | null        // fix pass: the last Write's recorded error while it is failed (or interrupted); else null
 }
 // FilingStatus gains   keepAsSources: boolean
 // FilingTrialItem gains:
@@ -332,7 +334,7 @@ export interface EntitiesView {
 // the proposal review's `edited` gains: useType?: string; category?: string
 ```
 
-`EntitiesView.state`: `collecting` while the filing state is `idle | running | trial`, `review` in `entities`, `writing` in `writing`, `written` in `done` after a write.
+`EntitiesView.state`: `collecting` while the filing state is `idle | running | trial`, `review` in `entities` (and in `failed` after a Write, with `writeError` set to the recorded error), `writing` in `writing`, `written` in `done` after a write.
 
 ### Client (`frontend/src/api/client.ts`) and mock (`frontend/src/test/mockApi.ts`)
 
@@ -863,3 +865,4 @@ On a 4-CPU box this runs as about four parallel agents (the front-end tracks are
 
 **Consumed from M28/M29 (names as their plans give them):** `Space.apply_setup("itops")`; `basicsetup.source_type()`, `basicsetup.sources_property()` and the `source` id in `ITOPS_TYPE_IDS` (M28, the Source type and the nine entity types' `sources` → counterpart `{"name": "Distilled into", "key": "distilledInto"}`); relation counterparts at `options["counterpart"] = {"name", "key"} | None`, found with `counterparts.find_relation`; `Space.counterparts(path) -> list[CounterpartRow]`; M28's IT ops property keys `runsOn`, `uses`, `fqdn`, `ipAddress`, `operatingSystem`, `locatedAt`, `covers`, `sources`; M29 `PropertyDefinition.synced: SyncedSpec | None` and `Space.ensure_id` (already in `space.py`).
 25. **The default when a request leaves `keepAsSources` out is on, everywhere** (Gene, 2026-11-09: on for every import; build, 2026-11-10). The plan's older lines assumed off when absent (T4 step 4, T8/T9 "test_m27_* unchanged", T13's plain import, call 3). Kept Gene's decision: the API, v1 and MCP `start_import` also default to on, and the M15-M27 tests and acceptance scripts that test a plain mapped import now send `keepAsSources: false` explicitly (no other change to them).
+26. **What counts as a category, narrowed** (fix pass, 2026-11-10; refines call 17 and the Global Constraints' "a label option of a type in the space"). A category is an option of a label property **named (or keyed) Category, Kind or Environment**, any case, on any type but Source, or a tag's title (`proposal.CATEGORY_LABELS`, `proposal.category_labels`, used by both `entities._categories` and `proposal._category_of`). Every label option counted before, so Host's Roles ("DNS", "DHCP"), Script's Language ("Python") and Source's Category and System ("Document", "Ticket", "Wiki") made an entity impossible and `create "Ticket"` was refused. Source's own Category and System no longer count (call 17's "an entity named Wiki stays text" is dropped): they say what a page is and where it came from, not a kind of thing in the space. A tag still counts (Docker stays a tag; in an IT ops space "Active Directory" is a starter tag, so it stays a category there).

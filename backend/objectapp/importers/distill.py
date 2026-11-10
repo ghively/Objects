@@ -38,7 +38,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import unicodedata
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -165,26 +164,17 @@ def pick_values(found: dict[str, list[dict[str, Any]]], main_pages: set[str]) ->
     return out
 
 
-def _norm_text(text: str) -> str:
-    """`entities.norm_name`; its documented rule here while that function is still T1's stub."""
-    from . import entities  # noqa: PLC0415 (entities imports distill at module level)
-
-    try:
-        return entities.norm_name(text)
-    except NotImplementedError:
-        t = " ".join(unicodedata.normalize("NFKC", text).casefold().split())
-        return t.strip(".,;:()[]\"' ")
-
-
 def summary_lines(found: list[dict[str, Any]], main_pages: set[str]) -> list[SummaryLine]:
     """The entity's lines (``found``: ``[{"text", "quote", "page", "modified"}]``), merged by their
     normalised text, main pages first, then by the newest Source, then text; at most `MAX_LINES`.
     A merged line's text is its newest Source's spelling."""
+    from . import entities  # noqa: PLC0415 (entities imports distill at module level)
+
     groups: dict[str, list[dict[str, Any]]] = {}
     for row in found:
         text = str(row.get("text") or "").strip()
         if text:
-            groups.setdefault(_norm_text(text), []).append(row)
+            groups.setdefault(entities.norm_name(text), []).append(row)
 
     def rank(item: tuple[str, list[dict[str, Any]]]) -> tuple[bool, float, str]:
         norm, members = item

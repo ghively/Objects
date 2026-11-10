@@ -64,6 +64,8 @@ FILING_LINE = "Filing pass for an import batch."
 CONFIDENCE = ("high", "medium", "low")
 NOT_APPLIED = "Pages stay Sources; the page's own type, values and links are not applied."
 """M30: the note on a Source batch's result whose decision gives a type, values or links."""
+SOURCE_NOT_FILED = "An imported Source is read-only: not filed."
+"""M30: the note on M27's result for an imported Source (a re-run keeps its pages Sources)."""
 NOT_SOURCE_BATCH = "This import didn't keep its pages as Sources."
 WRITTEN_ALREADY = "The entities are written already."
 NO_ENTITIES_YET = "There are no entities to write yet: the filing pass hasn't finished."
@@ -315,6 +317,10 @@ def apply_decision(
         res["rejected"] = True
         return res
     res["title"] = summary.title
+    if sources.is_imported_source(summary.type, fm):  # M30: never filed, retyped or put in the inbox
+        res["notes"].append(SOURCE_NOT_FILED)
+        res["rejected"] = True
+        return res
     doc = _doc_text(of, fm, summary.title)
     wanted = str(decision.get("type") or "").strip()
     tid = space._type_id(wanted) if wanted else ""
@@ -561,9 +567,10 @@ class Filing:
     def status(self, batch: str) -> dict[str, Any]:
         """The wizard's ``FilingStatus`` (reads only). KeyError: no such batch."""
         batches.load_batch(self.space.root, batch)
-        d = self._load(batch)
+        alive = self.running()  # before the read: a worker that saves its last state and exits in between
+        d = self._load(batch)  # is then read as that state, never as interrupted
         as_sources = sources.is_source_batch(self.space.root, batch)
-        state, d["error"] = self._state(d)
+        state, d["error"] = self._state(d, alive)
         shown = {"trial-running": "running"}.get(state, state)
         items = []
         for p in d["trialPaths"]:
@@ -591,20 +598,25 @@ class Filing:
         return {"state": shown, "trial": {"items": items, "rightShare": share}, "normalise": d["normalise"],
                 "error": d["error"], "keepAsSources": as_sources}
 
-    def _state(self, d: dict[str, Any]) -> tuple[str, str | None]:
-        """The recorded state and error, a pass or write that no thread runs any more read as ``failed``."""
+    def _state(self, d: dict[str, Any], alive: bool) -> tuple[str, str | None]:
+        """The recorded state and error, a pass or write that no thread runs any more read as ``failed``.
+        ``alive`` is `running` taken **before** ``d`` was read, so a worker that saved its last state and
+        exited after the read is not taken for an interrupted one."""
         state, error = d["state"], d["error"]
-        if state in ("running", "trial-running") and not self.running():
+        if state in ("running", "trial-running") and not alive:
             return "failed", error or "The pass was interrupted."
-        if state == "writing" and not self.running():
+        if state == "writing" and not alive:
             return "failed", error or WRITE_INTERRUPTED
         return state, error
 
     def eligible(self, batch: str) -> list[str]:
-        """Paths of the batch's objects the pass may read: written by the import and not changed since, not kept from AI."""
+        """Paths of the batch's objects the pass may read: written by the import and not changed since, not kept from AI.
+        On a batch not kept as Sources (M27's pass) never an imported Source: a re-run keeps its pages
+        Sources whatever its option says, and M27's pass would file them."""
         from ..space import version_of
 
         data, items = batches.load_batch(self.space.root, batch)
+        as_sources = data.get("keepAsSources") is True
         moved = [str(m) for m in data.get("movedFrom") or []]  # the paths the source had before it moved
         recorded = batches.load_prior(self.space.root, str(data.get("source", {}).get("path", "")), also=moved).versions
         out: list[str] = []
@@ -618,6 +630,8 @@ class Filing:
                 continue
             try:
                 _of, fm, _v = self.space.read(p)
+                if not as_sources and sources.is_imported_source(self.space.get(p).type, fm):
+                    continue
                 # Edited (or already filed) since the import wrote it: the pass leaves it alone.
                 want = it.get("version") or recorded.get(str(p))
                 if want and version_of((self.space.root / p).read_bytes()) != want:
@@ -762,11 +776,12 @@ class Filing:
         not kept as Sources."""
         from . import entities
 
+        alive = self.running()  # before the read, as in `status`
         d = self._source_batch(batch)
-        state, _error = self._state(d)
+        state, error = self._state(d, alive)
         if state == "failed" and d.get("mode") != "entities":
             state = "running"  # a pass that failed: its entities are still being collected
-        return entities.view(self.space, batch, d["results"], state)
+        return entities.view(self.space, batch, d["results"], state, error)
 
     def save_entity_review(self, batch: str, review: dict[str, Any]) -> dict[str, Any]:
         """Check and store Gene's review (``entities-review.json``, the only file written); answers the

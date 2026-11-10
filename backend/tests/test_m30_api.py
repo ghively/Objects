@@ -297,5 +297,18 @@ def test_skill_states_the_rules() -> None:
     text = importskill.TEXT
     for words in ("Keep pages as Sources", "exists on its own", "more than one page", "properties of its own",
                   "never entities", "read-only Sources", "newest Source wins", "Use", "with a category",
-                  "import_entities(batch)"):
+                  "import_entities(batch)", "an option of a type's Category, Kind or Environment"):
         assert words in text, words
+
+
+def test_skill_states_the_order_for_both_kinds_of_batch() -> None:
+    """The app's order: on a batch kept as Sources, Entities right after the bulk pass, then normalise,
+    and no links pass; otherwise normalise, then links last."""
+    text = importskill.TEXT
+    bulk = text[text.index("## 6. Bulk pass"):text.index("## 7. Entities")]
+    ents = text[text.index("## 7. Entities"):text.index("## 8. Report")]
+    assert "On a batch not kept as Sources" in bulk and "Links between objects are filled last" in bulk
+    assert "On a batch kept as Sources, nothing is filed and there is no links pass" in bulk
+    assert "the Entities stage comes next, then normalise" in bulk
+    assert "right after the bulk pass, before normalise" in ents
+    assert ents.index("import_entities(batch)") < ents.index("merges near-duplicate tags and option values")

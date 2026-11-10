@@ -106,6 +106,25 @@ def test_category_name_refused(tmp_path) -> None:
     assert ok["problems"] == [] and "offer" not in ok
 
 
+def test_only_category_kind_and_environment_options_are_categories(tmp_path) -> None:
+    """Options of other labels (Host's Roles, Script's Language, Source's Category and System) don't
+    make a name a category; Environment's do."""
+    root = itops_space(tmp_path)
+    own = [{"name": "Hypervisor version", "kind": "text", "share": 1.0},
+           {"name": "Memory", "kind": "number", "share": 1.0}]
+    names = ["DHCP", "Python", "Ticket", "Document", "Wiki", "Production", "Rack"]
+    _batch, items = _save(root, *(_create(n, own, iid=f"g{i}") for i, n in enumerate(names, 1)))
+    got = dict(zip(names, items, strict=True))
+    for n in ("DHCP", "Python", "Ticket", "Document", "Wiki"):
+        assert got[n]["problems"] == [] and "offer" not in got[n], n
+    assert got["Production"]["problems"] == ["Production is a category: a property value or a tag, not a type."]
+    assert got["Production"]["offer"] == {"label": "Use Host, with a category", "typeId": "host", "category": "Production"}
+    assert got["Rack"]["problems"] == ["Rack is a category: a property value or a tag, not a type."]
+    assert got["Rack"]["offer"]["typeId"] == "location"  # Location's Kind
+    assert [pd.key for pd in proposal.category_labels(Space(root).type_by_id("host"))] == ["category", "environment"]
+    assert proposal.category_labels(Space(root).type_by_id("source")) == []
+
+
 def test_offer_applied(tmp_path) -> None:
     root = itops_space(tmp_path)
     batch, (kiosk,) = _save(root, _create("Kiosk"))
@@ -139,6 +158,28 @@ def test_offer_applied(tmp_path) -> None:
     assert _options(Space(root), "location", "kind")[-1] == "Closet"
     eff = proposal.effective_item({**kiosk}, {"status": "edited", "edited": {"useType": "person", "category": "X"}}, Space(root))
     assert eff["action"] == "use" and eff["typeId"] == "person" and eff["properties"] == []
+
+
+def test_offer_of_an_existing_option_adds_nothing(tmp_path) -> None:
+    """``create "Production"``: Production is already an option of Host's Environment, so the offer
+    taken is a plain use of Host (nothing added to its Category or anywhere); the same for a name
+    already in Host's Category."""
+    root = itops_space(tmp_path)
+    own = [{"name": "Owner team", "kind": "text", "share": 1.0}, {"name": "Change window", "kind": "text", "share": 1.0}]
+    batch, (prod, ws) = _save(root, _create("Production", own), _create("Workstation", own, iid="g2"))
+    assert prod["offer"] == {"label": "Use Host, with a category", "typeId": "host", "category": "Production"}
+    assert ws["offer"] == {"label": "Use Host, with a category", "typeId": "host", "category": "Workstation"}
+    space = Space(root)
+    for it in (prod, ws):
+        eff = proposal.effective_item(it, {"status": "edited", "edited": {"useType": "host", "category": it["name"]}}, space)
+        assert eff["action"] == "use" and eff["typeId"] == "host" and eff["properties"] == [], it["name"]
+    before = _type_files(root)
+    proposal.save_review(space, batch, [{"id": it["id"], "status": "edited",
+                                         "edited": {"useType": "host", "category": it["name"]}} for it in (prod, ws)])
+    out = proposal.apply(Space(root), batch)
+    assert out["created"] == [] and out["extended"] == [] and out["skipped"] == []
+    assert _type_files(root) == before
+    assert "Production" not in _options(Space(root), "host", "category")
 
 
 def test_relations_outside_named_set_dropped(tmp_path) -> None:

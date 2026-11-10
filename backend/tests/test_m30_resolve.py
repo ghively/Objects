@@ -13,17 +13,12 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
-from m30_helpers import MODIFIED, PAGES, decisions, itops_space, result, use_simple_distill
+from m30_helpers import MODIFIED, PAGES, decisions, itops_space, result
 
 from objectapp.importers import batches, entities
 from objectapp.space import Space
 
 IMPORTED_AT = "2026-11-09T10:00:00.000Z"
-
-
-@pytest.fixture(autouse=True)
-def _distill(monkeypatch: pytest.MonkeyPatch) -> None:
-    use_simple_distill(monkeypatch)
 
 
 def _when(day: str) -> str:
@@ -146,7 +141,7 @@ def test_categories_and_single_mentions_are_left_out(tmp_path: Path) -> None:
     results = _results(paths)
     rack, payroll = paths["Rack notes"], paths["Payroll"]
     # "Docker" is a seed tag (a category even with a value); "Docker 24" is Software (properties of its own);
-    # "Wiki" is an option of Source's System (a category, on two pages)
+    # "Wiki" is an option of Source's System, which is not a category (call 17, refined): on two pages, kept
     results[rack]["entities"] += result(rack, entities=[
         {"type": "Software", "name": "Docker", "values": [{"key": "version", "value": "24"}]},
         {"type": "Software", "name": "Docker 24", "values": [{"key": "version", "value": "24"}]},
@@ -156,20 +151,41 @@ def test_categories_and_single_mentions_are_left_out(tmp_path: Path) -> None:
     res = entities.resolve(Space(root), results)
 
     left = {e.name: e for e in res.leftOut}
-    assert set(left) == {"Server", "VM", "Rack 4", "Windows Server 2019", "Docker", "Wiki"}
+    assert set(left) == {"Server", "VM", "Rack 4", "Windows Server 2019", "Docker"}
     assert left["Server"].category is True and left["Server"].typeId == "host"  # Host's Category option
     assert left["VM"].category is True  # a seed tag
     assert left["Docker"].category is True and left["Docker"].rule == "properties"
-    assert left["Wiki"].category is True and left["Wiki"].rule == "pages"
     assert left["Rack 4"].category is False and left["Rack 4"].rule is None
     assert left["Windows Server 2019"].rule is None
 
     kept = {e.name: e for e in res.entities}
-    assert set(kept) == {"APP01", "SRV-DB01", "Payroll", "HQ", "Restart Payroll", "SQL Server 2019", "Docker 24"}
+    assert set(kept) == {"APP01", "SRV-DB01", "Payroll", "HQ", "Restart Payroll", "SQL Server 2019", "Docker 24", "Wiki"}
+    assert kept["Wiki"].rule == "pages" and not kept["Wiki"].category
     assert kept["HQ"].rule == "pages" and kept["HQ"].pages == sorted([paths["APP01"], rack])
     assert kept["Docker 24"].rule == "properties" and not kept["Docker 24"].category
     assert kept["Restart Payroll"].rule == "own" and kept["Restart Payroll"].typeId == "runbook"
     assert not any(e.category for e in res.entities)
+
+
+def test_only_category_kind_and_environment_options_are_categories(tmp_path: Path) -> None:
+    """A category is an option of a Category, Kind or Environment label (any type but Source), or a
+    tag: Host's Roles ("DHCP"), Script's Language ("Python") and Source's Category ("Ticket") are not."""
+    root, paths = _source_space(tmp_path)
+    results = _results(paths)
+    rack, payroll = paths["Rack notes"], paths["Payroll"]
+    both = [{"type": "Application", "name": "DHCP"}, {"type": "Application", "name": "Ticket"},
+            {"type": "Host", "name": "Production"}, {"type": "Location", "name": "Building"}]
+    results[rack]["entities"] += result(rack, entities=both)["entities"]
+    results[payroll]["entities"] += result(payroll, entities=[
+        *both, {"type": "Software", "name": "Python", "values": [{"key": "version", "value": "3"}]}])["entities"]
+    res = entities.resolve(Space(root), results)
+    kept = {e.name: e for e in res.entities}
+    left = {e.name: e for e in res.leftOut}
+    assert {"DHCP", "Ticket", "Python"} <= set(kept)
+    assert not any(kept[n].category for n in ("DHCP", "Ticket", "Python"))
+    assert left["Production"].category is True  # Host's Environment
+    assert left["Building"].category is True  # Location's Kind
+    assert left["Server"].category is True  # Host's Category
 
 
 def test_distilled_from_every_page(tmp_path: Path) -> None:
@@ -331,13 +347,20 @@ def test_view_shape_and_reads_write_nothing(tmp_path: Path) -> None:
     root, paths = _source_space(tmp_path)
     sp = Space(root)
     results = _results(paths)
-    batches.batch_dir(root, "b1").mkdir(parents=True)
+    folder = batches.batch_dir(root, "b1")
+    folder.mkdir(parents=True)
+    batches.write_json(folder / "batch.json", {"id": "b1", "keepAsSources": True})
+    batches.write_json(folder / "items.json", [{"sourcePath": f"{t}.md", "title": t, "path": p, "action": "created"}
+                                               for t, p in paths.items()])  # fmt: skip
     before = _snapshot(root)
 
     v = entities.view(sp, "b1", results, "entities")
     assert set(v) == {"state", "entities", "leftOut", "suggestedMerges", "relations", "sources", "conflicts",
-                      "review", "undecided", "written"}  # fmt: skip
-    assert v["state"] == "review"
+                      "review", "undecided", "written", "writeError"}  # fmt: skip
+    assert v["state"] == "review" and v["writeError"] is None
+    failed = entities.view(sp, "b1", results, "failed", "disk full")
+    assert failed["state"] == "review" and failed["writeError"] == "disk full"
+    assert entities.view(sp, "b1", results, "entities", "disk full")["writeError"] is None
     assert [(e["type"], e["name"]) for e in v["entities"]] == [
         ("Application", "Payroll"), ("Host", "APP01"), ("Host", "SRV-DB01"), ("Location", "HQ"),
         ("Runbook", "Restart Payroll"), ("Software", "SQL Server 2019")]  # fmt: skip

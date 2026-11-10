@@ -4,18 +4,12 @@ source, a ``space-sample`` copy with the IT ops setup, an import kept as Sources
 
 Everything is synthetic (hosts ``APP01``, ``SRV-DB01``; "SQL Server 2019"; "Payroll"; "HQ";
 ``10.0.0.x``).
-
-`simple_pick` and `simple_lines` are reference implementations of the Contract's rules for
-`distill.pick_values` and `distill.summary_lines`, for T3's tests while those were stubs
-(`use_simple_distill`). T5 filled `distill`, so `use_simple_distill` now patches nothing; the three
-stay only until T3's tests (built in parallel) are merged and pointed at `distill`, then go.
 """
 
 from __future__ import annotations
 
 import os
 import shutil
-import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -23,7 +17,7 @@ from typing import Any
 from fastapi.testclient import TestClient
 from m15_helpers import wait_job
 
-from objectapp.importers import batches, distill, filing, sources
+from objectapp.importers import batches
 from objectapp.server import create_app
 from objectapp.space import Space
 
@@ -51,15 +45,6 @@ MODIFIED: dict[str, str] = {
     "Notes/Old APP01 notes.md": "2025-06-01",
 }
 """Each page's modified date (UTC midnight, set with ``os.utime``): APP01's page is newer than the old notes."""
-
-
-def t4_landed() -> bool:
-    """Whether M30 Task 4 (Keep pages as Sources) is built: `import_as_sources`' tests xfail until then."""
-    try:
-        sources.keep_as_sources(None, False, False)
-    except NotImplementedError:
-        return False
-    return True
 
 
 def make_itops_source(tmp_path: Path) -> Path:
@@ -236,82 +221,3 @@ def result(path: str, **checked: Any) -> dict[str, Any]:
     out["relations"] = [{"quote": "", "confidence": conf, "plain": False, "ok": True, **r} for r in out["relations"]]
     out["merges"] = [{"typeId": str(m.get("type") or "").casefold(), "ok": True, **m} for m in out["merges"]]
     return out
-
-
-# -- reference rules for distill (until T5) ------------------------------------------------------------
-
-
-def _when(modified: str | None) -> float:
-    """A Source's modified time as a number (None and unreadable oldest)."""
-    if not modified:
-        return float("-inf")
-    try:
-        t = datetime.fromisoformat(modified)
-    except ValueError:
-        return float("-inf")
-    return (t if t.tzinfo else t.replace(tzinfo=UTC)).timestamp()
-
-
-def _ref(row: dict[str, Any]) -> distill.SourceRef:
-    return {"path": row["page"], "quote": row.get("quote") or "", "modified": row.get("modified")}
-
-
-def _order(rows: list[dict[str, Any]], main_pages: set[str]) -> list[dict[str, Any]]:
-    return sorted(rows, key=lambda r: (r["page"] not in main_pages, r["page"]))
-
-
-def simple_pick(found: dict[str, list[dict[str, Any]]], main_pages: set[str]) -> dict[str, distill.PickedValue]:
-    """Reference `distill.pick_values`: values equal by ``filing._norm(str(value))`` are one value with
-    every Source that says it; the value whose newest Source is the most recent wins (None oldest),
-    a main page's then the smallest path on a tie; the others are its ``conflict``."""
-    out: dict[str, distill.PickedValue] = {}
-    for key, rows in found.items():
-        groups: dict[str, list[dict[str, Any]]] = {}
-        for row in rows:
-            groups.setdefault(filing._norm(str(row["value"])), []).append(row)
-
-        def rank(members: list[dict[str, Any]]) -> tuple[float, bool, str]:
-            newest = max(_when(m.get("modified")) for m in members)
-            return (-newest, not any(m["page"] in main_pages for m in members), min(m["page"] for m in members))
-
-        ordered = sorted(groups.values(), key=rank)
-        win, rest = ordered[0], ordered[1:]
-        top = min(win, key=lambda m: (-_when(m.get("modified")), m["page"] not in main_pages, m["page"]))
-        out[key] = {
-            "value": top["value"],
-            "sources": [_ref(m) for m in _order(win, main_pages)],
-            "conflict": [{"value": g[0]["value"], "sources": [_ref(m) for m in _order(g, main_pages)]} for g in rest]
-            or None,
-        }
-    return out
-
-
-def _norm_line(text: str) -> str:
-    t = " ".join(unicodedata.normalize("NFKC", text).casefold().split())
-    return t.strip(".,;:()[]\"' ")
-
-
-def simple_lines(found: list[dict[str, Any]], main_pages: set[str]) -> list[distill.SummaryLine]:
-    """Reference `distill.summary_lines`: lines equal by their normalised text merge their Sources;
-    main pages' lines first, then by the newest Source, then text; at most `distill.MAX_LINES`."""
-    groups: dict[str, list[dict[str, Any]]] = {}
-    for row in found:
-        groups.setdefault(_norm_line(str(row["text"])), []).append(row)
-
-    def rank(members: list[dict[str, Any]]) -> tuple[bool, float, str]:
-        return (not any(m["page"] in main_pages for m in members),
-                -max(_when(m.get("modified")) for m in members), members[0]["text"])
-
-    out: list[distill.SummaryLine] = []
-    for members in sorted(groups.values(), key=rank)[: distill.MAX_LINES]:
-        out.append({"text": members[0]["text"], "sources": [_ref(m) for m in _order(members, main_pages)]})
-    return out
-
-
-def use_simple_distill(monkeypatch: Any) -> None:
-    """Point `distill.pick_values` and `distill.summary_lines` at the reference rules while they are stubs."""
-    try:
-        distill.pick_values({}, set())
-    except NotImplementedError:
-        monkeypatch.setattr(distill, "pick_values", simple_pick)
-        monkeypatch.setattr(distill, "summary_lines", simple_lines)

@@ -7,8 +7,8 @@ splits). Per entity it picks the values from all its Sources (`distill.pick_valu
 Source wins, conflicts kept), assembles the summary lines, and applies **the entity rule**: a
 candidate becomes an object when a page is mainly about it (``"own"``), more than one page mentions
 it (``"pages"``, `entitycheck.MIN_PAGES`) or it has properties of its own (``"properties"``);
-otherwise it stays text. A category (a label option of a type in the space, or a tag) is never an
-entity. The resolved list is **computed** on every read from ``filing.json`` and
+otherwise it stays text. A category (an option of a type's Category, Kind or Environment label, or a
+tag) is never an entity. The resolved list is **computed** on every read from ``filing.json`` and
 ``entities-review.json`` (never stored), so reading writes nothing.
 
 Gene's review, ``.object/imports/<batch>/entities-review.json`` (`EntitiesReview`)::
@@ -323,12 +323,12 @@ def _modified(space: Space, page: str) -> str | None:
 
 
 def _categories(space: Space) -> set[str]:
-    """`norm_name` of every label option of every type in the space, and of every tag's title."""
+    """`norm_name` of every option of a Category, Kind or Environment label of a type in the space
+    (`proposal.category_labels`: never the Source type's), and of every tag's title."""
     out = {norm_name(s.title) for s in space.list("tag")}
     for t in space.types:
-        for p in t.propertyDefinitions:
-            if p.type == "label":
-                out |= {norm_name(str(o.get("text", ""))) for o in p.options.get("set") or [] if isinstance(o, dict)}
+        for p in proposal.category_labels(t):
+            out |= {norm_name(str(o.get("text", ""))) for o in p.options.get("set") or [] if isinstance(o, dict)}
     out.discard("")
     return out
 
@@ -545,16 +545,45 @@ def undecided(res: Resolution, review: dict[str, Any]) -> list[str]:
 
 # -- the wizard's view -------------------------------------------------------------------
 
+_WRITTEN = ("created", "updated", "unchanged", "resolvedTake", "resolvedKeep")
+"""The ``items.json`` actions of an object the batch wrote (or kept), as `filing.Filing.eligible` reads them."""
+
+
+def batch_sources(space: Space, batch: str) -> int:
+    """How many imported Sources the batch's ``items.json`` holds (not the entities a Write made). Reads only."""
+    from . import sources
+
+    try:
+        _data, items = batches.load_batch(space.root, batch)
+    except KeyError:
+        return 0
+    seen: set[str] = set()
+    for it in items:
+        p = it.get("path")
+        if it.get("entity") or it.get("action") not in _WRITTEN or not isinstance(p, str) or p in seen:
+            continue
+        try:
+            _of, fm, _v = space.read(p)
+            type_id = space.get(p).type
+        except (KeyError, ValueError, OSError):
+            continue
+        if sources.is_imported_source(type_id, fm):
+            seen.add(p)
+    return len(seen)
+
+
 _STATES = {"idle": "collecting", "running": "collecting", "trial": "collecting", "entities": "review",
            "writing": "writing", "failed": "review"}  # fmt: skip
 
 
-def view(space: Space, batch: str, results: dict[str, dict[str, Any]], state: str) -> dict[str, Any]:
+def view(space: Space, batch: str, results: dict[str, dict[str, Any]], state: str,
+         write_error: str | None = None) -> dict[str, Any]:  # fmt: skip
     """The wizard's ``EntitiesView`` for the batch in filing ``state``. Reads only.
 
     ``collecting`` while the filing state is ``idle``, ``running`` or ``trial``; ``review`` in
     ``entities`` (and ``failed``, which Write can be run again from); ``writing``; ``written`` in
-    ``done`` after a write."""
+    ``done`` after a write. ``writeError`` is ``write_error`` (the failed Write's recorded error) in
+    ``failed``, else None."""
     from . import entitywrite
 
     review = load_review(space.root, batch)
@@ -623,9 +652,10 @@ def view(space: Space, batch: str, results: dict[str, dict[str, Any]], state: st
         "suggestedMerges": res.suggestedMerges,
         "relations": {"total": len(res.relations), "lowConfidence": sum(1 for r in res.relations if low(r)),
                       "plain": sum(1 for r in res.relations if r.get("plain"))},
-        "sources": len(res.pages),
+        "sources": batch_sources(space, batch),
         "conflicts": sum(1 for e in res.entities for pv in e.values.values() if pv.get("conflict")),
         "review": {k: review[k] for k in ("decisions", "merges", "splits")},
         "undecided": len(undecided(res, review)),
         "written": written,
+        "writeError": (write_error or None) if state == "failed" else None,
     }  # fmt: skip
