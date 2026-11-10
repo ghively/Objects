@@ -63,6 +63,11 @@ Object has no accounts.
   device: Where I left off | Calendar | Calendar today | Specific object); Highlight Style (Default with a
   rail and notes section | Minimal); Backlink sections start as (Backlinks Open | Closed; Unlinked
   Mentions Open | Closed | Hidden); Backlink content view (Embed default).
+  (M31) "Hide App Menu" (a switch after "Hide outliner lines"; device setting `hideAppMenu`, off by default): Object's
+  window has no menu bar, so its app menu is the top bar's space menu (spaces, Space settings, Space history, Create
+  space, Open folder…). On, that button is hidden (the sidebar toggle stays); a lone Alt tap shows it, focused, and
+  another hides it, as a hidden window menu comes back with Alt (our call). The palette and Ctrl+, reach its spaces
+  and settings too.
 - Language: interface language list (English, English (UK), Deutsch, Français, Español, Dutch, Português (BR),
   Magyar, Italian); Decimal separator (Automatic | Dot | Comma). Gene, 2026-11-10: the interface stays in English;
   the list sets date and number formatting only (translating every screen is not planned).
@@ -156,6 +161,11 @@ Ctrl+Shift+G.
 Start presentation mode Ctrl+Alt+P; back one slide / next presentation slide; exit presentation mode Esc | Find in page Ctrl+F | Select all top-level blocks |
 Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down) | Scroll to top Home, bottom End,
 page up/down.
+(M31) Select all top-level blocks Ctrl+Alt+Shift+A and Copy deep link Ctrl+Alt+Shift+L (our keys; ⌃⇧⌘A / ⌃⇧⌘L on
+macOS) work in the page or the open peek, caret in the editor included: the first selects every top-level block as a
+block selection, the second copies the object's reference `[[Title]]` (as Copy > "Copy object reference"; Object has
+no URL scheme, our call) and toasts "Deep link copied". Home, End, Page Up and Page Down ("Page up", "Page down") scroll
+the page outside text fields.
 
 **Navigation**: Navigate back Ctrl+Left or Ctrl+[ | Navigate forward Ctrl+Right or Ctrl+] | Open in new tab Ctrl+Click | Open in
 side panel (Shift+Click; inline `[[links]]` too) | Open in preview Alt+Shift+Click | Navigate tabs Ctrl+Tab | "Open Minigame" Ctrl+Shift+Y (not in Object).
@@ -552,6 +562,11 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   outside edit adding `[[X]]`), the Properties panel's Backlinks chips and the Tasks dashboard's Context grouping
   update without a reload (a change to any other object re-reads them).
 - **Inline tag**: a `#tag` typed in a paragraph renders as a colored chip in the text.
+  (M31) The chip is a decoration: the file keeps the plain `#tag` text. A tag is `#` at the start or after a space,
+  `(` or `,`, then letters, digits, `-`, `_` or `/` (the importer's reading); digits only (`#123`) is no tag, nor
+  text in code, link text, a URL's `#anchor` or a heading's `# `. It reads paragraphs and headings anywhere. Its
+  color is its Tag object's, else gray; a click opens the Tag object like a link (Ctrl: new tab, Shift: side panel),
+  or with no Tag object a search for `#tag` in a new tab (our call; a click never creates a tag).
 - **Export dialog** (object `...` > Export, Ctrl+E): a modal with format tiles PDF, Markdown, Microsoft Word,
   Latex; Markdown is selected on open. PDF: Style cards (Notes: matches the page's styling; Essay; Academic — all
   three available, none marked Experimental), Options (Include embeds; Include outline; Hide empty properties, on by

@@ -207,6 +207,15 @@ export function selectAllBlocks(editor: Editor): boolean {
   return true
 }
 
+/** M31, the Page group's "Select all top-level blocks": every block of the top level, as a block selection. */
+export function selectTopLevelBlocks(editor: Editor): boolean {
+  const { doc } = editor.state
+  const range = doc.childCount ? rangeByIndex(doc, 0, 0, doc.childCount - 1) : null
+  if (!range) return false
+  editor.view.dispatch(selectRange(editor.state.tr, range))
+  return true
+}
+
 // ---------------------------------------------------------------------------
 // Block operations (on the block selection, else the block with the cursor)
 

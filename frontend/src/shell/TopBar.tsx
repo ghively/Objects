@@ -1,5 +1,6 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Icon, IconOrEmoji } from '@/components/Icon'
+import { useSettings } from '@/settings/useSettings'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { SpacesMenu } from '@/spaces/SpacesMenu'
 import { openTodaysNote, TODAYS_NOTE_TEXT } from '@/calendar/openTodaysNote'
@@ -55,6 +56,46 @@ function BarButton({
   )
 }
 
+/**
+ * M31, Editor "Hide App Menu": Object's app menu is the top bar's space menu (the spaces, Space
+ * settings, Space history, Create space, Open folder…); Object's window has no menu bar of its own.
+ * With the setting on the menu's button is hidden. A lone tap of Alt (pressed and released with no
+ * other key or click between) shows it, focused, as a hidden window menu bar comes back with Alt;
+ * another tap hides it. Its spaces and settings stay in the palette and Ctrl+, too.
+ */
+function useAppMenuShown(): { shown: boolean; revealed: boolean } {
+  const hide = useSettings((s) => !!s.settings.hideAppMenu)
+  const [revealed, setRevealed] = useState(false)
+  useEffect(() => {
+    if (!hide) return
+    let armed = false
+    const onDown = (e: KeyboardEvent) => {
+      armed = e.key === 'Alt' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.shiftKey
+    }
+    const onUp = (e: KeyboardEvent) => {
+      if (e.key !== 'Alt' || !armed) return
+      armed = false
+      setRevealed((r) => !r)
+    }
+    const disarm = () => {
+      armed = false
+    }
+    window.addEventListener('keydown', onDown, true)
+    window.addEventListener('keyup', onUp, true)
+    window.addEventListener('pointerdown', disarm, true)
+    window.addEventListener('blur', disarm)
+    return () => {
+      window.removeEventListener('keydown', onDown, true)
+      window.removeEventListener('keyup', onUp, true)
+      window.removeEventListener('pointerdown', disarm, true)
+      window.removeEventListener('blur', disarm)
+      // Turned off (or unmounted): the next time it is on, the menu starts hidden.
+      setRevealed(false)
+    }
+  }, [hide])
+  return { shown: !hide || revealed, revealed: hide && revealed }
+}
+
 export function TopBar({
   spaceName,
   onToggleSidebar,
@@ -74,21 +115,30 @@ export function TopBar({
   }, [])
   const name = info?.name || spaceName
   const sidepanelLabel = rightPanelOpen ? TOP_BAR_TEXT.hideSidepanel : TOP_BAR_TEXT.showSidepanel
+  const appMenu = useAppMenuShown()
+  const spaceButtonRef = useRef<HTMLButtonElement>(null)
+  // Shown by Alt: focus it, so Enter or Space opens it.
+  useEffect(() => {
+    if (appMenu.revealed) spaceButtonRef.current?.focus()
+  }, [appMenu.revealed])
   return (
     <header data-typing-fade="" className="flex h-[42px] shrink-0 items-center gap-1 bg-app pr-2 pl-2.5 text-fg">
-      <div className="flex w-[348px] shrink-0 items-center justify-between">
-        <SpacesMenu>
-          <button
-            type="button"
-            className="flex h-8 items-center gap-1.5 rounded-md px-1.5 text-[15px] font-semibold hover:bg-hover data-[state=open]:bg-hover"
-            title={TOP_BAR_TEXT.changeSpace}
-            aria-label={`${TOP_BAR_TEXT.changeSpace}: ${name}`}
-          >
-            <IconOrEmoji icon={info?.icon || null} fallback="ph-lightbulb" size={15} />
-            <span className="max-w-[220px] truncate">{name}</span>
-            <Icon name="ph-caret-up-down" size={13} className="text-fg-muted" />
-          </button>
-        </SpacesMenu>
+      <div className={`flex w-[348px] shrink-0 items-center ${appMenu.shown ? 'justify-between' : 'justify-end'}`}>
+        {appMenu.shown && (
+          <SpacesMenu>
+            <button
+              ref={spaceButtonRef}
+              type="button"
+              className="flex h-8 items-center gap-1.5 rounded-md px-1.5 text-[15px] font-semibold hover:bg-hover data-[state=open]:bg-hover"
+              title={TOP_BAR_TEXT.changeSpace}
+              aria-label={`${TOP_BAR_TEXT.changeSpace}: ${name}`}
+            >
+              <IconOrEmoji icon={info?.icon || null} fallback="ph-lightbulb" size={15} />
+              <span className="max-w-[220px] truncate">{name}</span>
+              <Icon name="ph-caret-up-down" size={13} className="text-fg-muted" />
+            </button>
+          </SpacesMenu>
+        )}
         <BarButton label="Toggle sidebar" icon="ph-sidebar-simple" onClick={onToggleSidebar} />
       </div>
       <div className="flex items-center gap-0.5 pl-2">

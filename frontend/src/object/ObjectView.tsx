@@ -65,6 +65,7 @@ import { lazyWithReload } from '@/lib/lazyReload'
 import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, HeaderTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
+import { usePageShortcuts } from './pageShortcuts'
 import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
 import { ImportSourceLine, importSourceOf } from './ImportSourceLine'
 import { counterpartEditor } from './CounterpartRows'
@@ -988,6 +989,8 @@ export function ObjectView({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [mode, path])
+  // M31: the Page group's Select all top-level blocks, Copy deep link and the scroll keys.
+  usePageShortcuts({ mode, path, summary, editorRef })
 
   const writeProperties = (updates: Record<string, unknown>) => {
     if ('tags' in updates && Array.isArray(updates.tags)) {
