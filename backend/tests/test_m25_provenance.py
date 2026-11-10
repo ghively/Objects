@@ -87,7 +87,8 @@ def run(client, source, target=None, kind="auto", **extra) -> dict:
     r = client.post("/api/import/preview", json={"source": {"path": str(source), "kind": kind}, "target": "currentSpace"})
     assert r.status_code == 200, r.text
     preview = r.json()
-    body = {"previewId": preview["previewId"], "mapping": preview["mapping"], "target": target or {"kind": "currentSpace"}, **extra}
+    body = {"previewId": preview["previewId"], "mapping": preview["mapping"], "target": target or {"kind": "currentSpace"},
+            "keepAsSources": False, **extra}
     r = client.post("/api/import/start", json=body)
     assert r.status_code == 202, r.text
     job = wait_job(client, r.json()["jobId"])
@@ -419,7 +420,7 @@ def test_move_batch_to_trash_after_a_moved_rerun(client, tmp_path):
     r = client.post("/api/import/preview", json={"source": {"path": str(vault)}, "target": "currentSpace"})
     assert r.json()["mapping"]["typeSource"] == "folder"
     r = client.post("/api/import/start", json={"previewId": r.json()["previewId"], "mapping": {"typeSource": "none"},
-                                               "target": {"kind": "currentSpace"}})
+                                               "target": {"kind": "currentSpace"}, "keepAsSources": False})
     first = wait_job(client, r.json()["jobId"])["result"]
     moved = tmp_path / "Moved"
     shutil.move(str(vault), str(moved))
