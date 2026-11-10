@@ -121,9 +121,9 @@ def run(fixture: Path, tmp: Path) -> None:
 
         # 3. import with the batch
         pv = c.post("/api/import/preview", json={"source": {"path": str(src), "kind": "files"}, "target": "currentSpace",
-                                                 "leaveOut": ["Credentials"]}).json()
+                                                 "leaveOut": ["Credentials"], "keepAsSources": False}).json()
         r = c.post("/api/import/start", json={"previewId": pv["previewId"], "mapping": pv["mapping"],
-                                              "target": {"kind": "currentSpace"}, "batch": batch,
+                                              "target": {"kind": "currentSpace"}, "batch": batch, "keepAsSources": False,
                                               "scan": {"leaveOut": ["Credentials"], "leaveOutFiles": [], "excludeFromAi": ["Runbooks/Secrets.md"]}})
         job_id = r.json()["jobId"]
         while (job := c.get(f"/api/import/jobs/{job_id}").json())["phase"] not in ("done", "failed"):

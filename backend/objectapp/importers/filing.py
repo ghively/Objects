@@ -12,6 +12,14 @@ last fenced ``json`` block of its answer, ``{"decisions": [...]}``; nothing else
 contain the value) and the property's kind, and writes only what passes; the rest is listed. Low
 confidence, or a type no approved proposal makes, files the object in the "Import inbox"
 collection. Records are ``filing.json`` and ``inbox.json`` in the batch's folder.
+
+M30 (plan ``2026-11-09-m30-entity-extraction.md``, Task 8): on a batch **kept as Sources**
+(`sources.is_source_batch`) the pass writes nothing. `collect_decision` reads the page, records the
+checks of its tags and collections and stores `entitycheck.check_candidates` in the result; the
+bulk pass ends in the state ``entities`` (Gene reviews the list in the Entities step), and
+`Filing.write_entities` runs the Write (`entitywrite.write_entities`) in the worker thread, through
+``writing`` to ``done`` (or ``failed``, which Write can be run again from). On a batch not kept as
+Sources everything here is M27's.
 """
 
 from __future__ import annotations
@@ -28,7 +36,7 @@ from typing import TYPE_CHECKING, Any
 from ..apiquery import is_excluded
 from ..propvalues import InvalidValue, label_lookup
 from ..typedefs import SYSTEM_KEYS
-from . import batches, kinds, planner, proposal
+from . import batches, kinds, planner, proposal, sources
 
 if TYPE_CHECKING:
     from ..space import Space
@@ -41,6 +49,7 @@ __all__ = [
     "NotAllowed",
     "apply_decision",
     "build_prompt",
+    "collect_decision",
     "parse_reply",
 ]
 
@@ -53,6 +62,13 @@ INBOX_FILE = "inbox.json"
 FILING_LINE = "Filing pass for an import batch."
 """The first line of the filing prompt (the fake claude looks for it)."""
 CONFIDENCE = ("high", "medium", "low")
+NOT_APPLIED = "Pages stay Sources; the page's own type, values and links are not applied."
+"""M30: the note on a Source batch's result whose decision gives a type, values or links."""
+NOT_SOURCE_BATCH = "This import didn't keep its pages as Sources."
+WRITTEN_ALREADY = "The entities are written already."
+NO_ENTITIES_YET = "There are no entities to write yet: the filing pass hasn't finished."
+STILL_TO_DECIDE = "{n} entities are still to decide."
+WRITE_INTERRUPTED = "The write was interrupted. Write again to finish."
 OBJECT_MARK = "Object: "
 """A prompt line per object: ``Object: <path>``."""
 
@@ -93,7 +109,43 @@ def parse_reply(text: str) -> list[dict[str, Any]]:
     return []
 
 
-def build_prompt(batch: str, paths: list[str], titles: dict[str, str], types: list[dict[str, Any]]) -> str:
+SOURCES_PROMPT = """Every page is kept as it is, as a read-only source. Do not file the page itself: leave "type", "values" and
+"links" empty. Instead list what the page is about and what it mentions (the user reviews the list before
+anything is written); each thing is built from every page that mentions it:
+- "mainEntity": the one thing the page is mainly about (a server page is about that Host; a runbook, script or
+  prompt page is about that Runbook, Script or Prompt, named as the page); else null.
+- "entities": things the page names that exist on their own (hosts, software per version, applications,
+  locations, networks, people, vendors...): {"type", "name", "aliases", "values": [{"key", "value", "quote"}],
+  "lines": [{"text", "quote"}], "confidence"}. Use the types listed; never make up a type.
+  A category (Server, VM, Production) is a property value or a tag, never an entity. Every name and alias must be
+  written in the page.
+- "lines": at most three short sentences on what this page says about the thing, each with the quote it rests on.
+- "relations": {"subject", "relation", "object", "quote", "confidence"}, relation being a relation property's name
+  from the lists above (any other relation becomes a plain link); the quote must name both sides (the page's
+  main subject may be left unnamed).
+- "merges": names you know are the same thing, {"type", "names": [...]}.
+- "tags" and "collections" go on the page's main entity."""
+"""M30: the prompt's additions on a batch kept as Sources (the plan's Contract; our strings)."""
+
+
+def _entity_type_line(t: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for p in t["properties"]:
+        if p["kind"] == "entity":
+            parts.append(f'{p["key"]}: "{p["name"]}" → {", ".join(p.get("targets") or []) or "any type"}')
+        elif p.get("options"):
+            parts.append(f"{p['key']} ({p['kind']}: {' | '.join(p['options'][:20])})")
+        else:
+            parts.append(f"{p['key']} ({p['kind']})")
+    for c in t.get("counterparts") or []:
+        parts.append(f'{c["key"]}: "{c["name"]}" (shown from {c["from"]} "{c["fromName"]}")')
+    return f"- {t['name']}: {', '.join(parts) or 'no properties'}"
+
+
+def build_prompt(batch: str, paths: list[str], titles: dict[str, str], types: list[dict[str, Any]],
+                 entity_types: list[dict[str, Any]] | None = None) -> str:
+    """The filing prompt. ``entity_types`` (M30, a batch kept as Sources only) adds the entity types
+    list and the instructions for the extended decision after the types list."""
     lines = [
         FILING_LINE,
         f"Batch: {batch}",
@@ -110,6 +162,10 @@ def build_prompt(batch: str, paths: list[str], titles: dict[str, str], types: li
             for p in t["properties"]
         )
         lines.append(f"- {t['name']}: {props or 'no properties'}")
+    if entity_types is not None:
+        lines += ["", "Entity types (use these names exactly):"]
+        lines += [_entity_type_line(t) for t in entity_types]
+        lines += ["", *SOURCES_PROMPT.splitlines()]
     lines += [
         "",
         "Answer with one fenced json block: {\"decisions\": [ ... ]}, one decision per object:",
@@ -328,20 +384,7 @@ def apply_decision(
         updates[key] = value
         entry["ok"] = True
 
-    for field_, label in (("tags", "tags"), ("collections", "collections")):
-        add: list[str] = []
-        for row in _items(decision.get(field_)):
-            v = str(row.get("value") or "").strip()
-            e = {"value": v, "quote": str(row.get("quote") or ""), "ok": False}
-            res[label].append(e)
-            why = _check_quote(doc, v, row.get("quote"), "text") if v else "empty"
-            if why:
-                e["reason"] = why
-            elif field_ == "collections" and not any(c.name.casefold() == v.casefold() for c in space.list_collections()):
-                e["reason"] = "no such collection"
-            else:
-                add.append(v)
-                e["ok"] = True
+    for field_, add in _check_tags(space, decision, doc, res).items():
         if add:
             cur = have.get(field_)
             cur = list(cur) if isinstance(cur, list) else []
@@ -353,6 +396,79 @@ def apply_decision(
         {"key": str(r.get("key") or ""), "target": str(r.get("target") or ""), "quote": str(r.get("quote") or ""), "ok": None}
         for r in _items(decision.get("links"))
     ]
+    return res
+
+
+def _check_tags(space: Space, decision: dict[str, Any], doc: str, res: dict[str, Any]) -> dict[str, list[str]]:
+    """M27's checks of a decision's tags and collections, recorded in ``res``; answers what passed."""
+    passed: dict[str, list[str]] = {}
+    for field_ in ("tags", "collections"):
+        add: list[str] = []
+        for row in _items(decision.get(field_)):
+            v = str(row.get("value") or "").strip()
+            e = {"value": v, "quote": str(row.get("quote") or ""), "ok": False}
+            res[field_].append(e)
+            why = _check_quote(doc, v, row.get("quote"), "text") if v else "empty"
+            if why:
+                e["reason"] = why
+            elif field_ == "collections" and not any(c.name.casefold() == v.casefold() for c in space.list_collections()):
+                e["reason"] = "no such collection"
+            else:
+                add.append(v)
+                e["ok"] = True
+        passed[field_] = add
+    return passed
+
+
+def collect_decision(space: Space, decision: dict[str, Any], *, allowed: set[str]) -> dict[str, Any]:
+    """M30: one decision on a batch kept as Sources, checked and recorded; **writes nothing**.
+
+    The result is M27's record (``path``, ``title``, ``confidence``, the checked ``tags`` and
+    ``collections``, which go on the page's main entity at Write) plus `entitycheck.check_candidates`'
+    ``mainEntity``, ``entities``, ``relations`` and ``merges``. The page stays a Source: the
+    decision's own ``type``, ``values`` and ``links`` are recorded, not applied (`NOT_APPLIED`), and
+    it never goes to the Import inbox. Low confidence marks the result and its candidates low. A
+    rejected page gets no candidates."""
+    from . import entitycheck  # entitycheck imports this module
+
+    path = str(decision.get("path") or "")
+    res: dict[str, Any] = {
+        "path": path, "origPath": path, "title": "", "type": None, "confidence": "low", "values": [],
+        "tags": [], "collections": [], "links": [], "inbox": False, "notes": [],
+        "mainEntity": None, "entities": [], "relations": [], "merges": [],
+    }  # fmt: skip
+    conf = decision.get("confidence")
+    res["confidence"] = conf if conf in CONFIDENCE else "low"
+    if path not in allowed:
+        res["notes"].append("Not an object of this batch, or kept from AI: not filed.")
+        res["rejected"] = True
+        return res
+    try:
+        of, fm, _version = space.read(path)
+        summary = space.get(path)
+    except (KeyError, ValueError, OSError):
+        res["notes"].append("The object is gone.")
+        res["rejected"] = True
+        return res
+    res["title"] = summary.title
+    doc = _doc_text(of, fm, summary.title)
+    _check_tags(space, decision, doc, res)
+    wanted = str(decision.get("type") or "").strip()
+    res["type"] = wanted or None
+    res["values"] = [{"key": str(r.get("key") or ""), "value": r.get("value"), "quote": str(r.get("quote") or ""),
+                      "ok": False, "reason": NOT_APPLIED} for r in _items(decision.get("values"))]  # fmt: skip
+    res["links"] = [{"key": str(r.get("key") or ""), "target": str(r.get("target") or ""),
+                     "quote": str(r.get("quote") or ""), "ok": False, "reason": NOT_APPLIED}
+                    for r in _items(decision.get("links"))]  # fmt: skip
+    if wanted or res["values"] or res["links"]:
+        res["notes"].append(NOT_APPLIED)
+    checked = entitycheck.check_candidates(space, decision, doc, path, summary.title)
+    if res["confidence"] == "low":
+        res["notes"].append("Low confidence.")
+        for c in [checked["mainEntity"], *checked["entities"], *checked["relations"]]:
+            if isinstance(c, dict):
+                c["confidence"] = "low"
+    res.update(checked)
     return res
 
 
@@ -446,10 +562,8 @@ class Filing:
         """The wizard's ``FilingStatus`` (reads only). KeyError: no such batch."""
         batches.load_batch(self.space.root, batch)
         d = self._load(batch)
-        state = d["state"]
-        if state in ("running", "trial-running") and not self.running():
-            state = "failed"
-            d["error"] = d["error"] or "The pass was interrupted."
+        as_sources = sources.is_source_batch(self.space.root, batch)
+        state, d["error"] = self._state(d)
         shown = {"trial-running": "running"}.get(state, state)
         items = []
         for p in d["trialPaths"]:
@@ -466,10 +580,25 @@ class Filing:
                                 for c in r.get("collections") or []],
                 "verdict": d["verdicts"].get(p),
             })
+            if as_sources:  # M30: what the page is about and what it mentions
+                main = r.get("mainEntity")
+                items[-1]["mainEntity"] = ({"type": str(main.get("type") or ""), "name": str(main.get("name") or "")}
+                                           if isinstance(main, dict) and main.get("ok") else None)
+                items[-1]["entities"] = [{"type": str(e.get("type") or ""), "name": str(e.get("name") or ""),
+                                          "ok": bool(e.get("ok"))} for e in r.get("entities") or [] if isinstance(e, dict)]
         marked = [v for p, v in d["verdicts"].items() if p in d["trialPaths"]]
         share = (marked.count("right") / len(marked)) if marked else None
         return {"state": shown, "trial": {"items": items, "rightShare": share}, "normalise": d["normalise"],
-                "error": d["error"]}
+                "error": d["error"], "keepAsSources": as_sources}
+
+    def _state(self, d: dict[str, Any]) -> tuple[str, str | None]:
+        """The recorded state and error, a pass or write that no thread runs any more read as ``failed``."""
+        state, error = d["state"], d["error"]
+        if state in ("running", "trial-running") and not self.running():
+            return "failed", error or "The pass was interrupted."
+        if state == "writing" and not self.running():
+            return "failed", error or WRITE_INTERRUPTED
+        return state, error
 
     def eligible(self, batch: str) -> list[str]:
         """Paths of the batch's objects the pass may read: written by the import and not changed since, not kept from AI."""
@@ -481,6 +610,8 @@ class Filing:
         out: list[str] = []
         for it in items:
             if it.get("action") not in ("created", "updated", "unchanged", "resolvedTake", "resolvedKeep"):
+                continue
+            if it.get("entity"):  # M30: an entity a Write made, not a page of the import
                 continue
             p = it.get("path")
             if not p or p in out:
@@ -509,6 +640,7 @@ class Filing:
             d = self._load(batch)
             if d["state"] == "trial":
                 raise NotAllowed("The trial is waiting for your marks. Continue, or mark more first.")
+            self._not_written(batch, d)
             if not trial and not self._trial_done_for_source(batch):
                 raise NotAllowed("Run the trial first: the first pass of a new source is applied to 50 objects.")
             d.update(state="running", mode="trial" if trial else "bulk", error=None)
@@ -541,6 +673,7 @@ class Filing:
             d = self._load(batch)
             if d["state"] == "trial":
                 raise NotAllowed("The trial is waiting for the user's marks in Object. Wait for them to continue.")
+            as_sources = self._not_written(batch, d)
             trial = not self._trial_done_for_source(batch)
             if trial and len(decisions) > TRIAL_SIZE:
                 raise NotAllowed(f"The first pass of a source is a trial: send at most {TRIAL_SIZE} decisions.")
@@ -554,14 +687,19 @@ class Filing:
                 if p not in allowed:
                     refused.append({"path": p, "reason": "Not an object of this batch, kept from AI, or already filed."})
                     continue
-                res = apply_decision(self.space, dec, allowed={p}, type_names=names)
+                if as_sources:
+                    res = collect_decision(self.space, dec, allowed={p})
+                else:
+                    res = apply_decision(self.space, dec, allowed={p}, type_names=names)
                 d["results"][p] = res
                 done.append(p)
             batches.write_json(batches.batch_dir(self.space.root, batch) / "decisions.json", decisions)
             if trial:
                 d["trialPaths"], d["verdicts"], d["state"] = list(done), {}, "trial"
+            elif as_sources:
+                d["normalise"], d["state"] = [], "entities"  # M30: Gene reviews the entities next
             else:
-                d["normalise"] = self._normalise_suggestions(d)
+                d["normalise"] = self._normalise_suggestions(d, self._filed(batch, d))
                 self._links_pass(d)
                 self._inbox_items(batch, d)
                 d["state"] = "done"
@@ -601,6 +739,127 @@ class Filing:
                 return True
         return False
 
+    # M30: the entities of a batch kept as Sources
+
+    def _not_written(self, batch: str, d: dict[str, Any]) -> bool:
+        """Whether the batch is kept as Sources; `NotAllowed` once its Write runs or ran (a pass then
+        would make a second Write possible)."""
+        if not sources.is_source_batch(self.space.root, batch):
+            return False
+        if d.get("mode") == "entities" and d["state"] in ("writing", "done"):
+            raise NotAllowed(WRITTEN_ALREADY)
+        return True
+
+    def _source_batch(self, batch: str) -> dict[str, Any]:
+        """The batch's filing record; KeyError: no such batch; `NotAllowed`: not kept as Sources."""
+        batches.load_batch(self.space.root, batch)
+        if not sources.is_source_batch(self.space.root, batch):
+            raise NotAllowed(NOT_SOURCE_BATCH)
+        return self._load(batch)
+
+    def entities_view(self, batch: str) -> dict[str, Any]:
+        """The Entities step's ``EntitiesView`` (reads only). KeyError: no such batch; `NotAllowed`:
+        not kept as Sources."""
+        from . import entities
+
+        d = self._source_batch(batch)
+        state, _error = self._state(d)
+        if state == "failed" and d.get("mode") != "entities":
+            state = "running"  # a pass that failed: its entities are still being collected
+        return entities.view(self.space, batch, d["results"], state)
+
+    def save_entity_review(self, batch: str, review: dict[str, Any]) -> dict[str, Any]:
+        """Check and store Gene's review (``entities-review.json``, the only file written); answers the
+        new ``EntitiesView``. `entities.ReviewInvalid`; `NotAllowed` once written (or writing) or when
+        the batch isn't kept as Sources; KeyError: no such batch."""
+        from . import entities
+
+        with self._lock:
+            d = self._source_batch(batch)
+            if d.get("mode") == "entities" and d["state"] in ("writing", "done"):
+                raise NotAllowed(WRITTEN_ALREADY)
+            entities.save_review(self.space, batch, review, d["results"])
+        return self.entities_view(batch)
+
+    def write_entities(self, batch: str) -> None:
+        """Start the Write of the entities Gene accepted, in the worker thread (``entities`` ->
+        ``writing`` -> ``done``, or ``failed``, which can be written again). `Busy` while a pass or a
+        write runs; `NotAllowed` when the batch isn't kept as Sources, isn't waiting for its Write, or
+        has entities still to decide; KeyError: no such batch."""
+        from . import entities
+
+        with self._lock:
+            if self.running():
+                raise Busy("A filing pass is running.")
+            d = self._source_batch(batch)
+            if d.get("mode") == "entities" and d["state"] == "done":
+                raise NotAllowed(WRITTEN_ALREADY)
+            if not (d["state"] == "entities" or (d["state"] in ("failed", "writing") and d.get("mode") == "entities")):
+                raise NotAllowed(NO_ENTITIES_YET)
+            review = entities.load_review(self.space.root, batch)
+            left = entities.undecided(entities.resolve(self.space, d["results"], review), review)
+            if left:
+                raise NotAllowed(STILL_TO_DECIDE.format(n=len(left)))
+            d.update(state="writing", mode="entities", error=None)
+            self._save(batch, d)
+            self._thread = threading.Thread(target=self._write_work, args=(batch,), daemon=True)
+            self._thread.start()
+        self.announce()
+
+    def _write_work(self, batch: str) -> None:
+        try:
+            self._run_write(batch)
+        except Exception as exc:  # noqa: BLE001 - recorded; what was written stays, and Write can run again
+            _log.exception("Writing the entities failed")
+            d = self._load(batch)
+            d.update(state="failed", mode="entities", error=(str(exc) or type(exc).__name__)[:300])
+            self._save(batch, d)
+        finally:
+            self.announce()
+
+    def _run_write(self, batch: str) -> None:
+        from . import entities, entitywrite
+
+        root = self.space.root
+        data, items = batches.load_batch(root, batch)
+        d = self._load(batch)
+        review = entities.load_review(root, batch)
+        res = entities.resolve(self.space, d["results"], review)
+        chosen = entities.accepted(res, review)
+        system = str((data.get("source") or {}).get("system") or "")
+        imported_at = str(data.get("importedAt") or data.get("startedAt") or _now())
+        folder = batches.batch_dir(root, batch)
+        try:
+            out = entitywrite.write_entities(self.space, batch, system, imported_at, chosen, res, d["results"], items)
+        finally:
+            batches.write_json(folder / "items.json", items)  # the created entities, also after a failure
+
+        # the low-confidence links: the subject entity in the Import inbox (never a Source)
+        try:
+            rows = json.loads((folder / INBOX_FILE).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            rows = []
+        rows = [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+        have = {(r.get("path"), r.get("reason")) for r in rows}
+        for link in out.get("inboxLinks") or []:
+            if (link["path"], link["reason"]) not in have:
+                have.add((link["path"], link["reason"]))
+                rows.append({"path": link["path"], "title": link["title"], "reason": link["reason"], "suggestedType": None})
+        batches.write_json(folder / INBOX_FILE, rows)
+
+        try:
+            placed = json.loads((folder / entitywrite.WRITTEN_FILE).read_text(encoding="utf-8")).get("placed") or {}
+        except (OSError, ValueError, AttributeError):
+            placed = {}
+        paths = list(dict.fromkeys(str(placed[e.id]) for e, _name in chosen if e.id in placed))
+        turned_down = sum(1 for e in res.entities if (review.get("decisions") or {}).get(e.id, {}).get("status") == "rejected")
+        section = _entities_section(res, chosen, turned_down, out)
+        d = self._load(batch)
+        d.update(entityPaths=paths, normalise=self._normalise_suggestions(d, paths), state="done", mode="entities",
+                 error=None)  # fmt: skip
+        self._save(batch, d)
+        self.record_accuracy(batch, entities_section=section)
+
     # the work
 
     def _work(self, batch: str, trial: bool, runner: Runner) -> None:
@@ -639,6 +898,36 @@ class Filing:
             out.append({"name": t.name, "properties": props})
         return out, names
 
+    def _entity_types_for_prompt(self) -> list[dict[str, Any]]:
+        """M30: the types that can hold entities (every importable type but Source), with their relations
+        (``key``, ``name``, target type names) and the M28 counterparts shown on them."""
+        from ..counterparts import specs_for
+
+        types = [t for t in self.space.types if planner.importable_type(t) and t.id != sources.SOURCE_TYPE_ID]
+        names = {t.id: t.name for t in self.space.types}
+        out: list[dict[str, Any]] = []
+        for t in types:
+            props = []
+            for p in t.propertyDefinitions:
+                if p.key in SYSTEM_KEYS or p.key == "sources" or p.type not in kinds_supported():
+                    continue
+                if getattr(p, "synced", None) is not None:
+                    continue  # M29: never filled by the import
+                row: dict[str, Any] = {"key": p.key, "name": p.name, "kind": p.type}
+                if p.type == "label":
+                    row["options"] = [str(o.get("text", "")) for o in p.options.get("set") or [] if isinstance(o, dict)]
+                if p.type == "entity":
+                    allowed = p.options.get("allowedTypes")
+                    ids = [a for a in allowed if isinstance(a, str)] if isinstance(allowed, list) else []
+                    row["targets"] = [names[i] for i in ids if i in names and i != sources.SOURCE_TYPE_ID]
+                props.append(row)
+            shown = [{"key": c.key, "name": c.name, "from": names.get(c.source_type_id, c.source_type_id),
+                      "fromName": c.source_name}
+                     for c in specs_for(t.id, self.space.types)
+                     if c.source_type_id != sources.SOURCE_TYPE_ID and c.source_key != "sources"]  # fmt: skip
+            out.append({"name": t.name, "properties": props, "counterparts": shown})
+        return out
+
     def _pass(self, batch: str, trial: bool, runner: Runner) -> None:
         d = self._load(batch)
         paths = [p for p in self.eligible(batch) if p not in d["results"]]
@@ -647,6 +936,8 @@ class Filing:
             d["trialPaths"] = list(paths)
             d["verdicts"] = {}
         types, names = self._types_for_prompt(batch)
+        as_sources = sources.is_source_batch(self.space.root, batch)
+        entity_types = self._entity_types_for_prompt() if as_sources else None
         allowed = set(paths)
         for i in range(0, len(paths), BATCH_SIZE):
             chunk = paths[i : i + BATCH_SIZE]
@@ -656,34 +947,45 @@ class Filing:
                     titles[p] = self.space.get(p).title
                 except (KeyError, ValueError):
                     pass
-            reply = runner(build_prompt(batch, chunk, titles, types))
+            reply = runner(build_prompt(batch, chunk, titles, types, entity_types))
             decided = {str(r.get("path")): r for r in parse_reply(reply)}
             for p in chunk:
                 dec = decided.get(p) or {"path": p, "confidence": "low"}
-                res = apply_decision(self.space, dec, allowed=allowed, type_names=names)
+                if as_sources:
+                    res = collect_decision(self.space, dec, allowed=allowed)
+                else:
+                    res = apply_decision(self.space, dec, allowed=allowed, type_names=names)
                 d["results"][p] = res
                 self._save(batch, d)
         d["state"] = "trial" if trial else "running"
         if trial:
             self._save(batch, d)
             return
-        d["normalise"] = self._normalise_suggestions(d)
-        self._links_pass(d)
-        self._inbox_items(batch, d)
-        d["state"] = "done"
+        if as_sources:
+            # M30: no links pass (relations replace it) and nothing in the inbox yet: Gene reviews the
+            # entities, and Write files them (`write_entities`).
+            d["normalise"], d["state"] = [], "entities"
+        else:
+            d["normalise"] = self._normalise_suggestions(d, self._filed(batch, d))
+            self._links_pass(d)
+            self._inbox_items(batch, d)
+            d["state"] = "done"
         d["trialDone"] = d["trialDone"] or bool(d["trialPaths"])
         self._save(batch, d)
         self.record_accuracy(batch)
 
     # normalise
 
-    def _filed(self, d: dict[str, Any]) -> list[str]:
+    def _filed(self, batch: str, d: dict[str, Any]) -> list[str]:
+        """The objects the pass filed; on a batch kept as Sources, the entities its Write wrote (never a Source)."""
+        if sources.is_source_batch(self.space.root, batch):
+            return [str(p) for p in d.get("entityPaths") or []]
         return [r["path"] for r in d["results"].values() if not r.get("inbox") and not r.get("rejected")]
 
-    def _normalise_suggestions(self, d: dict[str, Any]) -> list[dict[str, Any]]:
+    def _normalise_suggestions(self, d: dict[str, Any], paths: list[str]) -> list[dict[str, Any]]:
         tag_counts: dict[str, int] = {}
         opt_counts: dict[str, int] = {}
-        for p in self._filed(d):
+        for p in paths:
             try:
                 vals = self.space.rows(None, None, [p], None, False)[0].values
                 t = self.space.type_by_id(self.space.get(p).type)
@@ -706,7 +1008,7 @@ class Filing:
         """Apply Gene's merges to the batch's filed objects (tags and option values); answers the counts."""
         d = self._load(batch)
         changed = 0
-        for p in self._filed(d):
+        for p in self._filed(batch, d):
             try:
                 vals = self.space.rows(None, None, [p], None, False)[0].values
                 t = self.space.type_by_id(self.space.get(p).type)
@@ -841,8 +1143,12 @@ class Filing:
         return {"right": right, "wrong": wrong, "trial": len(d["trialPaths"]),
                 "share": (right / len(marked)) if marked else None}
 
-    def record_accuracy(self, batch: str) -> None:
-        """Write the trial's accuracy (and the pass's counts) into the batch's report.md and report page."""
+    def record_accuracy(self, batch: str, entities_section: str | None = None) -> None:
+        """Write the trial's accuracy (and the pass's counts) into the batch's report.md and report page.
+
+        M30: on a batch kept as Sources the report page (an object of the space) is written only by
+        the Write's finish, which also hands the ``## Entities`` section (`entities_section`); until
+        then the pass writes only the batch's records."""
         d = self._load(batch)
         a = self.accuracy(batch)
         results = list(d["results"].values())
@@ -860,30 +1166,79 @@ class Filing:
         data, _ = batches.load_batch(self.space.root, batch)
         md = batches.batch_dir(self.space.root, batch) / "report.md"
         _replace_section(md, section)
+        if entities_section is not None:
+            _replace_section(md, entities_section, ENTITIES_HEADING)
         rp = data.get("reportPath")
+        if data.get("keepAsSources") is True and entities_section is None:
+            rp = None  # the pass and the trial write no .md file
         if rp:
             try:
                 of, _fm, version = self.space.read(rp)
                 body = _swap(of.body, section)
+                if entities_section is not None:
+                    body = _swap(body, entities_section, ENTITIES_HEADING)
                 if body != of.body:
                     self.space.save_body(rp, body, version)
             except (KeyError, ValueError, OSError):
                 _log.warning("Could not update the report page %s", rp)
 
 
-def _swap(text: str, section: str) -> str:
+AI_HEADING = "## AI filing"
+ENTITIES_HEADING = "## Entities"
+
+
+def _swap(text: str, section: str, heading: str = AI_HEADING) -> str:
     text = text or ""
-    m = re.search(r"^## AI filing\n.*?(?=^## |\Z)", text, re.S | re.M)
+    m = re.search(rf"^{re.escape(heading)}\n.*?(?=^## |\Z)", text, re.S | re.M)
     if m:
         return text[: m.start()] + section + "\n" + text[m.end():]
     return text.rstrip("\n") + "\n\n" + section
 
 
-def _replace_section(md: Path, section: str) -> None:
+def _replace_section(md: Path, section: str, heading: str = AI_HEADING) -> None:
     from ..textfile import atomic_write
 
     try:
         text = md.read_text(encoding="utf-8")
     except OSError:
         text = ""
-    atomic_write(md, _swap(text, section).encode("utf-8"))
+    atomic_write(md, _swap(text, section, heading).encode("utf-8"))
+
+
+def _value_text(value: Any) -> str:
+    if isinstance(value, list):
+        return ", ".join(_value_text(v) for v in value)
+    if isinstance(value, dict):
+        return str(value.get("target") or value.get("title") or value.get("start") or value)
+    return str(value)
+
+
+def _source_titles(refs: list[dict[str, Any]]) -> str:
+    return ", ".join(dict.fromkeys(str(r.get("title") or r.get("path") or "") for r in refs))
+
+
+def _entities_section(res: Any, chosen: list[Any], turned_down: int, out: dict[str, Any]) -> str:
+    """M30: the report's ``## Entities`` section, from the resolution, Gene's choices and what Write
+    answered (its ``conflicts`` list of ConflictRows and ``sectionsLeftList``)."""
+    lines = [
+        ENTITIES_HEADING, "",
+        f"- Sources: {len(res.pages)} pages kept as Sources",
+        (f"- Entities: {len(chosen)} accepted ({out.get('created', 0)} created, {out.get('existing', 0)} already in the "
+         f"space), {turned_down} turned down, {len(res.leftOut)} not made into objects"),
+        (f"- Links written: {out.get('relations', 0)}; plain links: {out.get('plainLinks', 0)}; "
+         f"to the Import inbox: {out.get('relationsInbox', 0)}"),
+        (f"- From sources sections: {out.get('sections', 0)} written, {out.get('sectionsLeft', 0)} left as they are "
+         "(edited by you)"),
+    ]  # fmt: skip
+    lines += [f"- {s['text']}" for s in out.get("sectionsLeftList") or []]
+    failed = out.get("failed") or []
+    lines += [f"- Not written: {f['name']}: {f['reason']}" for f in failed]
+    conflicts = [c for c in out.get("conflicts") or [] if isinstance(c, dict)]
+    if conflicts:
+        lines += ["", "### Sources disagree", ""]
+        for c in conflicts:
+            kept = c["kept"]
+            parts = [f"{_value_text(kept['value'])} ({_source_titles(kept['sources'])})"]
+            parts += [f"{_value_text(o['value'])} ({_source_titles(o['sources'])})" for o in c.get("others") or []]
+            lines.append(f"- {c['entity']['title']}: {c['name']} {' / '.join(parts)}; kept {_value_text(kept['value'])}")
+    return "\n".join(lines) + "\n"
