@@ -2347,16 +2347,7 @@ class Space:
             if result.objectId is not None:
                 continue
             if path not in ids:
-                ids[path] = None
-                try:
-                    before = self.cached_version(path)
-                    new_id, version = self.ensure_id(path, history=False)
-                except (Conflict, ReadOnly, KeyError, FileNotFoundError, ValueError) as exc:
-                    failed[path] = getattr(exc, "reason", None) or str(exc)
-                else:
-                    ids[path] = new_id
-                    if version != before:  # the file had its id already: nothing was written
-                        id_writes.append((path, version))
+                ids[path] = self._sync_id(path, id_writes, failed)
             result.objectId = ids[path]
             if result.objectId is None:
                 result.status = "invalid"
@@ -2371,6 +2362,39 @@ class Space:
             self.synced.apply(t.id, updates, refreshed_at) if updates else self.synced.revision(t.id)
         )
         return SyncOutcome(t.id, refreshed_at, revision, results, id_writes)
+
+    def _sync_id(
+        self, path: str, id_writes: list[tuple[str, str]], failed: dict[str, str]
+    ) -> str | None:
+        """The id of a matched object `sync_facts` saw without one, inserted when still missing.
+
+        Under the space lock, so two syncs of one id-less object add one id line between them:
+        the summary's id is read again first (another sync may have added it since the
+        candidates were taken) and adopted when there. An external write during the insert is
+        retried once. Records the write in ``id_writes``, or the failure's detail in ``failed``.
+        """
+        with self._lock:
+            for attempt in range(2):
+                summary = self._summaries.get(self._rel(path))
+                if summary is not None and summary.id:
+                    return summary.id
+                try:
+                    before = self.cached_version(path)
+                    new_id, version = self.ensure_id(path, history=False)
+                except Conflict:
+                    if attempt == 0:
+                        self.rescan_file(path)
+                        continue
+                    # our string
+                    failed[path] = "The object changed on disk while it got its id. Sync it again."
+                    return None
+                except (ReadOnly, KeyError, FileNotFoundError, ValueError) as exc:
+                    failed[path] = getattr(exc, "reason", None) or str(exc)
+                    return None
+                if version != before:  # the file had its id already: nothing was written
+                    id_writes.append((path, version))
+                return new_id
+        return None
 
     # -- the write engine -----------------------------------------------------
 
