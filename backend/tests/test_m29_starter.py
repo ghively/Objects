@@ -138,11 +138,6 @@ def test_gallery_host_has_synced_facts(client):
     assert raw["propertyDefinitions"][-5:] == synced
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="needs Space.create_type (space.py, T4's file) to copy the gallery template's "
-    "namePatterns: t.namePatterns = list(tpl.namePatterns)",
-)
 def test_gallery_host_has_synced_facts_and_patterns(client):
     c, root = client
     res = c.post("/api/types", json={"name": "Host", "pluralName": "Hosts", "template": "host"})

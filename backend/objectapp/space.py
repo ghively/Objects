@@ -5079,6 +5079,7 @@ class Space:
             query = None
             if tpl is not None:
                 t.description = tpl.description
+                t.namePatterns = list(tpl.namePatterns)  # M29: the starter's name patterns
                 t.extra["templateKey"] = tpl.key
                 # Built and checked before the type is written, so a query that can't be
                 # made never leaves a half-created type: the type is made without it.

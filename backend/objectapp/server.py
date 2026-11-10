@@ -148,6 +148,13 @@ Routes (all JSON):
   (Server-Sent Events of `AiEvent`), ``GET /api/ai/chat?path=``, ``POST /api/ai/chat/save``.
 - M11: `api_v1` adds the token-protected local API (``/api/v1/*``) and the token routes
   (``/api/integrations/tokens``); its docstring lists them.
+- M29: `api_v1_synced` adds ``POST /api/v1/synced/{typeId}`` (a ``read-write`` or ``sync``
+  token fills a type's synced facts, kept in ``.object/synced/<typeId>.json``; see that
+  module). ``GET /api/object`` gains ``synced: {refreshedAt, values}`` when the object's type
+  has synced properties, and its ``computed`` reads the synced values (``frontmatter`` stays the
+  file's own); ``POST /api/rows`` rows carry ``syncedAt``. ``PUT /api/types/{id}`` answers
+  ``422`` with the first problem of the type's ``namePatterns`` (`typesuggest.pattern_problems`)
+  or of a property's ``synced`` mark (`typemodel.synced_problems`).
 
 Errors: a path outside the space or not an object is ``400``; a missing object is ``404``;
 a file the OS refused to write (locked by another program, say) is ``503 {detail}``.
@@ -207,6 +214,7 @@ from . import (
     delegation,
     api_v1_captures,
     api_v1_desksync,
+    api_v1_synced,
     api_v1_work,
     api_work,
     api_work_agent,
@@ -253,7 +261,7 @@ from .notify import FileNotifier, system_notifier
 from .formula import FormulaError
 from .formula import parse as parse_formula
 from .counterparts import CounterpartEditRequest
-from .propvalues import InvalidValue
+from .propvalues import InvalidValue, decode_value
 from .queries import QueryDef
 from .reminders import ReminderScheduler, file_clock
 from .reviews import ReviewRunner
@@ -284,8 +292,11 @@ from .typemodel import (
     TypeDefinition,
     TypeReadOnly,
     option_shape_problems,
+    synced_problems,
     type_revision,
 )
+from .synced import synced_props
+from .typesuggest import pattern_problems
 from .uistate import patch_ui, read_ui, ui_read_only_reason, ui_with_defaults
 from .watcher import LINKED_KINDS, ChangeEvent, SpaceWatcher
 from .whiteboardapi import whiteboard_router
@@ -1250,10 +1261,27 @@ def create_app(
                 "version": version,
                 "links": space.links_of(path, fm),
                 "backlinks": space.backlinks(summary.path),
-                "computed": computed_of(summary, fm),
+                "computed": computed_of(summary, space.synced_fm(summary, fm)),
                 "counterparts": space.counterparts(summary.path),  # M28: computed, never stored
+                **synced_of(summary, fm),
             }
         )
+
+    def synced_of(summary: Any, fm: dict) -> dict[str, Any]:
+        """M29: ``{"synced": {refreshedAt, values}}`` when the object's type has synced
+        properties (``{}`` otherwise): the store's values, decoded as the rows decode them."""
+        t = space.type_by_id(summary.type)
+        props = synced_props(t)
+        if t is None or not props:
+            return {}
+        overlaid = space.synced.overlay(t, fm)
+        entry = space.synced.entry(t.id, summary.id)
+        return {
+            "synced": {
+                "refreshedAt": (entry.refreshedAt or None) if entry is not None else None,
+                "values": {p.key: decode_value(p, overlaid.get(p.key), overlaid) for p in props},
+            }
+        }
 
     def computed_of(summary: Any, fm: dict) -> dict[str, Any]:
         """M12: the object's formula and rollup values (``{}`` when it has none)."""
@@ -2046,6 +2074,13 @@ def create_app(
                 if bad:
                     name = entry.get("name") or entry.get("key") or "a property"
                     return _error(422, f"The options of {name} are not valid: {', '.join(bad)}.")
+        # M29: the synced mark and the name patterns, checked as sent (a bad one never reaches
+        # `from_json`, which would keep it aside in `extra`).
+        problems = pattern_problems(data.get("namePatterns"))
+        for entry in data.get("propertyDefinitions") or []:
+            problems += synced_problems(entry)
+        if problems:
+            return _error(422, problems[0])
         try:
             t = TypeDefinition.from_json(data, fallback_id=type_id)
             result = space.save_type(t, req.baseRevision, confirm=req.confirm)
@@ -2127,6 +2162,7 @@ def create_app(
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
             return _error(404, f'There is no object at "{req.path}".')
+        fm = space.synced.overlay(t, fm)  # M29: the synced facts, as every reader sees them
         value = Computer(space, types={t.id: t}).evaluate(Obj(summary.path, fm, summary, t), req.expression)
         return _display_safe(
             {"value": value, "error": value.get("error") if value["type"] == "error" else None}
@@ -2427,6 +2463,8 @@ def create_app(
     api.include_router(api_desksync.router(ctx, work_loop, work, automations))
     api.include_router(api_v1_captures.router(ctx, work_loop, work))
     api.include_router(api_v1_desksync.router(ctx, work_loop, work))
+    # M29: ``POST /api/v1/synced/{typeId}``, a script's or agent's synced facts.
+    api.include_router(api_v1_synced.router(ctx))
     # M23: the Work section's routes, over the same service, the M24 seams and the alert watch.
     api.include_router(api_work_section.router(ctx, work, build_seams(space, work), alert_watch))
     # M18: the learning routes go before api_agents, whose GET /agents/{id}/chats/{chatId} would
