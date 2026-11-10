@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 2,
+  "id": "configuration",
+  "name": "Configuration",
+  "pluralName": "Configurations",
+  "folder": "Configurations",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-sliders-horizontal"
+  },
+  "color": "amber",
+  "description": "A policy, rule or setting, and what it applies to.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The name of the object, shown wherever it appears",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "The collections this object belongs to",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "A short summary of what the object is about",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "When the object was made",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "When the object last changed",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "Tags attached to the object",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "An emoji or icon shown beside the title",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Other names the object goes by",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "01M71CTX9MA7RYH7P9Y15RK8VX",
+      "key": "kind",
+      "name": "Kind",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "gpo",
+            "text": "GPO",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "firewall-rule",
+            "text": "Firewall rule",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "scheduled-task",
+            "text": "Scheduled task",
+            "icon": null,
+            "color": "amber"
+          },
+          {
+            "id": "app-setting",
+            "text": "App setting",
+            "icon": null,
+            "color": "violet"
+          },
+          {
+            "id": "template",
+            "text": "Template",
+            "icon": null,
+            "color": "sky"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9MD5C5S0RFKXX85KHZ",
+      "key": "appliesTo",
+      "name": "Applies to",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "host",
+          "application"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Configured by",
+          "key": "configuredBy"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9M773726JQNQS5378X",
+      "key": "sources",
+      "name": "Sources",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "source"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Distilled into",
+          "key": "distilledInto"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9MAZMAMYEEYWSHA32H",
+      "key": "notes",
+      "name": "Notes",
+      "type": "blocks",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-dashes"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [
+      "01M71CTXAB1Q8TBB72Y96R3HPA"
+    ],
+    "defaultTemplateId": "01M71CTXAB1Q8TBB72Y96R3HPA"
+  }
+}

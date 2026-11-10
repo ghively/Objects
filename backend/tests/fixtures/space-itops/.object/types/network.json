@@ -1,0 +1,268 @@
+{
+  "schemaVersion": 2,
+  "id": "network",
+  "name": "Network",
+  "pluralName": "Networks",
+  "folder": "Networks",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-network"
+  },
+  "color": "sky",
+  "description": "A subnet, VLAN, wifi network or domain.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The name of the object, shown wherever it appears",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "The collections this object belongs to",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "A short summary of what the object is about",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "When the object was made",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "When the object last changed",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "Tags attached to the object",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "An emoji or icon shown beside the title",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Other names the object goes by",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "01M71CTX9MBX6VR9X86KXKZG9A",
+      "key": "kind",
+      "name": "Kind",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "subnet",
+            "text": "Subnet",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "vlan",
+            "text": "VLAN",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "wifi",
+            "text": "Wifi",
+            "icon": null,
+            "color": "amber"
+          },
+          {
+            "id": "domain",
+            "text": "Domain",
+            "icon": null,
+            "color": "violet"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9M2TJDDATH0TTEGWDA",
+      "key": "range",
+      "name": "Range",
+      "type": "text",
+      "description": "CIDR",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "01M71CTX9MDAQ23ZPDCE7K4H65",
+      "key": "vlanId",
+      "name": "VLAN id",
+      "type": "number",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-hash"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "01M71CTX9MHRPN4CR2V2SC1Y7V",
+      "key": "locatedAt",
+      "name": "Located at",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "allowedTypes": [
+          "location"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Contains",
+          "key": "contains"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9MP0CDCSMFQQ4PQ6P2",
+      "key": "sources",
+      "name": "Sources",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "source"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Distilled into",
+          "key": "distilledInto"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9MC6Z8JCRQESKRNEJG",
+      "key": "notes",
+      "name": "Notes",
+      "type": "blocks",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-dashes"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [
+      "01M71CTXAJQ0ZPTXP7TA8KW33C"
+    ],
+    "defaultTemplateId": "01M71CTXAJQ0ZPTXP7TA8KW33C"
+  }
+}

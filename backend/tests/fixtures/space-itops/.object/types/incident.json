@@ -1,0 +1,783 @@
+{
+  "schemaVersion": 2,
+  "id": "incident",
+  "name": "Incident",
+  "pluralName": "Incidents",
+  "folder": "Incidents",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-warning-octagon"
+  },
+  "color": "red",
+  "description": "Something that broke: what it affected, why, and how it was resolved.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The name of the object, shown wherever it appears",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "The collections this object belongs to",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "A short summary of what the object is about",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "When the object was made",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "When the object last changed",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "Tags attached to the object",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "An emoji or icon shown beside the title",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Other names the object goes by",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "01M71CTX9M0YMYXS1ET4ZX6J3Q",
+      "key": "status",
+      "name": "Status",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "open",
+            "text": "Open",
+            "icon": null,
+            "color": "red",
+            "statusCategory": "in-progress"
+          },
+          {
+            "id": "mitigated",
+            "text": "Mitigated",
+            "icon": null,
+            "color": "amber",
+            "statusCategory": "in-progress"
+          },
+          {
+            "id": "resolved",
+            "text": "Resolved",
+            "icon": null,
+            "color": "green",
+            "statusCategory": "done"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9M6HZKY7B6V0BBG5G7",
+      "key": "severity",
+      "name": "Severity",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "sev1",
+            "text": "SEV1",
+            "icon": null,
+            "color": "red"
+          },
+          {
+            "id": "sev2",
+            "text": "SEV2",
+            "icon": null,
+            "color": "orange"
+          },
+          {
+            "id": "sev3",
+            "text": "SEV3",
+            "icon": null,
+            "color": "amber"
+          },
+          {
+            "id": "sev4",
+            "text": "SEV4",
+            "icon": null,
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9MPQG1WBN4288XAF72",
+      "key": "impact",
+      "name": "Impact",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "01M71CTX9MQEDMY6PZHQA7Q3Q6",
+      "key": "cause",
+      "name": "Cause",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "01M71CTX9NTVH27N2SET933AXM",
+      "key": "affects",
+      "name": "Affects",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "host",
+          "application"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Affected by",
+          "key": "affectedBy"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9NFVNNPRRWPRPP37VZ",
+      "key": "started",
+      "name": "Started",
+      "type": "datetime",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "time"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9NBCNDZ0G6GZTY7CWJ",
+      "key": "resolved",
+      "name": "Resolved",
+      "type": "datetime",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "time"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9N1FKF3Y23H171EEHJ",
+      "key": "notes",
+      "name": "Notes",
+      "type": "blocks",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-dashes"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "ticketId",
+      "key": "ticketId",
+      "name": "Ticket ID",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "system",
+      "key": "system",
+      "name": "System",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "servicenow",
+            "text": "ServiceNow",
+            "color": "green",
+            "icon": null
+          },
+          {
+            "id": "jira",
+            "text": "Jira",
+            "color": "blue",
+            "icon": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "ticketLink",
+      "key": "ticketLink",
+      "name": "Ticket link",
+      "type": "url",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-link"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "deskStatus",
+      "key": "deskStatus",
+      "name": "Desk status",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "open",
+            "text": "Open",
+            "color": "gray",
+            "icon": null
+          },
+          {
+            "id": "in-progress",
+            "text": "In progress",
+            "color": "blue",
+            "icon": null
+          },
+          {
+            "id": "active",
+            "text": "Active",
+            "color": "sky",
+            "icon": null
+          },
+          {
+            "id": "blocked",
+            "text": "Blocked",
+            "color": "red",
+            "icon": null
+          },
+          {
+            "id": "waiting-response",
+            "text": "Waiting response",
+            "color": "amber",
+            "icon": null
+          },
+          {
+            "id": "resolved",
+            "text": "Resolved",
+            "color": "green",
+            "icon": null
+          },
+          {
+            "id": "closed",
+            "text": "Closed",
+            "color": "gray",
+            "icon": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "deskPriority",
+      "key": "deskPriority",
+      "name": "Desk priority",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "critical",
+            "text": "Critical",
+            "color": "red",
+            "icon": null
+          },
+          {
+            "id": "high",
+            "text": "High",
+            "color": "amber",
+            "icon": null
+          },
+          {
+            "id": "medium",
+            "text": "Medium",
+            "color": "yellow",
+            "icon": null
+          },
+          {
+            "id": "low",
+            "text": "Low",
+            "color": "gray",
+            "icon": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "requester",
+      "key": "requester",
+      "name": "Requester",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "deskGroup",
+      "key": "deskGroup",
+      "name": "Group",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "deskLocation",
+      "key": "deskLocation",
+      "name": "Location",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "deskOpened",
+      "key": "deskOpened",
+      "name": "Opened",
+      "type": "datetime",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "day",
+          "endTimeSettings": "notAllowed"
+        }
+      }
+    },
+    {
+      "id": "deskUpdated",
+      "key": "deskUpdated",
+      "name": "Desk updated",
+      "type": "datetime",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "day",
+          "endTimeSettings": "notAllowed"
+        }
+      }
+    },
+    {
+      "id": "deskResolved",
+      "key": "deskResolved",
+      "name": "Desk resolved",
+      "type": "datetime",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "day",
+          "endTimeSettings": "notAllowed"
+        }
+      }
+    },
+    {
+      "id": "rank",
+      "key": "rank",
+      "name": "Rank",
+      "type": "number",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-hash"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "area",
+      "key": "area",
+      "name": "Area",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "isArray": false,
+        "set": []
+      }
+    },
+    {
+      "id": "priorityNote",
+      "key": "priorityNote",
+      "name": "Priority note",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "blockedOn",
+      "key": "blockedOn",
+      "name": "Blocked on",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "findings",
+      "key": "findings",
+      "name": "Findings",
+      "type": "textBlock",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "hypothesis",
+      "key": "hypothesis",
+      "name": "Hypothesis",
+      "type": "textBlock",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "confidence",
+      "key": "confidence",
+      "name": "Confidence",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "high",
+            "text": "High",
+            "color": "green",
+            "icon": null
+          },
+          {
+            "id": "medium",
+            "text": "Medium",
+            "color": "amber",
+            "icon": null
+          },
+          {
+            "id": "low",
+            "text": "Low",
+            "color": "red",
+            "icon": null
+          },
+          {
+            "id": "n-a",
+            "text": "N/A",
+            "color": "gray",
+            "icon": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "confidenceReason",
+      "key": "confidenceReason",
+      "name": "Confidence reason",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "verified",
+      "key": "verified",
+      "name": "Verified",
+      "type": "textList",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-bullets"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "assumed",
+      "key": "assumed",
+      "name": "Assumed",
+      "type": "textList",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-bullets"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "toRaiseConfidence",
+      "key": "toRaiseConfidence",
+      "name": "To raise confidence",
+      "type": "textList",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-bullets"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "floorItems",
+      "key": "floorItems",
+      "name": "Floor items",
+      "type": "floorItems",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clipboard-text"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {}
+    },
+    {
+      "id": "steps",
+      "key": "steps",
+      "name": "Steps",
+      "type": "steps",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-checks"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "completed",
+      "key": "completed",
+      "name": "Completed",
+      "type": "datetimeSimple",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-check"
+      },
+      "visibility": "hidden",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "time",
+          "endTimeSettings": "notAllowed"
+        }
+      }
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [
+      "01M71CTXBE8AY5B5ZX5GFZJK0C"
+    ],
+    "defaultTemplateId": "01M71CTXBE8AY5B5ZX5GFZJK0C"
+  }
+}

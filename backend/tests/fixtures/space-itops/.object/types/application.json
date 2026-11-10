@@ -1,0 +1,320 @@
+{
+  "schemaVersion": 2,
+  "id": "application",
+  "name": "Application",
+  "pluralName": "Applications",
+  "folder": "Applications",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-app-window"
+  },
+  "color": "indigo",
+  "description": "A service people use: what it runs on and what it is built from.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The name of the object, shown wherever it appears",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "The collections this object belongs to",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "A short summary of what the object is about",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "When the object was made",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "When the object last changed",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "Tags attached to the object",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "An emoji or icon shown beside the title",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Other names the object goes by",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "01M71CTX9MW4SRW2GR7BMT4214",
+      "key": "status",
+      "name": "Status",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "live",
+            "text": "Live",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "planned",
+            "text": "Planned",
+            "icon": null,
+            "color": "yellow"
+          },
+          {
+            "id": "retired",
+            "text": "Retired",
+            "icon": null,
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9MNBWDSNM89KVRH9N2",
+      "key": "ownedBy",
+      "name": "Owned by",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "person"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Owns",
+          "key": "owns"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9ME1GKC7SS8CXN5DBZ",
+      "key": "department",
+      "name": "Department",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "it",
+            "text": "IT",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "finance",
+            "text": "Finance",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "all",
+            "text": "All",
+            "icon": null,
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9M2VF9R8QQJ7MAKK9K",
+      "key": "runsOn",
+      "name": "Runs on",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "host",
+          "container"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Runs",
+          "key": "runs"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9MSB8XCA284EH5BMXJ",
+      "key": "uses",
+      "name": "Uses",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "software"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Used by",
+          "key": "usedBy"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9MJ3XTFBCYVP93331Q",
+      "key": "sources",
+      "name": "Sources",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "source"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Distilled into",
+          "key": "distilledInto"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9MVHPQ7HHY60ZDTEAW",
+      "key": "notes",
+      "name": "Notes",
+      "type": "blocks",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-dashes"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [
+      "01M71CTXA4T2JTWXP7MSQTQMV7"
+    ],
+    "defaultTemplateId": "01M71CTXA4T2JTWXP7MSQTQMV7"
+  }
+}

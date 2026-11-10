@@ -1,0 +1,490 @@
+{
+  "schemaVersion": 2,
+  "id": "host",
+  "name": "Host",
+  "pluralName": "Hosts",
+  "folder": "Hosts",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-hard-drives"
+  },
+  "color": "blue",
+  "description": "A server, workstation or network device: what runs on it and where it is.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The name of the object, shown wherever it appears",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "The collections this object belongs to",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "A short summary of what the object is about",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "When the object was made",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "When the object last changed",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "Tags attached to the object",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "An emoji or icon shown beside the title",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Other names the object goes by",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "01M71CTX9M3VJTHNXTSZ14Q2NK",
+      "key": "category",
+      "name": "Category",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "server",
+            "text": "Server",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "workstation",
+            "text": "Workstation",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "network-device",
+            "text": "Network device",
+            "icon": null,
+            "color": "amber"
+          },
+          {
+            "id": "printer",
+            "text": "Printer",
+            "icon": null,
+            "color": "violet"
+          },
+          {
+            "id": "nas",
+            "text": "NAS",
+            "icon": null,
+            "color": "sky"
+          },
+          {
+            "id": "firewall",
+            "text": "Firewall",
+            "icon": null,
+            "color": "rose"
+          },
+          {
+            "id": "vpn",
+            "text": "VPN",
+            "icon": null,
+            "color": "teal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9MHDQYKBK0JC31YFC5",
+      "key": "roles",
+      "name": "Roles",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "set": [
+          {
+            "id": "dns",
+            "text": "DNS",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "dhcp",
+            "text": "DHCP",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "active-directory",
+            "text": "Active Directory",
+            "icon": null,
+            "color": "amber"
+          },
+          {
+            "id": "file-server",
+            "text": "File server",
+            "icon": null,
+            "color": "violet"
+          },
+          {
+            "id": "print-server",
+            "text": "Print server",
+            "icon": null,
+            "color": "sky"
+          },
+          {
+            "id": "rds",
+            "text": "RDS",
+            "icon": null,
+            "color": "rose"
+          },
+          {
+            "id": "hypervisor",
+            "text": "Hypervisor",
+            "icon": null,
+            "color": "teal"
+          },
+          {
+            "id": "firewall-vpn",
+            "text": "Firewall/VPN",
+            "icon": null,
+            "color": "orange"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9MDKZPK6GCA0780QHB",
+      "key": "ipAddress",
+      "name": "IP address",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "01M71CTX9MTC818N92NE1HVJTN",
+      "key": "fqdn",
+      "name": "FQDN",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "01M71CTX9MQBY61SSBJJHQ0KGZ",
+      "key": "department",
+      "name": "Department",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "it",
+            "text": "IT",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "finance",
+            "text": "Finance",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "all",
+            "text": "All",
+            "icon": null,
+            "color": "gray"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9M29HV00X3C48T1F0Z",
+      "key": "environment",
+      "name": "Environment",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "production",
+            "text": "Production",
+            "icon": null,
+            "color": "red"
+          },
+          {
+            "id": "test",
+            "text": "Test",
+            "icon": null,
+            "color": "amber"
+          },
+          {
+            "id": "development",
+            "text": "Development",
+            "icon": null,
+            "color": "green"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9MCTN51TEKET5V20Q3",
+      "key": "operatingSystem",
+      "name": "Operating system",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "allowedTypes": [
+          "software"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Installed on",
+          "key": "installedOn"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9M690SAG4Q15D847V9",
+      "key": "locatedAt",
+      "name": "Located at",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "allowedTypes": [
+          "location"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Contains",
+          "key": "contains"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9MZG117NK2GX2RN1VF",
+      "key": "network",
+      "name": "Network",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "network"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": []
+      }
+    },
+    {
+      "id": "01M71CTX9MF39MCC1GKJZ35WSR",
+      "key": "ownedBy",
+      "name": "Owned by",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "person",
+          "vendor"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Owns",
+          "key": "owns"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9MMTNWQRE1CSCFCCDW",
+      "key": "sources",
+      "name": "Sources",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "source"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Distilled into",
+          "key": "distilledInto"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9ME9DX368G87Y69AM5",
+      "key": "notes",
+      "name": "Notes",
+      "type": "blocks",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-dashes"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [
+      "01M71CTX9QAJJJD7P1M41740X0"
+    ],
+    "defaultTemplateId": "01M71CTX9QAJJJD7P1M41740X0"
+  }
+}

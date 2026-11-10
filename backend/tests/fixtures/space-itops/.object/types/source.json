@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 2,
+  "id": "source",
+  "name": "Source",
+  "pluralName": "Sources",
+  "folder": "Sources",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-file-text"
+  },
+  "color": "slate",
+  "description": "A page kept as it was imported, and what was distilled from it.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The name of the object, shown wherever it appears",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "The collections this object belongs to",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "A short summary of what the object is about",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "When the object was made",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "When the object last changed",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "Tags attached to the object",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "An emoji or icon shown beside the title",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Other names the object goes by",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "01M71CTX9MKD0QQ8S1RK2WS4N7",
+      "key": "category",
+      "name": "Category",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "wiki-page",
+            "text": "Wiki page",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "document",
+            "text": "Document",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "spreadsheet",
+            "text": "Spreadsheet",
+            "icon": null,
+            "color": "amber"
+          },
+          {
+            "id": "presentation",
+            "text": "Presentation",
+            "icon": null,
+            "color": "violet"
+          },
+          {
+            "id": "pdf",
+            "text": "PDF",
+            "icon": null,
+            "color": "sky"
+          },
+          {
+            "id": "diagram",
+            "text": "Diagram",
+            "icon": null,
+            "color": "rose"
+          },
+          {
+            "id": "email",
+            "text": "Email",
+            "icon": null,
+            "color": "teal"
+          },
+          {
+            "id": "ticket",
+            "text": "Ticket",
+            "icon": null,
+            "color": "orange"
+          },
+          {
+            "id": "chat",
+            "text": "Chat",
+            "icon": null,
+            "color": "indigo"
+          },
+          {
+            "id": "web-page",
+            "text": "Web page",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "image",
+            "text": "Image",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "note",
+            "text": "Note",
+            "icon": null,
+            "color": "amber"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9MQBFS1RSVRQTGAFTW",
+      "key": "system",
+      "name": "System",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "sharepoint",
+            "text": "SharePoint",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "wiki",
+            "text": "Wiki",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "notion",
+            "text": "Notion",
+            "icon": null,
+            "color": "amber"
+          },
+          {
+            "id": "obsidian",
+            "text": "Obsidian",
+            "icon": null,
+            "color": "violet"
+          },
+          {
+            "id": "anytype",
+            "text": "Anytype",
+            "icon": null,
+            "color": "sky"
+          },
+          {
+            "id": "files",
+            "text": "Files",
+            "icon": null,
+            "color": "rose"
+          },
+          {
+            "id": "markdown",
+            "text": "Markdown",
+            "icon": null,
+            "color": "teal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9M5Q9K3Y4SSFDS9ZMT",
+      "key": "notes",
+      "name": "Notes",
+      "type": "blocks",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-dashes"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [],
+    "defaultTemplateId": null
+  }
+}
