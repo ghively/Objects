@@ -542,6 +542,7 @@ T11 integrates after all tracks. Then one whole-milestone review (correctness, f
 17. **Incident is a work type** (the M22 work fields and hidden `completed`, as Project), so incidents with a ticket appear in Tickets and Work; its own Cause (text) replaces the work-field Cause label on this type. (ours; the design says "plus the ticket fields")
 18. **Incident Status categories**: Open and Mitigated are in progress, Resolved is done. (ours)
 19. **Source in the starter** (Gene, 2026-11-09, design 5a): built by `source_type()` so M30 creates the same type in other spaces; icon `ph-file-text`, gray, no template (its body is the imported text). The **Sources** relation sits on the nine entity types only, hidden while empty; M30 adds it elsewhere when it distils into another type. (placement, icon, visibility ours)
+20. **No Sources without a Source type** (fix pass): an IT ops type made from the gallery in a space with no Source type leaves its Sources relation out (it would be open to any type, so whatever it linked would show "Distilled into"); M30 adds it when it creates Source. (ours)
 
 ### Guesses (points the design leaves open that this plan had to settle; for Gene)
 

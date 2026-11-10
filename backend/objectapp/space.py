@@ -4846,7 +4846,8 @@ class Space:
         template's properties replace "Content", its name, plural, description,
         icon and colour fill whatever isn't given, and the key is stored as
         ``templateKey`` (the template it was made from). M28: an IT ops entry (a key in
-        `basicsetup.ITOPS_TYPE_IDS`) also gets its default template (`_add_itops_template`).
+        `basicsetup.ITOPS_TYPE_IDS`) also gets its default template (`_add_itops_template`), and
+        no Sources relation while the space has no Source type to point it at.
         """
         tpl = None
         if template is not None:
@@ -4890,6 +4891,15 @@ class Space:
                     icon=parsed, color=color, extra={"templateKey": tpl.key},
                 )
                 custom = build_template(tpl.key, [itself, *self.types])
+                if tpl.section == "itOperations":
+                    # M28 fix pass: with no Source type to point at, Sources would be open to any
+                    # type, giving whatever it links a "Distilled into" row: it is left out (M30
+                    # adds it when it creates Source).
+                    custom = [
+                        p
+                        for p in custom
+                        if p.key != "sources" or p.options.get("allowedTypes")
+                    ]
             else:
                 custom = [
                     PropertyDefinition(
