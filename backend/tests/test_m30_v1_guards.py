@@ -1,25 +1,30 @@
-"""M30 fix pass: what an outside agent reads of a batch's entities (plan
-``2026-11-09-m30-entity-extraction.md``).
+"""M30 fix pass: what an outside agent reads of a batch's entities, and the import start while the
+entities are being written (plan ``2026-11-09-m30-entity-extraction.md``).
 
 - v1 / MCP ``import_entities`` never names an object excluded from AI: its Sources, the values and
   summary lines only they say, and an ``existing`` object that is excluded, are left out.
+- ``POST /api/import/start`` answers 409 while the filing worker writes a batch's entities.
 """
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
+import pytest
 from test_m30_api import (  # noqa: F401 - the fixtures
     Env,
+    _accept_all,
     _import,
     _mcp,
     _to_entities,
     _token,
+    _wait,
     env,
     fake,
 )
 
-from objectapp.importers import batches
+from objectapp.importers import batches, entitywrite
 
 
 def _paths(e: Env, batch: str) -> dict[str, str]:
@@ -88,3 +93,33 @@ def test_v1_import_entities_leaves_out_what_is_excluded_from_ai(env: Env) -> Non
 
     _server, call = _mcp(e)
     assert not _all_paths(call("import_entities", batch=batch)) & hidden
+
+
+def test_start_refused_while_entities_are_written(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    e = env
+    batch = _import(e)
+    _to_entities(e, batch)
+    view = e.client.get(f"/api/import/batches/{batch}/entities").json()
+    assert e.client.put(f"/api/import/batches/{batch}/entities/review", json=_accept_all(view)).status_code == 200
+
+    entered, release = threading.Event(), threading.Event()
+    real = entitywrite.write_entities
+
+    def slow(*args: Any, **kwargs: Any) -> Any:
+        entered.set()
+        assert release.wait(30)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(entitywrite, "write_entities", slow)
+    assert e.client.post(f"/api/import/batches/{batch}/entities/write", json={}).status_code == 202
+    try:
+        assert entered.wait(30)
+        pv = e.client.post("/api/import/preview", json={"source": {"path": str(e.src)}, "target": "currentSpace"})
+        assert pv.status_code == 200, pv.text
+        r = e.client.post("/api/import/start", json={"previewId": pv.json()["previewId"], "mapping": pv.json()["mapping"],
+                                                     "target": {"kind": "currentSpace"}})
+        assert r.status_code == 409, r.text
+        assert r.json()["detail"] == "Another import is running."
+    finally:
+        release.set()
+    assert _wait(e, batch, {"done", "failed"})["state"] == "done"
