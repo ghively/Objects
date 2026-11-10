@@ -32,6 +32,7 @@ import { api } from '@/api/client'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command'
 import { createAndOpen, openObject, type OpenMods } from '@/create/createAndOpen'
+import { suggestFor } from '@/create/suggestContext'
 import { ensureLinkIndex, typeOf, typesByIdOf, useLinkIndex } from '@/links/linkIndex'
 import { useRecent } from '@/nav/recent'
 import { isTagType } from '@/object/ObjectHeader'
@@ -46,6 +47,7 @@ import {
   hasFilters,
   NO_FILTERS,
   PALETTE_TEXT,
+  suggestableTypes,
   type SearchFilters,
   type SearchOption,
 } from './searchOptions'
@@ -212,7 +214,12 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
     return [...names.values()]
   }, [objects, types])
 
-  const options = useMemo(() => buildSearchOptions(q, types, tagNames, filters), [q, types, tagNames, filters])
+  // M29: with no type filter, the create row is of the query's suggested type (else Page).
+  const suggested = useMemo(() => (q.trim() ? (suggestFor(q, suggestableTypes(types))[0] ?? null) : null), [q, types])
+  const options = useMemo(
+    () => buildSearchOptions(q, types, tagNames, filters, suggested),
+    [q, types, tagNames, filters, suggested],
+  )
 
   const allActions = useMemo(() => (actionContext ? buildActions(actionContext) : []), [actionContext])
   const actions = useMemo(() => (hasFilters(filters) ? [] : matchActions(allActions, q)), [allActions, q, filters])

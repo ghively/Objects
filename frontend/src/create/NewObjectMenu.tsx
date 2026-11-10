@@ -7,6 +7,10 @@
  *
  * M6: "Whiteboard" is always offered in step 1, also before the space has the type (its
  * definition is written by the first create); a new whiteboard goes through `POST /api/whiteboards`.
+ *
+ * M29: in step 1, before anything is typed, the suggested type (the active collection's, query's
+ * or type page's type, else the space's last type) is the first row, marked "Suggested"; the
+ * others follow in the usual order. Every create sets the space's last type.
  */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import type { ObjectSummary, TypeDef } from '@/api/types'
@@ -20,6 +24,9 @@ import { ObjectIcon } from '@/object/ObjectHeader'
 import { byPluralName, TypeChip } from '@/shell/Sidebar'
 import { isWhiteboardType, WHITEBOARD_TYPE_NAME } from '@/whiteboard/isWhiteboard'
 import { createAndOpen, openObject, type OpenMods } from './createAndOpen'
+import { useLastType } from './lastType'
+import { suggestFor } from './suggestContext'
+import { SUGGEST_TEXT } from './typeSuggest'
 
 export const NEW_OBJECT_TEXT = {
   searchTypes: 'Search Object Types',
@@ -67,7 +74,7 @@ export interface NewObjectMenuProps {
 }
 
 type Item =
-  | { kind: 'type'; type: TypeDef }
+  | { kind: 'type'; type: TypeDef; suggested?: boolean }
   | { kind: 'new'; label: string }
   | { kind: 'object'; object: ObjectSummary }
 
@@ -113,13 +120,24 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
   const type = typeId ? types.find((t) => t.id === typeId) : undefined
   const q = query.trim()
 
+  // M29: the suggested type of step 1, read when the menu opens (the context, else the last type).
+  const lastType = useLastType((s) => s.typeId)
+  const suggestedId = useMemo(
+    () => (open && !initialTypeId ? (suggestFor('', types.filter((t) => !t.readOnlyReason))[0] ?? null) : null),
+    // `lastType` and `open`: re-read when they change (the tab's context is read as it is then).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [open, initialTypeId, types, lastType],
+  )
+
   const items: Item[] = useMemo(() => {
     const needle = q.toLowerCase()
     if (!typeId) {
-      return [...types]
+      const listed = [...types]
         .sort(byPluralName)
         .filter((t) => !needle || t.name.toLowerCase().includes(needle) || t.pluralName.toLowerCase().includes(needle))
         .map((t) => ({ kind: 'type' as const, type: t }))
+      const top = !needle && suggestedId ? listed.find((i) => i.type.id === suggestedId) : undefined
+      return top ? [{ ...top, suggested: true }, ...listed.filter((i) => i !== top)] : listed
     }
     const found = objects
       .filter((o) => o.type === typeId && (!needle || o.title.toLowerCase().includes(needle)))
@@ -128,7 +146,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
       .map((o) => ({ kind: 'object' as const, object: o }))
     const create: Item = { kind: 'new', label: q ? NEW_OBJECT_TEXT.newNamed(q) : NEW_OBJECT_TEXT.newUntitled }
     return [create, ...found]
-  }, [q, typeId, types, objects])
+  }, [q, typeId, types, objects, suggestedId])
 
   const createOf = async (id: string, kind: TypeDef | undefined, title: string, m: OpenMods) => {
     if (busy.current) return
@@ -136,6 +154,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
     try {
       if (isWhiteboardType(kind)) {
         const res = await whiteboardApi.createWhiteboard(title || undefined)
+        useLastType.getState().set(id)
         openObject(res.path, m, id)
         void invalidateLinkIndex()
       } else {
@@ -234,7 +253,10 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
               {item.kind === 'type' && (
                 <>
                   <TypeChip type={item.type} size={20} />
-                  <span className="truncate">{item.type.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{item.type.name}</span>
+                  {item.suggested && (
+                    <span className="shrink-0 rounded bg-hover px-1.5 text-[12px] text-fg-muted">{SUGGEST_TEXT.suggested}</span>
+                  )}
                 </>
               )}
               {item.kind === 'new' && (

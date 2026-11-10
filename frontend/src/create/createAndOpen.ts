@@ -11,6 +11,7 @@ import { invalidateLinkIndex, typeOf } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { useSettings } from '@/settings/useSettings'
 import { markFresh } from './freshObjects'
+import { useLastType } from './lastType'
 
 export interface OpenMods {
   ctrlKey?: boolean
@@ -49,7 +50,10 @@ export function openObject(path: string, mods: OpenMods = {}, typeId?: string | 
   return mode
 }
 
-/** Create an object of `typeId` (`templateId`: an id, `null` for the default, `"none"`) and open it. */
+/**
+ * Create an object of `typeId` (`templateId`: an id, `null` for the default, `"none"`) and open it.
+ * M29: `typeId` becomes the space's last type.
+ */
 export async function createAndOpen(
   typeId: string,
   opts: { title?: string; templateId?: string | null; values?: Record<string, unknown> } = {},
@@ -60,6 +64,8 @@ export async function createAndOpen(
   if (opts.templateId !== undefined) req.templateId = opts.templateId
   if (opts.values !== undefined && Object.keys(opts.values).length > 0) req.values = opts.values
   const res = await api.createObject(typeId, req)
+  // M29: the type of the last object created, the suggested type's fallback.
+  useLastType.getState().set(typeId)
   // Its header focuses the title once it shows (M2#3).
   markFresh(res.path)
   openObject(res.path, mods, typeId)

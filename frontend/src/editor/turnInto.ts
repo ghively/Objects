@@ -2,9 +2,9 @@
  * Turn a block into an object, a task, a Task object or a whiteboard (M8).
  *
  * - `turnIntoObject` ("Turn into object"): the block's text
- *   becomes the title of a new object of type `typeId` (default: the Page type, our choice), its
- *   children the body, and the block becomes `![[Title]]` shown as a Link block (`view=inline`,
- *   our choice).
+ *   becomes the title of a new object of type `typeId` (default, M29: the suggested type of the
+ *   title, else the Page type, our choice), its children the body, and the block becomes
+ *   `![[Title]]` shown as a Link block (`view=inline`, our choice).
  * - `turnIntoTask` ("Turn into task"): the same with the Task type.
  * - `turnTodoIntoTask` ("Turn into task object"): a
  *   to-do becomes a Task titled with its text, status Done when it was checked; with a block
@@ -23,7 +23,10 @@ import type { Editor } from '@tiptap/core'
 import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { api } from '@/api/client'
 import type { TypeDef } from '@/api/types'
+import { useLastType } from '@/create/lastType'
+import { suggestFor } from '@/create/suggestContext'
 import { invalidateLinkIndex, stemOf, summaryOf, typeOf, useLinkIndex } from '@/links/linkIndex'
+import { suggestableTypes } from '@/palette/searchOptions'
 import { turnBlocksIntoWhiteboard } from '@/whiteboard/turnInto'
 import { firstOptionOf, statusDef } from '@/tasks/statusCategory'
 import { makeOption } from './annotations'
@@ -223,6 +226,7 @@ async function createFor(editor: Editor, t: Turnable, typeId: string, values?: R
     ...(values && Object.keys(values).length ? { values } : {}),
     ...(body.trim() ? { appendBody: body } : {}),
   })
+  useLastType.getState().set(typeId)
   void invalidateLinkIndex()
   return linkTarget(created.path, t.title)
 }
@@ -239,10 +243,26 @@ async function turnWith(editor: Editor, turnables: Turnable[], typeOfItem: (t: T
   return replaceWithEmbeds(editor, done)
 }
 
+/** M29: the title the block at `pos` (or the selection) would get, or '' when it can't be turned. */
+export function turnTitleAt(editor: Editor, pos?: number): string {
+  return turnableAt(editor, pos)?.title ?? ''
+}
+
+/** M29: the suggested type id for turning a block titled `title` (null: none). */
+export function suggestedTurnType(title: string): string | null {
+  if (!title) return null
+  return suggestFor(title, suggestableTypes(useLinkIndex.getState().types))[0] ?? null
+}
+
 export async function turnIntoObject(editor: Editor, typeId?: string | null, opts: TurnIntoOptions = {}): Promise<boolean> {
   const t = turnableAt(editor, opts.pos)
   if (!t) return false
-  const tid = typeId || basicType('page')?.id || useLinkIndex.getState().types.find((x) => !x.readOnlyReason)?.id || 'Page'
+  const tid =
+    typeId ||
+    suggestedTurnType(t.title) ||
+    basicType('page')?.id ||
+    useLinkIndex.getState().types.find((x) => !x.readOnlyReason)?.id ||
+    'Page'
   return turnWith(editor, [t], () => ({ typeId: tid }))
 }
 
