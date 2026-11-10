@@ -175,6 +175,12 @@ A popover: "Add new object type", "Create your own", then template groups with a
 - Media: Books (authors, rating, genre), Films, TV series, Podcasts.
 - Planning and reflection: Weeks, Months (for weekly and monthly reviews; the Calendar's daily notes already cover
   each day, so the gallery offers no Day type; removed 2026-11-09).
+- IT operations (Object's own, M28): Hosts, Software, Applications, Containers, Configurations, Locations,
+  Networks, Vendors, Scripts, Commands, Runbooks, Prompts, Incidents — the IT ops starter's types that the groups
+  above don't already offer (People, Meetings and Projects stay the entries above; Source isn't offered, imports
+  make it). Each comes with its default template (the older entries add none) and one saved query; its relations
+  point at the space's own types (Location's "Part of" at Location; Application's "Runs on" at Host once the space
+  has one, any type before) and keep their named other side.
 - Organizations, Areas (areas of responsibility).
 Each starter template pre-fills the new type's properties.
 
@@ -188,9 +194,13 @@ Each starter template pre-fills the new type's properties.
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
 - A space opened as a new or empty folder (`objectapp --space <folder>`: no `setup` in `space.json`, no basic
-  types, no files) asks "Pick a starting point" once — the same "Start with basic setup" / "Empty space" choices
-  as "Create new space" (`POST /api/space/setup`). Nothing is written before a pick; closing asks again next
-  time. The pick is recorded as `space.json` `setup` (Create space records it too).
+  types, no files) asks "Pick a starting point" once — the same three choices as "Create new space"
+  (`POST /api/space/setup`): "Start with basic setup", "IT operations" ("Includes hosts, software, applications,
+  runbooks and incidents."; Object's own, M28) and "Empty space". IT operations writes the 17 IT ops types (Host,
+  Software, Application, Container, Configuration, Location, Network, Person, Vendor, Script, Command, Runbook,
+  Prompt, Source, Project, Incident, Meeting), a default template for each but Source, and 30 seed Tags; a type,
+  template or Tag already there is kept as it is. Nothing is written before a pick; closing asks again next
+  time. The pick is recorded as `space.json` `setup` (`basic`, `itops` or `blank`; Create space records it too).
 - Main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant (Gene's 2026-11-08 redesign;
   Calendar is the space's opening view). The Assistant is the built-in, always-on helper — a program
   feature, not an "agent" — shown with its own icon; a click opens its chat. Like an agent row it carries a
@@ -270,6 +280,18 @@ Each starter template pre-fills the new type's properties.
   the new name; Escape goes back only to the last committed name, so Enter then Escape keeps the new one (Escape
   in Property settings closes the dialog).
 - **Tags** are objects of the Tag type with a color; the chip uses that color.
+- **Counterpart rows** (Object's own, M28): a relation can name its other side ("Show on the other side as" in
+  Property settings, placeholder "No other side"; a renamed side keeps its key, an emptied field removes it; not
+  offered on basic types, and a relation that already syncs both ways shows "This relation already syncs both
+  ways." instead). The target then shows a row of that name (a Host's "Runs" lists the Applications and Containers
+  whose "Runs on" names it), after the type's own properties, with the same row chrome. It is computed from the
+  links and never stored on the target: adding or removing an object in the row writes that object's own relation
+  (a single-valued one is replaced), never the object you are on. Rows of one name from several types merge
+  ("Documented in" from Scripts, Commands and Runbooks is one row). An empty row waits under the panel's
+  "Hidden (n)" toggle. A relation open to any type (Command and Runbook "Covers") adds no row to every type: its
+  row shows on an object only while it has a value. A property the target type stores under the same key wins.
+  In views a counterpart filters, sorts and groups like a relation; its table column is read-only and a board
+  grouped by it refuses drops.
 
 ## 6. Editor chrome and menus
 
@@ -311,6 +333,10 @@ Each starter template pre-fills the new type's properties.
   Bottom right: zoom out, a zoom dropdown (Page Fit, 5% ... 300%), zoom in, download (image), and a settings
   dropdown: Show tags network, Filter object types, Exclude object types, Show completed tasks, Hide heavily
   linked objects, Hide dates, Hide indirect links, Show simplified graph (Object's own, last).
+- **Edge labels** (Object's own, M28): a link made by a relation property is labelled with the relation's name
+  ("Runs on"; a pair linked by relations both ways joins the names with " · "); a link from body text only has no
+  label. Labels show only on the hovered node's edges, or on the local graph centre's while nothing is hovered,
+  and "Show simplified graph" hides them with the node labels.
 - **Trash**: a list of deleted objects, "Empty Trash", 30-day retention, and "object types and collections cannot
   be restored completely".
 - **Explore** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"

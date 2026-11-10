@@ -93,9 +93,22 @@ The history below is in the order it was written: the per-milestone sections new
   and a 20 s import wait, failed only with the front-end suite running beside them and pass alone); front end 4095
   passed, 1 skipped (one 100 ms budget test likewise); `tsc`, lint and build clean; headless launch smoke run clean.
 
-- **Next: M28-M30**, the IT ops type model (design approved by Gene 2026-11-09, `specs/2026-11-09-it-ops-type-model-design.md`;
+- **M28-M30**, the IT ops type model (design approved by Gene 2026-11-09, `specs/2026-11-09-it-ops-type-model-design.md`;
   plans `2026-11-09-m28-itops-starter-and-relations.md`, `2026-11-09-m29-synced-facts-and-type-suggestion.md`,
   `2026-11-09-m30-entity-extraction.md`), built in that order.
+
+### Done on 2026-11-10
+
+- **M28 built: the IT ops starter and two-way relations** (T1-T10 on parallel lanes by file ownership, merged on
+  `ccr-9c93c0c4-ssxqz7` up to `78a2f8af`; T11 integration). "IT operations" is the third starting point (17 types,
+  16 default templates, 30 seed tags; nothing already there is replaced); the gallery's IT operations group adds the
+  13 types the other groups lack, each with its default template; a relation can name its computed other side
+  (`options.counterpart`), shown as an editable row on the target (Host "Runs", "Documented in", "Contains", …;
+  never stored, an edit writes the other object's relation only), filterable, sortable and groupable in views
+  (read-only table column, a board refuses drops); the graph labels relation edges on the hovered node. Catalog §3,
+  §4, §5, §7. `scripts/m28_acceptance.py` PASS (ten checks); `m8` and `m22` acceptance PASS. Next: the
+  whole-milestone review, one fix pass and the full gate, then Gene's hand checks (`m28-acceptance.md`).
+- **Next: M29** (synced facts and the type suggestion), then **M30** (entity extraction).
 
 ### Needs Gene
 
