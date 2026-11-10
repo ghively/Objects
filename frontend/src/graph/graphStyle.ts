@@ -66,11 +66,72 @@ export function colorValue(c: ThemeColor): string {
 }
 
 /** The label ink and the dimmed colour of nodes outside a hover. */
-export function canvasColors(): { label: string; dim: string; edge: string } {
+export function canvasColors(): { label: string; dim: string; edge: string; hoverBg: string } {
   return {
     label: cssVar('--text') || '#f4f4f5',
     dim: cssVar('--border-subtle') || '#27272a',
     edge: '#52525b',
+    // The hovered node's label box: the theme's raised surface, so the label (drawn in `label`)
+    // reads in every theme. sigma's own hover box is always white (white on white in dark themes).
+    hoverBg: cssVar('--bg-raised') || cssVar('--bg-panel') || '#27272a',
+  }
+}
+
+interface HoverData {
+  x: number
+  y: number
+  size: number
+  label?: string | null
+}
+
+interface HoverSettings {
+  labelSize: number
+  labelFont: string
+  labelWeight: string
+}
+
+/** sigma's `defaultDrawNodeHover`, with the box in `bg` and the label in `color` instead of
+ *  sigma's fixed white box (audit 2026-11-10: the hovered name was unreadable in dark themes). */
+export function drawNodeHover(
+  context: CanvasRenderingContext2D,
+  data: HoverData,
+  settings: HoverSettings,
+  bg: string,
+  color: string,
+): void {
+  const size = settings.labelSize
+  context.font = `${settings.labelWeight} ${size}px ${settings.labelFont}`
+  context.fillStyle = bg
+  context.shadowOffsetX = 0
+  context.shadowOffsetY = 0
+  context.shadowBlur = 8
+  context.shadowColor = '#000'
+  const PADDING = 2
+  if (typeof data.label === 'string' && data.label) {
+    const textWidth = context.measureText(data.label).width
+    const boxWidth = Math.round(textWidth + 5)
+    const boxHeight = Math.round(size + 2 * PADDING)
+    const radius = Math.max(data.size, size / 2) + PADDING
+    const angle = Math.asin(boxHeight / 2 / radius)
+    const dx = Math.sqrt(Math.abs(radius ** 2 - (boxHeight / 2) ** 2))
+    context.beginPath()
+    context.moveTo(data.x + dx, data.y + boxHeight / 2)
+    context.lineTo(data.x + radius + boxWidth, data.y + boxHeight / 2)
+    context.lineTo(data.x + radius + boxWidth, data.y - boxHeight / 2)
+    context.lineTo(data.x + dx, data.y - boxHeight / 2)
+    context.arc(data.x, data.y, radius, angle, -angle)
+    context.closePath()
+    context.fill()
+  } else {
+    context.beginPath()
+    context.arc(data.x, data.y, data.size + PADDING, 0, Math.PI * 2)
+    context.closePath()
+    context.fill()
+  }
+  context.shadowBlur = 0
+  if (typeof data.label === 'string' && data.label) {
+    context.fillStyle = color
+    context.fillText(data.label, data.x + data.size + 3, data.y + size / 3)
   }
 }
 

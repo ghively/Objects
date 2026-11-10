@@ -27,6 +27,7 @@ import {
   REDUCED_NODE_COLOR,
   REDUCED_NODE_SIZE,
   type EdgeKind,
+  drawNodeHover,
 } from './graphStyle'
 import { runLayout, startPosition } from './layout'
 
@@ -199,6 +200,8 @@ export function GraphCanvas({
         labelSize: 12,
         labelFont: 'Inter, system-ui, sans-serif',
         edgeLabelColor: { color: colors.label },
+        defaultDrawNodeHover: (context, data, settings) =>
+          drawNodeHover(context, data, settings, colorsRef.current?.hoverBg ?? colors.hoverBg, colorsRef.current?.label ?? colors.label),
         edgeLabelSize: 11,
         edgeLabelFont: 'Inter, system-ui, sans-serif',
         defaultEdgeColor: colors.edge,
