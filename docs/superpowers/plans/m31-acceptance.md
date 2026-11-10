@@ -42,10 +42,11 @@ back-end behaviour are hand checks only):
    order, as the app's own two steps (`POST /api/rows` with the query's scope, then `queryeval.run_query`), and the
    expected list; the page excluded from AI never shows.
 3. **Conventions in every space, and one Resolved.** In a copy of `space-sample` (no setup, none of the IT ops types)
-   a draft import batch and an agent's proposal over `/api/v1/import/proposal`: a new type "Box" with Server's
-   properties shows "It has the same properties as Server." and the offer "Use Server, with a category"; "Docs" (a tag
-   name) is "a category: a property value or a tag, not a type."; the relation "Backs up" stays a plain link; no type
-   file is written. A new space made with the IT ops setup has an Incident with one Resolved (`resolved`, a date and
+   a draft import batch and an agent's proposal over `/api/v1/import/proposal`: a new type "Box" with Project's
+   properties shows "It has the same properties as Project." and the offer "Use Project, with a category", while "Rack"
+   with two properties named like Server's (Cores, Owner) is no look-alike (the fix pass's tuning); "Docs" (a tag
+   name) is "a category: a property value or a tag, not a type."; the relation "Backs up" to Vault (neither in the space
+   nor proposed) stays a plain link; no type file is written. A new space made with the IT ops setup has an Incident with one Resolved (`resolved`, a date and
    time) and no `deskResolved`; the type gallery's Incident lists Resolved once.
 4. **Git provenance.** A synthetic repository (two commits by "Ada Example", an `origin` on GitHub never fetched, one
    file changed since the commit, one never committed); its `docs` folder imported into a new space. Each object's

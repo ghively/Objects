@@ -295,8 +295,14 @@ def test_mcp_import_entities_is_read_only(env: Env) -> None:
 
 def test_proposal_offer_roundtrip(env: Env) -> None:
     e = env
-    props = [{"name": "IP address", "kind": "text", "share": 1.0}, {"name": "FQDN", "kind": "text", "share": 0.9},
-             {"name": "Operating system", "kind": "text", "share": 0.8}]
+    # Every specific property of Host (M31 fix pass: a look-alike shares most of both types' properties).
+    props = [{"name": n, "kind": k, "share": 1.0} for n, k in (
+        ("IP address", "text"), ("FQDN", "text"), ("Last boot", "datetime"), ("Disk free", "number"),
+        ("Reboot pending", "boolean"), ("Last seen", "datetime"))]
+    props += [{"name": n, "kind": "label", "share": 1.0, "options": ["X"]}
+              for n in ("Category", "Roles", "Department", "Environment", "Patch state")]
+    props += [{"name": n, "kind": "entity", "target": t, "share": 1.0} for n, t in (
+        ("Operating system", "Software"), ("Located at", "Location"), ("Network", "Network"), ("Owned by", "Person"))]
     batch = e.client.post("/api/import/batches", json={"path": str(e.src)}).json()["batch"]
     proposal.save_proposal(Space(e.root), batch, {"summary": "", "items": [
         {"id": "g1", "action": "create", "group": "Kiosk", "name": "Kiosk", "documents": 10,

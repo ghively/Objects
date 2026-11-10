@@ -799,12 +799,18 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   out are listed under **Left out** with their reason, and the Apply summary names each skipped item and why
   ("Skipped: Memo (…)"; items the user turned down are not repeated). Only the app applies a proposal; no MCP tool can.
   In every space, whatever its setup (M30, design 5b; M31, Gene's 2026-11-10 decision "spaces never change
-  behaviour": the setup is only the starting set of types) the rules also say: existing types first; a new type with at least two properties, 80% or more of them by name also an existing
-  type's, is refused ("It has the same properties as Host.") and offers **Use Host, with a category**, which turns the
-  item into an extend of Host that adds the group's name to its Category (else Kind) options; a category name (Server,
-  Workstation, VM, Production) is never a type ("Server is a category: a property value or a tag, not a type."); a
-  relation property outside the space's named relations is left out ("Not one of the named relations; it stays a plain
-  link.") (M31).
+  behaviour": the setup is only the starting set of types) the rules also say: existing types first; a new type that
+  shares at least 3 specific properties with an existing type (same name, case and punctuation aside, and same kind; the
+  system properties and Notes, Type, Status, Cover image and Sources left out), 80% or more of both types' specific
+  properties together, is refused ("It has the same properties as Host.") and offers **Use Host, with a category**,
+  which turns the item into an extend of Host that adds the group's name to its Category (else Kind) options (tuned in
+  M31's fix pass: [Genre, Rating] is not Book, [Status, Notes] is not Project); a category name (Server, Workstation,
+  VM, Production) is never a type when the item also shares 2 specific properties with the type holding it ("Server is
+  a category: a property value or a tag, not a type."), and a tag's name never is; a category name on an item that
+  doesn't look like its type is a note ("Workstation is also one of Host's Category options.") with the same offer and
+  doesn't block Apply; a relation property is kept when it points at an existing type or one proposed in the same
+  proposal, else it is left out ("It points at Vault, which is neither a type in this space nor one proposed here; it
+  stays a plain link.") (M31 fix pass).
 - **Trial on the first 50 objects**: **Start trial**; each result shows a confidence (High, Medium, Low), the value
   and its **Quote**, the **Tags** and **Collections** it adds (each with its quote), and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
   failed the app's check says **Did not pass the check**. **Continue with the rest** starts the bulk pass (40 objects
