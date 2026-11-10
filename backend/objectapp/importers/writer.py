@@ -983,6 +983,8 @@ def _removed_at_source(planned: Planned, space: Space, state: WriteState) -> Non
     for key, it in state.prior.items.items():
         if key in seen:
             continue
+        if it.get("entity") is True or key[1].startswith("entity:"):
+            continue  # M30: an entity a Write made from the Sources, not an item of the source
         if key[1].endswith("#original") and key[1][: -len("#original")] in present:
             continue  # the File object of an original that is still at the source
         rel = str(it.get("path", ""))
