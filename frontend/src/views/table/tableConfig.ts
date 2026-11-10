@@ -38,22 +38,17 @@ export function defaultWidth(def: Pick<PropertyDef, 'type'> & { tableColWidth?: 
   return DEFAULT_COL_WIDTH[def.type] ?? FALLBACK_COL_WIDTH
 }
 
-/**
- * M28: a computed other side (`TypeDef.counterparts`) as a table column. It is shown with the
- * read-only Backlinks cell (the linked objects' chips; their count in a one-line cell), so a table
- * edit can never write the counterpart's key on this row: it is edited on the object page, which
- * writes the stored side of the other objects.
- */
-function counterpartColumn(def: PropertyDef): PropertyDef {
-  return { ...def, type: 'entity_backlinks' }
-}
+/** M28: whether `def` is a computed other side (`options.counterpartOf`), never written on its row. */
+export const isCounterpartDef = (def: Pick<PropertyDef, 'options'> | undefined): boolean => !!def?.options?.counterpartOf
 
 /**
  * The properties a table can show: every definition (the backlinks as a read-only column), then
- * (M28) the type's computed other sides, read-only.
+ * (M28) the type's computed other sides, as relation columns (`entity`) that the table renders
+ * read-only (`isCounterpartDef`): a table edit can never write the counterpart's key on this row,
+ * which is edited on the object page (it writes the stored side of the other objects).
  */
 export const tableDefs = (type: Pick<TypeDef, 'propertyDefinitions' | 'counterparts'>): PropertyDef[] =>
-  type.counterparts?.length ? [...type.propertyDefinitions, ...type.counterparts.map(counterpartColumn)] : type.propertyDefinitions
+  type.counterparts?.length ? [...type.propertyDefinitions, ...type.counterparts] : type.propertyDefinitions
 
 /**
  * The config a table renders: `wrapAllContent` defaults to true, new properties are appended,

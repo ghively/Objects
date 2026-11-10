@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { DataViewDefinition, Row, ViewState } from '@/api/types'
-import { objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
+import { counterpartDef, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
@@ -449,4 +449,11 @@ describe('TimelineSettings', () => {
     expect(screen.queryByRole('switch', { name: 'Show dependencies' })).toBeNull()
   })
 
+  // M28 review #9: the timeline's table builds its columns from the stored definitions only.
+  test('a computed other side is not offered as a column', () => {
+    const runs = counterpartDef({ key: 'runs', name: 'Runs', options: { counterpartOf: [{ typeId: 'application', key: 'runsOn' }] } })
+    render(<TimelineSettings types={[{ ...STORY, counterparts: [runs] }]} state={timeline()} onState={vi.fn()} />)
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Points' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Runs' })).toBeNull()
+  })
 })

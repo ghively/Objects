@@ -98,9 +98,15 @@ describe('test M28 counterparts in views', () => {
     const defs = tableDefs(host)
     expect(defs.map((d) => d.key)).toEqual(['title', 'fqdn', 'runs'])
     const col = defs.find((d) => d.key === 'runs')!
-    // A read-only relation cell (the chips of the linked objects): never written on this row.
-    expect(col.type).toBe('entity_backlinks')
+    // A relation column (review #9: its kind, not Backlinks, also in a saved table config); the
+    // table renders it read-only from `options.counterpartOf`, so it is never written on this row.
+    expect(col.type).toBe('entity')
+    expect(col.options.counterpartOf).toEqual(runs.options.counterpartOf)
     expect(col.name).toBe('Runs')
-    expect(normalizeTableConfig(host).properties.map((c) => c.id)).toEqual(['title', 'fqdn', 'runs'])
+    const cols = normalizeTableConfig(host).properties
+    expect(cols.map((c) => c.id)).toEqual(['title', 'fqdn', 'runs'])
+    expect(cols.find((c) => c.id === 'runs')?.type).toBe('entity')
+    // A config saved while it was a Backlinks column takes the relation kind again.
+    expect(normalizeTableConfig(host, { wrapAllContent: true, properties: [{ id: 'runs', type: 'entity_backlinks', isHidden: false, wrapContent: false, colWidth: 12 }] }).properties.find((c) => c.id === 'runs')?.type).toBe('entity')
   })
 })

@@ -24,6 +24,7 @@ import { CalcFooter } from './CalcFooter'
 import { ColumnMenu } from './ColumnMenu'
 import {
   clampWidth,
+  isCounterpartDef,
   isWrapped,
   leftOffsets,
   moveColumn,
@@ -321,7 +322,7 @@ const TableRow = memo(function TableRow({ row, index, mainContent, pinned, colum
                 <Cell
                   def={def}
                   value={valueFor(def, row)}
-                  readOnly={row.summary.readOnly}
+                  readOnly={row.summary.readOnly || isCounterpartDef(def)}
                   density={wrapped ? 'panel' : 'table'}
                   inTable
                   onChange={(next: unknown) => commit(row, def, next)}
