@@ -65,4 +65,4 @@ On a copy of your space (and a new scratch space for the first three):
 - [ ] In an existing space, the gallery's IT operations group adds Host alone, with its default template; adding Application later makes Runs on point at it; Location's Part of points at Location.
 - [ ] Property settings of a relation: "Show on the other side as" names its other side; the target shows the new row.
 - [ ] Opening the space and browsing changes no file (git status clean).
-- [ ] Check the guesses G1-G4 in the plan's "Our calls" (G1 Location's Part of with the other side Contains; G2 the Project statuses and Priority; G3 "Desk resolved" on Incident; G4 "its properties shown" as always-shown properties).
+- [ ] Check G1-G4 as Gene decided them on 2026-11-10 (M31 plan): G1 Location's Part of with the other side Contains (kept); G2 the Project statuses and Priority (kept); G3 an Incident has one Resolved, its own date and time, which Desk sync fills (no second "Resolved" among its ticket fields); G4 "its properties shown" as always-shown properties (kept).

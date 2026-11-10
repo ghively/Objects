@@ -2983,7 +2983,7 @@ export interface ProposalGroup {
   problems?: string[]
   /** Properties the app's rules left out of the item, each with the reason. */
   dropped?: { key: string; name: string; reason: string }[]
-  /** M30 (an IT ops space): "Use <type>, with a category" in place of a look-alike or category type. */
+  /** M30, in every space (M31): "Use <type>, with a category" in place of a look-alike or category type. */
   offer?: { label: string; typeId: string; category: string } | null
 }
 

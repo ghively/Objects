@@ -1,6 +1,6 @@
 # Object: remaining work
 
-Status as of 2026-11-10: **M1-M30 are built, gated and on `master`** (M28-M30, the IT ops type model, on 2026-11-10); a full milestone audit the same day is `milestone-audit-2026-11-10.md`, whose "Remaining work" is the current to-do list. Earlier status, 2026-11-09: **M1-M27 and everything built on 2026-11-08 and 2026-11-09 are on `master`**, the only live branch (`integrate/2026-11-08` was merged on 2026-11-09; Gene wants everything on `master`). That day: the sidebar redesign, the Tasks dashboard, git-backed spaces, the decisions memo (`decisions-memo-2026-11-08.md`, approved by Gene) built, live checks of the real CLI, OCR and MCP, and an automated run of all 435 acceptance boxes (`auto-acceptance-2026-11-08.md`). The current list is "What remains" below; the history follows it.
+Status as of 2026-11-10: **M1-M30 are built, gated and on `master`** (M28-M30, the IT ops type model, on 2026-11-10), and **M31 (completion: everything the audit listed as not built) is built and integrated** (its review, fix pass and gate next; `m31-acceptance.md`); a full milestone audit the same day is `milestone-audit-2026-11-10.md`, whose "Remaining work" is the current to-do list. Earlier status, 2026-11-09: **M1-M27 and everything built on 2026-11-08 and 2026-11-09 are on `master`**, the only live branch (`integrate/2026-11-08` was merged on 2026-11-09; Gene wants everything on `master`). That day: the sidebar redesign, the Tasks dashboard, git-backed spaces, the decisions memo (`decisions-memo-2026-11-08.md`, approved by Gene) built, live checks of the real CLI, OCR and MCP, and an automated run of all 435 acceptance boxes (`auto-acceptance-2026-11-08.md`). The current list is "What remains" below; the history follows it.
 
 **Gate on `integrate/2026-11-08` (Linux, 2026-11-09, after lanes A-F, G1-G5, H1-H3 and the acceptance fixes; vitest and pytest run one after the other):** back end 3391 passed, 16 skipped, 3 xpassed, 0 failed; front end 4074 passed, 1 skipped (537 files); lint 0 errors; `npm run build` clean. One frontend timing flake under load (`BrainDumpBar` "M23 seam") was fixed by waiting for the refusal text instead of one flush.
 
@@ -98,6 +98,18 @@ The history below is in the order it was written: the per-milestone sections new
   `2026-11-09-m30-entity-extraction.md`), built in that order.
 
 ### Done on 2026-11-10
+
+- **M31 built: completion** (plan `2026-11-10-m31-completion.md`; the contract `34cd1954`, then lanes A, B, C, D1, D2,
+  E1, E2 and F by file ownership, merged at `4d08f8ef`; the integrate step). Everything the audit listed as "Not built"
+  is built or decided (Gene's 2026-11-10 decisions): Full Export, manual and automated; saved queries over `/api/v1`
+  and MCP list what the app lists; spaces never change behaviour (the import's conventions in every space) and an
+  Incident has one Resolved; git provenance for an import from a git repository; "Remodel this space…"; the Explore
+  side panel; a collection in a peek with its stepper; graph controls; definition Version History with restore; inline
+  `#tag` chips; page shortcuts; "Hide App Menu"; the Table property kind; the Page link view; App icon, "Show developer
+  information", "New API token" and the Offline & Sync local rows; the unreachable 501 branch removed and decisions A-1
+  and English-only recorded (`workseams.py`'s M24-era fallbacks are still there). `scripts/m31_acceptance.py` RESULT:
+  PASS (66 checks); `m30`, `m29`, `m28` and `m25` RESULT: PASS. Next: the whole-milestone review, one fix pass and the
+  full gate, then Gene's hand checks (`m31-acceptance.md`).
 
 - **M30 built: entity extraction and distillation** (T1 contract; T2-T12 on parallel lanes by file ownership, merged
   up to `2befd1ad` on top of all of M28 and M29; T13 integration). Every import has the option **Keep pages as
