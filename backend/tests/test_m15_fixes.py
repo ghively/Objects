@@ -43,7 +43,7 @@ def client(space_dir):
 
 
 def _preview(client, path, **extra):
-    body = {"source": {"path": str(path), "kind": extra.pop("kind", "auto")}, **extra}
+    body = {"source": {"path": str(path), "kind": extra.pop("kind", "auto")}, "keepAsSources": False, **extra}
     return client.post("/api/import/preview", json=body)
 
 

@@ -26,9 +26,11 @@ Then it checks:
     Trash can restore it; "Try on a copy of this space" imports into a copy and leaves the open
     space untouched;
  6. never write on read: previews change nothing; ``git status`` of the space shows only new
-    files after a first import, and only imported objects and records after a re-run.
+    files after a first import (besides the type file of an existing type a planned type maps
+    onto, which M15 extends with the properties it lacks and which only gains), and only imported
+    objects and records after a re-run.
 
-Each check prints ``[ok]`` or ``[FAIL]``; exits non-zero on any failure.
+Each check prints ``[ok]`` or ``[FAIL]``; ``RESULT: PASS`` at the end; exits non-zero on any failure.
 """
 
 from __future__ import annotations
@@ -37,6 +39,7 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -93,6 +96,8 @@ class M25:
         self.src.mkdir()
         self.out = tmp / "copies"
         self.out.mkdir()
+        self.mapped: set[str] = set()
+        """Existing types an import into this space mapped a planned type onto (M15: they may gain properties)."""
 
     @property
     def http(self) -> Http:
@@ -104,6 +109,8 @@ class M25:
                                          "keepAsSources": False}
         )
         assert code == 200, (code, preview)
+        if target is None:
+            self.mapped |= {t["existingTypeId"] for t in preview["types"] if t.get("existingTypeId") and not t.get("skip")}
         body = {"previewId": preview["previewId"], "mapping": preview["mapping"], "target": target or {"kind": "currentSpace"},
                 "keepAsSources": False, **extra}
         code, started = self.http("POST", "/import/start", body)
@@ -115,6 +122,28 @@ class M25:
             time.sleep(0.05)
         assert job["phase"] == "done", job
         return job["result"]
+
+    def only_gained(self, rel: str) -> bool:
+        """``rel`` is the type file of an existing type an import mapped onto, and it only gained:
+        every property it had is still there, with its name and kind, and nothing else changed."""
+        if not (rel.startswith(".object/types/") and rel.endswith(".json")):
+            return False
+        try:
+            old = json.loads(git(self.root, "show", f"HEAD:{rel}"))
+            new = json.loads((self.root / rel).read_text(encoding="utf-8"))
+        except (OSError, ValueError, subprocess.CalledProcessError):  # not in HEAD, or unreadable
+            return False
+        if old.get("id") not in self.mapped or old.get("id") != new.get("id"):
+            return False
+        props = {p.get("key"): p for p in new.get("propertyDefinitions") or []}
+        for p in old.get("propertyDefinitions") or []:
+            q = props.get(p.get("key"))
+            if q is None or (q.get("name"), q.get("type")) != (p.get("name"), p.get("type")):
+                return False
+        rest = {k: v for k, v in new.items() if k != "propertyDefinitions"}
+        return rest == {k: v for k, v in old.items() if k != "propertyDefinitions"} and len(props) > len(
+            old.get("propertyDefinitions") or []
+        )
 
     @staticmethod
     def reconciles(r: dict) -> bool:
@@ -153,7 +182,16 @@ class M25:
                 self.run.report(w["url"] == "https://www.notion.so/0123456789abcdef0123456789abcdef", "notion: page url rebuilt from the id")
         self.run.report(tree(self.src) == pristine, "the sources are unchanged after importing")
         status = git(self.root, "status", "--porcelain", "--untracked-files=all").splitlines()
-        self.run.report(all(line.startswith("??") for line in status), f"a first import only adds files ({len(status)} new)")
+        added = [line for line in status if line.startswith("??")]
+        changed = [line[3:] for line in status if not line.startswith("??")]
+        # M15 (plan, "Types"): a planned type mapped onto an existing type of the same name extends it
+        # with the properties it lacks; nothing else of an existing file changes, and the type only gains.
+        extended = [p for p in changed if self.only_gained(p)]
+        self.run.report(
+            changed == extended,
+            f"a first import only adds files ({len(added)} new), besides the existing types it maps onto, which only "
+            f"gain properties ({', '.join(extended) or 'none'})",
+        )
         self.vault, self.notion = vault, notion
 
     # 2 ------------------------------------------------------------------------------
@@ -173,7 +211,8 @@ class M25:
         ]
         (lib / "_manifest.jsonl").write_text("\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
         before_src = tree(lib)
-        code, preview = self.http("POST", "/import/preview", {"source": {"path": str(lib)}, "target": "currentSpace"})
+        code, preview = self.http("POST", "/import/preview", {"source": {"path": str(lib)}, "target": "currentSpace",
+                                                                 "keepAsSources": False})
         self.run.report(code == 200 and preview["kind"] == "files" and tree(lib) == before_src, "preview detects Files and changes nothing")
         r = self.do_import(lib)
         bs = blocks(self.root)
@@ -292,7 +331,8 @@ class M25:
         print("\n5. Reads write nothing")
         before = (snapshot(self.root), tree(self.src))
         for path in (self.vault, self.src / "Library"):
-            code, _ = self.http("POST", "/import/preview", {"source": {"path": str(path)}, "target": "currentSpace"})
+            code, _ = self.http("POST", "/import/preview", {"source": {"path": str(path)}, "target": "currentSpace",
+                                                     "keepAsSources": False})
             assert code == 200
         self.http("GET", "/import/batches")
         self.run.report((snapshot(self.root), tree(self.src)) == before, "previews and batch listings change no file")
@@ -341,6 +381,7 @@ def main(argv: list[str] | None = None) -> int:
             remove_tree(tmp)
     failures = run.failures if run is not None else 1
     print(f"\n{'All checks passed' if not failures else f'{failures} check(s) failed'}.")
+    print("RESULT:", "PASS" if not failures else f"FAIL ({failures})")
     return 1 if failures else 0
 
 

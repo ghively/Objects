@@ -125,8 +125,16 @@ def test_option_defaults_and_values(tmp_path, app_on) -> None:
     secret = client.post("/api/integrations/tokens", json={"name": "agent", "scope": "read-write"}).json()["secret"]
     auth = {"Authorization": f"Bearer {secret}"}
     src = make_itops_source(tmp_path / "d")
+    r = client.post("/api/v1/import/preview", json={"path": str(src), "target": "currentSpace",
+                                                    "keepAsSources": False}, headers=auth)
+    assert r.status_code == 200, r.text
+    assert "Source" not in [t["name"] for t in r.json()["types"]]
+    mcp_pv = _mcp_call(client, "import_preview", path=str(src), keep_as_sources=False)
+    assert "Source" not in [t["name"] for t in mcp_pv["types"]]
+    assert [t["name"] for t in _mcp_call(client, "import_preview", path=str(src))["types"]] == ["Source"]
     r = client.post("/api/v1/import/preview", json={"path": str(src), "target": "currentSpace"}, headers=auth)
     assert r.status_code == 200, r.text
+    assert [t["name"] for t in r.json()["types"]] == ["Source"]  # absent: what the start writes
     r = client.post("/api/v1/import/start", json={"previewId": r.json()["previewId"], "target": "currentSpace"},
                     headers=auth)
     assert r.status_code == 202, r.text
@@ -136,11 +144,15 @@ def test_option_defaults_and_values(tmp_path, app_on) -> None:
     assert sources.is_source_batch(root, batch)
     assert all(space.get(it["path"]).type == "source" for it in _items(root, batch).values())
 
-    # A re-preview with keepAsSources: true plans one type, Source; without it, the mapped types.
+    # A re-preview with keepAsSources: true plans one type, Source; with false, the mapped types.
+    # Absent, the preview plans what a start without it writes: Sources (call 25).
     root = _sample_space(tmp_path / "e")
     client, _space = app_on(root)
     src = make_itops_source(tmp_path / "e")
-    pv = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace"}).json()
+    absent = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace"}).json()
+    assert [t["name"] for t in absent["types"]] == ["Source"]
+    pv = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace",
+                                                  "keepAsSources": False}).json()
     assert "Source" not in [t["name"] for t in pv["types"]]
     again = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace",
                                                      "mapping": pv["mapping"], "keepAsSources": True})
@@ -393,3 +405,159 @@ def test_rerun_updates_source_with_history(tmp_path, app_on) -> None:
     assert space.get(rel).readOnlyReason == READ_ONLY
     assert _types_dir(root) == types
     assert all(space.get(p).type == "source" for p in (it["path"] for it in _items(root, _batch3).values()))
+
+
+def _history_texts(client: TestClient, rel: str) -> list[str]:
+    versions = client.get("/api/history", params={"path": rel}).json()["versions"]
+    return [client.get("/api/history/version", params={"path": rel, "id": v["id"]}).json().get("text") or ""
+            for v in versions]
+
+
+def test_rerun_writes_the_new_source_bytes_exactly(tmp_path, app_on) -> None:
+    """A re-run's Source is the new source's bytes, whatever the old file's line endings and BOM."""
+    root = itops_space(tmp_path)
+    src = make_itops_source(tmp_path)
+    client, space = app_on(root)
+    batch = import_as_sources(root, src, client)
+    rel = _items(root, batch)[CRLF_BOM]["path"]
+    first = (root / rel).read_bytes()
+    assert first.startswith(BOM) and b"\r\n" in first
+
+    # Mixed endings, still with a BOM: the body is the new bytes, each line ending as the source has it.
+    mixed = BOM + b"SRV-DB01 holds Payroll.\r\nLine two\nLine three\r\n"
+    (src / CRLF_BOM).write_bytes(mixed)
+    batch2 = import_as_sources(root, src, client)
+    item = _items(root, batch2)[CRLF_BOM]
+    assert item["action"] == "updated"
+    data = (root / rel).read_bytes()
+    assert data.startswith(BOM)
+    assert _body_after_fence(data) == mixed[len(BOM):]
+    assert version_of(data) == item["version"]
+    assert any("SRV-DB01 holds the Payroll database" in t for t in _history_texts(client, rel))  # the old text kept
+
+    # The source drops its BOM and CRLF: so does the Source.
+    plain = b"SRV-DB01 holds Payroll, LF now.\n"
+    (src / CRLF_BOM).write_bytes(plain)
+    batch3 = import_as_sources(root, src, client)
+    data = (root / rel).read_bytes()
+    assert not data.startswith(BOM) and b"\r\n" not in data
+    assert _body_after_fence(data) == plain
+    assert version_of(data) == _items(root, batch3)[CRLF_BOM]["version"]
+    _of, fm, _v = space.read(rel)
+    assert fm["type"] == "Source" and fm["category"] == "Note"
+    assert space.get(rel).readOnlyReason == READ_ONLY
+    assert any("Line two" in t for t in _history_texts(client, rel))
+
+
+def _mcp_call(client: TestClient, tool: str, **args):
+    """Call an MCP tool through the app (``ApiError`` with the app's answer when it refuses)."""
+    import asyncio
+
+    from mcp.server.mcpserver.exceptions import ToolError
+    from objectapp.mcp_server import ApiError, ObjectClient, build_server
+
+    secret = client.post("/api/integrations/tokens", json={"name": "mcp", "scope": "read-write"}).json()["secret"]
+    server = build_server(ObjectClient("http://testserver", secret, client))
+    try:
+        out = asyncio.run(server.call_tool(tool, args))
+    except ToolError as exc:
+        raise ApiError(str(exc)) from exc
+    if out.is_error:
+        raise ApiError(" ".join(getattr(c, "text", "") for c in out.content))
+    return out.structured_content if out.structured_content is not None else json.loads(out.content[0].text)
+
+
+def test_version_restore_of_a_source_is_refused(tmp_path, app_on) -> None:
+    from objectapp.mcp_server import ApiError
+
+    root = itops_space(tmp_path)
+    src = make_itops_source(tmp_path)
+    client, space = app_on(root)
+    batch = import_as_sources(root, src, client)
+    rel = _items(root, batch)["Hosts/APP01.md"]["path"]
+    (src / "Hosts" / "APP01.md").write_bytes(b"APP01 changed.\n")
+    import_as_sources(root, src, client)
+    versions = client.get("/api/history", params={"path": rel}).json()["versions"]
+    assert versions
+    before = (root / rel).read_bytes()
+    version = version_of(before)
+
+    r = client.post("/api/history/restore", json={"path": rel, "id": versions[-1]["id"], "baseVersion": version})
+    assert r.status_code == 423, r.text
+    assert r.json()["reason"] == READ_ONLY and r.json()["detail"]
+    assert (root / rel).read_bytes() == before
+    assert client.get("/api/history", params={"path": rel}).json()["versions"] == versions  # no entry for nothing
+
+    secret = client.post("/api/integrations/tokens", json={"name": "agent", "scope": "read-write"}).json()["secret"]
+    r = client.post("/api/v1/history/restore", json={"path": rel, "versionId": versions[-1]["id"], "version": version},
+                    headers={"Authorization": f"Bearer {secret}"})
+    assert r.status_code == 423, r.text
+    assert r.json()["reason"] == READ_ONLY
+    with pytest.raises(ApiError, match=f"423: {READ_ONLY}"):
+        _mcp_call(client, "restore_version", path=rel, version_id=versions[-1]["id"], version=version)
+    assert (root / rel).read_bytes() == before
+    assert client.get("/api/history", params={"path": rel}).json()["versions"] == versions
+
+
+def test_vcs_file_restore_of_a_source_is_refused(tmp_path, app_on, monkeypatch) -> None:
+    from objectapp import vcs
+
+    if not vcs.available():
+        pytest.skip("git is not installed")
+    cfg = tmp_path / "gitconfig"
+    cfg.write_text("")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(cfg))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.delenv(vcs.GIT_ENV, raising=False)
+    root = itops_space(tmp_path)
+    src = make_itops_source(tmp_path)
+    client, _space = app_on(root)
+    assert client.post("/api/vcs/enable", json={"target": "space"}).status_code == 200
+    batch = import_as_sources(root, src, client)
+    rel = _items(root, batch)["Hosts/APP01.md"]["path"]
+    assert client.post("/api/vcs/commit", json={"target": "space"}).status_code == 200
+    (src / "Hosts" / "APP01.md").write_bytes(b"APP01 changed.\n")
+    import_as_sources(root, src, client)
+    assert client.post("/api/vcs/commit", json={"target": "space"}).status_code == 200
+    file_versions = client.get("/api/vcs/file-log", params={"path": rel}).json()["versions"]
+    assert len(file_versions) == 2
+    before = (root / rel).read_bytes()
+    r = client.post("/api/vcs/file-restore", json={"path": rel, "sha": file_versions[-1]["sha"],
+                                                    "baseVersion": version_of(before)})
+    assert r.status_code == 423, r.text
+    assert r.json()["reason"] == READ_ONLY and r.json()["detail"]
+    assert (root / rel).read_bytes() == before
+
+
+def test_merge_refuses_an_imported_source_on_either_side(tmp_path, app_on) -> None:
+    from objectapp.merge import merge_objects
+    from objectapp.mcp_server import ApiError
+
+    root = itops_space(tmp_path)
+    src = make_itops_source(tmp_path)
+    client, space = app_on(root)
+    batch = import_as_sources(root, src, client)
+    rel = _items(root, batch)["Hosts/APP01.md"]["path"]
+    host, _hv = space.create_object("host", "APP01 host")
+    secret = client.post("/api/integrations/tokens", json={"name": "agent", "scope": "read-write"}).json()["secret"]
+    auth = {"Authorization": f"Bearer {secret}"}
+    before = (root / rel).read_bytes()
+    host_before = (root / host).read_bytes()
+
+    for source, target in ((rel, host), (host, rel)):
+        sv, tv = space.read(source)[2], space.read(target)[2]
+        with pytest.raises(ReadOnly, match=READ_ONLY):
+            merge_objects(space, source, target, sv, tv)
+        r = client.post("/api/object/merge", json={"source": source, "target": target, "sourceVersion": sv,
+                                                   "targetVersion": tv, "confirm": True})
+        assert r.status_code == 423, r.text
+        assert r.json()["reason"] == READ_ONLY
+        r = client.post("/api/v1/object/merge", json={"source": source, "target": target, "sourceVersion": sv,
+                                                      "targetVersion": tv}, headers=auth)
+        assert r.status_code == 423, r.text
+        assert r.json()["reason"] == READ_ONLY
+        with pytest.raises(ApiError, match=f"423: {READ_ONLY}"):
+            _mcp_call(client, "merge", source=source, target=target, source_version=sv, target_version=tv)
+        assert (root / rel).read_bytes() == before  # the Source is where it was, unchanged
+        assert (root / host).read_bytes() == host_before
+    assert client.get("/api/trash").json() == []

@@ -84,7 +84,7 @@ def client(space_dir):
 
 
 def run(client, source, target=None, kind="auto", **extra) -> dict:
-    r = client.post("/api/import/preview", json={"source": {"path": str(source), "kind": kind}, "target": "currentSpace"})
+    r = client.post("/api/import/preview", json={"source": {"path": str(source), "kind": kind}, "target": "currentSpace", "keepAsSources": False})
     assert r.status_code == 200, r.text
     preview = r.json()
     body = {"previewId": preview["previewId"], "mapping": preview["mapping"], "target": target or {"kind": "currentSpace"},
@@ -198,7 +198,7 @@ def make_files(tmp_path: Path) -> Path:
 def test_files_kind_originals_and_manifest(client, tmp_path, monkeypatch):
     fake_readers(monkeypatch)
     src = make_files(tmp_path)
-    r = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace"})
+    r = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace", "keepAsSources": False})
     assert r.status_code == 200
     assert r.json()["kind"] == "files"
     assert any("manifest line" in w for w in r.json()["warnings"])
@@ -417,7 +417,7 @@ def test_a_moved_source_is_matched_only_within_its_own_system(client, tmp_path):
 
 def test_move_batch_to_trash_after_a_moved_rerun(client, tmp_path):
     vault = copy_fixture("import-obsidian", tmp_path / "Vault")
-    r = client.post("/api/import/preview", json={"source": {"path": str(vault)}, "target": "currentSpace"})
+    r = client.post("/api/import/preview", json={"source": {"path": str(vault)}, "target": "currentSpace", "keepAsSources": False})
     assert r.json()["mapping"]["typeSource"] == "folder"
     r = client.post("/api/import/start", json={"previewId": r.json()["previewId"], "mapping": {"typeSource": "none"},
                                                "target": {"kind": "currentSpace"}, "keepAsSources": False})
@@ -425,7 +425,7 @@ def test_move_batch_to_trash_after_a_moved_rerun(client, tmp_path):
     moved = tmp_path / "Moved"
     shutil.move(str(vault), str(moved))
     # a fresh preview from the new place starts from the mapping the first import used
-    r = client.post("/api/import/preview", json={"source": {"path": str(moved)}, "target": "currentSpace"})
+    r = client.post("/api/import/preview", json={"source": {"path": str(moved)}, "target": "currentSpace", "keepAsSources": False})
     assert r.json()["mapping"]["typeSource"] == "none"
     second = run(client, moved)["result"]
     assert second["objects"] == 0
@@ -444,7 +444,7 @@ def test_rerun_reuses_attachments_and_mapping(client, tmp_path):
     prior = batches.load_prior(root, str(vault))
     assert prior.mapping is not None and prior.attachments
     # A fresh preview of the same source starts from the last mapping.
-    r = client.post("/api/import/preview", json={"source": {"path": str(vault)}, "target": "currentSpace"})
+    r = client.post("/api/import/preview", json={"source": {"path": str(vault)}, "target": "currentSpace", "keepAsSources": False})
     assert r.json()["mapping"]["typeSource"] == prior.mapping["typeSource"]
 
 
@@ -563,7 +563,7 @@ def test_files_preview_writes_nothing_and_rerun_keeps_one_original(client, tmp_p
     src = make_files(tmp_path)
     root = client.space_root
     before = (snapshot(root), snapshot(src))
-    r = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace"})
+    r = client.post("/api/import/preview", json={"source": {"path": str(src)}, "target": "currentSpace", "keepAsSources": False})
     assert r.status_code == 200 and (snapshot(root), snapshot(src)) == before
     first = run(client, src)["result"]
     originals = sorted(p.name for p in (root / "Attachments" / "Originals").iterdir())

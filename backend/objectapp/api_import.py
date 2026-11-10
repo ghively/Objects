@@ -7,12 +7,13 @@
   (our choice): sent again with the same path and kind while the source's fingerprint is
   unchanged, the preview re-plans without reading the source again. A read is dropped when an
   import starts from one of its previews (the job keeps what it needs until it ends).
-- M30: both take ``keepAsSources`` ("Keep pages as Sources"). The preview plans every page as a
-  Source only when it is true; the start resolves it with `sources.keep_as_sources` (absent: on),
-  plans and writes with it, and the batch records it.
+- M30: both take ``keepAsSources`` ("Keep pages as Sources"), resolved by `sources.keep_as_sources`
+  (absent: on), so the preview plans every page as a Source exactly when the start writes them so;
+  the start plans and writes with it, and the batch records it.
 - ``POST /api/import/start`` `StartImportRequest` -> ``202`` `StartImportResponse`: checks the
-  target (``409`` the new space's folder exists, another import runs or the source changed since
-  the preview; ``422`` bad name, a target inside the source or the source inside the target;
+  target (``409`` the new space's folder exists, another import runs (M30: or a batch's entities are
+  being written) or the source changed since the preview; ``422`` bad name, a target inside the
+  source or the source inside the target;
   ``404`` unknown or expired preview, location not a folder) and starts the job.
 - ``GET /api/import/jobs/{id}`` -> `ImportJob` (``404``).
 - ``POST /api/import/jobs/{id}/cancel`` -> ``{ok}``: stops after the file being written (``404``).
@@ -27,6 +28,7 @@ reloads once instead of handling an event per object.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import secrets
@@ -147,6 +149,23 @@ def router(ctx: ApiContext) -> APIRouter:
         except Exception:  # noqa: BLE001 - an SSE hiccup never fails an import
             _log.warning("Could not announce the import's resync", exc_info=True)
 
+    def entities_writing() -> bool:
+        """M30: the filing worker is writing a batch's entities (an import then waits, as for
+        another import). Reads only the batches' filing records, and only while the worker runs."""
+        from .importers.filing import FILING_FILE
+
+        worker = getattr(r, "filing", None)
+        if worker is None or not worker.running():
+            return False
+        for f in batches.imports_root(ctx.space.root).glob(f"*/{FILING_FILE}"):
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if isinstance(d, dict) and d.get("state") == "writing" and d.get("mode") == "entities":
+                return True
+        return False
+
     @r.post("/import/preview")
     def post_preview(req: PreviewRequest):
         try:
@@ -173,7 +192,8 @@ def router(ctx: ApiContext) -> APIRouter:
         finally:
             src.close()
         target = Target("currentSpace", ctx.space) if req.target == "currentSpace" else Target("newSpace")
-        as_sources = bool(req.keepAsSources)  # M30: absent, the preview plans the mapped types
+        # M30: the start's default rule (absent: on), so the planned types match what is written
+        as_sources = sources.keep_as_sources(req.keepAsSources, False, False)
         reuse: dict[str, str] = {}
         mapping = req.mapping
         if req.target == "currentSpace":
@@ -202,7 +222,7 @@ def router(ctx: ApiContext) -> APIRouter:
             if c is None:
                 return _error(404, "This preview has expired. Preview the source again.")
             read = c.read
-        if jobs.running():
+        if jobs.running() or entities_writing():
             return _error(409, "Another import is running.")
         source = Path(read.sourcePath)
         source_folder = source if read.container == "folder" else source.parent

@@ -28,7 +28,8 @@ Routes (all JSON; ``read`` scope for the GETs and the import preview, ``read-wri
 - ``GET  /v1/history?path=`` -> ``{versions}``; ``GET /v1/history/version?path=&id=`` -> a version
 - ``GET  /v1/references?path=`` -> ``{mentions}`` (unlinked mentions in visible objects)
 - ``GET  /v1/trash`` -> ``{items}``; ``GET /v1/automations`` -> ``{automations}``
-- ``POST /v1/import/preview`` ``{path, kind?}`` -> the preview (writes nothing);
+- ``POST /v1/import/preview`` ``{path, kind?, leaveOut?, keepAsSources?}`` -> the preview (writes nothing;
+  M30: ``keepAsSources`` absent is on, as the start);
   ``GET /v1/import/jobs/{id}`` -> the job
 - ``POST /v1/object/body`` ``{path, version, body}`` -> ``{version}``
 - ``POST /v1/daily-notes`` ``{date}`` -> ``{path, version, created}``
@@ -207,6 +208,7 @@ class PreviewRequest(BaseModel):
     kind: str = "auto"
     target: str = "newSpace"
     leaveOut: list[str] = []
+    keepAsSources: bool | None = None  # M30: absent, on (as the start)
 
 
 class StartRequest(BaseModel):
@@ -329,6 +331,66 @@ def _failed(status: int, body: Any) -> JSONResponse:
         else:
             data["detail"] = f"The app answered {status}."
     return JSONResponse(data, status_code=status)
+
+
+def _entities_visible(space: Any, filing: Any, batch: str, view: dict[str, Any], hidden: set[str]) -> dict[str, Any]:
+    """M30: the ``EntitiesView`` an outside agent may read: no object excluded from AI (``hidden``)
+    is named, nor anything only such Sources say. Its Sources leave each entity's pages, main pages
+    and value citations; a value, conflicting value or summary line that only hidden Sources say
+    is left out, and so is an entity (or one left out as text) that only hidden Sources mention; an
+    ``existing`` object that is hidden reads as None. Counts are kept. Reads only."""
+    from .importers import entities
+
+    if not hidden:
+        return view
+    results = filing._load(batch).get("results") or {}  # the filing record the view was built from
+    existing = {x["existing"]["path"] for x in view["entities"] if x.get("existing")}
+    if not (hidden & set(results)) and not (hidden & existing):
+        return view
+    res = entities.resolve(space, results, entities.load_review(space.root, batch))
+    known = {e.id: e for e in [*res.entities, *res.leftOut]}
+
+    def seen(paths: list[str]) -> list[str]:
+        return [p for p in paths if p not in hidden]
+
+    def cited(refs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [r for r in refs if r.get("path") not in hidden]
+
+    def shown(e: Any, pages: list[str]) -> bool:
+        return bool(seen(list(e.pages) if e is not None else pages))
+
+    rows: list[dict[str, Any]] = []
+    for x in view["entities"]:
+        e = known.get(x["id"])
+        if not shown(e, [p["path"] for p in x["pages"]]):
+            continue
+        values = []
+        for v in x["values"]:
+            sources = cited(v["sources"])
+            if not sources:
+                continue
+            others = [{**c, "sources": cited(c["sources"])} for c in v.get("conflict") or []]
+            others = [c for c in others if c["sources"]]
+            values.append({**v, "sources": sources, "conflict": others or None})
+        if e is not None and len(e.lines) == len(x["summary"]):
+            summary = [t for t, ln in zip(x["summary"], e.lines, strict=True) if cited(list(ln["sources"]))]
+        else:
+            summary = []  # not attributable to its Sources: left out
+        ex = x.get("existing")
+        rows.append({
+            **x, "pages": [p for p in x["pages"] if p["path"] not in hidden], "mainPages": seen(x["mainPages"]),
+            "values": values, "summary": summary, "existing": ex if ex and ex["path"] not in hidden else None,
+        })  # fmt: skip
+    left = []
+    for x in view["leftOut"]:
+        e = known.get(x["id"])
+        if e is None:
+            left.append(x)
+        elif seen(list(e.pages)):
+            left.append({**x, "pages": len(seen(list(e.pages)))})
+    ids = {x["id"] for x in [*rows, *left]}
+    merges = [m for m in view["suggestedMerges"] if all(i in ids for i in m.get("ids") or [])]
+    return {**view, "entities": rows, "leftOut": left, "suggestedMerges": merges}
 
 
 def _approvals(fm: dict[str, Any]) -> set[tuple[Any, ...]]:
@@ -590,7 +652,8 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         target = req.target if req.target in ("newSpace", "currentSpace") else "newSpace"
         status, body = _call(
             next(rt for rt in imports.routes if getattr(rt, "path", "") == "/import/preview"),
-            {"source": {"path": req.path, "kind": req.kind}, "target": target, "leaveOut": req.leaveOut},
+            {"source": {"path": req.path, "kind": req.kind}, "target": target, "leaveOut": req.leaveOut,
+             "keepAsSources": req.keepAsSources},
         )
         if status >= 400:
             return _failed(status, body)
@@ -711,7 +774,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
             return error(404, "No such import batch.")
         except filing.NotAllowed as exc:
             return error(409, str(exc))
-        return SafeJSONResponse(_jsonable(view))
+        return SafeJSONResponse(_jsonable(_entities_visible(space, imports.filing, batch, view, hidden_now())))
 
     @r.get("/v1/import/jobs/{job_id}")
     @run
