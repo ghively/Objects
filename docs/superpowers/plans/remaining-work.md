@@ -99,6 +99,28 @@ The history below is in the order it was written: the per-milestone sections new
 
 ### Done on 2026-11-10
 
+- **M30 built: entity extraction and distillation** (T1 contract; T2-T12 on parallel lanes by file ownership, merged
+  up to `2befd1ad` on top of all of M28 and M29; T13 integration). Every import has the option **Keep pages as
+  Sources**, ticked for every import and on when a request leaves it out (API, `/api/v1`, MCP `start_import`'s
+  `keep_as_sources`; Gene's decision, plan Our calls 25), so the M15/M25/M27 tests and acceptance scripts that test a
+  plain mapped import send `keepAsSources: false`. On, every page is a read-only **Source** ("Imported source"; its
+  text byte-identical to the import; only a re-run of the same source updates it, the old text in version history).
+  On a Source batch the AI filing pass returns each page's main entity, its mentions, summary lines and relations,
+  each quoted and checked; it writes nothing but the batch's records and stops in a new **Entities** step (after the
+  bulk pass, before Normalise): accept, rename, merge, split or turn down each entity (the entity rule: a page is about
+  it, two pages mention it, or it has a value of its own; categories never), then **Write** (refused while another
+  import runs). Each entity is distilled from all its Sources: values with their Sources (`.object/distilled/<id>.json`;
+  the newest Source wins, conflicts listed; Gene's values never replaced), the Sources relation ("Distilled into" on
+  each Source), relations on their stored side, plain links (`Also linked: [[path|Title]] (relation)`), and a "From
+  sources" section on top of the body that only the import rewrites (an entity with no lines, conflicts or plain links
+  gets none). Low-confidence links put their subject entity in the Import inbox; existing objects (Gene's own) are
+  reused; Move batch to Trash takes the Sources and the created entities. In an IT ops space the proposal refuses
+  look-alike types and offers "Use <type>, with a category". New read tool `import_entities`. Catalog §10c.
+  `scripts/m30_acceptance.py` RESULT: PASS; `m27`, `m28`, `m29` RESULT: PASS; `m15` "All checks passed." (it prints
+  no RESULT line); `m25` fails one check that already failed at the M29 gate commit `8a2724e3` ("a first import only
+  adds files": the People folder now joins Person and extends `.object/types/person.json`), not an M30 change. Next:
+  the whole-milestone review, one fix pass and the full gate, then Gene's hand checks (`m30-acceptance.md`).
+
 - **M29 built: synced facts and the suggested type** (T1-T11 on parallel lanes by file ownership, merged up to
   `8ca54c02`; T12, the settings for the synced mark, name patterns and the sync token, on its own lane; T13
   integration). A property can be marked synced (text, URL, number, checkbox, date, label): its values come only

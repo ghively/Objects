@@ -25,7 +25,7 @@ The list of what this catalog does not yet specify is in `docs/superpowers/plans
 | Unlinked mentions | specified (section 11) |
 | Brain dump, Work agent | specified (section 10b) |
 | Agents: run tools and the fence | specified in part (section 10d) |
-| Import: Source line, Files source, scan, proposal, trial, normalise, Import inbox | specified (section 10c); the exact strings live in the code |
+| Import: Source line, Files source, scan, proposal, trial, normalise, Import inbox, Keep pages as Sources, Entities | specified (section 10c); the exact strings live in the code |
 | Tab and sidebar context menus, Overview tab, collection page, outline | specified (section 9) |
 | Drag and drop | specified (section 9b) |
 | Views: layouts, toolbar, filter, sort and group editors, Customize view, Queries page, Overview | specified (sections 8, 9) |
@@ -619,7 +619,7 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   ("The run didn't finish within 30 minutes.", "The agent finished without marking the step done.", "Object closed
   during this run.") or asks Gene one question (a Question step is inserted before the step).
 
-## 10c. Import and migration (M15 and M25-M27)
+## 10c. Import and migration (M15, M25-M27 and M30)
 
 The catalog has no import dialog (only the Import menu entries in sections 4 and 9), so everything here is Object's
 own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` and `import/agent/text.ts`.
@@ -634,7 +634,24 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   **Keep originals as** Attachments (default) | File objects, and **Try on a copy of this space** (imports into a copy
   named "<space> (trial)" next to the open space; on by default for a first run into this space). A finished import into
   the copy offers **Switch and review proposed schema** (the batch lives in the copy): it switches to the copy and opens
-  that batch's Proposed schema there.
+  that batch's Proposed schema there. The options also offer **Keep pages as Sources** (M30; the design's label), ticked
+  for every import ("Every page is kept as a read-only Source, exactly as imported. With the AI filing pass, the things
+  they talk about become their own objects, built from all the pages that mention them."); with it on the preview plans
+  one type, Source, and the import writes every page as a Source; unticked, pages are filed into their mapped types as
+  before. The batch records the choice (`keepAsSources` in `batch.json`); a request that leaves it out (the API, `/api/v1`,
+  MCP) keeps pages as Sources too, so a caller sends `keepAsSources: false` for a plain mapped import.
+- **Sources** (M30): a page of a batch kept as Sources is a **Source** object (type id `source`: M28's in an IT ops
+  space, else made from the basic Source type by the first import kept as Sources; a space whose `source` id is some
+  other type uses that type) in the Source type's folder, with its **Category** (from the original's format, then the
+  source system) and **System** (the source system's label: SharePoint, Wiki, Notion, Obsidian, Anytype, Files,
+  Markdown), its other fields kept as frontmatter keys the Source type doesn't declare, its kept original and its
+  `importSource` block. Images and other files stay Image and File objects. A Source's text is byte-identical to the
+  imported text (CRLF and BOM included): no page is turned into an entity, renamed, retyped or given a link, tag,
+  collection or Import inbox entry. An imported Source is read-only, reason **Imported source**: property edits, body
+  saves, rename, change type, mention links, version restores, `/api/v1`, MCP, agents, automations and the Entities
+  Write all refuse it (`423`); Move to Trash and Restore stay allowed, and a Source made by hand (no `importSource`) is
+  editable. Only a re-run of the same source updates a Source (the previous text in version history), and a Source
+  stays a Source on a re-run whatever the re-run's option says.
 - **Source line** (object page, under the properties; hidden when the object was not imported): **Source**
   "Imported from <system> (author, modified <date>, version <v>)", **Open original** (the web url, else the kept
   file) and **Show file** (shows the kept original in the file manager). Every imported object carries the system
@@ -690,19 +707,77 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   group. An item the rules will skip says so before Apply ("Apply will skip this: <reason>"), properties the rules left
   out are listed under **Left out** with their reason, and the Apply summary names each skipped item and why
   ("Skipped: Memo (…)"; items the user turned down are not repeated). Only the app applies a proposal; no MCP tool can.
+  In an IT ops space (setup `itops`, or one with the Host, Software and Application types; M30, design 5b) the rules
+  also say: existing types first; a new type with at least two properties, 80% or more of them by name also an existing
+  type's, is refused ("It has the same properties as Host.") and offers **Use Host, with a category**, which turns the
+  item into an extend of Host that adds the group's name to its Category (else Kind) options; a category name (Server,
+  Workstation, VM, Production) is never a type ("Server is a category: a property value or a tag, not a type.").
 - **Trial on the first 50 objects**: **Start trial**; each result shows a confidence (High, Medium, Low), the value
   and its **Quote**, the **Tags** and **Collections** it adds (each with its quote), and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
   failed the app's check says **Did not pass the check**. **Continue with the rest** starts the bulk pass (40 objects
-  per agent turn). Flagged files are not in the trial.
+  per agent turn). Flagged files are not in the trial. On a batch kept as Sources each result shows instead what the
+  page is about and what it mentions ("About: Host APP01", "Mentions: HQ, Payroll"); the trial, the bulk pass, the
+  Entities step and its review write no `.md` file and no type, only the batch's records.
+- **Entities** (M30; a batch kept as Sources only; after the bulk pass, before Normalise, because the candidates come
+  from the filing pass): **Entities**, "The things these pages talk about. The pages stay as read-only Sources, and each
+  entity is built from all the Sources that mention it. Accept, rename, merge, split or turn down each one." ("No
+  entities were found. The pages stay as Sources." when there are none; Write still finishes the batch). Entities are
+  grouped by type ("Host (3)") with their source count, "Also called …" for aliases, and the badges **A page is about
+  it**, **Already in this space** (an object of that type with that name or alias, never a Source, is reused, so Gene's
+  own Host "app01" takes APP01's values instead of a twin), **Merged by the agent** and **Sources disagree** ("10.0.0.5
+  kept, from the newer source; also 10.0.0.6"). Each entity: **Accept**, **Rename** (**New name**) or **Turn down**;
+  **Select <name>** and **Merge N selected** (same type only); **Split** ("Move these names to a new entity:") on one the
+  agent merged; **These look like the same thing** with **Merge** for near-duplicate names (only suggested). Names and
+  aliases that normalise the same (case, spacing, surrounding punctuation) merge by themselves within a type. **Not made
+  into objects** lists the rest with their reason ("Stays text: one page, no properties of its own" or "A category: kept
+  as a tag or property value"): a candidate becomes an object when a page is mainly about it, more than one page
+  mentions it, or it has a value of its own that passed the check; a category (a label option of a type in the space,
+  Source's own Category and System options included, or a tag) is never an entity. "N entities still to decide",
+  **Accept the rest**; **Write** stays disabled until every entity is decided (the server answers "N entities are still
+  to decide." and refuses a Write while another import runs), shows **Writing…**, then "N objects created, M already
+  here. N links and N "From sources" sections written." with the conflicts, the sections left as Gene edited them and
+  the low-confidence links sent to the Import inbox; "Writing stopped. What was written stays; Write again to finish."
+  after a failure (a second Write places nothing twice). The review survives closing and reopening the dialog.
+- **Distilled entities and the "From sources" section** (M30): each accepted entity is built from all the Sources that
+  mention it. Every value, alias, summary line and relation needs a quote from the page that the app checks (M27's
+  rules); a value for a synced property or for `sources` is refused. When Sources disagree the value of the most
+  recently modified Source wins (equal values from two Sources are one value) and the conflict is listed in the report
+  and on the entity; the import fills empty properties and replaces only values it set itself, never one Gene set.
+  Per-value citations live in `.object/distilled/<entity id>.json`, never in the `.md` file. The entity's **Sources**
+  relation lists its Sources (shown on each Source as **Distilled into**, computed, never written there). The top of
+  its body gets a section the import owns, between `<!-- group from-sources -->` and its matching `<!-- /group -->`
+  (shown as one grouped block): "## From sources", short lines each citing its Sources as links (`[[title]]` when the
+  title resolves to that Source, else `[[path|title]]`), "Sources disagree:" lines ("IP address: 10.0.0.5 (…) or
+  10.0.0.6 (…); 10.0.0.5 kept, from the newer source.") and `Also linked: [[path|Title]] (relation)` for a relation
+  outside the named set (in every space; the link resolves to the entity, not a same-named Source). An entity with no
+  lines, conflicts or plain links gets no section. Everything below it is Gene's and is never touched; a later Write
+  rewrites only the bytes between the markers, only when a cited Source changed or a new Source cites it, and a section
+  Gene edited (or whose markers are broken) is left alone and reported ("The From sources section of <title> was
+  edited, so it was left as it is."). A relation is written on its stored side, in that object's frontmatter (named
+  by a counterpart, it is stored on the other side). A link from a low-confidence candidate is not written: its subject entity (never a Source) goes
+  to the Import inbox with "Link not written (low confidence): <subject> <relation> <object>". The page's tags and
+  collections go on its main entity. Mentions of an entity in Sources stay unlinked and show under its unlinked
+  mentions. Created entities carry an `importSource` block (`id: entity:<typeId>:<key>`) and a `created` item in the
+  batch, so a re-run finds them instead of making twins and **Move batch to Trash** takes the batch's Sources and the
+  entities it created (not objects it only linked to or distilled into), restorable. The report gains `## Entities`
+  (Sources, entities accepted, created and already here, turned down, not made into objects; links, plain links and
+  inbox links; sections written and left) with `### Sources disagree`; on a batch kept as Sources the report page is
+  written at the Write's finish.
 - **Normalise tags and options**: near-duplicate tags and option values (for example Prod / prod / Production) with
   **Merge into** and **Merge N groups**; "Nothing looks like a duplicate." when there are none.
 - **Import inbox**: low-confidence pages land in a collection named "Import inbox"; the last step says
   "N objects in the Import inbox for you to look at." with **Open Import inbox**. The open window learns of the collection
   the pass made: an import's resync reloads the collections, and a collection page opened on an id the window
   doesn't know yet fetches the collections once more before it says "Unknown collection".
-- **MCP**: `import_scan`, `import_proposal`, `import_report` (read) and `save_import_proposal`, `save_import_decisions`
-  (write), the prompt `migrate_a_source` and the resource `object://skills/migrate-a-source` let an outside agent run the
-  same workflow; `start_import` refuses a mapping that creates types outside an approved proposal (for the open space or a trial copy; a brand-new space is not checked).
+- **MCP**: `import_scan`, `import_proposal`, `import_report`, `import_entities` (read) and `save_import_proposal`,
+  `save_import_decisions` (write), the prompt `migrate_a_source` and the resource `object://skills/migrate-a-source` let
+  an outside agent run the same workflow; `start_import` refuses a mapping that creates types outside an approved
+  proposal (for the open space or a trial copy; a brand-new space is not checked). `start_import` takes
+  `keep_as_sources` (sent as `keepAsSources`; on when left out). `import_entities(batch)` reads a Source batch's entity
+  list with Gene's decisions, values with their Sources and conflicts (`GET /api/v1/import/entities`; 409 "This import
+  didn't keep its pages as Sources." otherwise); decisions saved with `save_import_decisions` may carry `mainEntity`,
+  `entities` (with `lines`), `relations` and `merges`, checked the same way. No tool accepts, merges, splits or writes
+  entities (only the user does, in Object), and no tool writes a Source.
 
 ## 10d. Agents: tools and the fence (M17-M18)
 

@@ -100,10 +100,12 @@ class M25:
 
     def do_import(self, path: Path, kind: str = "auto", target: dict | None = None, **extra) -> dict:
         code, preview = self.http(
-            "POST", "/import/preview", {"source": {"path": str(path), "kind": kind}, "target": "currentSpace"}
+            "POST", "/import/preview", {"source": {"path": str(path), "kind": kind}, "target": "currentSpace",
+                                         "keepAsSources": False}
         )
         assert code == 200, (code, preview)
-        body = {"previewId": preview["previewId"], "mapping": preview["mapping"], "target": target or {"kind": "currentSpace"}, **extra}
+        body = {"previewId": preview["previewId"], "mapping": preview["mapping"], "target": target or {"kind": "currentSpace"},
+                "keepAsSources": False, **extra}
         code, started = self.http("POST", "/import/start", body)
         assert code == 202, (code, started)
         for _ in range(1200):
