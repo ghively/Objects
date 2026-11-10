@@ -888,13 +888,20 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
             changed_in_both()
             return
         batches.snapshot(space, rel, cur)
-        try:
-            # at the version checked: a save made since is never overwritten
-            with _source_writes(space, ex_source):
-                space._write(rel, version_of(cur), lambda _of, _fm, o2=new_of: o2, stamp=False, history=ex_source)
-        except Conflict:
-            changed_in_both()
-            return
+        if ex_source:
+            # M30: the Source is the new source's bytes exactly (its own line endings and BOM, not the
+            # old file's), at the version checked, the previous bytes kept in version history.
+            with space.source_writes():
+                if not space._write_exact(rel, version_of(cur), out):
+                    changed_in_both()
+                    return
+        else:
+            try:
+                # at the version checked: a save made since is never overwritten
+                space._write(rel, version_of(cur), lambda _of, _fm, o2=new_of: o2, stamp=False, history=False)
+            except Conflict:
+                changed_in_both()
+                return
         state.updated += 1
         state.written[sp] = rel
         _record(state, w, system, ident_, "updated", path=rel, contentHash=chash,

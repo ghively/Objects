@@ -393,3 +393,45 @@ def test_rerun_updates_source_with_history(tmp_path, app_on) -> None:
     assert space.get(rel).readOnlyReason == READ_ONLY
     assert _types_dir(root) == types
     assert all(space.get(p).type == "source" for p in (it["path"] for it in _items(root, _batch3).values()))
+
+
+def _history_texts(client: TestClient, rel: str) -> list[str]:
+    versions = client.get("/api/history", params={"path": rel}).json()["versions"]
+    return [client.get("/api/history/version", params={"path": rel, "id": v["id"]}).json().get("text") or ""
+            for v in versions]
+
+
+def test_rerun_writes_the_new_source_bytes_exactly(tmp_path, app_on) -> None:
+    """A re-run's Source is the new source's bytes, whatever the old file's line endings and BOM."""
+    root = itops_space(tmp_path)
+    src = make_itops_source(tmp_path)
+    client, space = app_on(root)
+    batch = import_as_sources(root, src, client)
+    rel = _items(root, batch)[CRLF_BOM]["path"]
+    first = (root / rel).read_bytes()
+    assert first.startswith(BOM) and b"\r\n" in first
+
+    # Mixed endings, still with a BOM: the body is the new bytes, each line ending as the source has it.
+    mixed = BOM + b"SRV-DB01 holds Payroll.\r\nLine two\nLine three\r\n"
+    (src / CRLF_BOM).write_bytes(mixed)
+    batch2 = import_as_sources(root, src, client)
+    item = _items(root, batch2)[CRLF_BOM]
+    assert item["action"] == "updated"
+    data = (root / rel).read_bytes()
+    assert data.startswith(BOM)
+    assert _body_after_fence(data) == mixed[len(BOM):]
+    assert version_of(data) == item["version"]
+    assert any("SRV-DB01 holds the Payroll database" in t for t in _history_texts(client, rel))  # the old text kept
+
+    # The source drops its BOM and CRLF: so does the Source.
+    plain = b"SRV-DB01 holds Payroll, LF now.\n"
+    (src / CRLF_BOM).write_bytes(plain)
+    batch3 = import_as_sources(root, src, client)
+    data = (root / rel).read_bytes()
+    assert not data.startswith(BOM) and b"\r\n" not in data
+    assert _body_after_fence(data) == plain
+    assert version_of(data) == _items(root, batch3)[CRLF_BOM]["version"]
+    _of, fm, _v = space.read(rel)
+    assert fm["type"] == "Source" and fm["category"] == "Note"
+    assert space.get(rel).readOnlyReason == READ_ONLY
+    assert any("Line two" in t for t in _history_texts(client, rel))
