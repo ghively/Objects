@@ -437,7 +437,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         # The list the window gets (`server.space_info`), so a script can keep a space's types
         # without closing Object (2026-11-09).
         auth(request)
-        return SafeJSONResponse(_jsonable({"types": [t.to_api(rev) for t, rev in space.types_with_revisions()]}))
+        return SafeJSONResponse(_jsonable({"types": space.types_api()}))
 
     @r.get("/v1/types/{type_id}")
     @run
@@ -448,7 +448,7 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
         if found is None:
             return error(404, f'There is no object type "{type_id}".')
         t, rev = found
-        return SafeJSONResponse(_jsonable(t.to_api(rev)))
+        return SafeJSONResponse(_jsonable(space.type_api(t, rev)))
 
     def find_collection(collection_id: str):
         for c, rev in space.collections_with_revisions():
