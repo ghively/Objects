@@ -110,3 +110,71 @@ def test_the_one_time_id_insert_keeps_crlf_and_bom(root: Path) -> None:
     assert after.startswith(b"\xef\xbb\xbf---\r\nid: ")
     assert b"\n" not in after.replace(b"\r\n", b"")
     assert after.replace(f"id: {outcome.results[0].objectId}\r\n".encode(), b"", 1) == without
+
+
+# -- finding 3: a hand-typed value under a synced key never shows ---------------------------
+
+
+def _hand_type(root: Path, rel: str, line: str) -> None:
+    """Add ``line`` to the end of the object's front matter (with the file's own line ending)."""
+    full = root / rel
+    data = full.read_bytes()
+    eol = b"\r\n" if b"\r\n" in data else b"\n"
+    head, sep, tail = data.partition(eol + b"---" + eol)
+    full.write_bytes(head + eol + line.replace("\n", eol.decode()).encode() + sep + tail)
+
+
+def test_calendar_ignores_a_hand_typed_synced_date(root: Path) -> None:
+    space = _space(root)
+    # SRV-02's file has a hand-typed `lastBoot: 2020-01-01T00:00:00.000Z`.
+    cal = space.calendar("2020-01-01", "2020-01-02")
+    dated = [e for day in cal["days"].values() for e in day.get("dated", [])]
+    assert [e for e in dated if e["path"] == SRV02] == []
+
+    item = _item("title", "SRV-02", {"lastBoot": "2026-11-08T07:12:00.000Z"})
+    space.sync_facts("host", [item], set())
+    cal = space.calendar("2026-11-08", "2026-11-08")
+    dated = [e for day in cal["days"].values() for e in day.get("dated", [])]
+    assert [(e["path"], e["key"]) for e in dated if e["path"] == SRV02] == [(SRV02, "lastBoot")]
+
+
+def test_search_never_indexes_a_hand_typed_synced_value(root: Path, tmp_path: Path) -> None:
+    from objectapp.searchindex import SearchIndex
+    from objectapp.searchtext import property_text
+
+    _hand_type(root, APP01, "patchState: Failed")
+    _hand_type(root, APP01, "diskFree: 987654")
+    space = _space(root)
+    host = space.type_by_id("host")
+    _of, fm, _version = space.read(APP01)
+    text = property_text(host, fm, lambda target: target)
+    assert "app01.example.test" in text
+    assert "Patch state" not in text and "Failed" not in text
+    assert "987654" not in text
+
+    idx = SearchIndex(space, tmp_path / "search-cache")
+    idx.start()
+    try:
+        assert idx.ready.wait(30)
+        assert idx.search("app01.example.test")["results"]  # the index holds APP01's props
+        assert [r["path"] for r in idx.search("987654")["results"]] == []
+        assert [r["path"] for r in idx.search("Failed")["results"]] == []
+    finally:
+        idx.stop()
+
+
+def test_reminders_skip_a_synced_date(root: Path) -> None:
+    from objectapp import reminders
+
+    host_json = root / ".object" / "types" / "host.json"
+    data = json.loads(host_json.read_text("utf-8"))
+    for p in data["propertyDefinitions"]:
+        if p["key"] == "lastBoot":
+            options = p.setdefault("options", {})
+            options.setdefault("constraints", {})["supportsReminders"] = True
+    host_json.write_text(json.dumps(data, indent=2), "utf-8")
+    _hand_type(root, APP01, "lastBoot: 2026-11-20T09:00:00.000Z")
+    _hand_type(root, APP01, "reminders:\n  lastBoot: 1d")
+    space = _space(root)
+    infos = reminders.task_infos(space)
+    assert [(i.path, i.key) for i in infos if i.path == APP01] == []

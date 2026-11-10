@@ -458,6 +458,8 @@ def calendar_range(space: Space, from_day: Any, to_day: Any) -> dict[str, Any]:
                 q.stamps(path, fm)
             if t is None:
                 continue
+            # M29: a synced key holds the store's value, never a hand-typed one.
+            fm = space.synced_fm(summary, fm)
             q.dated(path, dated_props[summary.type], fm)
             if is_task_type(t):
                 q.task(path, t, fm)

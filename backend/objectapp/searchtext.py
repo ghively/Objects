@@ -28,6 +28,7 @@ from .rows import (
     _TAG_RE,
     _TASK_RE,
 )
+from .synced import is_synced
 from .typedefs import has_undecodable
 
 if TYPE_CHECKING:
@@ -169,7 +170,9 @@ def property_text(
 
     A property counts when its kind is text, URL, number, label (option texts)
     or relation (``link_title`` turns each target into a title), and it is not
-    marked ``isNotSearchable``. Dates, checkboxes and system properties don't.
+    marked ``isNotSearchable``. Dates, checkboxes and system properties don't, nor do
+    synced ones (M29): their values live in the synced store and a sync must not rewrite
+    the index, so a hand-typed value under a synced key is never indexed either.
     """
     if t is None:
         return ""
@@ -178,6 +181,7 @@ def property_text(
         if (
             pdef.type not in SEARCHABLE_KINDS
             or pdef.extra.get("isNotSearchable") is True
+            or is_synced(pdef)
         ):
             continue
         if pdef.key not in fm:
