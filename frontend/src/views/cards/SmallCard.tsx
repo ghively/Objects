@@ -159,11 +159,14 @@ export function WallCardProperties({
   type,
   props,
   hide = [],
+  fullTables = false,
 }: {
   row: Row
   type?: TypeDef
   props: CardProperty[]
   hide?: string[]
+  /** M31 (the Page link view): a Table property shows its table, read-only, not "N rows". */
+  fullTables?: boolean
 }) {
   const shown = props.filter((p) => !hide.includes(p.propertyId))
   const has = (kind: string) => shown.some((p) => p.propertyType === kind)
@@ -242,7 +245,7 @@ export function WallCardProperties({
                     def={def}
                     value={value}
                     readOnly={button ? !!row.summary.readOnly : true}
-                    density="table"
+                    density={fullTables && def.type === 'simpleTableBlock' ? 'panel' : 'table'}
                     onChange={() => {}}
                     path={row.summary.path}
                   />

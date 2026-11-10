@@ -118,9 +118,12 @@ Object has no accounts.
   type are in audit item 28.
   - Add Property › **Table** (M31, after Files; ours: "A small table: a header row of column names, then rows of
     text."): stored as a Markdown table in a `|-` block (header row first; a hand-written YAML list of rows reads the
-    same). The panel edits cells, "Add row", "Add column", × on a row (never the header row) or a column; a table
-    view or card shows "N rows" (column names on hover), and a table view's opens the table in a peek. Its cells are
-    searchable; a document export lists it as "a, b; c, d". "Change property type": Table to Text or Text block (one
+    same; only line 2 is the separator, and a cell of dashes is written `\-`, `|` as `\|` and `\` as `\\`, read back
+    as typed). The panel edits cells, "Add row", "Add column", × on a row (never the header row) or a column; a table
+    view or card shows "N rows" (column names on hover), and a table view's opens the table in a peek; the Page link
+    view shows the table read-only. Property settings › "First column is a header" (ours; `headerColumn: true` in the
+    property's options) shows each row's first cell as a header in the panel, the peek and the Page view; the stored
+    table is the same. Its cells are searchable; a document export lists it as "a, b; c, d". "Change property type": Table to Text or Text block (one
     line, "a, b; c, d"); Text or Text block to Table (one cell under the property's name, or the table it holds).
   - "Card view and linking" › Default link view: Link block, Small card, Wide card, Embed, **Page** (M31, spec §3;
     `defaultViewType: page`; also in an object block's `…` › Change Block View, `view=page`). Ours: a full-width,

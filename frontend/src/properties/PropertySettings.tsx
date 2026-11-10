@@ -72,6 +72,9 @@ const TEXT = {
   counterpart: 'Show on the other side as',
   counterpartPlaceholder: 'No other side',
   counterpartSynced: 'This relation already syncs both ways.',
+  // M31 (our strings): a Table property's header column (`options.headerColumn`).
+  headerColumn: 'First column is a header',
+  headerColumnDescription: 'Show the first cell of each row as a header, like the header row.',
 }
 
 export interface PropertySettingsProps {
@@ -296,6 +299,26 @@ function toLocalInput(iso: string | null | undefined): string {
   const d = wallClock(iso)
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+/**
+ * M31 (the spec's "header row and column"): a Table property's switch that shows its first column
+ * as header cells (`options.headerColumn`; display only, the stored table is the same). Off
+ * removes the key rather than writing `false`.
+ */
+function TableSection({ def, save }: { def: PropertyDef; save(next: PropertyDef): void }) {
+  return (
+    <Section title={TEXT.headerColumn} description={TEXT.headerColumnDescription}>
+      <Switch
+        aria-label={TEXT.headerColumn}
+        checked={def.options.headerColumn === true}
+        onCheckedChange={(v) => {
+          const { headerColumn: _, ...rest } = def.options
+          save({ ...def, options: v ? { ...rest, headerColumn: true } : rest })
+        }}
+      />
+    </Section>
+  )
 }
 
 /**
@@ -884,6 +907,7 @@ export function PropertySettings({
               />
             </label>
             {def.type === 'number' && <NumberSection def={def} save={save} />}
+            {def.type === 'simpleTableBlock' && <TableSection def={def} save={save} />}
             {(def.type === 'datetime' || def.type === 'datetimeSimple') && (
               <DateSection
                 def={def}

@@ -81,9 +81,11 @@ const REMOVE_BTN =
   'flex size-5 shrink-0 items-center justify-center rounded text-fg-muted opacity-0 hover:bg-hover hover:text-fg focus-visible:opacity-100 group-hover/table:opacity-100'
 
 /**
- * The table itself: the header row (column names) as header cells, then the rows. Editable: each
- * cell is an input, leaving a cell saves the whole table; "Add row" and "Add column" grow it and
- * the × buttons remove a row (never the header row) or a column, each saved at once.
+ * The table itself: the header row (column names) as header cells, then the rows; with the
+ * property's "First column is a header" (`options.headerColumn`) each row's first cell is a row
+ * header too (display only: the stored table is the same). Editable: each cell is an input,
+ * leaving a cell saves the whole table; "Add row" and "Add column" grow it and the × buttons
+ * remove a row (never the header row) or a column, each saved at once.
  */
 function TableEditor({
   def,
@@ -108,48 +110,53 @@ function TableEditor({
     onCommit(next)
   }
   const width = rows[0]?.length ?? 0
+  const headerColumn = def.options.headerColumn === true
 
   return (
     <div className="group/table overflow-x-auto">
       <table aria-label={def.name} className="border-collapse text-[14px]">
         <tbody>
           {rows.map((row, r) => {
-            const Cell = r === 0 ? 'th' : 'td'
             return (
               <tr key={r}>
-                {row.map((cell, c) => (
-                  <Cell
-                    key={c}
-                    scope={r === 0 ? 'col' : undefined}
-                    className={cn('border border-line p-0 text-left align-top', r === 0 && 'bg-hover font-medium')}
-                  >
-                    {readOnly ? (
-                      <span className="block min-w-16 px-2 py-1 text-fg">{cell}</span>
-                    ) : (
-                      <span className="flex items-center">
-                        <input
-                          aria-label={`Row ${r + 1}, column ${c + 1}`}
-                          value={cell}
-                          onFocus={onFocusCell}
-                          onChange={(e) => setCell(r, c, e.target.value)}
-                          onBlur={() => onCommit(rows)}
-                          className={cn('w-28 min-w-0 flex-1 bg-transparent px-2 py-1 text-fg outline-none', r === 0 && 'font-medium')}
-                        />
-                        {r === 0 && (
-                          <button
-                            type="button"
-                            aria-label={`Remove column ${c + 1}`}
-                            title="Remove column"
-                            onClick={() => change(rows.map((x) => x.filter((_, j) => j !== c)))}
-                            className={cn(REMOVE_BTN, 'mr-0.5')}
-                          >
-                            <Icon name="ph-x" size={11} />
-                          </button>
-                        )}
-                      </span>
-                    )}
-                  </Cell>
-                ))}
+                {row.map((cell, c) => {
+                  const rowHeader = r > 0 && c === 0 && headerColumn
+                  const header = r === 0 || rowHeader
+                  const Cell = header ? 'th' : 'td'
+                  return (
+                    <Cell
+                      key={c}
+                      scope={r === 0 ? 'col' : rowHeader ? 'row' : undefined}
+                      className={cn('border border-line p-0 text-left align-top', header && 'bg-hover font-medium')}
+                    >
+                      {readOnly ? (
+                        <span className="block min-w-16 px-2 py-1 text-fg">{cell}</span>
+                      ) : (
+                        <span className="flex items-center">
+                          <input
+                            aria-label={`Row ${r + 1}, column ${c + 1}`}
+                            value={cell}
+                            onFocus={onFocusCell}
+                            onChange={(e) => setCell(r, c, e.target.value)}
+                            onBlur={() => onCommit(rows)}
+                            className={cn('w-28 min-w-0 flex-1 bg-transparent px-2 py-1 text-fg outline-none', header && 'font-medium')}
+                          />
+                          {r === 0 && (
+                            <button
+                              type="button"
+                              aria-label={`Remove column ${c + 1}`}
+                              title="Remove column"
+                              onClick={() => change(rows.map((x) => x.filter((_, j) => j !== c)))}
+                              className={cn(REMOVE_BTN, 'mr-0.5')}
+                            >
+                              <Icon name="ph-x" size={11} />
+                            </button>
+                          )}
+                        </span>
+                      )}
+                    </Cell>
+                  )
+                })}
                 {!readOnly && (
                   <td className="w-6 border-0 p-0 pl-0.5 align-middle">
                     {r > 0 && (

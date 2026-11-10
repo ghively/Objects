@@ -1,7 +1,7 @@
 // M31: the "Page" link view: a full-width, read-only preview of the object as its page shows it.
 // Top to bottom: the cover image, the type label, the icon and title (large), the description, the
 // properties the page's panel shows (one labelled row each, "Empty" when unset; hidden ones and
-// empty "hide when empty" ones left out), then the first lines of the body. Clicking it, or Enter,
+// empty "hide when empty" ones left out; a Table shows its table), then the first lines of the body. Clicking it, or Enter,
 // opens the object. Larger than the wide card; nothing in it is edited (our calls).
 import type { MouseEvent } from 'react'
 import { api } from '@/api/client'
@@ -77,7 +77,7 @@ export function PageCard({ row, type, onOpen }: { row: Row; type?: TypeDef; onOp
         </h3>
         {/* The description (under the title), then one row per property. */}
         <div className="flex max-w-[640px] min-w-0 flex-col gap-1.5">
-          <WallCardProperties row={row} type={type} props={props} />
+          <WallCardProperties row={row} type={type} props={props} fullTables />
         </div>
         {preview && (
           <p data-testid="page-card-body" className="mt-1 line-clamp-6 whitespace-pre-line text-[15px] leading-relaxed text-fg">
