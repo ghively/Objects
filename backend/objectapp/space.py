@@ -5083,8 +5083,11 @@ class Space:
             new.name = " ".join(str(new.name or "").split())
             new.pluralName = " ".join(str(new.pluralName or "").split())
             # M28: a counterpart must be well shaped, on a relation that doesn't sync both ways,
-            # with a key no explicit target type holds (checked with `new` in place).
-            problem = check_counterparts(new, [new if x.id == new.id else x for x in self.types])
+            # with a key no explicit target type holds, and a newly stored key no counterpart
+            # naming this type uses (checked with `new` in place; only what changes from `old`).
+            problem = check_counterparts(
+                new, [new if x.id == new.id else x for x in self.types], old
+            )
             if problem is not None:
                 raise InvalidValue(problem)
 

@@ -281,3 +281,66 @@ def test_gallery_location_part_of_points_at_the_new_type(tmp_path: Path, monkeyp
     # Other targets still resolve against the space's types as before.
     host = space.create_type("", "", template="host")
     assert host.prop("locatedAt").options["allowedTypes"] == ["location"]
+
+
+# -- the counterpart check only refuses what the save changes (fix pass, finding 1) ---------------
+
+
+def _add_stored_runs(root: Path) -> None:
+    """Give the stored Host type a ``runs`` text property, as a hand edit (or the gallery) could."""
+    import json
+
+    path = root / ".object" / "types" / "host.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["propertyDefinitions"].append(
+        {"id": "01HANDRUNS000000000000000", "key": "runs", "name": "Runs", "type": "text",
+         "description": "", "visibility": "alwaysShow", "options": {}}
+    )
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def test_save_type_with_an_unchanged_taken_counterpart_saves(root: Path) -> None:
+    _add_stored_runs(root)
+    space = Space(root)
+    t = copy.deepcopy(space.type_by_id("application"))
+    t.description = "Changed."
+    assert space.save_type(t, type_revision(root, "application")).type.description == "Changed."
+    container = copy.deepcopy(space.type_by_id("container"))
+    container.description = "Changed too."
+    assert space.save_type(container, type_revision(root, "container")).type.description == "Changed too."
+
+    # A changed key is still checked.
+    moved = copy.deepcopy(space.type_by_id("application"))
+    moved.prop("runsOn").options["counterpart"] = {"name": "Runs", "key": "category"}
+    with pytest.raises(InvalidValue) as exc:
+        space.save_type(moved, type_revision(root, "application"))
+    assert str(exc.value) == 'Host already has a property with the key "category".'
+
+
+def test_save_type_refuses_a_stored_key_a_counterpart_uses(root: Path) -> None:
+    from objectapp.counterparts import COUNTERPART_TAKEN_BY
+    from objectapp.typemodel import PropertyDefinition
+
+    space = Space(root)
+    type_file = root / ".object" / "types" / "host.json"
+    before = type_file.read_bytes()
+    host = copy.deepcopy(space.type_by_id("host"))
+    host.propertyDefinitions.append(
+        PropertyDefinition.from_json(
+            {"id": "01HANDRUNS000000000000000", "key": "runs", "name": "Runs", "type": "text"}
+        )
+    )
+    with pytest.raises(InvalidValue) as exc:
+        space.save_type(host, type_revision(root, "host"))
+    assert str(exc.value) == COUNTERPART_TAKEN_BY.format(type="Application", relation="Runs on", key="runs")
+    assert str(exc.value) == "Application's \"Runs on\" already uses the key \"runs\" for its other side here."
+    assert type_file.read_bytes() == before
+
+    # A key only an "any" relation uses (Command's "Documented in" on a Source) stays free.
+    source = copy.deepcopy(space.type_by_id("source"))
+    source.propertyDefinitions.append(
+        PropertyDefinition.from_json(
+            {"id": "01HANDDOC0000000000000000", "key": "documentedIn", "name": "Documented in", "type": "text"}
+        )
+    )
+    assert space.save_type(source, type_revision(root, "source")).type.prop("documentedIn") is not None

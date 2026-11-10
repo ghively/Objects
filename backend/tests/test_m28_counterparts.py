@@ -323,6 +323,45 @@ def test_check_type() -> None:
     assert check_type(cmd, types) is None
 
 
+def test_check_type_checks_only_what_changes() -> None:
+    """Fix pass, finding 1: with the stored definition given, a key a target came to hold since
+    blocks nothing unrelated; a new key, a newly named target and a newly stored key still do."""
+    from objectapp.counterparts import COUNTERPART_TAKEN_BY
+
+    types = itops_types()
+    by_id = {t.id: t for t in types}
+    host = TypeDefinition.from_json(by_id["host"].to_json())
+    host.propertyDefinitions.append(
+        PropertyDefinition.from_json({"id": "r", "key": "runs", "name": "Runs", "type": "text"})
+    )
+    with_runs = [host if t.id == "host" else t for t in types]
+    app = by_id["application"]
+    edited = TypeDefinition.from_json(app.to_json())
+    edited.description = "Changed."
+    assert check_type(edited, with_runs, app) is None
+    assert check_type(edited, with_runs) == COUNTERPART_TAKEN.format(type="Host", key="runs")
+
+    # Container's Runs on newly naming Application, which stores `runs`.
+    container = by_id["container"]
+    renamed_target = TypeDefinition.from_json(container.to_json())
+    renamed_target.prop("runsOn").options["allowedTypes"] = ["host", "application"]
+    app_with_runs = TypeDefinition.from_json(app.to_json())
+    app_with_runs.propertyDefinitions.append(
+        PropertyDefinition.from_json({"id": "r", "key": "runs", "name": "Runs", "type": "text"})
+    )
+    others = [app_with_runs if t.id == "application" else t for t in types]
+    assert check_type(renamed_target, others, container) == COUNTERPART_TAKEN.format(
+        type="Application", key="runs"
+    )
+
+    # The other direction: Host newly storing `runs`, which Application's Runs on uses for it.
+    assert check_type(host, types, by_id["host"]) == COUNTERPART_TAKEN_BY.format(
+        type="Application", relation="Runs on", key="runs"
+    )
+    # ... but not a key that was stored already.
+    assert check_type(host, with_runs, host) is None
+
+
 def test_find_relation() -> None:
     types = itops_types()
     assert find_relation(types, "application", "host", "runs on") == RelationMatch("application", "runsOn", False)
