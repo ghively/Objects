@@ -155,7 +155,7 @@ export function ImportDialog() {
     seq.current++
     setStep('source')
     lastStep.current = 'source'
-    setPath('')
+    setPath(preset.sourcePath ?? '')
     setKind(preset.kind ?? 'auto')
     setSource(null)
     setBusy(false)
@@ -283,7 +283,7 @@ export function ImportDialog() {
     repreview()
   }
   const changeTarget = (next: ImportTargetKind) => {
-    if (next === target) return
+    if (next === target || (preset.newSpaceOnly && next !== 'newSpace')) return
     setTarget(next)
     setNotice(null)
     repreview()
@@ -567,6 +567,7 @@ export function ImportDialog() {
               location={location}
               onLocation={setLocation}
               spaceName={space?.name ?? null}
+              newSpaceOnly={!!preset.newSpaceOnly}
             />
             <ImportOptions
               kind={preview.kind}

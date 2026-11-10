@@ -2,7 +2,7 @@
  * M27 "Proposed schema" step (design section 8): each proposal item (use / extend / create) with
  * its evidence is accepted, edited or turned down; Apply is enabled only when nothing is undecided.
  * The review is saved as it changes, so a closed dialog resumes where it was.
- * M30 (an IT ops space): an item the rules refuse as a look-alike offers "Use <type>, with a category",
+ * M30 (in every space since M31): an item the rules refuse as a look-alike offers "Use <type>, with a category",
  * which saves it as an edit onto that existing type.
  */
 import { useCallback, useEffect, useState } from 'react'

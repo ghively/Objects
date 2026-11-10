@@ -22,6 +22,9 @@ Safety (contract "Safety and limits"):
 - A zip whose every entry sits under one folder is read as that folder (our choice).
 - Dot-folders are not entered: ``.obsidian/`` is noted for detection and listed once
   (``appSettings``), any other once (``unsupported``); dot-files are listed (``unsupported``).
+- M31 (remodelling a space, IT ops design section 6): a folder with ``.object/space.json`` is an
+  Object space (`Source.is_space`): its ``.object/`` and ``.object-cache/`` are listed once as
+  ``appSettings``, and its ``Templates/`` folder once (``unsupported``): templates are not objects.
 - Limits: `MAX_ENTRIES` entries (413 above); `Source.read` refuses more than `limit` bytes and
   cuts a zip entry at its declared size (``damaged`` when it yields more); `TextBudget` caps the
   Markdown and CSV text one preview reads (413).
@@ -48,6 +51,7 @@ from pathlib import Path, PurePosixPath
 from .model import SkippedItem
 
 __all__ = [
+    "SPACE_TEMPLATES",
     "MAX_ENTRIES",
     "MAX_OBJECTS",
     "MAX_PREVIEW_TEXT",
@@ -73,6 +77,10 @@ MAX_CHECKPOINTS = 1024
 
 _DRIVE_RE = re.compile(r"^[A-Za-z]:")
 _BAD_CHARS_RE = re.compile("[\x00�\ud800-\udfff]")
+
+
+SPACE_TEMPLATES = "Templates"
+"""M31: an Object space's templates folder, left out when the space is a source."""
 
 
 class SourceMissing(LookupError):
@@ -133,6 +141,8 @@ class Source:
     skipped: list[SkippedItem] = field(default_factory=list)
     has_obsidian: bool = False
     """A ``.obsidian/`` folder at the root (detection)."""
+    is_space: bool = False
+    """M31: the folder is an Object space (``.object/space.json`` at its root)."""
     left_out: list[str] = field(default_factory=list)
     """M27: files matching a "Leave out" pattern: listed here, never added to `files`, so never read."""
     fingerprint: str = ""
@@ -254,6 +264,7 @@ def open_source(path: str | Path, leave_out: tuple[str, ...] | list[str] = ()) -
     if stat.S_ISDIR(st.st_mode):
         src = Source(Path(os.path.realpath(p)), "folder")
         src._root_real = str(src.path)
+        src.is_space = os.path.isfile(os.path.join(src.path, ".object", "space.json"))
         _list_folder(src, tuple(leave_out))
         return src
     if stat.S_ISREG(st.st_mode) and p.suffix.lower() == ".zip":
@@ -292,6 +303,11 @@ class _Lister:
     def hidden(self, rel: str) -> bool:
         """True (and listed once per dot-folder) when ``rel`` is in a dot-folder or a dot-file."""
         parts = rel.split("/")
+        if self.src.is_space and len(parts) > 1 and parts[0] == SPACE_TEMPLATES:
+            if SPACE_TEMPLATES not in self.dot_listed:
+                self.dot_listed.add(SPACE_TEMPLATES)
+                self.skip(SPACE_TEMPLATES + "/", "unsupported", "The space's templates")  # our string
+            return True
         for i, part in enumerate(parts):
             if not part.startswith(".") and part != "__MACOSX":
                 continue
@@ -304,6 +320,9 @@ class _Lister:
                 if folder == ".obsidian":
                     self.src.has_obsidian = True
                     self.skip(folder + "/", "appSettings", "Obsidian's settings")
+                elif self.src.is_space and folder in (".object", ".object-cache"):
+                    self.skip(folder + "/", "appSettings", "Object's settings and types" if folder == ".object"
+                              else "Object's cache")  # our strings
                 elif part == ".trash":
                     self.skip(folder + "/", "unsupported", "Deleted notes")
                 else:

@@ -46,6 +46,7 @@ __all__ = [
     "field_defs",
     "is_work_type",
     "project_type_ids",
+    "resolved_key",
     "topup_work_fields",
     "with_work_fields",
     "work_type_ids",
@@ -166,6 +167,19 @@ def is_work_type(t: TypeDefinition | None) -> bool:
         return False
     p = t.prop("steps")
     return p is not None and p.type == "steps"
+
+
+def resolved_key(t: TypeDefinition | None) -> str | None:
+    """M31 (G3): the property that holds a ticket's resolved time on ``t``: the ticket field
+    ``deskResolved`` when the type has it (a Task, a Project, an M28-era Incident), else the type's
+    own ``resolved`` date (the Incident's one Resolved), else None."""
+    if t is None:
+        return None
+    for key in ("deskResolved", "resolved"):
+        p = t.prop(key)
+        if p is not None and p.type == "datetime":
+            return key
+    return None
 
 
 def work_type_ids(types: Iterable[TypeDefinition]) -> list[str]:

@@ -122,6 +122,8 @@ class WriteState:
     conflicts: list[dict[str, Any]] = field(default_factory=list)
     removed: list[dict[str, Any]] = field(default_factory=list)
     losses: list[tuple[str, str]] = field(default_factory=list)
+    uncommitted: list[str] = field(default_factory=list)
+    """M31: source paths whose file differs from its git commit (the report's Git section)."""
     """(source path, what the conversion lost or couldn't do)."""
     originals_kept: int = 0
     originals_large: list[str] = field(default_factory=list)
@@ -838,6 +840,8 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
         body = _body(planned, w, src, budget, state)
     prov = provenance.prov_for(planned.read, o, data, orig_rel)
     prov.contentHash = chash
+    if prov.uncommitted:
+        state.uncommitted.append(sp)
     if page is not None:
         prov.author = prov.author or page.author
         prov.created = prov.created or page.created
@@ -986,6 +990,7 @@ def _restamp_source(space: Space, state: WriteState, rel: str, block: dict[str, 
 def _removed_at_source(planned: Planned, space: Space, state: WriteState) -> None:
     """Objects an earlier batch of this source made whose source item is gone: listed, never trashed."""
     seen = {provenance.ident(planned.read, o) for o in planned.read.objects}
+    seen |= {k for o in planned.read.objects if (k := provenance.legacy_ident(planned.read, o)) is not None}
     present = {o.sourcePath for o in planned.read.objects}
     for key, it in state.prior.items.items():
         if key in seen:
@@ -1037,6 +1042,16 @@ def _count(planned: Planned, state: WriteState) -> None:
         "removed": len(state.removed),
         "originals": state.originals_kept,
     }
+
+
+def _git_report(planned: Planned, state: WriteState) -> dict[str, Any] | None:
+    """M31: the commit a source in a git repository was imported at, and its uncommitted files."""
+    from . import gitprov
+
+    repo = gitprov.repo_for_read(planned.read)
+    if repo is None:
+        return None
+    return {"commit": repo.head, "uncommitted": list(state.uncommitted)}
 
 
 def _records(planned: Planned, space: Space, state: WriteState, started: str) -> None:
@@ -1144,6 +1159,7 @@ def _report(planned: Planned, space: Space, state: WriteState) -> None:
             "removed": [(r["title"], r["path"]) for r in state.removed],
             "scan": {"leftOut": sorted(state.left_out_files), "excluded": sorted(state.exclude_ai)},
             "movedFrom": list(state.moved_from),
+            "git": _git_report(planned, state),
         },
     )
     state.report_body = body

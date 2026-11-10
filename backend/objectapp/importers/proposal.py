@@ -14,8 +14,8 @@ item, as ``problems``, ``dropped`` and ``merged``) and again when an item is app
   and the merge is shown (``merged``);
 - relation properties name a proposed type or an existing one.
 
-M30 (design 2026-11-09 section 5b): in an IT ops space (`is_itops_space`) the conventions are
-rules too. A new type whose properties match an existing type's (`lookalike`) is refused with the
+M30 (design 2026-11-09 section 5b), M31 (Gene's decision 1, "spaces never change behaviour"): in
+every space, whatever its setup, the conventions are rules too. A new type whose properties match an existing type's (`lookalike`) is refused with the
 offer "Use <type>, with a category" (``offer``); a new type named like a category (a label option
 of a type, or a tag) is refused, with the offer for the type holding that option; a relation
 property outside the named set (`named_relations`) is dropped and stays a plain link. Gene takes
@@ -39,7 +39,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .. import spaceconfig
 from ..ids import new_ulid
 from ..typedefs import SYSTEM_KEYS, slug
 from ..typemodel import PROPERTY_ICONS, Icon, PropertyDefinition, label_options
@@ -64,7 +63,6 @@ __all__ = [
     "approved_create_names",
     "category_labels",
     "effective_item",
-    "is_itops_space",
     "load_proposal",
     "load_review",
     "lookalike",
@@ -182,19 +180,11 @@ def merge_options(options: list[Any]) -> tuple[list[str], list[dict[str, Any]]]:
     return out[:MAX_OPTIONS], [{"values": g["values"], "to": g["suggested"]} for g in merged]
 
 
-# -- the IT ops conventions (M30, design 5b) ---------------------------------------------------
+# -- the conventions (M30, design 5b; in every space since M31) -----------------------------------
 
 
-ITOPS_TYPES = ("host", "software", "application")
 _SOURCE_TYPE = "source"
 """M30's Source type (`sources.SOURCE_TYPE_ID`): made by imports only, so never offered."""
-
-
-def is_itops_space(space: Space) -> bool:
-    """The space's setup is ``itops``, or it has the Host, Software and Application types."""
-    if spaceconfig.read(space.root)[0].get("setup") == "itops":
-        return True
-    return all(space.type_by_id(t) is not None for t in ITOPS_TYPES)
 
 
 def named_relations(space: Space) -> set[str]:
@@ -316,8 +306,7 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
     if not isinstance(documents, int) or isinstance(documents, bool) or documents < 0:
         raise ProposalInvalid(f"Item {index + 1} ({name}): documents is the number of documents in the group.")
     iid = _text(raw.get("id"), 64) or f"item-{index + 1}"
-    itops = space is not None and is_itops_space(space)
-    named = named_relations(space) if itops and space is not None else set()
+    named = named_relations(space) if space is not None else set()
     problems: list[str] = []
     exists = f"A type named {name!r} already exists; use or extend it."
     type_id: str | None = None
@@ -379,7 +368,7 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
             if not options:
                 dropped.append({"key": key, "name": pname, "reason": "A label property needs the values found."})
                 continue
-        if kind == "entity" and itops and pname.casefold() not in named:
+        if kind == "entity" and space is not None and pname.casefold() not in named:
             dropped.append({"key": key, "name": pname, "reason": "Not one of the named relations; it stays a plain link."})
             continue
         if kind == "entity":
@@ -398,7 +387,7 @@ def _check_item(raw: dict[str, Any], index: int, space: Space | None, names: set
         problems.append("There is nothing to add: no property passed the checks.")
     group = _text(raw.get("group"), 200) or name
     offer: dict[str, str] | None = None
-    if itops and space is not None and action == "create":
+    if space is not None and action == "create":
         rules: list[str] = []
         like = lookalike(props, space, exclude=type_id)
         if like is not None:

@@ -19,7 +19,7 @@ from .propvalues import decode_value
 from .typedefs import read_raw
 from .typemodel import PropertyDefinition, TypeDefinition
 from .workbody import ActivityLine, WorkNoteLine, activity_lines, work_note_lines
-from .workfields import TICKET_FIELDS, WORK_FIELDS, is_work_type
+from .workfields import TICKET_FIELDS, WORK_FIELDS, is_work_type, resolved_key
 from .workmodel import NOT_WORK_ITEM, FloorItem, Stage, Step, Turn
 from .workresolution import WorkItemData as ResolutionData
 from .workresolution import resolution_note
@@ -136,6 +136,16 @@ def _day(value: Any) -> str | None:
     if isinstance(value, dict) and isinstance(value.get("start"), str):
         return value["start"][:10]
     return None
+
+
+def _resolved_day(t: TypeDefinition, fields: dict[str, Any], fm: dict[str, Any]) -> str | None:
+    """The ticket's resolved day: ``deskResolved``, or (M31, G3) the type's own Resolved when it has
+    no ``deskResolved`` (the Incident)."""
+    if resolved_key(t) == "resolved":
+        p = t.prop("resolved")
+        assert p is not None
+        return _day(decode_value(p, fm.get("resolved"), fm))
+    return _day(fields.get("deskResolved"))
 
 
 def _system(text: str | None, ticket_id: str | None) -> str | None:
@@ -276,7 +286,7 @@ def item_data(space: Space, rel: str, *, now: datetime, jira_site: str | None) -
             "location": text("deskLocation"),
             "opened": _day(fields.get("deskOpened")),
             "updated": _day(fields.get("deskUpdated")),
-            "resolved": _day(fields.get("deskResolved")),
+            "resolved": _resolved_day(t, fields, fm),
         }
 
     project = fields.get("project") if "project" in defs else None

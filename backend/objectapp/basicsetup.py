@@ -47,8 +47,9 @@ calls"):
   Affects after Meetings (guess G2). Person: the basic Person plus Department. Meeting: the basic
   Meeting with Type options Operations and Helpdesk appended.
 - Incident is a work type: its own properties, Notes, the M22 work fields without ``cause`` (its
-  own Cause, a text, wins the key) and with ``deskResolved`` named "Desk resolved" (guess G3),
-  then Task's hidden ``completed``. Status categories: Open and Mitigated in progress, Resolved
+  own Cause, a text, wins the key) and without ``deskResolved`` (M31, G3 "drop the duplicate": the
+  Incident's own Resolved is its one resolved time; Desk sync writes there), then Task's hidden
+  ``completed``. Status categories: Open and Mitigated in progress, Resolved
   done.
 - Template names (= the type name) and their ``## <section>`` bodies (`ITOPS_TEMPLATE_SECTIONS`).
 - Seed Tags are coloured ``bg-<THEME_COLORS[i % 18]>`` by their index in `ITOPS_TAGS`. The Task
@@ -510,10 +511,8 @@ def _itops_project(project: TypeDefinition) -> TypeDefinition:
 def _incident() -> TypeDefinition:
     work = []
     for p in field_defs(task=False, project_type_ids=["project"]):
-        if p.key == "cause":
-            continue  # the Incident's own Cause (text) wins the key
-        if p.key == "deskResolved":
-            p.name = "Desk resolved"  # guess G3: the Incident has its own Resolved
+        if p.key in ("cause", "deskResolved"):
+            continue  # the Incident's own Cause (text) and Resolved (G3, M31) win
         work.append(p)
     return _type(
         "incident", "Incident", "Incidents",

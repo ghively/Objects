@@ -25,10 +25,12 @@ from .obsidian import read_markdown_folder
 from .readmodel import ReadResult, notion_id
 from .source import MAX_OBJECTS, LimitExceeded, Source, TextBudget, is_csv, is_markdown
 
-__all__ = ["UNKNOWN_SOURCE", "detect", "read_source"]
+__all__ = ["SPACE_SOURCE", "UNKNOWN_SOURCE", "detect", "read_source"]
 
 UNKNOWN_SOURCE = "Couldn't tell where this export came from; it is read as a Markdown folder."
 NO_PAGES = "No Markdown files were found in this source."
+SPACE_SOURCE = "This folder is an Object space: its objects keep their types, and the space is only read, never changed."
+"""M31 (remodelling a space): the preview's note for a space read as a source (our string)."""
 
 
 def detect(src: Source) -> str | None:
@@ -68,7 +70,9 @@ def read_source(src: Source, kind: str = "auto", budget: TextBudget | None = Non
         read = read_markdown_folder(
             src, kind="obsidian", detected=detected, suggested=suggested, budget=budget
         )
-        if detected is None and kind == "auto":
+        if src.is_space:
+            read.warnings.insert(0, SPACE_SOURCE)
+        elif detected is None and kind == "auto":
             read.warnings.insert(0, UNKNOWN_SOURCE)
     if not read.objects:
         read.warnings.append(NO_PAGES)

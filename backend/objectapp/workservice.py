@@ -582,8 +582,11 @@ class WorkService:
                     raise
 
     def fields(self, path: str, base_version: str, set_: dict[str, Any], remove: list[str],
-               actor: Actor) -> dict:
+               actor: Actor, *, own: Iterable[str] = ()) -> dict:
         """Set and remove ticket and work fields (not ``steps``, ``floorItems`` or ``status``).
+
+        ``own`` (M31, G3): the type's own properties this call may also set, beside the fields
+        (Desk sync's ``resolved`` on an Incident, `desksync.apply_ticket_fields`).
 
         Raises `InvalidValue` (422), `Conflict` (a stale ``base_version``), `KeyError`,
         `NotWorkItem`, `ReadOnly`."""
@@ -592,9 +595,10 @@ class WorkService:
         remove = list(remove or [])
         t = self.space.type_by_id(self.space.get(rel).type)
         assert t is not None
+        allowed = _FIELD_WRITE_KEYS | set(own)
         for key in (*set_, *remove):
             p = t.prop(key)
-            if key not in _FIELD_WRITE_KEYS or p is None:
+            if key not in allowed or p is None:
                 raise InvalidValue(NOT_A_FIELD.format(key=key))
         if "deskPriority" in set_:
             v = set_["deskPriority"]

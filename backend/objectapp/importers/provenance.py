@@ -18,6 +18,15 @@ property)::
       importedAt: 2026-11-06T16:00:00.000Z
 
 Nothing here reads or writes a file; the writer places the block and a re-run reads it back.
+
+M31 (design section 1's "Wiki (git)" row): a Markdown or Obsidian folder inside a git repository
+(`gitprov.repo_for_read`) is ``system: wiki``; each file's ``version`` is the commit (HEAD's sha),
+``url`` the file's web page at that commit when ``origin`` is a known web host (else the ``file:``
+link, as for any folder), ``author`` and ``modified`` its last commit's author and date, and
+``uncommitted: true`` when the file differs from the commit (then ``modified`` stays the file's own
+date). A Files folder in a repository keeps ``system: files`` and gets the same commit fields. An
+earlier import of the same folder, made before M31 as ``obsidian`` or ``markdown``, is still found
+by a re-run (`legacy_ident`).
 """
 
 from __future__ import annotations
@@ -29,6 +38,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
+from . import gitprov
 from .readmodel import ReadObject, ReadResult, notion_id
 
 if TYPE_CHECKING:
@@ -45,6 +55,7 @@ __all__ = [
     "duplicates",
     "find",
     "index_space",
+    "legacy_ident",
     "moved_sources",
     "scope",
     "read_block",
@@ -54,7 +65,8 @@ __all__ = [
 
 BLOCK_KEY = "importSource"
 SYSTEMS = ("sharepoint", "notion", "wiki", "obsidian", "anytype", "files", "markdown")
-_ORDER = ("system", "url", "id", "source", "version", "author", "created", "modified", "original", "contentHash", "batch", "importedAt")
+_ORDER = ("system", "url", "id", "source", "version", "uncommitted", "author", "created", "modified", "original",
+          "contentHash", "batch", "importedAt")
 
 
 def hash_bytes(data: bytes) -> str:
@@ -74,6 +86,8 @@ class Prov:
     contentHash: str | None = None
     source: str | None = None
     """Which source the id belongs to (ids that are paths mean nothing across two sources)."""
+    uncommitted: bool | None = None
+    """M31: True when the file differs from its git commit (else left out)."""
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -87,7 +101,18 @@ def system_of(read: ReadResult, o: ReadObject | None = None) -> str:
         return "anytype"
     if read.kind == "files":
         return "files"
+    if gitprov.repo_for_read(read) is not None:
+        return "wiki"
     return "obsidian" if read.detected == "obsidian" else "markdown"
+
+
+def legacy_ident(read: ReadResult, o: ReadObject) -> tuple[str, str] | None:
+    """The (system, id) an import before M31 gave ``o`` when that differs from `ident`: a Markdown
+    or Obsidian folder in a git repository was ``obsidian`` or ``markdown`` then, ``wiki`` now."""
+    system, ident_ = ident(read, o)
+    if system != "wiki" or o.prov.get("system") == "wiki":
+        return None
+    return ("obsidian" if read.detected == "obsidian" else "markdown"), ident_
 
 
 def _raw_ident(read: ReadResult, o: ReadObject) -> tuple[str, str]:
@@ -190,7 +215,27 @@ def prov_for(read: ReadResult, o: ReadObject, data: bytes | None, original: str 
             p.version = p.contentHash
         p.modified = p.modified or o.mtime
         p.created = p.created or _text(o.system.get("createdAt"))
+        if not m:
+            _git_fields(read, o, p)
     return p
+
+
+def _git_fields(read: ReadResult, o: ReadObject, p: Prov) -> None:
+    """M31: the commit, its web link, the last commit's author and date, and the uncommitted mark."""
+    repo = gitprov.repo_for_read(read)
+    if repo is None:
+        return
+    rel = o.sourcePath
+    if repo.committed(rel):
+        p.version = repo.head
+        p.url = repo.url(rel) or p.url
+        last = repo.last_commit(rel)
+        if last is not None:
+            p.author = p.author or last[0] or None
+            if not repo.uncommitted(rel):
+                p.modified = last[1] or p.modified
+    if repo.uncommitted(rel):
+        p.uncommitted = True
 
 
 def _text(v: Any) -> str | None:
@@ -303,6 +348,9 @@ def find(index: dict[tuple[str, str], list[Existing]], read: ReadResult, o: Read
     the same source has the id, one from a source this one moved from (`moved_sources`) is it."""
     here = scope(read, o)
     hits = index.get(ident(read, o), [])
+    legacy = legacy_ident(read, o)
+    if legacy is not None:
+        hits = [*hits, *index.get(legacy, [])]
     for hit in hits:
         there = hit.block.get("source")
         if here is None or there is None or _same_source(str(there), here):

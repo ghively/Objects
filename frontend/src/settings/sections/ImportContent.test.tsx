@@ -13,6 +13,7 @@ import { api } from '@/api/client'
 import { resetImportDialog, useImportDialog } from '@/import/useImportDialog'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { resetSettingsModal, useSettingsModal } from '@/settings/useSettingsModal'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { IMPORT_CONTENT_TEXT, ImportContentSection } from './ImportContent'
 
 const T = IMPORT_CONTENT_TEXT
@@ -45,6 +46,23 @@ describe('Import Content', () => {
       expect(useImportDialog.getState()).toMatchObject({ isOpen: true, preset: { kind } })
       expect(useSettingsModal.getState().isOpen).toBe(false)
     }
+  })
+
+  test('test M31 remodel this space opens the dialog preset to the space folder, into a new space', async () => {
+    useSpaceInfo.setState({
+      space: { name: 'Work', root: '/home/gene/Spaces/Work', types: [], icon: null, description: null, hideTaskManagement: false, revision: '' },
+      loaded: true,
+    } as never)
+    const user = userEvent.setup()
+    act(() => useSettingsModal.getState().open('importContent'))
+    render(<ImportContentSection />)
+    expect(screen.getByText(T.remodelHelp)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: T.remodel }))
+    expect(useImportDialog.getState()).toMatchObject({
+      isOpen: true,
+      preset: { sourcePath: '/home/gene/Spaces/Work', newSpaceOnly: true, name: 'Work (remodelled)' },
+    })
+    expect(useSettingsModal.getState().isOpen).toBe(false)
   })
 
   test('test each source says how to make its export', () => {

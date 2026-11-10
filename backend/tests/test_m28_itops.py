@@ -417,7 +417,7 @@ def test_basic_variants():
     assert is_work_type(incident)
     assert incident.prop("cause").type == "text"
     assert [p.key for p in incident.propertyDefinitions].count("cause") == 1
-    assert incident.prop("deskResolved").name == "Desk resolved"
+    assert incident.prop("deskResolved") is None  # M31, G3: its own Resolved is the one
     assert done_option(incident.prop("status")) == "Resolved"
     assert incident.prop("completed").visibility == "hidden"
     keys = _own_keys(incident)
@@ -425,7 +425,7 @@ def test_basic_variants():
         "status", "severity", "impact", "cause", "affects", "started", "resolved", "notes",
     ]
     assert keys[-1] == "completed"
-    assert set(keys[8:-1]) == FIELD_KEYS - {"cause", "project"}
+    assert set(keys[8:-1]) == FIELD_KEYS - {"cause", "project", "deskResolved"}
     # The basic Project's work fields keep their own Resolved name.
     assert project.prop("deskResolved").name == "Resolved"
 
@@ -591,11 +591,19 @@ def _without_m29(data: dict) -> dict:
     return data
 
 
+def _without_m31(tid: str, data: dict) -> dict:
+    """The fixture's Incident as M28 wrote it keeps its ticket fields' ``deskResolved`` ("Desk
+    resolved"): M31 (G3) drops it from the starter, and an existing space keeps it."""
+    if tid == "incident":
+        data = {**data, "propertyDefinitions": [p for p in data["propertyDefinitions"] if p["key"] != "deskResolved"]}
+    return data
+
+
 def test_fixture_types_match():
     # The fixture is an M28-era space: M29 never tops its types up (M29 plan, "Our calls" 19).
     for t in itops_types():
         path = FIXTURE / ".object" / "types" / f"{t.id}.json"
-        got = TypeDefinition.from_json(json.loads(path.read_text("utf-8")))
+        got = TypeDefinition.from_json(_without_m31(t.id, json.loads(path.read_text("utf-8"))))
         assert _without_ids(got.to_json()) == _without_ids(_without_m29(t.to_json())), t.id
         if t.id != "source":
             assert got.templates["defaultTemplateId"] == got.templates["ids"][0]
