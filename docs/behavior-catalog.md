@@ -517,6 +517,11 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   outside edit adding `[[X]]`), the Properties panel's Backlinks chips and the Tasks dashboard's Context grouping
   update without a reload (a change to any other object re-reads them).
 - **Inline tag**: a `#tag` typed in a paragraph renders as a colored chip in the text.
+  (M31) The chip is a decoration: the file keeps the plain `#tag` text. A tag is `#` at the start or after a space,
+  `(` or `,`, then letters, digits, `-`, `_` or `/` (the importer's reading); digits only (`#123`) is no tag, nor
+  text in code, link text, a URL's `#anchor` or a heading's `# `. It reads paragraphs and headings anywhere. Its
+  color is its Tag object's, else gray; a click opens the Tag object like a link (Ctrl: new tab, Shift: side panel),
+  or with no Tag object a search for `#tag` in a new tab (our call; a click never creates a tag).
 - **Export dialog** (object `...` > Export, Ctrl+E): a modal with format tiles PDF, Markdown, Microsoft Word,
   Latex; Markdown is selected on open. PDF: Style cards (Notes: matches the page's styling; Essay; Academic — all
   three available, none marked Experimental), Options (Include embeds; Include outline; Hide empty properties, on by

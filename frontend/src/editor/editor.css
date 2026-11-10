@@ -80,6 +80,12 @@
   color: var(--chip-fg);
   background: var(--chip-bg);
 }
+/* M31: an inline `#tag` (a decoration; its colours come from the tag's Tag object, else gray). */
+.object-editor .inline-tag {
+  border-radius: 4px;
+  padding: 0 0.15em;
+  cursor: pointer;
+}
 .object-editor .wikilink-unresolved {
   opacity: 0.5;
   cursor: default;

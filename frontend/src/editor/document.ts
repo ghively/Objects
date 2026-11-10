@@ -42,6 +42,7 @@ import {
 } from './extensions/blockSource'
 import { BlockSelection } from './extensions/blockSelection'
 import { FileDrop } from './extensions/fileDrop'
+import { InlineTag } from './extensions/inlineTag'
 import { MarkdownShortcuts } from './extensions/markdownShortcuts'
 import { RawBlock } from './extensions/rawBlock'
 import { SlashMenu } from './extensions/slashMenu'
@@ -174,6 +175,8 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     M8Keys,
     FileDrop,
     MarkdownShortcuts.configure({ numbered }),
+    // M31
+    InlineTag,
   ]
 }
 
