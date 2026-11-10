@@ -6,8 +6,9 @@ Everything is synthetic (hosts ``APP01``, ``SRV-DB01``; "SQL Server 2019"; "Payr
 ``10.0.0.x``).
 
 `simple_pick` and `simple_lines` are reference implementations of the Contract's rules for
-`distill.pick_values` and `distill.summary_lines`, for T3's tests while those are stubs
-(`use_simple_distill`); T5's commit deletes the three and points their users at `distill`.
+`distill.pick_values` and `distill.summary_lines`, for T3's tests while those were stubs
+(`use_simple_distill`). T5 filled `distill`, so `use_simple_distill` now patches nothing; the three
+stay only until T3's tests (built in parallel) are merged and pointed at `distill`, then go.
 """
 
 from __future__ import annotations
