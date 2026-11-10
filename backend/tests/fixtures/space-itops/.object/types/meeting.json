@@ -1,0 +1,313 @@
+{
+  "schemaVersion": 2,
+  "id": "meeting",
+  "name": "Meeting",
+  "pluralName": "Meetings",
+  "folder": "Meetings",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-users-three"
+  },
+  "color": "orange",
+  "description": "Notes from a meeting: who came, when, and what was said.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The name of the object, shown wherever it appears",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "The collections this object belongs to",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "A short summary of what the object is about",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "When the object was made",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "When the object last changed",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "Tags attached to the object",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "An emoji or icon shown beside the title",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Other names the object goes by",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "01M71CTX9K7P412KAWFJN78FH6",
+      "key": "date",
+      "name": "Date",
+      "type": "datetime",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "constraints": {
+          "resolutionPreference": "time"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9K8H6PFW8319DW42CP",
+      "key": "meetingType",
+      "name": "Type",
+      "type": "label",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-caret-circle-down"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "set": [
+          {
+            "id": "team-meeting",
+            "text": "Team Meeting",
+            "icon": null,
+            "color": "blue"
+          },
+          {
+            "id": "one-on-one",
+            "text": "One-on-One",
+            "icon": null,
+            "color": "sky"
+          },
+          {
+            "id": "client-meeting",
+            "text": "Client Meeting",
+            "icon": null,
+            "color": "cyan"
+          },
+          {
+            "id": "brainstorming",
+            "text": "Brainstorming",
+            "icon": null,
+            "color": "teal"
+          },
+          {
+            "id": "workshop",
+            "text": "Workshop",
+            "icon": null,
+            "color": "emerald"
+          },
+          {
+            "id": "presentation",
+            "text": "Presentation",
+            "icon": null,
+            "color": "green"
+          },
+          {
+            "id": "interview",
+            "text": "Interview",
+            "icon": null,
+            "color": "lime"
+          },
+          {
+            "id": "conference",
+            "text": "Conference",
+            "icon": null,
+            "color": "yellow"
+          },
+          {
+            "id": "operations",
+            "text": "Operations",
+            "icon": null,
+            "color": "amber"
+          },
+          {
+            "id": "helpdesk",
+            "text": "Helpdesk",
+            "icon": null,
+            "color": "orange"
+          }
+        ]
+      }
+    },
+    {
+      "id": "01M71CTX9K4RYYMVB88K6BH6Z3",
+      "key": "attendees",
+      "name": "Attendees",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "person"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": []
+      }
+    },
+    {
+      "id": "01M71CTX9KC8RS03BG8D29G22Q",
+      "key": "project",
+      "name": "Project",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "project"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": []
+      }
+    },
+    {
+      "id": "01M71CTX9K953TJXG0793DFFCM",
+      "key": "reviewed",
+      "name": "Reviewed",
+      "type": "boolean",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-check-square"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "coverImage",
+      "key": "coverImage",
+      "name": "Cover image",
+      "type": "coverImage",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-image"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "01M71CTX9KFZ5VH1E7ZW8ZR34F",
+      "key": "notes",
+      "name": "Notes",
+      "type": "blocks",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-dashes"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [
+      "01M71CTXBJ8CADCMV94W11F76E"
+    ],
+    "defaultTemplateId": "01M71CTXBJ8CADCMV94W11F76E"
+  }
+}

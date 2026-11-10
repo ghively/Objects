@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 2,
+  "id": "container",
+  "name": "Container",
+  "pluralName": "Containers",
+  "folder": "Containers",
+  "formerNames": [],
+  "icon": {
+    "type": "iconify",
+    "val": "ph-shipping-container"
+  },
+  "color": "cyan",
+  "description": "A container, its image and the host it runs on.",
+  "basic": false,
+  "propertyDefinitions": [
+    {
+      "id": "title",
+      "key": "title",
+      "name": "Title",
+      "type": "entity_title",
+      "description": "The name of the object, shown wherever it appears",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-t"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "collections",
+      "key": "collections",
+      "name": "Collections",
+      "type": "entity_collections",
+      "description": "The collections this object belongs to",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards-three"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "description",
+      "key": "description",
+      "name": "Description",
+      "type": "entity_description",
+      "description": "A short summary of what the object is about",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-info"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "createdAt",
+      "key": "createdAt",
+      "name": "Created at",
+      "type": "entity_createdAt",
+      "description": "When the object was made",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-calendar-blank"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "lastUpdated",
+      "key": "lastUpdated",
+      "name": "Last updated",
+      "type": "entity_lastUpdated",
+      "description": "When the object last changed",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-clock-clockwise"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "tags",
+      "key": "tags",
+      "name": "Tags",
+      "type": "entity_tags",
+      "description": "Tags attached to the object",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-tag"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "tag"
+        ]
+      }
+    },
+    {
+      "id": "icon",
+      "key": "icon",
+      "name": "Icon",
+      "type": "entity_icon",
+      "description": "An emoji or icon shown beside the title",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-smiley"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "aliases",
+      "key": "aliases",
+      "name": "Aliases",
+      "type": "entity_aliases",
+      "description": "Other names the object goes by",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-cards"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true
+      }
+    },
+    {
+      "id": "01M71CTX9M5GZDH7768Q9MYN3V",
+      "key": "image",
+      "name": "Image",
+      "type": "text",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-text-align-left"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    },
+    {
+      "id": "01M71CTX9MQ4W4HTPYQRCEQP7C",
+      "key": "runsOn",
+      "name": "Runs on",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "host"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Runs",
+          "key": "runs"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9M6YQ2HR85RTMDJV6W",
+      "key": "partOf",
+      "name": "Part of",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "alwaysShow",
+      "options": {
+        "isArray": false,
+        "allowedTypes": [
+          "application"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Containers",
+          "key": "containers"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9MXJK3075F1XG0X5Q6",
+      "key": "sources",
+      "name": "Sources",
+      "type": "entity",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-file-text"
+      },
+      "visibility": "hideWhenEmpty",
+      "options": {
+        "isArray": true,
+        "allowedTypes": [
+          "source"
+        ],
+        "hasFixedSet": false,
+        "fixedSet": [],
+        "counterpart": {
+          "name": "Distilled into",
+          "key": "distilledInto"
+        }
+      }
+    },
+    {
+      "id": "01M71CTX9MBZYDHDG10WFZFBZM",
+      "key": "notes",
+      "name": "Notes",
+      "type": "blocks",
+      "description": "",
+      "icon": {
+        "type": "iconify",
+        "val": "ph-list-dashes"
+      },
+      "visibility": "alwaysShow",
+      "options": {}
+    }
+  ],
+  "collectionsPropertyPosition": 0,
+  "viewDesign": null,
+  "font": "sans-serif",
+  "wideLayoutMode": false,
+  "wideCoverImage": false,
+  "cropCoverImage": true,
+  "templates": {
+    "ids": [
+      "01M71CTXA76ARSWT3F428H8QBE"
+    ],
+    "defaultTemplateId": "01M71CTXA76ARSWT3F428H8QBE"
+  }
+}
