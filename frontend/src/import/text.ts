@@ -141,6 +141,10 @@ export const IMPORT_TEXT = {
   tryCopyNote: 'Imports into a copy of this space, made next to it under the name below, for you to look at before the real run.',
   copyName: 'Name of the copy',
   copyDefaultName: (space: string) => `${space} (trial)`,
+  // M30 (the label is the design's; the help is our string).
+  keepAsSources: 'Keep pages as Sources',
+  keepAsSourcesHelp:
+    'Every page is kept as a read-only Source, exactly as imported. With the AI filing pass, the things they talk about become their own objects, built from all the pages that mention them.',
   accountedFor: (
     r: Pick<ImportResult, 'sourceItems' | 'objects' | 'updated' | 'unchanged' | 'changedInBoth' | 'leftOut' | 'failed' | 'notWritten'>,
   ) =>

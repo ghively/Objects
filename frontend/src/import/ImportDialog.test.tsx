@@ -295,7 +295,10 @@ describe('ImportDialog: source and preview', () => {
     await user.type(screen.getByRole('textbox', { name: T.source }), '/home/gene/Downloads/export.zip')
     await user.click(preview)
     await waitFor(() =>
-      expect(mocked.importPreview).toHaveBeenCalledWith({ source: { path: '/home/gene/Downloads/export.zip', kind: 'notion' } }),
+      expect(mocked.importPreview).toHaveBeenCalledWith({
+        source: { path: '/home/gene/Downloads/export.zip', kind: 'notion' },
+        keepAsSources: true,
+      }),
     )
     await passScan(user)
     expect(await screen.findByRole('status')).toHaveTextContent(T.summary(0, 0, 0))
@@ -351,7 +354,10 @@ describe('ImportDialog: source and preview', () => {
     await user.paste('  "C:\\Users\\gene\\Downloads\\Export.zip" ')
     await user.click(screen.getByRole('button', { name: T.preview }))
     await waitFor(() =>
-      expect(mocked.importPreview).toHaveBeenCalledWith({ source: { path: 'C:\\Users\\gene\\Downloads\\Export.zip', kind: 'auto' } }),
+      expect(mocked.importPreview).toHaveBeenCalledWith({
+        source: { path: 'C:\\Users\\gene\\Downloads\\Export.zip', kind: 'auto' },
+        keepAsSources: true,
+      }),
     )
   })
 
@@ -377,6 +383,7 @@ describe('ImportDialog: mapping step', () => {
         source: { path: '/home/gene/Downloads/vault.zip', kind: 'auto' },
         mapping: { typeSource: 'folder', typeKey: null, types: { 'folder:Books': { name: 'Novel' } }, properties: {} },
         target: 'newSpace',
+        keepAsSources: true,
       }),
     )
     await waitFor(() => expect(screen.getByRole('button', { name: T.import })).toBeEnabled())
@@ -533,6 +540,7 @@ describe('ImportDialog: target, progress and finish', () => {
         previewId: 'preview-7',
         mapping: { typeSource: 'folder', typeKey: null, types: {}, properties: {} },
         target: { kind: 'newSpace', name: 'Vault', location: '/home/gene/Spaces' },
+        keepAsSources: true,
       }),
     )
     expect(await screen.findByRole('heading', { name: T.importing })).toHaveFocus()
@@ -644,6 +652,7 @@ describe('ImportDialog: target, progress and finish', () => {
         previewId: 'preview-7',
         mapping: { typeSource: 'folder', typeKey: null, types: {}, properties: { 'folder:Books': { rating: { kind: 'label' } } } },
         target: { kind: 'currentSpace' },
+        keepAsSources: true,
       }),
     )
   })

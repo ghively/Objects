@@ -15,6 +15,10 @@
  * (finding 4); a start refused with 404 (the preview expired or was dropped) reads the export again
  * and waits for the user (finding 15); a job that ends into this space reloads this window's
  * objects and types (`announceResync`, finding 2).
+ *
+ * M30: "Keep pages as Sources" starts checked for every import (Gene, 2026-11-09); its value goes to
+ * the first preview, every re-preview (a change re-previews, so the planned types show Source when it
+ * is on) and the start. Unchecked, pages are filed into their mapped types as before.
  */
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { announceResync, api, ApiError } from '@/api/client'
@@ -120,6 +124,8 @@ export function ImportDialog() {
   const [copyTouched, setCopyTouched] = useState(false)
   const [copyName, setCopyName] = useState('')
   const [firstRun, setFirstRun] = useState(true)
+  // M30: every page kept as a read-only Source (on for every import).
+  const [keepAsSources, setKeepAsSources] = useState(true)
   // M27: the scan step's choices, carried into the import request.
   const [scanOutcome, setScanOutcome] = useState<ScanOutcome | null>(null)
   const [rev, setRev] = useState(0)
@@ -166,6 +172,7 @@ export function ImportDialog() {
     setCopyTouched(false)
     setCopyName('')
     setFirstRun(true)
+    setKeepAsSources(true)
     setScanOutcome(null)
     setRev(0)
     setUpdating(false)
@@ -237,7 +244,7 @@ export function ImportDialog() {
     setBusy(true)
     setError(null)
     try {
-      const res = await api.importPreview({ source: { path: p, kind } })
+      const res = await api.importPreview({ source: { path: p, kind }, keepAsSources })
       if (my !== seq.current) return
       setSource({ path: p, kind })
       setPreview(res)
@@ -270,6 +277,11 @@ export function ImportDialog() {
     setNotice(null)
     repreview()
   }
+  const changeKeepAsSources = (next: boolean) => {
+    setKeepAsSources(next)
+    setNotice(null)
+    repreview()
+  }
   const changeTarget = (next: ImportTargetKind) => {
     if (next === target) return
     setTarget(next)
@@ -282,7 +294,7 @@ export function ImportDialog() {
     const my = ++seq.current
     const timer = setTimeout(() => {
       api
-        .importPreview({ source, mapping: cleanMapping(mapping, target), target })
+        .importPreview({ source, mapping: cleanMapping(mapping, target), target, keepAsSources })
         .then((res) => {
           if (my !== seq.current) return
           setPreview(res)
@@ -299,7 +311,7 @@ export function ImportDialog() {
         })
     }, importTiming.debounceMs)
     return () => clearTimeout(timer)
-  }, [rev, source, mapping, target])
+  }, [rev, source, mapping, target, keepAsSources])
 
   const copying = target === 'currentSpace' && tryCopy
   const newSpaceReady =
@@ -322,6 +334,7 @@ export function ImportDialog() {
         previewId: preview.previewId,
         mapping: cleanMapping(mapping, target),
         target: into,
+        keepAsSources,
         ...(preview.kind === 'files' ? { keepOriginals } : {}),
         ...(scanOutcome &&
         (scanOutcome.leaveOut.length || scanOutcome.leaveOutFiles.length || scanOutcome.excludeFromAi.length)
@@ -556,6 +569,8 @@ export function ImportDialog() {
             <ImportOptions
               kind={preview.kind}
               target={target}
+              keepAsSources={keepAsSources}
+              onKeepAsSources={changeKeepAsSources}
               keepOriginals={keepOriginals}
               onKeepOriginals={setKeepOriginals}
               tryCopy={tryCopy}
