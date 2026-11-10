@@ -160,6 +160,17 @@ The history below is in the order it was written: the per-milestone sections new
   hand-typed value under a synced key showed in the calendar and search; change type and merge could write a synced
   key); all fixed with tests. Name patterns use a linear matcher, not a regex (plan Our calls 21).
 
+- **M30 gate (Linux, 2026-11-10, after one review and one fix pass; the final gate for M28-M30):** back end 3819
+  passed, 19 skipped (the 2 message-style failures were fixed after the run: the Source label allow-listed, one repr
+  quote removed; one speed-budget test passes alone); front end 4267 passed, 1 skipped; `tsc`, lint and build
+  clean; acceptance `m30`, `m29`, `m28`, `m27`, `m25`, `m22`, `m8` RESULT: PASS and `m15` "All checks passed.". The
+  review found 18 items (the worst: a Source re-run took the old file's line endings and BOM; merge could trash a
+  Source; a second import's older Source could overwrite a newer value and drop earlier citations; restoring a
+  Source answered 500; preview and start defaulted differently); all fixed with tests. The M25 acceptance check
+  "a first import only adds files" was stale since before M28 (an import into an existing type extends it, by
+  design); the check now allows exactly those type files. Categories are now only Category, Kind and Environment
+  options and tags (plan Our calls 26); the keepAsSources default is on everywhere (Our calls 25).
+
 ### Needs Gene
 
 1. **Hand-checks:** the list in `auto-acceptance-2026-11-08.md`, "What needs Gene by hand" (Windows and pywebview,
