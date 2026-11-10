@@ -12,6 +12,8 @@
  *   `api.attachments()`), "Open {type} on system"
  *   and "Download {mediaType}"; caption.
  * - a missing attachment shows "File not found." (our string).
+ * - M31: with "Media loading: Required only" (a device setting) image, PDF, audio and video show a
+ *   placeholder with "Load" until clicked; space files carry the media token (`settings/mediaLoading.ts`).
  * Every block has a `…` menu with "Remove Block".
  *
  * The bookmark is a card with the link title, the domain and the URL, opened
@@ -23,6 +25,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { Attachment } from '@/api/types'
 import { Icon } from '@/components/Icon'
+import { MEDIA_TEXT, useMediaOnRequest, useMediaToken, withMediaToken } from '@/settings/mediaLoading'
 import type { AttachmentKind, Option } from '../annotations'
 import { EmbedMenu, ResizableEmbed, type EmbedMenuItem, type ResizableEmbedProps } from './ResizableEmbed'
 import { cachedAttachments, decodeMarkdownPath, findAttachment, isExternalUrl, showToast } from './upload'
@@ -41,6 +44,15 @@ const KIND_WORD: Record<AttachmentKind, string> = {
   audio: 'audio',
   video: 'video',
   file: 'file',
+}
+
+/** M31: the "Required only" placeholder's icon per kind. */
+const PLACEHOLDER_ICON: Record<AttachmentKind, string> = {
+  image: 'ph-image',
+  pdf: 'ph-file-pdf',
+  audio: 'ph-speaker-high',
+  video: 'ph-play',
+  file: 'ph-file',
 }
 
 /** A VS Code file icon by extension (bundled `vscode-icons`). */
@@ -150,7 +162,12 @@ export function MediaView({ node, editor, getPos, selected }: NodeViewProps) {
   // Wiki-form targets may be Obsidian short names: look them up; md images are loaded as written.
   const lookup = useAttachment(attrs.form === 'wiki' || kind === 'file' ? local : null)
   const path = lookup ? lookup.path : local
-  const url = external ? written : path ? api.fileUrl(path) : ''
+  // M31: the media token "Clear media cache" bumps reloads space files past the browser's cache.
+  const mediaToken = useMediaToken()
+  const url = external ? written : path ? withMediaToken(api.fileUrl(path), mediaToken) : ''
+  // M31 "Media loading: Required only": media waits behind "Load" until asked for.
+  const onRequest = useMediaOnRequest()
+  const [asked, setAsked] = useState(false)
   const missing = attrs.form === 'wiki' || kind === 'file' ? lookup === null : false
   const name = attrs.form === 'md' ? attrs.alt || baseName(local ?? written) : attrs.label || baseName(path ?? written)
 
@@ -176,6 +193,25 @@ export function MediaView({ node, editor, getPos, selected }: NodeViewProps) {
       <div className="media-missing" data-testid="media-missing">
         <span className="media-missing-name">{baseName(written)}</span>
         <span>{FILE_NOT_FOUND}</span>
+      </div>,
+      { captionable: true },
+    )
+  } else if (onRequest && !asked && kind !== 'file') {
+    content = frame(
+      <div className="flex items-center gap-3 rounded-lg border border-dashed border-line px-3 py-2.5 text-[13px]" data-testid="media-placeholder">
+        <Icon name={PLACEHOLDER_ICON[kind]} size={18} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-fg">{name}</div>
+          <div className="text-fg-muted">{MEDIA_TEXT.notLoaded}</div>
+        </div>
+        <button
+          type="button"
+          contentEditable={false}
+          onClick={() => setAsked(true)}
+          className="shrink-0 rounded-md border border-line bg-raised px-2.5 py-1 text-[13px] font-medium text-fg hover:bg-hover"
+        >
+          {MEDIA_TEXT.load}
+        </button>
       </div>,
       { captionable: true },
     )

@@ -207,6 +207,7 @@ from . import (
     api_schedules_v1,
     api_search,
     api_spaces_m8,
+    api_storage,
     api_tasks,
     api_v1,
     api_v1_tools,
@@ -2415,6 +2416,7 @@ def create_app(
     api.include_router(api_search.router(ctx))
     api.include_router(api_references.router(ctx))
     api.include_router(api_graph.router(ctx))
+    api.include_router(api_storage.router(ctx))  # M31: Offline & Sync's Local Storage, Clear media cache
     # M8: each router is filled by its own task (see the plan's "Shared files").
     for module in (api_tasks, api_history, api_blocks, api_merge, api_spaces_m8):
         api.include_router(module.router(ctx))

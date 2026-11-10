@@ -74,6 +74,13 @@ Object has no accounts.
 - Offline & Sync: sync status and cloud media storage are **(out of scope)** (no sync). The local parts apply:
   "Rebuild search index"; Local Storage (size estimate); Media loading (Everything | Required only);
   Clear media cache.
+  Local rows (M31): "Local Storage" lists the space folder, its cache (`.object-cache`) and Object's data for the
+  space in the state folder (saved versions and the per-space files), and the total (`GET /api/storage`, read
+  only). "Media loading" (device setting `mediaLoading`): "Required only" shows images, video, audio and PDF
+  blocks in pages as a placeholder with "Load" until clicked; "Everything" loads them at once. "Clear media
+  cache" asks first ("Clear the media cache?"), then removes only the cache's media parts (`media/`,
+  `thumbnails/`; Object keeps no media copies of its own, so normally nothing) and has the pages load their
+  media again from the files, past the browser's cache; it says what it freed. Notes and files are never touched.
 - Import Content: migration guides per source tool (Notion, Obsidian, Evernote, Apple Notes, Tana, Other tool);
   Bulk import "Start importing" (upload files, review mappings).
 - Full Export: Automated Full Exports (desktop app only); Manual Full Export with Spaces (All Spaces) and
