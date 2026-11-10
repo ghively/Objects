@@ -63,6 +63,11 @@ Object has no accounts.
   device: Where I left off | Calendar | Calendar today | Specific object); Highlight Style (Default with a
   rail and notes section | Minimal); Backlink sections start as (Backlinks Open | Closed; Unlinked
   Mentions Open | Closed | Hidden); Backlink content view (Embed default).
+  (M31) "Hide App Menu" (a switch after "Hide outliner lines"; device setting `hideAppMenu`, off by default): Object's
+  window has no menu bar, so its app menu is the top bar's space menu (spaces, Space settings, Space history, Create
+  space, Open folder…). On, that button is hidden (the sidebar toggle stays); a lone Alt tap shows it, focused, and
+  another hides it, as a hidden window menu comes back with Alt (our call). The palette and Ctrl+, reach its spaces
+  and settings too.
 - Language: interface language list (English, English (UK), Deutsch, Français, Español, Dutch, Português (BR),
   Magyar, Italian); Decimal separator (Automatic | Dot | Comma).
 - Date & Time: Time zone (list); Date formatting with a live preview (Localized | ISO 8601 (year-month-day); date order

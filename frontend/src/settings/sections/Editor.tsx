@@ -40,6 +40,10 @@ export const EDITOR_TEXT = {
   inlineIconsDescription: 'Put a small colored type icon before each inline link to an object.',
   outliner: 'Hide outliner lines',
   outlinerDescription: 'Removes the vertical guide lines beside blocks nested in a toggle.',
+  // M31
+  hideAppMenu: 'Hide App Menu',
+  hideAppMenuDescription:
+    'Hides the space menu at the top left of the window. Tap Alt to show it again, and again to hide it. The palette and Settings (Ctrl+,) still reach its spaces and settings.', // our string
   openOnStart: 'When this space opens',
   openOnStartDescription:
     'What appears when the app starts or you switch to this space. Each space has its own choice, kept on this device only.',
@@ -122,6 +126,7 @@ export const EDITOR_SEARCH: string[] = [
   ...Object.values(T.highlightStyles).map((s) => s.name),
   T.inlineIcons,
   T.outliner,
+  T.hideAppMenu,
   T.openOnStart,
   ...Object.values(T.openModes),
   T.startup,
@@ -387,6 +392,7 @@ export function EditorSection() {
         onChange={(v) => set({ hideTypeSettings: v })}
       />
       <SwitchRow title={T.outliner} help={T.outlinerDescription} checked={settings.hideOutlinerLines} onChange={(v) => set({ hideOutlinerLines: v })} />
+      <SwitchRow title={T.hideAppMenu} help={T.hideAppMenuDescription} checked={!!settings.hideAppMenu} onChange={(v) => set({ hideAppMenu: v })} />
       <SettingGroup title={T.openOnStart} help={T.openOnStartDescription}>
         <OptionCards
           label={T.openOnStart}

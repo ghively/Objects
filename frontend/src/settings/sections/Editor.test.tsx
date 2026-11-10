@@ -12,7 +12,7 @@ import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { objectSummary, spaceEntry, typeDef } from '@/test/mockApi'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
-import { EditorSection } from './Editor'
+import { EDITOR_SEARCH, EDITOR_TEXT, EditorSection } from './Editor'
 
 const mocked = vi.mocked(api)
 
@@ -229,4 +229,20 @@ describe('EditorSection', () => {
     await user.tab()
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ spellCheckLang: null }, expect.anything())
   })
+
+  test('M31: "Hide App Menu" sits after "Hide outliner lines" and before "When this space opens", and patches hideAppMenu', async () => {
+    const user = userEvent.setup()
+    render(<EditorSection />)
+    const sw = screen.getByRole('switch', { name: 'Hide App Menu' })
+    expect(sw).toHaveAttribute('aria-checked', 'false')
+    const outliner = screen.getByRole('switch', { name: 'Hide outliner lines' })
+    const opens = screen.getByRole('radiogroup', { name: 'When this space opens' })
+    expect(outliner.compareDocumentPosition(sw) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(sw.compareDocumentPosition(opens) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText(EDITOR_TEXT.hideAppMenuDescription)).toBeInTheDocument()
+    await user.click(sw)
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ hideAppMenu: true }, expect.anything())
+    expect(EDITOR_SEARCH).toContain('Hide App Menu')
+  })
 })
+

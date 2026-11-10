@@ -8,6 +8,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { TopBar, type TopBarProps } from './TopBar'
 
@@ -29,6 +30,7 @@ function bar(props: Partial<TopBarProps> = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   resetSpaceInfo()
+  useSettings.setState({ settings: settingsDefaults, revision: 'r0', loaded: true })
 })
 
 describe('TopBar', () => {
@@ -74,5 +76,46 @@ describe('TopBar', () => {
     mocked.space.mockImplementation(() => new Promise(() => undefined))
     bar({ spaceName: 'Loading space' })
     expect(screen.getByTitle('Change space')).toHaveTextContent('Loading space')
+  })
+
+  // M31 item 12: Editor "Hide App Menu" hides the top bar's space menu (Object's app menu: the
+  // spaces, Space settings, Space history, Create space, Open folder…). Tapping Alt shows it again,
+  // as a hidden window menu bar comes back with Alt; tapping Alt again hides it.
+  test('Hide App Menu hides the space menu; a lone Alt tap shows it and another hides it', async () => {
+    const user = userEvent.setup()
+    useSettings.setState({ settings: { ...settingsDefaults, hideAppMenu: true } })
+    bar()
+    expect(screen.queryByTitle('Change space')).not.toBeInTheDocument()
+    // The sidebar toggle stays.
+    expect(screen.getByRole('button', { name: 'Toggle sidebar' })).toBeInTheDocument()
+
+    await user.keyboard('{Alt}')
+    const shown = await screen.findByTitle('Change space')
+    expect(shown).toHaveFocus()
+    await user.click(shown)
+    expect(await screen.findByRole('list', { name: 'Spaces' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+
+    await user.keyboard('{Alt}')
+    await waitFor(() => expect(screen.queryByTitle('Change space')).not.toBeInTheDocument())
+
+    // Alt held with another key (Alt+Left, a shortcut) is not a tap.
+    await user.keyboard('{Alt>}{ArrowLeft}{/Alt}')
+    expect(screen.queryByTitle('Change space')).not.toBeInTheDocument()
+  })
+
+  test('with Hide App Menu off, Alt does nothing to the space menu', async () => {
+    const user = userEvent.setup()
+    bar()
+    expect(screen.getByTitle('Change space')).toBeInTheDocument()
+    await user.keyboard('{Alt}')
+    expect(screen.getByTitle('Change space')).toBeInTheDocument()
+  })
+
+  test('turning Hide App Menu on hides the menu at once', async () => {
+    bar()
+    expect(screen.getByTitle('Change space')).toBeInTheDocument()
+    useSettings.setState((s) => ({ settings: { ...s.settings, hideAppMenu: true } }))
+    await waitFor(() => expect(screen.queryByTitle('Change space')).not.toBeInTheDocument())
   })
 })
