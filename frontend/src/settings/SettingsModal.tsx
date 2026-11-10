@@ -14,6 +14,7 @@ import { AUTOMATIONS_SEARCH, AUTOMATIONS_TEXT, AutomationsSection } from './sect
 import { DATE_TIME_SEARCH, DATE_TIME_TEXT, DateTimeSection } from './sections/DateTime'
 import { INTEGRATIONS_SEARCH, INTEGRATIONS_TEXT, IntegrationsSection } from './sections/Integrations'
 import { EDITOR_SEARCH, EDITOR_TEXT, EditorSection } from './sections/Editor'
+import { FULL_EXPORT_SEARCH, FULL_EXPORT_TEXT, FullExportSection } from './sections/FullExport'
 import { IMPORT_CONTENT_SEARCH, IMPORT_CONTENT_TEXT, ImportContentSection } from './sections/ImportContent'
 import { LANGUAGE_SEARCH, LANGUAGE_TEXT, LanguageSection } from './sections/Language'
 import { NOTIFICATIONS_SEARCH, NOTIFICATIONS_TEXT, NotificationsSection } from './sections/Notifications'
@@ -72,6 +73,8 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     search: IMPORT_CONTENT_SEARCH,
     Component: ImportContentSection,
   },
+  // M31: catalog section 1 lists "Full Export" right after Import Content.
+  { id: 'fullExport', group: 'general', label: FULL_EXPORT_TEXT.heading, icon: 'ph-export', search: FULL_EXPORT_SEARCH, Component: FullExportSection },
   {
     id: 'notifications',
     group: 'general',

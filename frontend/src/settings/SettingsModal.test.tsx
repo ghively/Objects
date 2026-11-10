@@ -41,6 +41,7 @@ describe('SettingsModal', () => {
       'Language',
       'Offline & Sync',
       'Import Content',
+      'Full Export',
       'Notifications',
     ])
     expect(within(groups[1]).getAllByRole('button').map((b) => b.textContent)).toEqual([

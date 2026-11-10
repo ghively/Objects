@@ -196,6 +196,7 @@ from . import (
     api_desksync,
     api_graph,
     api_history,
+    api_fullexport,
     api_import,
     api_importscan,
     api_learning,
@@ -998,10 +999,12 @@ def create_app(
         work_loop.start()
         alert_watch.start()
         curator.start()
+        full_export_auto.start()  # M31: Automated Full Exports
         if not watch:
             try:
                 yield
             finally:
+                await asyncio.to_thread(full_export_auto.stop)
                 await curator.stop()
                 await asyncio.to_thread(work_loop.stop)
                 await asyncio.to_thread(automations.stop)
@@ -1022,6 +1025,7 @@ def create_app(
         try:
             yield
         finally:
+            await asyncio.to_thread(full_export_auto.stop)
             await curator.stop()
             await asyncio.to_thread(work_loop.stop)
             await asyncio.to_thread(automations.stop)
@@ -2481,6 +2485,9 @@ def create_app(
     # /api route, and not an MCP tool.
     vcs_service.on_restored = lambda target, changed: api_vcs.reload_after_restore(ctx, target, changed)
     api.include_router(api_vcs.router(ctx, vcs_service))
+    # M31: Full Export, manual (background jobs) and automated (started in `lifespan`).
+    full_export_auto = api_fullexport.auto_export(space)
+    api.include_router(api_fullexport.router(ctx, full_export_auto))
     app.include_router(api)
     # M6: the whiteboard routes carry their own /api prefix.
     app.include_router(whiteboard_router(space, announce_whiteboard))

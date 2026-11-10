@@ -11,6 +11,8 @@ export type SettingsSectionId =
   | 'language'
   | 'offlineSync'
   | 'importContent'
+  /** M31 */
+  | 'fullExport'
   | 'notifications'
   | 'space'
   /** 2026-11-08: version control and backup */
