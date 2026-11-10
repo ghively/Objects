@@ -51,8 +51,8 @@ Start with `schema` to learn the types and property ids, then `search` or `query
 objects and `peek` before `read` (peek is small: title, properties, outline, links).
 `type_definition`, `collection` and `saved_query` give a full definition and its `revision`;
 `read_whiteboard`, `version_history`, `read_version`, `unlinked_mentions`, `trash`,
-`automations`, `import_preview`, `import_status`, `import_scan`, `import_proposal` and
-`import_report` read the rest. To move a folder of files into Object, read the prompt
+`automations`, `import_preview`, `import_status`, `import_scan`, `import_proposal`,
+`import_report` and `import_entities` read the rest. To move a folder of files into Object, read the prompt
 `migrate_a_source` first.
 Every write needs the `version` from your last read of that object (definitions and
 whiteboards need their `revision`); on a conflict, read it again, then retry. Writes go to
@@ -325,6 +325,14 @@ def build_server(client: ObjectClient, write: bool = True, sync: bool | None = N
         """An import batch's report (counts that reconcile, losses, scan findings, the AI pass) and
         the state of its filing pass."""
         return client.get("/import/report", batch=batch)
+
+    @server.tool(annotations=READ)
+    def import_entities(batch: str) -> dict:
+        """The entity list of an import batch kept as Sources: each entity with the user's decision
+        (accepted, renamed, turned down), its aliases, its values with the Sources and quotes they
+        come from and where Sources disagree, its summary lines, and what was not made into objects.
+        Only the user accepts and writes entities, in Object."""
+        return client.get("/import/entities", batch=batch)
 
     # -- the migration skill (M27) --------------------------------------------------
 
@@ -603,16 +611,21 @@ def build_server(client: ObjectClient, write: bool = True, sync: bool | None = N
 
     @server.tool(annotations=WRITE)
     def start_import(
-        preview_id: str, target: dict, mapping: dict | None = None, batch: str | None = None, scan: dict | None = None
+        preview_id: str, target: dict, mapping: dict | None = None, batch: str | None = None, scan: dict | None = None,
+        keep_as_sources: bool | None = None,
     ) -> dict:
         """Start the import `import_preview` described. `target` is {"kind": "newSpace",
         "name": ..., "location": <folder>} or {"kind": "currentSpace"}; without `mapping`
         the preview's is used. Refused when the mapping would create a type no approved
         schema proposal creates. `batch` is the id `import_scan` answered; `scan` carries
-        {leaveOut, leaveOutFiles, excludeFromAi}. Follow it with `import_status`."""
+        {leaveOut, leaveOutFiles, excludeFromAi}. `keep_as_sources` ("Keep pages as Sources", on
+        when left out): every page is kept as a read-only Source, exactly as imported, and the
+        filing pass lists the entities they talk about; false files pages into their mapped types.
+        Follow it with `import_status`."""
         return client.post(
             "/import/start",
-            {"previewId": preview_id, "target": target, "mapping": mapping, "batch": batch, "scan": scan},
+            {"previewId": preview_id, "target": target, "mapping": mapping, "batch": batch, "scan": scan,
+             "keepAsSources": keep_as_sources},
         )
 
     @server.tool(annotations=WRITE)
@@ -633,7 +646,11 @@ def build_server(client: ObjectClient, write: bool = True, sync: bool | None = N
         [{key, target, quote}]}]. Every value needs a quote copied from the document. The app checks each
         value against its quote and the property's kind and writes only what passes; low confidence goes
         to the Import inbox. The first hand-over of a source is a trial of at most 50 objects the user
-        marks in Object."""
+        marks in Object. On a batch kept as Sources leave `type`, `values` and `links` empty and give
+        `mainEntity` (what the page is mainly about: {type, name, aliases, values, lines}, or null),
+        `entities` (what it mentions: {type, name, aliases, values, lines: [{text, quote}], confidence}),
+        `relations` ([{subject, relation, object, quote, confidence}]) and `merges` ([{type, names}]),
+        checked the same way; the user reviews the entities in Object (`import_entities`)."""
         return client.post("/import/decisions", {"batch": batch, "decisions": decisions})
 
     @server.tool(annotations=WRITE)

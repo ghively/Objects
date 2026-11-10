@@ -10,6 +10,11 @@
   ``GET .../filing`` -> ``{state, trial: {items, rightShare}, normalise, error}``;
   ``POST .../filing/mark`` ``{path, verdict}``; ``POST .../filing/continue``;
   ``POST .../filing/normalise`` ``{merges: [{from: [...], to}]}``.
+- M30, a batch kept as Sources: ``GET /api/import/batches/{id}/entities`` -> ``EntitiesView``;
+  ``PUT .../entities/review`` ``{decisions, merges, splits}`` -> ``{ok, view}``;
+  ``POST .../entities/write`` ``{}`` -> 202 ``{ok}`` (the Write runs in the filing worker; poll
+  ``GET .../filing``). App only; there is no MCP tool to accept or write entities. ``409``
+  ("This import didn't keep its pages as Sources.") on a batch not kept as Sources.
 
 Reads write nothing. ``404`` unknown batch, ``409`` busy or not allowed now, ``422`` bad input.
 """
@@ -25,7 +30,7 @@ from pydantic import BaseModel, Field
 from . import importfiling
 from .api_importscan import NO_SOURCE, scan_root
 from .apictx import ApiContext
-from .importers import batches, filing, proposal
+from .importers import batches, entities, filing, proposal
 from .importers.jobs import Jobs
 from .importscan import scan_tree
 
@@ -57,6 +62,22 @@ class Merge(BaseModel):
 
 class NormaliseRequest(BaseModel):
     merges: list[Merge]
+
+
+class EntityDecision(BaseModel):
+    status: str
+    name: str | None = None
+
+
+class SplitOp(BaseModel):
+    id: str
+    names: list[str]
+
+
+class EntitiesReviewRequest(BaseModel):
+    decisions: dict[str, EntityDecision] = Field(default_factory=dict)
+    merges: list[list[str]] = Field(default_factory=list)
+    splits: list[SplitOp] = Field(default_factory=list)
 
 
 def _error(status: int, detail: str) -> JSONResponse:
@@ -161,5 +182,44 @@ def router(ctx: ApiContext, jobs: Jobs, announce_resync) -> APIRouter:
             return _error(404, NO_BATCH)
         announce_resync()
         return {"ok": True, **out}
+
+    # M30: the entities of a batch kept as Sources
+
+    @r.get("/import/batches/{batch_id}/entities")
+    def get_entities(batch_id: str):
+        try:
+            return fil.entities_view(batch_id)
+        except KeyError:
+            return _error(404, NO_BATCH)
+        except filing.NotAllowed as exc:
+            return _error(409, str(exc))
+
+    @r.put("/import/batches/{batch_id}/entities/review")
+    def put_entities_review(batch_id: str, req: EntitiesReviewRequest):
+        try:
+            view = fil.save_entity_review(batch_id, req.model_dump(exclude_none=True))
+        except KeyError:
+            return _error(404, NO_BATCH)
+        except filing.NotAllowed as exc:
+            return _error(409, str(exc))
+        except entities.ReviewInvalid as exc:
+            return _error(422, str(exc))
+        return {"ok": True, "view": view}
+
+    @r.post("/import/batches/{batch_id}/entities/write", status_code=202)
+    def post_entities_write(batch_id: str):
+        try:
+            batches.load_batch(ctx.space.root, batch_id)
+        except KeyError:
+            return _error(404, NO_BATCH)
+        if jobs.running():
+            return _error(409, "Another import is running.")
+        try:
+            fil.write_entities(batch_id)
+        except KeyError:
+            return _error(404, NO_BATCH)
+        except (filing.Busy, filing.NotAllowed) as exc:
+            return _error(409, str(exc))
+        return {"ok": True}
 
     return r

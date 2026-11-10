@@ -59,6 +59,8 @@ OBJECT_READ: tuple[str, ...] = (
     "work_items", "work_item",
     # M27
     "import_scan", "import_proposal", "import_report",
+    # M30
+    "import_entities",
 )
 """The read tools of ``objectapp-mcp`` (short names)."""
 
