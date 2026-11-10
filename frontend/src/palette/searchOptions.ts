@@ -106,19 +106,36 @@ export function pageType(types: readonly TypeDef[]): TypeDef | undefined {
 }
 
 /**
+ * M29: the types a suggestion may name for a create row that makes plain objects (the palette,
+ * Turn into object): not read-only, not DailyNote (made by its date), not Whiteboard (its own
+ * route and its own "Turn into whiteboard").
+ */
+export function suggestableTypes(types: readonly TypeDef[]): TypeDef[] {
+  return types.filter((t) => {
+    const name = t.name.toLowerCase()
+    return !t.readOnlyReason && t.id !== 'dailynote' && name !== 'dailynote' && !(t.basic && name === 'whiteboard')
+  })
+}
+
+/**
  * The option rows below the results, in order: create, then the type include/exclude pairs, then
- * the tag filters. Nothing for an empty query.
+ * the tag filters. Nothing for an empty query. The create row's type is the type filter's, else
+ * `suggested` (M29: the suggested type of the query), else Page.
  */
 export function buildSearchOptions(
   query: string,
   types: readonly TypeDef[],
   tags: readonly string[],
   filters: SearchFilters,
+  suggested?: string | null,
 ): SearchOption[] {
   const title = query.trim()
   if (!title) return []
   const out: SearchOption[] = []
-  const createType = (filters.types.length > 0 ? types.find((t) => t.id === filters.types[0]) : undefined) ?? pageType(types)
+  const createType =
+    (filters.types.length > 0 ? types.find((t) => t.id === filters.types[0]) : undefined) ??
+    (suggested ? types.find((t) => t.id === suggested) : undefined) ??
+    pageType(types)
   if (createType) {
     out.push({ kind: 'create', typeId: createType.id, title, label: PALETTE_TEXT.createNewWithTitle(createType.name, title) })
   }

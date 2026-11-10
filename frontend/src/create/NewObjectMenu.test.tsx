@@ -14,6 +14,7 @@ import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { TypePage } from '@/types/TypePage'
 import { createAndOpen } from './createAndOpen'
+import { setLastTypeSpace } from './lastType'
 import { NewObjectMenu } from './NewObjectMenu'
 
 const mocked = vi.mocked(api)
@@ -27,8 +28,10 @@ const PROJECT = typeDef({
 })
 const TASK = typeDef({ id: 'task', name: 'Task', pluralName: 'Tasks', basic: true })
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear()
+  // M29: no last type, so step 1 keeps its order.
+  await setLastTypeSpace(null)
   useTabs.getState().reset()
   usePeek.getState().close()
   resetLinkIndex()

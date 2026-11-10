@@ -55,7 +55,8 @@ import { showToast } from '../media/upload'
 import { BlockStyleExtras, BlockStyleMenu } from '../menus/BlockStyleMenu'
 import { copyBlockReference } from '../nodes/blockRef'
 import { LINK_CARD_TEXT, linkToCard, soleLinkBlock } from '../linkCard'
-import { hasTodoAt, turnIntoObject, turnIntoWhiteboard, turnTodoIntoTask } from '../turnInto'
+import { SUGGEST_TEXT } from '@/create/typeSuggest'
+import { hasTodoAt, suggestedTurnType, turnIntoObject, turnIntoWhiteboard, turnTitleAt, turnTodoIntoTask } from '../turnInto'
 
 export const BLOCK_MENU_TEXT = {
   insertAbove: 'Insert block above',
@@ -138,19 +139,27 @@ export interface BlockMenuProps {
 /**
  * The object picker behind "Turn into..." (and the block-selection bar's "Turn blocks into"): the
  * writable types, "Turn into whiteboard" when no type is the whiteboard one, and a to-do's "Turn
- * into task object". Render inside a dropdown menu's content.
+ * into task object". Render inside a dropdown menu's content. M29: the suggested type for the
+ * block's title comes first, marked "Suggested"; the others keep their order.
  */
 export function TurnIntoObjectItems({ editor, todo }: { editor: Editor; todo: boolean }) {
-  const types = useLinkIndex((s) => s.types).filter((t: TypeDef) => !t.readOnlyReason)
+  const writable = useLinkIndex((s) => s.types).filter((t: TypeDef) => !t.readOnlyReason)
+  const suggestedId = suggestedTurnType(turnTitleAt(editor))
+  const top = suggestedId ? writable.find((t) => t.id === suggestedId) : undefined
+  const types = top ? [top, ...writable.filter((t) => t !== top)] : writable
   return (
     <>
       {types.map((t) => (
         <DropdownMenuItem
           key={t.id}
+          data-turn-type={t.id}
           onSelect={() => run(() => (isWhiteboardType(t) ? turnIntoWhiteboard(editor) : turnIntoObject(editor, t.id)))}
         >
           <TypeChip type={t} size={18} />
           {t.name}
+          {t === top && (
+            <span className="ml-auto rounded bg-hover px-1.5 text-[12px] text-fg-muted">{SUGGEST_TEXT.suggested}</span>
+          )}
         </DropdownMenuItem>
       ))}
       {!types.some(isWhiteboardType) && (

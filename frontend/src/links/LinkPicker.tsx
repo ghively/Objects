@@ -9,22 +9,63 @@
  *
  * Linking at the start of an empty block (the block holds only the `[[` or `@`) makes an object
  * block too, unless the `alwaysCreateInlineLinks` setting is on.
+ *
+ * M29: with a query typed, the matching objects are followed by a create row "New '<q>'" of the
+ * suggested type (`create/suggestContext.suggestFor`; Page when there is none), then "Other types",
+ * which lists every other writable type. Picking one creates `<q>` of it (no `templateId`, so the
+ * type's default template applies), links (or embeds) it as an existing object would be, and sets
+ * the space's last type.
  */
 import type { Editor } from '@tiptap/core'
 import { Selection } from '@tiptap/pm/state'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { create } from 'zustand'
+import { api } from '@/api/client'
 import type { ObjectSummary, TypeDef } from '@/api/types'
+import { whiteboardApi } from '@/api/whiteboardClient'
 import { Icon } from '@/components/Icon'
 import { KeyHints } from '@/components/KeyHints'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { setWikilinkTrigger, wikilinkTargetFor } from '@/editor/extensions/wikilink'
 import { setObjectEmbedPicker } from '@/editor/nodes/objectEmbed'
+import { showToast } from '@/editor/media/upload'
+import { useLastType } from '@/create/lastType'
+import { NEW_OBJECT_TEXT } from '@/create/NewObjectMenu'
+import { suggestFor } from '@/create/suggestContext'
+import { SUGGEST_TEXT } from '@/create/typeSuggest'
 import { useRecent } from '@/nav/recent'
+import { isDailyNoteType } from '@/object/ObjectHeader'
+import { pageType } from '@/palette/searchOptions'
 import { useSettings } from '@/settings/useSettings'
-import { TypeChip } from '@/shell/Sidebar'
+import { byPluralName, TypeChip } from '@/shell/Sidebar'
 import { cn } from '@/lib/utils'
-import { ensureLinkIndex, typeOf, useLinkIndex } from './linkIndex'
+import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
+import { ensureLinkIndex, invalidateLinkIndex, typeOf, useLinkIndex } from './linkIndex'
+
+/** M29, our string: the row that lists the other types a new object can be made of. */
+export const LINK_PICKER_TEXT = { otherTypes: 'Other types' }
+
+/**
+ * M29: the types a create row may make an object of: not read-only and not DailyNote (a daily
+ * note is made by its date); Whiteboard is left out in embed mode. In the sidebar's order.
+ */
+export function creatableTypes(types: readonly TypeDef[], mode: LinkPickerMode = 'link'): TypeDef[] {
+  return types
+    .filter((t) => !t.readOnlyReason && !isDailyNoteType(t) && !(mode === 'embed' && isWhiteboardType(t)))
+    .sort(byPluralName)
+}
+
+/**
+ * M29: create an object titled `title` of type `t` from a create row: no `templateId` (the type's
+ * default template applies; a whiteboard goes through its own route), and the space's last type
+ * becomes `t`.
+ */
+export async function createTitled(t: TypeDef, title: string): Promise<{ path: string }> {
+  const res = isWhiteboardType(t) ? await whiteboardApi.createWhiteboard(title) : await api.createObject(t.id, { title })
+  useLastType.getState().set(t.id)
+  void invalidateLinkIndex()
+  return res
+}
 
 export type LinkPickerMode = 'link' | 'embed'
 
@@ -123,7 +164,13 @@ function takeTypedAhead(editor: Editor | null, range: { from: number; to: number
 /** What opens the picker: `[[`, or `@` at the start of a word. */
 const isOpener = (text: string) => text === '[[' || text === '@'
 
-type Row = { kind: 'object'; o: ObjectSummary } | { kind: 'type'; t: TypeDef; count: number }
+type Row =
+  | { kind: 'object'; o: ObjectSummary }
+  | { kind: 'type'; t: TypeDef; count: number }
+  /** M29: create the query as an object of `t` (`suggested`: the suggestion, not the Page fallback). */
+  | { kind: 'create'; t: TypeDef; suggested: boolean }
+  /** M29: list the other types to create the query as. */
+  | { kind: 'otherTypes' }
 
 export function LinkPicker() {
   const { editor, range, mode, hide } = useLinkPicker()
@@ -145,9 +192,14 @@ export function LinkPicker() {
   const recentPaths = useRecent((s) => s.paths)
   const types = useLinkIndex((s) => s.types)
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
+  // M29: the "Other types" list is showing.
+  const [otherTypes, setOtherTypes] = useState(false)
 
   useEffect(() => {
-    if (open) setTypeFilter(null)
+    if (open) {
+      setTypeFilter(null)
+      setOtherTypes(false)
+    }
   }, [open])
 
   const rows: Row[] = useMemo(() => {
@@ -156,7 +208,18 @@ export function LinkPicker() {
       const own = objects.filter((o) => o.type === filterType.id)
       return fuzzyMatch(query, own, 30).map((o) => ({ kind: 'object' as const, o }))
     }
-    if (query.trim()) return fuzzyMatch(query, objects).map((o) => ({ kind: 'object' as const, o }))
+    const q = query.trim()
+    if (q) {
+      const offered = creatableTypes(types, mode)
+      const suggestedId = suggestFor(q, offered)[0]
+      const main = (suggestedId ? offered.find((t) => t.id === suggestedId) : undefined) ?? pageType(offered)
+      const others = offered.filter((t) => t.id !== main?.id)
+      if (otherTypes) return others.map((t) => ({ kind: 'create' as const, t, suggested: false }))
+      const found: Row[] = fuzzyMatch(query, objects).map((o) => ({ kind: 'object' as const, o }))
+      if (main) found.push({ kind: 'create', t: main, suggested: main.id === suggestedId })
+      if (others.length > 0) found.push({ kind: 'otherTypes' })
+      return found
+    }
     const byPath = new Map(objects.map((o) => [o.path, o]))
     const recent = recentPaths.map((p) => byPath.get(p)).filter((o): o is ObjectSummary => !!o).slice(0, 6)
     const counts = new Map<string, number>()
@@ -168,7 +231,7 @@ export function LinkPicker() {
     const head: Row[] = [...recent.map((o) => ({ kind: 'object' as const, o })), ...typeRows]
     // No recents and no types to browse: the first few objects, as before.
     return head.length ? head : fuzzyMatch('', objects).map((o) => ({ kind: 'object' as const, o }))
-  }, [query, objects, types, typeFilter, recentPaths])
+  }, [query, objects, types, typeFilter, recentPaths, mode, otherTypes])
 
   // The list shows about eight rows: keep the active one in view as the arrow keys move it.
   const listRef = useRef<HTMLUListElement | null>(null)
@@ -192,7 +255,7 @@ export function LinkPicker() {
     return new DOMRect(window.innerWidth / 2 - 160, window.innerHeight * 0.22, 0, 0)
   }
 
-  const choose = (o: ObjectSummary | undefined) => {
+  const choose = (o: Pick<ObjectSummary, 'title' | 'path'> | undefined) => {
     if (!editor || !range || editor.isDestroyed) return hide()
     if (o && mode === 'embed') {
       const at = Math.min(range.from, editor.state.doc.content.size)
@@ -226,8 +289,30 @@ export function LinkPicker() {
     hide()
   }
 
+  const creating = useRef(false)
+  const createAs = async (t: TypeDef) => {
+    const title = query.trim()
+    if (!title || creating.current) return
+    creating.current = true
+    try {
+      const res = await createTitled(t, title)
+      choose({ title, path: res.path })
+    } catch (err) {
+      // The object couldn't be made: the picker stays open with the query.
+      showToast(err instanceof Error ? err.message : String(err))
+    } finally {
+      creating.current = false
+    }
+  }
+
   const pickRow = (row: Row | undefined) => {
     if (!row) return choose(undefined)
+    if (row.kind === 'create') return void createAs(row.t)
+    if (row.kind === 'otherTypes') {
+      setOtherTypes(true)
+      setActive(0)
+      return
+    }
     if (row.kind === 'type') {
       setTypeFilter(row.t.id)
       setQuery('')
@@ -265,6 +350,7 @@ export function LinkPicker() {
             onChange={(e) => {
               setQuery(e.target.value)
               setActive(0)
+              if (!e.target.value.trim()) setOtherTypes(false)
             }}
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') {
@@ -276,9 +362,13 @@ export function LinkPicker() {
               } else if (e.key === 'Enter') {
                 e.preventDefault()
                 pickRow(rows[active])
-              } else if (e.key === 'ArrowRight' && rows[active]?.kind === 'type') {
+              } else if (e.key === 'ArrowRight' && (rows[active]?.kind === 'type' || rows[active]?.kind === 'otherTypes')) {
                 e.preventDefault()
                 pickRow(rows[active])
+              } else if (e.key === 'ArrowLeft' && otherTypes && e.currentTarget.selectionStart === 0) {
+                e.preventDefault()
+                setOtherTypes(false)
+                setActive(0)
               } else if (e.key === 'Backspace' && !query && typeFilter) {
                 e.preventDefault()
                 setTypeFilter(null)
@@ -291,9 +381,16 @@ export function LinkPicker() {
         <ul ref={listRef} role="listbox" aria-label="Objects" className="max-h-[320px] overflow-auto p-1.5">
           {rows.length === 0 && <li className="px-3 py-2 text-fg-muted italic">No matching objects</li>}
           {rows.map((row, i) => {
-            const type = row.kind === 'object' ? typeOf(row.o.type) : row.t
+            const type = row.kind === 'object' ? typeOf(row.o.type) : row.kind === 'otherTypes' ? undefined : row.t
+            const key =
+              row.kind === 'object' ? row.o.path : row.kind === 'otherTypes' ? 'otherTypes' : `${row.kind}:${row.t.id}`
             return (
-              <li key={row.kind === 'object' ? row.o.path : `type:${row.t.id}`} role="option" aria-selected={i === active}>
+              <li
+                key={key}
+                role="option"
+                aria-selected={i === active}
+                data-create-type={row.kind === 'create' ? row.t.id : undefined}
+              >
                 <button
                   type="button"
                   onMouseEnter={() => setActive(i)}
@@ -304,10 +401,26 @@ export function LinkPicker() {
                   )}
                 >
                   {type && <TypeChip type={type} size={20} />}
+                  {row.kind === 'otherTypes' && <Icon name="ph-plus" size={15} />}
                   {row.kind === 'object' ? (
                     <>
                       <span className="min-w-0 flex-1 truncate">{row.o.title}</span>
                       {type && <span className="text-[13px] text-fg-muted">{type.name}</span>}
+                    </>
+                  ) : row.kind === 'create' && otherTypes ? (
+                    <span className="min-w-0 flex-1 truncate">{row.t.name}</span>
+                  ) : row.kind === 'create' ? (
+                    <>
+                      <span className="min-w-0 flex-1 truncate">{NEW_OBJECT_TEXT.newNamed(query.trim())}</span>
+                      <span className="text-[13px] text-fg-muted">{row.t.name}</span>
+                      {row.suggested && (
+                        <span className="rounded bg-hover px-1.5 text-[12px] text-fg-muted">{SUGGEST_TEXT.suggested}</span>
+                      )}
+                    </>
+                  ) : row.kind === 'otherTypes' ? (
+                    <>
+                      <span className="min-w-0 flex-1 truncate">{LINK_PICKER_TEXT.otherTypes}</span>
+                      <Icon name="ph-caret-right" size={12} />
                     </>
                   ) : (
                     <>
