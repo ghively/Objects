@@ -13,7 +13,10 @@ Value forms (spec section 4, the shapes a Markdown export uses):
 kind                on disk                                     API value
 ==================  ==========================================  ============================
 text, url, ...      string                                      ``str | None``
-blocks, table       literal ``|-`` block of Markdown            ``str | None``
+blocks              literal ``|-`` block of Markdown            ``str | None``
+simpleTableBlock    literal ``|-`` block holding a GFM table    ``str | None`` (the table)
+                    (header row first); a hand-written list
+                    of rows (lists of cells) reads the same
 number              int or float                                ``int | float | None``
 boolean             ``true`` / ``false``                        ``bool``
 datetime*           ``2026-10-30``, ``...T14:00:00.000Z``,       ``{start, end?, resolution}``
@@ -62,12 +65,17 @@ __all__ = [
     "encode_updates",
     "encode_value",
     "label_lookup",
+    "TABLE_KIND",
+    "table_markdown",
+    "table_one_line",
+    "table_plain",
+    "table_rows",
 ]
 
 # Which kinds a property can change to, and so which conversions `convert_value` does.
 KIND_TRANSFORMS: dict[str, tuple[str, ...]] = {
-    "text": ("text", "textBlock", "url", "number", "boolean", "label"),
-    "textBlock": ("text", "textBlock", "url", "number", "boolean", "label"),
+    "text": ("text", "textBlock", "url", "number", "boolean", "label", "simpleTableBlock"),
+    "textBlock": ("text", "textBlock", "url", "number", "boolean", "label", "simpleTableBlock"),
     "url": ("text", "textBlock"),
     "number": ("text", "textBlock", "label"),
     "boolean": ("text", "textBlock"),
@@ -75,10 +83,13 @@ KIND_TRANSFORMS: dict[str, tuple[str, ...]] = {
     "entity": ("label", "text", "textBlock"),
     "datetime": ("datetimeSimple", "text", "textBlock"),
     "datetimeSimple": ("datetime", "text", "textBlock"),
+    # M31: a table becomes one line of text ("a, b; c, d"); a text becomes a one-cell table.
+    "simpleTableBlock": ("text", "textBlock"),
 }
 
 _STRING_KINDS = frozenset({"text", "textBlock", "url", "coverImage", "entity_description"})
-_BLOCK_KINDS = frozenset({"blocks", "simpleTableBlock"})
+_BLOCK_KINDS = frozenset({"blocks"})
+TABLE_KIND = "simpleTableBlock"
 _DATE_KINDS = frozenset({"datetime", "datetimeSimple"})
 _STRING_LIST_KINDS = frozenset({"entity_tags", "entity_aliases"})
 # M22: the work kinds, read and written by `workvalues`.
@@ -117,6 +128,151 @@ _FALSE_TEXTS = frozenset({"false", "no", "0", ""})
 
 class InvalidValue(ValueError):
     """A value that doesn't fit its property (the API answers 422)."""
+
+
+# -- simple tables (M31) ----------------------------------------------------------------
+
+_TABLE_SEP_RE = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$")
+_NOT_A_TABLE = (
+    "Expected a table: a header row, a separator row (| --- |) and rows of cells, "
+    'each line starting with "|".'
+)
+
+
+def _split_row(line: str) -> list[str]:
+    s = line.strip()
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|") and not s.endswith("\\|"):
+        s = s[:-1]
+    cells: list[str] = []
+    cur = ""
+    i = 0
+    while i < len(s):
+        if s[i] == "\\" and s[i + 1 : i + 2] == "|":
+            cur += "|"
+            i += 2
+            continue
+        if s[i] == "|":
+            cells.append(cur.strip())
+            cur = ""
+        else:
+            cur += s[i]
+        i += 1
+    cells.append(cur.strip())
+    return cells
+
+
+def _table_lines(text: str) -> list[str]:
+    return [line for line in text.replace("\r\n", "\n").split("\n") if line.strip()]
+
+
+def _is_table(text: str) -> bool:
+    """A GFM table: a header line, a separator line, then rows; every line starts with ``|``."""
+    lines = _table_lines(text)
+    return (
+        len(lines) >= 2
+        and all(line.lstrip().startswith("|") for line in lines)
+        and bool(_TABLE_SEP_RE.match(lines[1]))
+        and not any(_TABLE_SEP_RE.match(line) for line in lines[2:])
+    )
+
+
+def table_rows(text: str | None) -> list[list[str]]:
+    """The cells of a GFM table, header row first, every row padded to the widest.
+
+    ``[]`` when ``text`` has no separator row (it is not a table). The frontend's
+    ``parseGfmTable`` reads the same way.
+    """
+    if not text or not isinstance(text, str):
+        return []
+    lines = _table_lines(text)
+    if len(lines) < 2 or not _TABLE_SEP_RE.match(lines[1]):
+        return []
+    rows = [_split_row(line) for line in lines if not _TABLE_SEP_RE.match(line)]
+    width = max(len(r) for r in rows)
+    return [r + [""] * (width - len(r)) for r in rows]
+
+
+def _one_line_cell(cell: str) -> str:
+    return " ".join(cell.replace("\r\n", "\n").split("\n")).strip()
+
+
+def table_markdown(rows: list[list[str]]) -> str:
+    """Rows as a GFM table: the first row is the header, ``|`` in a cell is escaped."""
+    if not rows:
+        return ""
+    width = max(len(r) for r in rows)
+
+    def line(r: list[str]) -> str:
+        cells = [_one_line_cell(c).replace("|", "\\|") for c in r + [""] * (width - len(r))]
+        return "| " + " | ".join(cells) + " |"
+
+    sep = "| " + " | ".join(["---"] * width) + " |"
+    return "\n".join([line(rows[0]), sep, *(line(r) for r in rows[1:])])
+
+
+def _cell_text(cell: Any) -> str:
+    if cell is None:
+        return ""
+    if isinstance(cell, bool):
+        return "true" if cell else "false"
+    if isinstance(cell, (str, int, float)):
+        return str(cell)
+    raise InvalidValue("A table cell holds text.")
+
+
+def _rows_of(value: Any) -> list[list[str]] | None:
+    """The cells of a list of rows (each a list of cells), or None when it is not one."""
+    if not isinstance(value, list) or not all(isinstance(r, list) for r in value):
+        return None
+    return [[_cell_text(c) for c in r] for r in value]
+
+
+def _table_text(rows: list[list[str]]) -> str | None:
+    """One line: cells joined with ", ", rows with "; " (a table's text for a kind change)."""
+    parts = [", ".join(c for c in r if c.strip()) for r in rows]
+    return "; ".join(p for p in parts if p) or None
+
+
+def table_plain(value: Any) -> str:
+    """The cells of a table value as one line of words (search text)."""
+    return " ".join(c for r in table_rows(value) for c in r if c.strip())
+
+
+def table_one_line(value: Any) -> str:
+    """A table value as one line, ``"a, b; c, d"`` (document exports)."""
+    return _table_text(table_rows(value)) or ""
+
+
+def _decode_table(raw: Any) -> str | None:
+    try:
+        rows = _rows_of(raw)
+    except InvalidValue:
+        rows = None
+    if rows is not None:
+        return table_markdown(rows) if rows and any(any(c for c in r) for r in rows) else None
+    text = _scalar_text(raw)
+    return text if text else None
+
+
+def _encode_table(value: Any) -> Any:
+    rows = _rows_of(value)
+    if rows is None:
+        if not isinstance(value, str):
+            raise InvalidValue(_NOT_A_TABLE)
+        if not value.strip():
+            return None
+        if not _is_table(value):
+            raise InvalidValue(_NOT_A_TABLE)
+        rows = table_rows(value)
+        text = value
+    else:
+        text = table_markdown(rows) if rows else ""
+    if not any(c.strip() for r in rows for c in r):
+        return None
+    # A hand-written list of rows (on disk) is replaced by the Markdown table.
+    return LiteralScalarString(text)
 
 
 # -- helpers ---------------------------------------------------------------------
@@ -394,6 +550,8 @@ def decode_value(pdef: PropertyDefinition, raw: Any, fm: dict[str, Any] | None =
     if kind in _STRING_LIST_KINDS:
         texts = (_scalar_text(item) for item in _as_list(raw))
         return [t for t in texts if t]
+    if kind == TABLE_KIND:
+        return _decode_table(raw)
     if kind == "entity_icon":
         icon = Icon.parse(raw if isinstance(raw, (str, dict)) else None)
         if icon is None:
@@ -601,6 +759,8 @@ def encode_value(
     if kind in _BLOCK_KINDS:
         text = _encode_string(value)
         return LiteralScalarString(text) if text else None
+    if kind == TABLE_KIND:
+        return _encode_table(value)
     if kind == "number":
         return _encode_number(value)
     if kind == "boolean":
@@ -760,8 +920,19 @@ def convert_value(
     if sk == "boolean":
         return ("true" if decode_value(src, raw) else "false"), False
 
+    if sk == TABLE_KIND:  # to text or textBlock: one line, the rows and columns are gone
+        rows = table_rows(decode_value(src, raw))
+        text = _table_text(rows)
+        return text, text is not None
+
     # text, textBlock, url
     text = decode_value(src, raw) or ""
+    if dk == TABLE_KIND:
+        if not text.strip():
+            return None, False
+        if _is_table(text):
+            return text, False
+        return table_markdown([[dst.name], [text]]), False
     if dk == "number":
         return _text_to_number(text)
     if dk == "boolean":

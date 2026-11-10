@@ -36,7 +36,7 @@ describe('CardViewSettings', () => {
     expect(screen.getByText('The properties a small card of this type shows by default.')).toBeInTheDocument()
 
     const group = screen.getByRole('radiogroup', { name: 'Default link view' })
-    expect(within(group).getAllByRole('radio').map((r) => r.textContent)).toEqual(['Link block', 'Small card', 'Wide card', 'Embed'])
+    expect(within(group).getAllByRole('radio').map((r) => r.textContent)).toEqual(['Link block', 'Small card', 'Wide card', 'Embed', 'Page'])
     expect(within(group).getByRole('radio', { name: 'Link block' })).toHaveAttribute('aria-checked', 'true')
     await user.click(within(group).getByRole('radio', { name: 'Wide card' }))
     await waitFor(() => expect(mocked.saveType).toHaveBeenCalledTimes(1))
@@ -79,5 +79,16 @@ describe('CardViewSettings', () => {
     await user.click(screen.getByRole('button', { name: 'Remove Note' }))
     await waitFor(() => expect(mocked.saveType).toHaveBeenCalled())
     expect(saved(0).smallCardViewConfig?.properties).toEqual([{ propertyType: 'entity_title', propertyId: 'title' }])
+  })
+
+  test('M31: "Page" saves the page link view and checks it', async () => {
+    const user = userEvent.setup()
+    render(<CardViewSettings typeId="project" />)
+    const group = screen.getByRole('radiogroup', { name: 'Default link view' })
+    await user.click(within(group).getByRole('radio', { name: 'Page' }))
+    await waitFor(() => expect(mocked.saveType).toHaveBeenCalledTimes(1))
+    expect(saved(0).defaultViewType).toBe('page')
+    useLinkIndex.setState({ types: [typeDef({ ...PROJECT, defaultViewType: 'page' })] })
+    await waitFor(() => expect(within(group).getByRole('radio', { name: 'Page' })).toHaveAttribute('aria-checked', 'true'))
   })
 })

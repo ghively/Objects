@@ -97,6 +97,7 @@ describe('ObjectEmbedView', () => {
       'Small card',
       'Wide card',
       'Embed',
+      'Page',
     ])
     expect(within(group).getByRole('menuitemradio', { name: /Wide card/ })).toHaveAttribute('aria-checked', 'true')
 
@@ -135,7 +136,28 @@ describe('ObjectEmbedView', () => {
     expect(await within(embeds[1]).findByTestId('small-card')).toBeInTheDocument()
     expect(embedViewOf(null, undefined)).toBe('smallCard')
     expect(embedViewOf([{ key: 'view', value: 'bogus', raw: 'view=bogus' }], undefined)).toBe('smallCard')
-    expect(EMBED_VIEWS.map((v) => v.view)).toEqual(['inline', 'smallCard', 'wideCard', 'embed'])
+    expect(EMBED_VIEWS.map((v) => v.view)).toEqual(['inline', 'smallCard', 'wideCard', 'embed', 'page'])
+    expect(embedViewOf([{ key: 'view', value: 'page', raw: 'view=page' }], undefined)).toBe('page')
+  })
+
+  test('M31: a type whose link view is Page shows its objects as a page preview; Change Block View offers Page', async () => {
+    setup([typeDef({ id: 'person', defaultViewType: 'page' }), typeDef({ id: 'page' })])
+    const editor = await mount('![[Ada Lovelace]]\n')
+    const embed = await screen.findByTestId('object-embed')
+    expect(await within(embed).findByTestId('page-card')).toHaveTextContent('Ada Lovelace')
+    expect(embed).toHaveAttribute('data-view', 'page')
+    // Read-only: the block holds no editor, and its width is not resized.
+    expect(within(embed).queryByRole('separator', { name: 'Resize width' })).toBeNull()
+    fireEvent.click(within(embed).getByTestId('page-card'))
+    expect(openObject).toHaveBeenCalledWith(ADA.path, expect.objectContaining({ via: 'link' }), 'person')
+
+    fireEvent.click(within(embed).getByRole('button', { name: 'Block menu' }))
+    expect(await screen.findByRole('menuitemradio', { name: /Page/ })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: /Wide card/ }))
+    expect(serializeBody(editor)).toBe('<!-- block: view=wideCard -->\n![[Ada Lovelace]]\n')
+    fireEvent.click(within(embed).getByRole('button', { name: 'Block menu' }))
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: /Page/ }))
+    expect(serializeBody(editor)).toBe('<!-- block: view=page -->\n![[Ada Lovelace]]\n')
   })
 
   test('test unresolved embed shows the muted chip', async () => {

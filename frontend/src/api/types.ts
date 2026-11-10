@@ -48,8 +48,8 @@ export const PROPERTY_TYPES: readonly PropertyType[] = Object.values(PROPERTY_KI
  * creates a new property and keeps the old one (Task 6). A kind is never listed as its own target.
  */
 export const KIND_TRANSFORMS: Readonly<Record<PropertyType, readonly PropertyType[]>> = {
-  text: ['textBlock', 'url', 'number', 'boolean', 'label'],
-  textBlock: ['text', 'url', 'number', 'boolean', 'label'],
+  text: ['textBlock', 'url', 'number', 'boolean', 'label', 'simpleTableBlock'],
+  textBlock: ['text', 'url', 'number', 'boolean', 'label', 'simpleTableBlock'],
   url: ['text', 'textBlock'],
   number: ['text', 'textBlock', 'label'],
   boolean: ['text', 'textBlock'],
@@ -57,7 +57,8 @@ export const KIND_TRANSFORMS: Readonly<Record<PropertyType, readonly PropertyTyp
   entity: ['label', 'text', 'textBlock'],
   datetime: ['datetimeSimple', 'text', 'textBlock'],
   datetimeSimple: ['datetime', 'text', 'textBlock'],
-  simpleTableBlock: [],
+  // M31: a table becomes one line of text; a text becomes a one-cell table.
+  simpleTableBlock: ['text', 'textBlock'],
   blocks: [],
   coverImage: [],
   color: [],
@@ -352,7 +353,8 @@ export interface TypeDef {
   templates: { ids: string[]; defaultTemplateId: string | null }
   /** Per-view card settings (store-only in M3 other than the small card). */
   typeViews?: Record<string, unknown>
-  defaultViewType?: 'inline' | 'smallCard' | 'wideCard' | 'embed'
+  /** The default link view; M31 adds `page` (a full-width page preview). */
+  defaultViewType?: 'inline' | 'smallCard' | 'wideCard' | 'embed' | 'page'
   smallCardViewConfig?: SmallCardViewConfig
   /** M4: absent = offered in the calendar's quick-create chips; `createOnce` = once per day. */
   createInCalendarOption?: 'disabled' | 'createOnce'
