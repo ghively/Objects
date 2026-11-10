@@ -540,6 +540,8 @@ class Filing:
         self.announce = announce
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
+        self._ended: threading.Thread | None = None
+        """The worker that has saved its last state (`_finish`): it may still be in its ``finally``."""
 
     # records
 
@@ -559,8 +561,19 @@ class Filing:
         batches.write_json(self._path(batch), data)
 
     def running(self) -> bool:
+        """Whether a pass or a Write runs: its worker is alive and hasn't saved its last state yet. A
+        worker past its last save (still announcing) no longer counts, so a request right after the
+        poll that saw that state is never refused with "A filing pass is running." (M31 fix pass)."""
         t = self._thread
-        return t is not None and t.is_alive()
+        return t is not None and t.is_alive() and t is not self._ended
+
+    def _finish(self, batch: str, d: dict[str, Any]) -> None:
+        """The worker's last save: the state and "no longer running" in one step, under the lock, so
+        nobody sees the one without the other."""
+        with self._lock:
+            self._save(batch, d)
+            if threading.current_thread() is self._thread:
+                self._ended = self._thread
 
     # reading
 
@@ -842,7 +855,7 @@ class Filing:
             _log.exception("Writing the entities failed")
             d = self._load(batch)
             d.update(state="failed", mode="entities", error=(str(exc) or type(exc).__name__)[:300])
-            self._save(batch, d)
+            self._finish(batch, d)
         finally:
             self.announce()
 
@@ -883,11 +896,12 @@ class Filing:
         paths = list(dict.fromkeys(str(placed[e.id]) for e, _name in chosen if e.id in placed))
         turned_down = sum(1 for e in res.entities if (review.get("decisions") or {}).get(e.id, {}).get("status") == "rejected")
         section = _entities_section(res, chosen, turned_down, out)
+        # The report first, then the state that says the Write ended (as in `_pass`).
+        self.record_accuracy(batch, entities_section=section)
         d = self._load(batch)
         d.update(entityPaths=paths, normalise=self._normalise_suggestions(d, paths), state="done", mode="entities",
                  error=None)  # fmt: skip
-        self._save(batch, d)
-        self.record_accuracy(batch, entities_section=section)
+        self._finish(batch, d)
 
     # the work
 
@@ -898,7 +912,7 @@ class Filing:
             _log.exception("The filing pass failed")
             d = self._load(batch)
             d.update(state="failed", error=(str(exc) or type(exc).__name__)[:300])
-            self._save(batch, d)
+            self._finish(batch, d)
         finally:
             self.announce()
 
@@ -988,7 +1002,7 @@ class Filing:
                 self._save(batch, d)
         d["state"] = "trial" if trial else "running"
         if trial:
-            self._save(batch, d)
+            self._finish(batch, d)
             return
         if as_sources:
             # M30: no links pass (relations replace it) and nothing in the inbox yet: Gene reviews the
@@ -1005,7 +1019,7 @@ class Filing:
         # "done" never meets the report half written (audit 2026-11-10).
         self.record_accuracy(batch)
         d["state"] = final
-        self._save(batch, d)
+        self._finish(batch, d)
 
     # normalise
 
