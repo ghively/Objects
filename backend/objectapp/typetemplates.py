@@ -19,9 +19,16 @@ those are **our choice**:
   the earlier Day template keeps working from its own file; its key is just not offered.
 - Organization: Category (label), People (relation to Person), Projects (relation to
   Project), Cover image, Notes.
+- M28, section ``itOperations``: the IT ops types that aren't already in the gallery (Host,
+  Software, Application, Container, Configuration, Location, Network, Vendor, Script, Command,
+  Runbook, Prompt, Incident), each exactly as `basicsetup.itops_types` defines it, other sides
+  (``counterpart``) included. Person, Meeting and Project stay the basic entries; Source is not
+  offered (imports make it and its objects). Plan ``2026-11-09-m28-itops-starter-and-relations.md``.
 
 A relation names the template key of its target ("person"); when the type is created it
-points at the space's type made from that template (or named like it), else at any type.
+points at the space's type made from that template (or named like it), else at any type. An IT
+ops relation whose target isn't in the gallery (Source) points at the space's type of that id or
+name.
 Template objects of the templates are not created. Each template's one saved query
 (`TEMPLATE_QUERIES`, written to ``.object/queries/`` when a type is created from the
 gallery, never for a blank type) is **our choice** too; a query uses only properties its
@@ -54,7 +61,7 @@ class TypeTemplate:
     """The template key, stored as the type's ``templateKey``."""
     section: str | None
     """Gallery group: ``useCases`` (our choice), ``research``, ``media``,
-    ``planningAndReflection`` or None."""
+    ``planningAndReflection``, ``itOperations`` (M28) or None."""
     name: str
     pluralName: str
     description: str
@@ -72,6 +79,16 @@ def _b():
 def _from_basic(tid: str) -> Callable[[], list[PropertyDefinition]]:
     def props() -> list[PropertyDefinition]:
         t = next(x for x in _b().basic_types() if x.id == tid)
+        return [p for p in t.propertyDefinitions if not p.type.startswith("entity_")]
+
+    return props
+
+
+def _from_itops(tid: str) -> Callable[[], list[PropertyDefinition]]:
+    """The IT ops type `tid`'s own properties (fresh ids), as `basicsetup.itops_types` makes them."""
+
+    def props() -> list[PropertyDefinition]:
+        t = next(x for x in _b().itops_types() if x.id == tid)
         return [p for p in t.propertyDefinitions if not p.type.startswith("entity_")]
 
     return props
@@ -211,6 +228,47 @@ _TEMPLATES: tuple[TypeTemplate, ...] = (
     TypeTemplate("month", "planningAndReflection", "Month", "Months",
                  "One entry per month, for monthly reviews and plans.",
                  "ph-calendar-dots", "cyan", _period),
+    # M28: the IT ops types (names, descriptions, icons and colours as `basicsetup.itops_types`;
+    # `test_m28_gallery.py` holds them to it).
+    TypeTemplate("host", "itOperations", "Host", "Hosts",
+                 "A server, workstation or network device: what runs on it and where it is.",
+                 "ph-hard-drives", "blue", _from_itops("host")),
+    TypeTemplate("software", "itOperations", "Software", "Software",
+                 "A product at one version, who makes it and when its support ends.",
+                 "ph-package", "violet", _from_itops("software")),
+    TypeTemplate("application", "itOperations", "Application", "Applications",
+                 "A service people use: what it runs on and what it is built from.",
+                 "ph-app-window", "indigo", _from_itops("application")),
+    TypeTemplate("container", "itOperations", "Container", "Containers",
+                 "A container, its image and the host it runs on.",
+                 "ph-shipping-container", "cyan", _from_itops("container")),
+    TypeTemplate("configuration", "itOperations", "Configuration", "Configurations",
+                 "A policy, rule or setting, and what it applies to.",
+                 "ph-sliders-horizontal", "amber", _from_itops("configuration")),
+    TypeTemplate("location", "itOperations", "Location", "Locations",
+                 "A site, building, room or rack, and what is in it.",
+                 "ph-map-pin", "emerald", _from_itops("location")),
+    TypeTemplate("network", "itOperations", "Network", "Networks",
+                 "A subnet, VLAN, wifi network or domain.",
+                 "ph-network", "sky", _from_itops("network")),
+    TypeTemplate("vendor", "itOperations", "Vendor", "Vendors",
+                 "A company you buy from: its support and its contract.",
+                 "ph-storefront", "orange", _from_itops("vendor")),
+    TypeTemplate("script", "itOperations", "Script", "Scripts",
+                 "A script, its language and what it works on.",
+                 "ph-file-code", "teal", _from_itops("script")),
+    TypeTemplate("command", "itOperations", "Command", "Commands",
+                 "A command worth keeping, and the shell it runs in.",
+                 "ph-terminal-window", "gray", _from_itops("command")),
+    TypeTemplate("runbook", "itOperations", "Runbook", "Runbooks",
+                 "The steps to follow for a known task or problem.",
+                 "ph-book-open-text", "lime", _from_itops("runbook")),
+    TypeTemplate("prompt", "itOperations", "Prompt", "Prompts",
+                 "A prompt for an AI model, and what it is for.",
+                 "ph-chat-text", "fuchsia", _from_itops("prompt")),
+    TypeTemplate("incident", "itOperations", "Incident", "Incidents",
+                 "Something that broke: what it affected, why, and how it was resolved.",
+                 "ph-warning-octagon", "red", _from_itops("incident")),
     TypeTemplate("organization", None, "Organization", "Organizations",
                  "Companies, schools and other groups, with their people.",
                  "ph-buildings", "gray", _organization),
@@ -289,6 +347,25 @@ TEMPLATE_QUERIES: dict[str, TemplateQuery] = {
     "organization": TemplateQuery("Companies", (("category", "contains", Option("Company")),),
                                   (("title", "ascending"),)),
     "area": TemplateQuery("All areas A-Z", (), (("title", "ascending"),)),
+    # M28: the IT ops entries (plan 2026-11-09-m28, Task 7; our choice).
+    "host": TemplateQuery("Production hosts", (("environment", "contains", Option("Production")),),
+                          (("title", "ascending"),), "table"),
+    "software": TemplateQuery("Software by product", (),
+                              (("product", "ascending"), ("version", "descending")), "table"),
+    "application": TemplateQuery("Live applications", (("status", "contains", Option("Live")),),
+                                 (("title", "ascending"),)),
+    "container": TemplateQuery("All containers A-Z", (), (("title", "ascending"),)),
+    "configuration": TemplateQuery("All configurations A-Z", (), (("title", "ascending"),)),
+    "location": TemplateQuery("Sites", (("kind", "contains", Option("Site")),)),
+    "network": TemplateQuery("All networks A-Z", (), (("title", "ascending"),), "table"),
+    "vendor": TemplateQuery("Contracts ending", (("contractEnds", "isNotEmpty", None),),
+                            (("contractEnds", "ascending"),)),
+    "script": TemplateQuery("Recently updated scripts", (), (("lastUpdated", "descending"),)),
+    "command": TemplateQuery("All commands A-Z", (), (("title", "ascending"),)),
+    "runbook": TemplateQuery("Runbooks to review", (), (("lastReviewed", "ascending"),)),
+    "prompt": TemplateQuery("All prompts A-Z", (), (("title", "ascending"),)),
+    "incident": TemplateQuery("Open incidents", (("status", "contains", Option("Open")),),
+                              (("lastUpdated", "descending"),)),
 }  # fmt: skip
 
 
@@ -364,8 +441,27 @@ def build_template(key: str, types: list[TypeDefinition]) -> list[PropertyDefini
     for p in props:
         if p.type == "entity":
             allowed = p.options.get("allowedTypes") or []
-            p.options["allowedTypes"] = [by_template[a] for a in allowed if a in by_template]
+            p.options["allowedTypes"] = [
+                tid for a in allowed if (tid := _target(a, tpl, by_template, types)) is not None
+            ]
     return props
+
+
+def _target(
+    a: str, tpl: TypeTemplate, by_template: dict[str, str], types: list[TypeDefinition]
+) -> str | None:
+    """The space's type a template relation's target ``a`` points at, or None (any type).
+
+    M28: an IT ops entry's target that isn't in the gallery (Source) is the space's type of that
+    id, else one named like it.
+    """
+    if a in by_template:
+        return by_template[a]
+    if tpl.section != "itOperations" or a in _BY_KEY:
+        return None
+    return next((t.id for t in types if t.id == a), None) or next(
+        (t.id for t in types if t.name.lower() == a), None
+    )
 
 
 def template_catalog(types: list[TypeDefinition]) -> list[dict[str, Any]]:

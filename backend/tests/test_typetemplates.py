@@ -20,7 +20,11 @@ from objectapp.typetemplates import (
 
 GALLERY = (
     "meeting", "person", "project", "atomicNote", "definition", "book", "film", "tvSeries",
-    "podcast", "week", "month", "organization", "area",
+    "podcast", "week", "month",
+    # M28: the IT ops entries (`test_m28_gallery.py`).
+    "host", "software", "application", "container", "configuration", "location", "network",
+    "vendor", "script", "command", "runbook", "prompt", "incident",
+    "organization", "area",
 )  # fmt: skip
 
 
@@ -42,7 +46,9 @@ def test_the_gallery_has_the_starter_templates_in_order():
     month = next(c for c in cat if c["key"] == "month")
     assert month["description"] == "One entry per month, for monthly reviews and plans."
     assert [p["name"] for p in month["properties"]] == ["Date", "Notes"]
-    assert {c["section"] for c in cat} == {"useCases", "research", "media", "planningAndReflection", None}
+    assert {c["section"] for c in cat} == {
+        "useCases", "research", "media", "planningAndReflection", "itOperations", None
+    }
 
 
 def test_a_day_type_made_from_the_old_template_keeps_working(tmp_path: Path):

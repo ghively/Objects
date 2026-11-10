@@ -709,6 +709,711 @@
       }
     }
   },
+  "host": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "environment",
+        "name": "Environment",
+        "type": "label",
+        "options": {
+          "isArray": false,
+          "set": [
+            {
+              "id": "production",
+              "text": "Production",
+              "icon": null,
+              "color": "red"
+            },
+            {
+              "id": "test",
+              "text": "Test",
+              "icon": null,
+              "color": "amber"
+            },
+            {
+              "id": "development",
+              "text": "Development",
+              "icon": null,
+              "color": "green"
+            }
+          ]
+        }
+      }
+    ],
+    "query": {
+      "name": "Production hosts",
+      "definition": {
+        "types": [
+          {
+            "id": "host"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "environment",
+              "option": "contains",
+              "referenceValue": [
+                "production"
+              ],
+              "typeId": "host"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "typeId": "host"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "table"
+        }
+      }
+    }
+  },
+  "software": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "product",
+        "name": "Product",
+        "type": "text",
+        "options": {}
+      },
+      {
+        "key": "version",
+        "name": "Version",
+        "type": "text",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "Software by product",
+      "definition": {
+        "types": [
+          {
+            "id": "software"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "product",
+            "option": "ascending",
+            "typeId": "software"
+          },
+          {
+            "propertyId": "version",
+            "option": "descending",
+            "typeId": "software"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "table"
+        }
+      }
+    }
+  },
+  "application": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "status",
+        "name": "Status",
+        "type": "label",
+        "options": {
+          "isArray": false,
+          "set": [
+            {
+              "id": "live",
+              "text": "Live",
+              "icon": null,
+              "color": "green"
+            },
+            {
+              "id": "planned",
+              "text": "Planned",
+              "icon": null,
+              "color": "yellow"
+            },
+            {
+              "id": "retired",
+              "text": "Retired",
+              "icon": null,
+              "color": "gray"
+            }
+          ]
+        }
+      }
+    ],
+    "query": {
+      "name": "Live applications",
+      "definition": {
+        "types": [
+          {
+            "id": "application"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "status",
+              "option": "contains",
+              "referenceValue": [
+                "live"
+              ],
+              "typeId": "application"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "typeId": "application"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "container": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "All containers A-Z",
+      "definition": {
+        "types": [
+          {
+            "id": "container"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "typeId": "container"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "configuration": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "All configurations A-Z",
+      "definition": {
+        "types": [
+          {
+            "id": "configuration"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "typeId": "configuration"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "location": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "kind",
+        "name": "Kind",
+        "type": "label",
+        "options": {
+          "isArray": false,
+          "set": [
+            {
+              "id": "site",
+              "text": "Site",
+              "icon": null,
+              "color": "blue"
+            },
+            {
+              "id": "building",
+              "text": "Building",
+              "icon": null,
+              "color": "green"
+            },
+            {
+              "id": "room",
+              "text": "Room",
+              "icon": null,
+              "color": "amber"
+            },
+            {
+              "id": "rack",
+              "text": "Rack",
+              "icon": null,
+              "color": "violet"
+            }
+          ]
+        }
+      }
+    ],
+    "query": {
+      "name": "Sites",
+      "definition": {
+        "types": [
+          {
+            "id": "location"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "kind",
+              "option": "contains",
+              "referenceValue": [
+                "site"
+              ],
+              "typeId": "location"
+            }
+          ]
+        },
+        "sorts": [],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "network": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "All networks A-Z",
+      "definition": {
+        "types": [
+          {
+            "id": "network"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "typeId": "network"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "table"
+        }
+      }
+    }
+  },
+  "vendor": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "contractEnds",
+        "name": "Contract ends",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "day"
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "Contracts ending",
+      "definition": {
+        "types": [
+          {
+            "id": "vendor"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "contractEnds",
+              "option": "isNotEmpty",
+              "typeId": "vendor"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "contractEnds",
+            "option": "ascending",
+            "typeId": "vendor"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "script": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "lastUpdated",
+        "name": "Last updated",
+        "type": "entity_lastUpdated",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "Recently updated scripts",
+      "definition": {
+        "types": [
+          {
+            "id": "script"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "lastUpdated",
+            "option": "descending",
+            "typeId": "script"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "command": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "All commands A-Z",
+      "definition": {
+        "types": [
+          {
+            "id": "command"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "typeId": "command"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "runbook": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "lastReviewed",
+        "name": "Last reviewed",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "day"
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "Runbooks to review",
+      "definition": {
+        "types": [
+          {
+            "id": "runbook"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "lastReviewed",
+            "option": "ascending",
+            "typeId": "runbook"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "prompt": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "All prompts A-Z",
+      "definition": {
+        "types": [
+          {
+            "id": "prompt"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "typeId": "prompt"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "incident": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "lastUpdated",
+        "name": "Last updated",
+        "type": "entity_lastUpdated",
+        "options": {}
+      },
+      {
+        "key": "status",
+        "name": "Status",
+        "type": "label",
+        "options": {
+          "isArray": false,
+          "set": [
+            {
+              "id": "open",
+              "text": "Open",
+              "icon": null,
+              "color": "red",
+              "statusCategory": "in-progress"
+            },
+            {
+              "id": "mitigated",
+              "text": "Mitigated",
+              "icon": null,
+              "color": "amber",
+              "statusCategory": "in-progress"
+            },
+            {
+              "id": "resolved",
+              "text": "Resolved",
+              "icon": null,
+              "color": "green",
+              "statusCategory": "done"
+            }
+          ]
+        }
+      }
+    ],
+    "query": {
+      "name": "Open incidents",
+      "definition": {
+        "types": [
+          {
+            "id": "incident"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "status",
+              "option": "contains",
+              "referenceValue": [
+                "open"
+              ],
+              "typeId": "incident"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "lastUpdated",
+            "option": "descending",
+            "typeId": "incident"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
   "organization": {
     "properties": [
       {
