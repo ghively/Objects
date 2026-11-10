@@ -109,6 +109,21 @@ DEFAULTS: dict[str, Any] = {
     # 2026-11-09: the languages the import's OCR reads (Tesseract codes joined with ``+``, such as
     # ``eng+deu``); "" means every installed language.
     "ocrLanguages": "",
+    # M31 (catalog section 1): Appearance "App icon" (the window and tab icon's colour on this device),
+    # Editor "Hide App Menu", Integrations "Show developer information", Offline & Sync "Media loading".
+    "appIcon": "default",
+    "hideAppMenu": False,
+    "showDeveloperInfo": False,
+    "mediaLoading": "everything",
+    # M31: Full Export (catalog section 1). The manual export's options, and the automated export:
+    # on or off, which spaces, the folder each dated export goes into, and how often.
+    "fullExportMedia": True,
+    "fullExportWikilinks": False,
+    "fullExportTitleHeading": False,
+    "fullExportAuto": False,
+    "fullExportScope": "current",
+    "fullExportFolder": None,
+    "fullExportInterval": "daily",
 }
 
 # A model name or alias for ``claude --model``: the one rule, in `aimodels` (M16).
@@ -133,6 +148,10 @@ _CHOICES: dict[str, tuple[str, ...]] = {
     "language": ("en", "en-gb", "de", "fr", "es", "it", "nl", "pt-br", "hu"),
     "decimalSeparator": ("automatic", "dot", "comma"),
     "backlinkContentView": ("inline", "smallCard", "wideCard", "embed"),
+    "appIcon": ("default", "red", "orange", "green", "blue", "purple", "pink", "gray"),
+    "mediaLoading": ("everything", "required"),
+    "fullExportScope": ("current", "all"),
+    "fullExportInterval": ("daily", "weekly"),
     "nestedBacklinkView": ("showBlockContainingBacklink", "showFullPathAbove"),
     "highlightStyle": ("default", "minimal"),
 }
@@ -181,6 +200,7 @@ _PROBLEM_MESSAGES = {
     "workReadTools": "A read tool is mcp__<server>__<tool> (at most 500).",
     "workAgentId": "The work agent is one of Object's agents.",
     "workAlertFolder": "Pick a folder (a full path).",
+    "fullExportFolder": "Pick a folder (a full path).",
     "workAlertIntervals": "Intervals are whole minutes from 1 to 10080.",
 }
 
@@ -224,7 +244,7 @@ def _valid(key: str, value: Any) -> bool:
             and "\n" not in value
             and "\r" not in value
         )
-    if key == "workAlertFolder":
+    if key in ("workAlertFolder", "fullExportFolder"):
         return value is None or (
             isinstance(value, str)
             and 0 < len(value) <= WORK_ALERT_FOLDER_MAX

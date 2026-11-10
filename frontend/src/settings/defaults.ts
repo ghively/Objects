@@ -59,4 +59,16 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   workReadTools: [],
   // Import (2026-11-09)
   ocrLanguages: '',
+  // M31
+  appIcon: 'default',
+  hideAppMenu: false,
+  showDeveloperInfo: false,
+  mediaLoading: 'everything',
+  fullExportMedia: true,
+  fullExportWikilinks: false,
+  fullExportTitleHeading: false,
+  fullExportAuto: false,
+  fullExportScope: 'current',
+  fullExportFolder: null,
+  fullExportInterval: 'daily',
 }) as DeviceSettings

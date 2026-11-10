@@ -549,7 +549,28 @@ export interface DeviceSettings {
   /** The languages the import's OCR reads: Tesseract codes joined with `+` (`eng+deu`); `''` = every
    *  installed language. */
   ocrLanguages: string
+  // ---- M31 (catalog section 1) ----
+  /** Appearance "App icon": the window and tab icon's colour on this device. */
+  appIcon: AppIconColor
+  /** Editor "Hide App Menu". */
+  hideAppMenu: boolean
+  /** Integrations "Show developer information" (ids and paths shown in the UI). */
+  showDeveloperInfo: boolean
+  /** Offline & Sync "Media loading": everything at once, or media only when asked for. */
+  mediaLoading: 'everything' | 'required'
+  /** Full Export: the manual export's options. */
+  fullExportMedia: boolean
+  fullExportWikilinks: boolean
+  fullExportTitleHeading: boolean
+  /** Full Export: the automated export (on/off, which spaces, the folder, how often). */
+  fullExportAuto: boolean
+  fullExportScope: 'current' | 'all'
+  fullExportFolder: string | null
+  fullExportInterval: 'daily' | 'weekly'
 }
+
+/** M31 Appearance "App icon" colours. */
+export type AppIconColor = 'default' | 'red' | 'orange' | 'green' | 'blue' | 'purple' | 'pink' | 'gray'
 
 /** M8 `DeviceSettings.language`. */
 export type SettingsLanguage = 'en' | 'en-gb' | 'de' | 'fr' | 'es' | 'it' | 'nl' | 'pt-br' | 'hu'

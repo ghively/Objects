@@ -56,6 +56,18 @@ CONTRACT_DEFAULTS = {
     "workReadTools": [],
     # 2026-11-09 (`test_ocr_languages.py` checks it)
     "ocrLanguages": "",
+    # M31
+    "appIcon": "default",
+    "hideAppMenu": False,
+    "showDeveloperInfo": False,
+    "mediaLoading": "everything",
+    "fullExportMedia": True,
+    "fullExportWikilinks": False,
+    "fullExportTitleHeading": False,
+    "fullExportAuto": False,
+    "fullExportScope": "current",
+    "fullExportFolder": None,
+    "fullExportInterval": "daily",
 }
 
 
@@ -249,3 +261,27 @@ def test_settings_patch_route_announces_a_settings_event(state: Path, blocks_spa
         while not published and time.monotonic() < deadline:
             time.sleep(0.02)
     assert published == [ChangeEvent("settings", "settings.json", r.json()["revision"], origin="w1")]
+
+
+@pytest.mark.parametrize(
+    ("key", "good", "bad"),
+    [
+        ("appIcon", "blue", "teal"),
+        ("hideAppMenu", True, "yes"),
+        ("showDeveloperInfo", True, 1),
+        ("mediaLoading", "required", "some"),
+        ("fullExportMedia", False, None),
+        ("fullExportAuto", True, "on"),
+        ("fullExportScope", "all", "mine"),
+        ("fullExportInterval", "weekly", "hourly"),
+        ("fullExportFolder", "/tmp/exports", "relative/path"),
+    ],
+)
+def test_m31_settings_accept_their_values_and_refuse_others(state: Path, key, good, bad) -> None:
+    """M31's device settings (catalog section 1: App icon, Hide App Menu, Show developer information,
+    Media loading, Full Export) take their values and refuse anything else (422)."""
+    _, rev = settings.read()
+    merged, rev = settings.patch({key: good}, rev)
+    assert merged[key] == good
+    with pytest.raises(settings.SettingsProblem):
+        settings.patch({key: bad}, rev)
