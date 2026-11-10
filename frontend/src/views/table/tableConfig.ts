@@ -38,8 +38,22 @@ export function defaultWidth(def: Pick<PropertyDef, 'type'> & { tableColWidth?: 
   return DEFAULT_COL_WIDTH[def.type] ?? FALLBACK_COL_WIDTH
 }
 
-/** The properties a table can show: every definition (the backlinks as a read-only column). */
-export const tableDefs = (type: Pick<TypeDef, 'propertyDefinitions'>): PropertyDef[] => type.propertyDefinitions
+/**
+ * M28: a computed other side (`TypeDef.counterparts`) as a table column. It is shown with the
+ * read-only Backlinks cell (the linked objects' chips; their count in a one-line cell), so a table
+ * edit can never write the counterpart's key on this row: it is edited on the object page, which
+ * writes the stored side of the other objects.
+ */
+function counterpartColumn(def: PropertyDef): PropertyDef {
+  return { ...def, type: 'entity_backlinks' }
+}
+
+/**
+ * The properties a table can show: every definition (the backlinks as a read-only column), then
+ * (M28) the type's computed other sides, read-only.
+ */
+export const tableDefs = (type: Pick<TypeDef, 'propertyDefinitions' | 'counterparts'>): PropertyDef[] =>
+  type.counterparts?.length ? [...type.propertyDefinitions, ...type.counterparts.map(counterpartColumn)] : type.propertyDefinitions
 
 /**
  * The config a table renders: `wrapAllContent` defaults to true, new properties are appended,
@@ -47,7 +61,7 @@ export const tableDefs = (type: Pick<TypeDef, 'propertyDefinitions'>): PropertyD
  * is clamped to 2-50 rem, and the title column comes first and can't be hidden. Columns are
  * matched to definitions by property key.
  */
-export function normalizeTableConfig(type: Pick<TypeDef, 'propertyDefinitions'>, config?: TableViewConfig | null): TableViewConfig {
+export function normalizeTableConfig(type: Pick<TypeDef, 'propertyDefinitions' | 'counterparts'>, config?: TableViewConfig | null): TableViewConfig {
   const defs = tableDefs(type)
   const byKey = new Map(defs.map((d) => [d.key, d]))
   const seen = new Set<string>()

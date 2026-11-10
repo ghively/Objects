@@ -443,9 +443,15 @@ function sameKind(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'>,
   return !own || own.type === def.type
 }
 
-/** Whether a kanban drop may write `def`'s value on `row` (see `sameKind`): a row of a type with the key as another kind is refused. */
-export function canDropRow(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'>, types: TypeDef[]): boolean {
-  return sameKind(row, entry, def, types.find((t) => t.id === row.summary.type))
+/**
+ * Whether a kanban drop may write `def`'s value on `row` (see `sameKind`): a row of a type with the
+ * key as another kind is refused. M28: so is a computed other side (`counterpartOf`), which is
+ * never written on the row (it is edited on the object page, on the stored side).
+ */
+export function canDropRow(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'> & Partial<Pick<PropertyDef, 'options'>>, types: TypeDef[]): boolean {
+  const type = types.find((t) => t.id === row.summary.type)
+  if (def.options?.counterpartOf || defIn(type, entry.propertyId)?.options.counterpartOf) return false
+  return sameKind(row, entry, def, type)
 }
 
 const cmpSort = (a: number | string, b: number | string): number =>

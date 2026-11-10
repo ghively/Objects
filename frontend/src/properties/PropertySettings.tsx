@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { wallClock, zonedInstant } from '@/lib/zonedTime'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTypeEditor, type TypeEditor } from '@/object/useTypeEditor'
+import { counterpartKey } from './counterpartKey'
 import { CURRENCIES } from './currencies'
 import { KIND_META, objectSelectTypes } from './kinds'
 import { LabelMenu } from './LabelMenu'
@@ -65,6 +66,10 @@ const TEXT = {
   remindersDescription: 'Allow a reminder on values of this property.',
   hideInCalendar: 'Hide in calendar',
   hideInCalendarDescription: "Values of this property don't show on their days in the calendar.",
+  // M28 (our strings): the name of a relation's computed other side (`options.counterpart`).
+  counterpart: 'Show on the other side as',
+  counterpartPlaceholder: 'No other side',
+  counterpartSynced: 'This relation already syncs both ways.',
 }
 
 export interface PropertySettingsProps {
@@ -610,6 +615,62 @@ function RelationSection({
   )
 }
 
+/**
+ * M28: "Show on the other side as": the name the linked objects show this relation under (a
+ * computed row, never stored on them). A new name makes the key from it, avoiding the target types'
+ * stored keys; a renamed one keeps its key, so saved views keep working; an emptied field removes
+ * the other side. A relation that already syncs both ways (`propertySyncing`) can't have one.
+ */
+function CounterpartSection({ type, def, editor }: { type: TypeDef; def: PropertyDef; editor: TypeEditor }) {
+  const types = useLinkIndex((s) => s.types)
+  const current = def.options.counterpart ?? null
+  const saved = current?.name ?? ''
+  const [name, setName] = useState(saved)
+  useEffect(() => setName(saved), [saved])
+  if (def.options.propertySyncing?.propertyIds?.length) {
+    return (
+      <Section title={TEXT.counterpart}>
+        <p className="text-[13px] text-fg-muted">{TEXT.counterpartSynced}</p>
+      </Section>
+    )
+  }
+  const commit = () => {
+    const n = name.trim().replace(/\s+/g, ' ')
+    if (n === saved) {
+      setName(saved)
+      return
+    }
+    let counterpart: PropertyOptions['counterpart'] = null
+    if (n && current) counterpart = { ...current, name: n }
+    else if (n) {
+      const allowed = def.options.allowedTypes ?? []
+      const targets = allowed.length ? types.filter((t) => allowed.includes(t.id)) : types
+      const taken = new Set(targets.flatMap((t) => t.propertyDefinitions.map((d) => d.key)))
+      counterpart = { name: n, key: counterpartKey(n, taken) }
+    }
+    void editor.save(updateProperty(type, def.id, (d) => ({ ...d, options: { ...d.options, counterpart } })))
+  }
+  return (
+    <Section title={TEXT.counterpart}>
+      <input
+        aria-label={TEXT.counterpart}
+        placeholder={TEXT.counterpartPlaceholder}
+        value={name}
+        maxLength={60}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            e.currentTarget.blur()
+          }
+        }}
+        className="w-full rounded border border-line bg-transparent px-2 py-1 text-[14px] outline-none"
+      />
+    </Section>
+  )
+}
+
 // -- label -----------------------------------------------------------------------------------
 
 function LabelSection({ type, def, save }: { type: TypeDef; def: PropertyDef; save(next: PropertyDef): void }) {
@@ -829,6 +890,7 @@ export function PropertySettings({
               />
             )}
             {def.type === 'entity' && !type.basic && <RelationSection type={type} def={def} editor={ed} />}
+            {def.type === 'entity' && !type.basic && <CounterpartSection type={type} def={def} editor={ed} />}
             {def.type === 'label' && <LabelSection type={type} def={def} save={save} />}
             {def.type === 'button' && <ButtonSettingsSection type={type} def={def} save={save} />}
             {def.type === 'formula' && <FormulaSection type={type} def={def} save={save} objectPath={objectPath} />}

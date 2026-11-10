@@ -2,6 +2,7 @@ import { Fragment, memo, useMemo, useRef, useState, type ReactNode } from 'react
 import { COMPUTED_KINDS } from '@/api/types'
 import type {
   ComputedValue,
+  CounterpartRow,
   DateValue,
   EntityRef,
   Icon as IconValue,
@@ -23,6 +24,7 @@ import { PropertyMenu } from '@/properties/PropertyMenu'
 import { DeletePropertySection, PropertySettings } from '@/properties/PropertySettings'
 import { useSettings } from '@/settings/useSettings'
 import { LAYOUT_KEYS, removeProperty } from '@/properties/typeEdits'
+import { CounterpartRows, mergeCounterparts } from './CounterpartRows'
 import type { TypeEditor } from './useTypeEditor'
 
 /** Frontmatter keys shown elsewhere (header, metadata) or kept by the app, never as extra properties. */
@@ -239,6 +241,10 @@ export interface PropertyPanelProps {
   backlinks?: EntityRef[]
   /** M12: formula and rollup values by property key (`ObjectDetail.computed`). */
   computed?: Record<string, ComputedValue>
+  /** M28: the computed other sides pointing here (`ObjectDetail.counterparts`). */
+  counterparts?: CounterpartRow[]
+  /** M28: add or remove other objects on a counterpart row (writes their stored side). */
+  onEditCounterpart?(key: string, add: string[], remove: string[]): Promise<void>
   readOnly?: boolean
   /** A cell committed `value` for the frontmatter `key`. */
   onChange?(key: string, value: unknown): void
@@ -422,6 +428,8 @@ export function PropertyPanel({
   summary,
   backlinks,
   computed,
+  counterparts,
+  onEditCounterpart,
   readOnly,
   onChange,
   onChangeMany,
@@ -453,6 +461,17 @@ export function PropertyPanel({
     else visible.push(d)
   }
   const external = externalKeys(type, frontmatter)
+  // M28: the computed other sides, after the type's own properties and before Backlinks. One
+  // hidden while empty (its definition's `hideWhenEmpty`) waits under the "Hidden" toggle, so it
+  // can still be filled from this side.
+  const counterpartDefs = type?.counterparts ?? []
+  const merged = mergeCounterparts(counterparts ?? [], counterpartDefs)
+  const filledCounterparts = merged.filter((m) => m.paths.length > 0 || m.def.visibility === 'alwaysShow').length
+  const emptyCounterparts = merged.length - filledCounterparts
+  const backlinksAt = visible.findIndex((d) => d.type === 'entity_backlinks')
+  const ownBefore = backlinksAt < 0 ? visible : visible.slice(0, backlinksAt)
+  const ownAfter = backlinksAt < 0 ? [] : visible.slice(backlinksAt)
+  const hiddenCount = hidden.length + emptyCounterparts
 
   // The handlers rows get are stable (they read the newest props through `latest`), so a value
   // change re-renders only its own row, whatever handlers the parent passes per render.
@@ -501,6 +520,13 @@ export function PropertyPanel({
   // Without a type definition (M1 inference) the row is a plain read-only value.
   const ro = !!readOnly || !typed || !onChange
   const editDefs = canEditType && typed && !!type
+  const counterpartProps = {
+    rows: counterparts ?? [],
+    defs: counterpartDefs,
+    readOnly: !!readOnly || !onEditCounterpart,
+    onEdit: (key: string, add: string[], remove: string[]) => onEditCounterpart?.(key, add, remove) ?? Promise.resolve(),
+    onOpenObject,
+  }
   const renderRow = (def: PropertyDef) => (
     <PropertyRow
       def={def}
@@ -521,13 +547,20 @@ export function PropertyPanel({
       data-panel-variant={variant}
       className={`group/panel text-fg ${PANEL_CLASS[variant]}`}
     >
-      {visible.map((def, i) => (
+      {ownBefore.map((def, i) => (
         <Fragment key={def.id}>
           {i > 0 && <hr className="my-3 border-line" />}
           {renderRow(def)}
         </Fragment>
       ))}
-      {hidden.length > 0 && (
+      {filledCounterparts > 0 && <CounterpartRows {...counterpartProps} only="filled" leadingRule={ownBefore.length > 0} />}
+      {ownAfter.map((def, i) => (
+        <Fragment key={def.id}>
+          {(i > 0 || ownBefore.length > 0 || filledCounterparts > 0) && <hr className="my-3 border-line" />}
+          {renderRow(def)}
+        </Fragment>
+      ))}
+      {hiddenCount > 0 && (
         <div className="mt-4">
           <button
             type="button"
@@ -536,7 +569,7 @@ export function PropertyPanel({
             className="flex items-center gap-1.5 px-1 text-[14px] text-fg-muted hover:text-fg"
           >
             <Icon name={showHidden ? 'ph-caret-down' : 'ph-caret-right'} size={12} />
-            {`Hidden (${hidden.length})`}
+            {`Hidden (${hiddenCount})`}
           </button>
           {showHidden &&
             hidden.map((def) => (
@@ -545,6 +578,7 @@ export function PropertyPanel({
                 {renderRow(def)}
               </Fragment>
             ))}
+          {showHidden && emptyCounterparts > 0 && <CounterpartRows {...counterpartProps} only="empty" leadingRule />}
         </div>
       )}
       {external.length > 0 && (

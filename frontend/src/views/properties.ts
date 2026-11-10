@@ -1,5 +1,6 @@
 // The properties a view can filter, sort, group and calculate on: the definitions of the types
-// the view spans, plus the system ones every type has.
+// the view spans (M28: each followed by its computed other sides, `TypeDef.counterparts`), plus
+// the system ones every type has.
 import type { PropertyDef, PropertyType, TypeDef } from '@/api/types'
 
 export interface PropChoice {
@@ -30,7 +31,7 @@ export function propertyChoices(viewTypes: TypeDef[]): PropChoice[] {
   const out: PropChoice[] = []
   const seen = new Map<string, { choice: PropChoice; count: number; typeId: string }>()
   for (const t of viewTypes) {
-    for (const d of t.propertyDefinitions) {
+    for (const d of [...t.propertyDefinitions, ...(t.counterparts ?? [])]) {
       const have = seen.get(d.key)
       if (have) {
         have.count += 1

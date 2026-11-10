@@ -122,6 +122,24 @@ describe('CreateSpaceDialog', () => {
     expect(await screen.findByRole('radio', { name: 'Empty space' })).toBeChecked()
   })
 
+  test('test create dialog offers IT operations between basic setup and empty space (M28)', async () => {
+    const user = await openDialog()
+    const radios = screen.getAllByRole('radio')
+    expect(radios.map((r) => r.getAttribute('aria-label'))).toEqual([
+      'Start with basic setup',
+      'IT operations',
+      'Empty space',
+    ])
+    expect(screen.getByText('Includes hosts, software, applications, runbooks and incidents.')).toBeInTheDocument()
+    expect(CREATE_SPACE_TEXT.itopsLabel).toBe('IT operations')
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Location' })).toHaveValue('/home/gene/Spaces'))
+    await user.type(screen.getByPlaceholderText('Name'), 'Ops')
+    await user.click(screen.getByText('IT operations'))
+    expect(screen.getByRole('radio', { name: 'IT operations' })).toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'Create space' }))
+    await waitFor(() => expect(mocked.createSpace).toHaveBeenCalledWith('Ops', '/home/gene/Spaces', 'itops'))
+  })
+
   test('test import from closes the dialog and opens the import dialog with the name and location (M15)', async () => {
     const user = await openDialog()
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Location' })).toHaveValue('/home/gene/Spaces'))
