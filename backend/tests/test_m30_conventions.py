@@ -106,6 +106,25 @@ def test_category_name_refused(tmp_path) -> None:
     assert ok["problems"] == [] and "offer" not in ok
 
 
+def test_only_category_kind_and_environment_options_are_categories(tmp_path) -> None:
+    """Options of other labels (Host's Roles, Script's Language, Source's Category and System) don't
+    make a name a category; Environment's do."""
+    root = itops_space(tmp_path)
+    own = [{"name": "Hypervisor version", "kind": "text", "share": 1.0},
+           {"name": "Memory", "kind": "number", "share": 1.0}]
+    names = ["DHCP", "Python", "Ticket", "Document", "Wiki", "Production", "Rack"]
+    _batch, items = _save(root, *(_create(n, own, iid=f"g{i}") for i, n in enumerate(names, 1)))
+    got = dict(zip(names, items, strict=True))
+    for n in ("DHCP", "Python", "Ticket", "Document", "Wiki"):
+        assert got[n]["problems"] == [] and "offer" not in got[n], n
+    assert got["Production"]["problems"] == ["Production is a category: a property value or a tag, not a type."]
+    assert got["Production"]["offer"] == {"label": "Use Host, with a category", "typeId": "host", "category": "Production"}
+    assert got["Rack"]["problems"] == ["Rack is a category: a property value or a tag, not a type."]
+    assert got["Rack"]["offer"]["typeId"] == "location"  # Location's Kind
+    assert [pd.key for pd in proposal.category_labels(Space(root).type_by_id("host"))] == ["category", "environment"]
+    assert proposal.category_labels(Space(root).type_by_id("source")) == []
+
+
 def test_offer_applied(tmp_path) -> None:
     root = itops_space(tmp_path)
     batch, (kiosk,) = _save(root, _create("Kiosk"))

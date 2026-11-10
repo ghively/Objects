@@ -56,11 +56,13 @@ __all__ = [
     "LOOKALIKE_SHARE",
     "MIN_DOCUMENTS",
     "MIN_SHARE",
+    "CATEGORY_LABELS",
     "OFFER",
     "ProposalConflict",
     "ProposalInvalid",
     "apply",
     "approved_create_names",
+    "category_labels",
     "effective_item",
     "is_itops_space",
     "load_proposal",
@@ -87,6 +89,8 @@ MAX_OPTIONS = 100
 LOOKALIKE_SHARE = 0.8
 """M30: a new type is a look-alike when this share of its properties (by name) are an existing type's."""
 OFFER = "Use {type}, with a category"
+CATEGORY_LABELS = ("category", "kind", "environment")
+"""M30: the label properties whose options are categories (by name or key, any case), on any type but Source."""
 
 ABBREVIATIONS: dict[str, str] = {
     "prod": "production", "prd": "production", "dev": "development", "stg": "staging",
@@ -247,29 +251,33 @@ def _category_label(t: TypeDefinition) -> Any:
     return None
 
 
+def category_labels(t: TypeDefinition) -> list[Any]:
+    """The type's label properties whose options are categories: named (or keyed) Category, Kind or
+    Environment, any case (`CATEGORY_LABELS`); none on the Source type, whose Category and System
+    say what a page is and where it came from, not a kind of thing."""
+    if t.id == _SOURCE_TYPE:
+        return []
+    return [pd for pd in t.propertyDefinitions
+            if pd.type == "label" and (pd.key.casefold() in CATEGORY_LABELS or _text(pd.name).casefold() in CATEGORY_LABELS)]
+
+
 def _category_of(space: Space, name: str) -> tuple[bool, TypeDefinition | None]:
-    """(whether ``name`` is a category, the type to offer): a label option of a type in the space
-    (a Category or Kind option first, then any label, in type order; the Source type counts as a
-    category but is never offered), or a tag's title (no type to offer)."""
+    """(whether ``name`` is a category, the type to offer): an option of a type's Category, Kind or
+    Environment label (`category_labels`; the type's Category or Kind first, then any of them, in type
+    order), or a tag's title (no type to offer). Any other label's options (Host's Roles, Script's
+    Language) are not categories."""
     want = _squash(name)
     if not want:
         return False, None
     holders: list[tuple[int, TypeDefinition]] = []
-    category = False
     for t in space.types:
         label = _category_label(t)
-        for pd in t.propertyDefinitions:
-            if pd.type != "label":
-                continue
+        for pd in category_labels(t):
             texts = [str(o.get("text", "")) for o in pd.options.get("set") or [] if isinstance(o, dict)]
             if any(_squash(x) == want for x in texts):
-                category = True
-                if t.id != _SOURCE_TYPE:
-                    holders.append((0 if pd is label else 1, t))
+                holders.append((0 if pd is label else 1, t))
     if holders:
         return True, min(holders, key=lambda h: h[0])[1]
-    if category:
-        return True, None
     return any(_squash(s.title) == want for s in space.list("tag")), None
 
 

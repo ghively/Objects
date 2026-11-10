@@ -7,8 +7,8 @@ splits). Per entity it picks the values from all its Sources (`distill.pick_valu
 Source wins, conflicts kept), assembles the summary lines, and applies **the entity rule**: a
 candidate becomes an object when a page is mainly about it (``"own"``), more than one page mentions
 it (``"pages"``, `entitycheck.MIN_PAGES`) or it has properties of its own (``"properties"``);
-otherwise it stays text. A category (a label option of a type in the space, or a tag) is never an
-entity. The resolved list is **computed** on every read from ``filing.json`` and
+otherwise it stays text. A category (an option of a type's Category, Kind or Environment label, or a
+tag) is never an entity. The resolved list is **computed** on every read from ``filing.json`` and
 ``entities-review.json`` (never stored), so reading writes nothing.
 
 Gene's review, ``.object/imports/<batch>/entities-review.json`` (`EntitiesReview`)::
@@ -323,12 +323,12 @@ def _modified(space: Space, page: str) -> str | None:
 
 
 def _categories(space: Space) -> set[str]:
-    """`norm_name` of every label option of every type in the space, and of every tag's title."""
+    """`norm_name` of every option of a Category, Kind or Environment label of a type in the space
+    (`proposal.category_labels`: never the Source type's), and of every tag's title."""
     out = {norm_name(s.title) for s in space.list("tag")}
     for t in space.types:
-        for p in t.propertyDefinitions:
-            if p.type == "label":
-                out |= {norm_name(str(o.get("text", ""))) for o in p.options.get("set") or [] if isinstance(o, dict)}
+        for p in proposal.category_labels(t):
+            out |= {norm_name(str(o.get("text", ""))) for o in p.options.get("set") or [] if isinstance(o, dict)}
     out.discard("")
     return out
 
