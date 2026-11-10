@@ -222,6 +222,27 @@ def test_merge_never_copies_a_synced_key(root: Path) -> None:
     assert "diskFree" not in result.dropped and "patchState" not in result.dropped
 
 
+# -- finding 13a: a key match names the property, not "the key" ------------------------------
+
+
+def test_a_key_match_detail_names_the_property(root: Path) -> None:
+    full = root / "Hosts/Lab/WEB01.md"
+    full.write_bytes(full.read_bytes().replace(b"web01.lab.example.test", b"web01.example.test"))
+    space = _space(root)
+    out = space.sync_facts(
+        "host",
+        [
+            _item("key", "nobody.example.test", {"diskFree": 1}, key="fqdn"),
+            _item("key", "web01.example.test", {"diskFree": 1}, key="fqdn"),
+        ],
+        set(),
+    )
+    assert [r.detail for r in out.results] == [
+        'No Host has the FQDN "nobody.example.test".',
+        '2 Hosts have the FQDN "web01.example.test".',
+    ]
+
+
 # -- finding 3: a hand-typed value under a synced key never shows ---------------------------
 
 
