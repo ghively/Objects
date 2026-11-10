@@ -1,6 +1,6 @@
 /**
  * Object Type Settings, in this order: breadcrumb; icon, name, plural, colour and
- * description; Properties; Templates; Work (M22: "Add work fields"); Configuration › Page, Card view
+ * description; Properties; Templates; Name patterns (M29); Work (M22: "Add work fields"); Configuration › Page, Card view
  * and linking; Delete object type.
  *
  * Every edit saves at once through `useTypeEditor` (text fields 400 ms after the last keystroke,
@@ -41,6 +41,7 @@ import { TypeChip } from '@/shell/Sidebar'
 import { FULL_VIEW_LAYOUTS, LAYOUTS } from '@/views/model'
 import { CardViewSettings } from './CardViewSettings'
 import { isBasicDailyNote } from './dashboardSections'
+import { NamePatternsSection, NAME_PATTERNS_TEXT } from './NamePatternsSection'
 import { DeleteTypeDialog } from './DeleteTypeDialog'
 import { PageLayoutCards } from './PageLayoutCards'
 import { TemplateManager, TEMPLATE_TEXT } from './TemplateManager'
@@ -500,6 +501,10 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
 
           <Section title={TYPE_SETTINGS_TEXT.templates} explanation={TEMPLATE_TEXT.explanation}>
             <TemplateManager typeId={type.id} editor={editor} onOpenTemplate={onOpenTemplate} disabled={readOnly} />
+          </Section>
+
+          <Section title={NAME_PATTERNS_TEXT.title}>
+            <NamePatternsSection type={type} editor={editor} />
           </Section>
 
           <Section title={WORK_FIELDS_TEXT.heading}>

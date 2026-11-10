@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { DateConstraints, PropertyDef, PropertyOptions, PropertyType, TypeDef } from '@/api/types'
-import { COMPUTED_KINDS } from '@/api/types'
+import { COMPUTED_KINDS, SYNCABLE_KINDS } from '@/api/types'
 import { ColorPicker } from '@/components/ColorPicker'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -17,6 +17,7 @@ import { LabelMenu } from './LabelMenu'
 import { NumberFormatMenu } from './NumberFormatMenu'
 import { FormulaSection } from './settings/FormulaSection'
 import { RollupSection } from './settings/RollupSection'
+import { SyncedSection } from './settings/SyncedSection'
 import { UniqueIdSection } from './settings/UniqueIdSection'
 import { canChangeVisibility, canDeleteProperty, VISIBILITY_OPTIONS } from './PropertyMenu'
 import {
@@ -896,6 +897,7 @@ export function PropertySettings({
             {def.type === 'formula' && <FormulaSection type={type} def={def} save={save} objectPath={objectPath} />}
             {def.type === 'rollup' && <RollupSection type={type} def={def} save={save} />}
             {def.type === 'uniqueId' && <UniqueIdSection type={type} def={def} save={save} />}
+            {SYNCABLE_KINDS.has(def.type) && <SyncedSection key={`synced-${def.id}`} def={def} save={save} />}
             {canChangeVisibility(def) && (
               <Section title="Visibility" description="Show or hide this property on the object page.">
                 <div className="flex gap-1.5">
