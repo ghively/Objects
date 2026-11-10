@@ -33,6 +33,7 @@ import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from '@/object/ObjectPage'
 import { ObjectPeek } from '@/object/ObjectPeek'
 import { inkPlugin } from './ink'
+import { setLastTypeSpace } from '@/create/lastType'
 
 const mocked = vi.mocked(api)
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true })
@@ -46,9 +47,11 @@ const WHITEBOARD = typeDef({
 const BOARD = 'Whiteboards/Network map.md'
 const NOTE = 'Pages/Note.md'
 
-beforeEach(() => {
+beforeEach(async () => {
   pageProps.length = 0
   localStorage.clear()
+  // M29: the last type created is the suggested one; start each test without one.
+  await setLastTypeSpace(null)
   useTabs.getState().reset()
   usePeek.getState().close()
   resetLinkIndex()
