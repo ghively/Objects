@@ -254,6 +254,23 @@ def test_prompt_lists_entity_types_on_a_source_batch(env: Env) -> None:
 # -- Write ---------------------------------------------------------------------------------------
 
 
+def test_view_counts_the_batch_sources(env: Env) -> None:
+    """``sources`` is the batch's Sources (its items), not the pages the pass has results for."""
+    e = env
+    batch = _import(e)
+    view = e.fil.entities_view(batch)
+    assert view["state"] == "collecting" and view["sources"] == 6 and view["entities"] == []
+    _decide(e, batch)
+    _trial_and_bulk(e, batch)
+    assert e.fil.entities_view(batch)["sources"] == 6
+    # the entities a Write creates are items of the batch too, but not Sources
+    _accept_all(e, batch)
+    _write(e, batch)
+    _data, items = batches.load_batch(e.root, batch)
+    assert any(it.get("entity") for it in items)
+    assert e.fil.entities_view(batch)["sources"] == 6
+
+
 def test_write_needs_every_entity_decided(env: Env) -> None:
     e = env
     batch = _import(e)

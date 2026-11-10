@@ -545,6 +545,33 @@ def undecided(res: Resolution, review: dict[str, Any]) -> list[str]:
 
 # -- the wizard's view -------------------------------------------------------------------
 
+_WRITTEN = ("created", "updated", "unchanged", "resolvedTake", "resolvedKeep")
+"""The ``items.json`` actions of an object the batch wrote (or kept), as `filing.Filing.eligible` reads them."""
+
+
+def batch_sources(space: Space, batch: str) -> int:
+    """How many imported Sources the batch's ``items.json`` holds (not the entities a Write made). Reads only."""
+    from . import sources
+
+    try:
+        _data, items = batches.load_batch(space.root, batch)
+    except KeyError:
+        return 0
+    seen: set[str] = set()
+    for it in items:
+        p = it.get("path")
+        if it.get("entity") or it.get("action") not in _WRITTEN or not isinstance(p, str) or p in seen:
+            continue
+        try:
+            _of, fm, _v = space.read(p)
+            type_id = space.get(p).type
+        except (KeyError, ValueError, OSError):
+            continue
+        if sources.is_imported_source(type_id, fm):
+            seen.add(p)
+    return len(seen)
+
+
 _STATES = {"idle": "collecting", "running": "collecting", "trial": "collecting", "entities": "review",
            "writing": "writing", "failed": "review"}  # fmt: skip
 
@@ -623,7 +650,7 @@ def view(space: Space, batch: str, results: dict[str, dict[str, Any]], state: st
         "suggestedMerges": res.suggestedMerges,
         "relations": {"total": len(res.relations), "lowConfidence": sum(1 for r in res.relations if low(r)),
                       "plain": sum(1 for r in res.relations if r.get("plain"))},
-        "sources": len(res.pages),
+        "sources": batch_sources(space, batch),
         "conflicts": sum(1 for e in res.entities for pv in e.values.values() if pv.get("conflict")),
         "review": {k: review[k] for k in ("decisions", "merges", "splits")},
         "undecided": len(undecided(res, review)),

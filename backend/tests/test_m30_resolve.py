@@ -347,7 +347,11 @@ def test_view_shape_and_reads_write_nothing(tmp_path: Path) -> None:
     root, paths = _source_space(tmp_path)
     sp = Space(root)
     results = _results(paths)
-    batches.batch_dir(root, "b1").mkdir(parents=True)
+    folder = batches.batch_dir(root, "b1")
+    folder.mkdir(parents=True)
+    batches.write_json(folder / "batch.json", {"id": "b1", "keepAsSources": True})
+    batches.write_json(folder / "items.json", [{"sourcePath": f"{t}.md", "title": t, "path": p, "action": "created"}
+                                               for t, p in paths.items()])  # fmt: skip
     before = _snapshot(root)
 
     v = entities.view(sp, "b1", results, "entities")
