@@ -39,6 +39,8 @@ export const AGENT_TEXT = {
   applied: (created: number, extended: number) => `${pl(created, 'type', 'types')} created, ${pl(extended, 'type', 'types')} extended.`,
   itemLabel: (name: string) => `Proposal item ${name}`,
   willSkip: (reason: string) => `Apply will skip this: ${reason}`,
+  // M30: in place of the item's own action and skip once "Use <type>, with a category" is taken.
+  offerTaken: (type: string, category: string) => `Apply will use ${type}, with ${category} as its category.`,
   droppedHeading: 'Left out',
   droppedLine: (name: string, reason: string) => `${name}: ${reason}`,
   skippedSummary: (items: { name: string; reason: string }[]) =>

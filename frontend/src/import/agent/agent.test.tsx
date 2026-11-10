@@ -29,7 +29,9 @@ vi.mock('./EntitiesStep', async () => {
 
 import { api } from '@/api/client'
 import type { FilingStatus, SchemaProposal } from '@/api/types'
+import { useLinkIndex } from '@/links/linkIndex'
 import { useTabs } from '@/nav/tabs'
+import { typeDef } from '@/test/mockApi'
 import { AgentFlow } from './AgentFlow'
 import { NormaliseStep } from './NormaliseStep'
 import { ProposalStep } from './ProposalStep'
@@ -473,5 +475,31 @@ describe('M30 the proposal offer', () => {
     expect(within(card).getByText(T.status.edited)).toBeInTheDocument()
     const book = screen.getByRole('group', { name: T.itemLabel('Book') })
     expect(within(book).queryByRole('button', { name: /with a category/ })).toBeNull()
+  })
+
+  test('the offer taken shows its effect, not the create and skip (M30 hands-on)', async () => {
+    useLinkIndex.setState({ types: [typeDef({ id: 'host', name: 'Host', pluralName: 'Hosts' })] })
+    const server = {
+      id: 'g9',
+      action: 'create' as const,
+      name: 'Server',
+      documentCount: 14,
+      examples: ['APP01'],
+      properties: [{ key: 'ip', name: 'IP address', kind: 'text', fillRate: 1 }],
+      problems: ['Host has the same properties.'],
+      offer: { label: 'Use Host, with a category', typeId: 'host', category: 'Server' },
+    }
+    m.importProposal.mockResolvedValue({
+      proposal: { groups: [server] },
+      review: { items: [{ id: 'g9', status: 'edited', edited: { useType: 'host', category: 'Server' } }] },
+    } as never)
+    render(<ProposalStep batch="b1" onApplied={vi.fn()} />)
+    const card = await screen.findByRole('group', { name: T.itemLabel('Server') })
+    expect(within(card).getByText(T.offerTaken('Host', 'Server'))).toBeInTheDocument()
+    expect(within(card).getByText(T.actions.use)).toBeInTheDocument()
+    expect(within(card).queryByText(T.actions.create)).toBeNull()
+    expect(within(card).queryByText(T.willSkip(server.problems[0]))).toBeNull()
+    expect(within(card).queryByText('IP address')).toBeNull()
+    useLinkIndex.setState({ types: [] })
   })
 })
