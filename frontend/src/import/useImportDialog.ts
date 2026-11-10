@@ -11,6 +11,10 @@ export interface ImportDialogPreset {
   location?: string
   /** Reopen the agent workflow (Proposed schema, Trial, Normalise, Import inbox) for this batch of the open space. */
   reviewBatch?: string
+  /** M31 "Remodel this space…": the source path filled in (the open space's folder). */
+  sourcePath?: string
+  /** M31: the import goes into a new space only ("This space" is not offered). */
+  newSpaceOnly?: boolean
 }
 
 export interface ImportDialogState {

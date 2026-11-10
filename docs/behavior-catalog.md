@@ -73,6 +73,12 @@ Object has no accounts.
   Clear media cache.
 - Import Content: migration guides per source tool (Notion, Obsidian, Evernote, Apple Notes, Tana, Other tool);
   Bulk import "Start importing" (upload files, review mappings).
+  "Remodel this space…" (M31, IT ops design section 6; our strings): the import dialog opens with the open space's
+  folder as the source and "A new space" as the only target (named "<space> (remodelled)"); the space is only read,
+  never changed. A folder with `.object/space.json` read as a source skips `.object/`, `.object-cache/` and
+  `Templates/`, takes each object's type from its `type` (typeSource key; plural names from the space's types; Page
+  stays Page), its dates from `createdAt`/`lastUpdated`, leaves out `id`, `template` and `importSource`, and notes
+  "This folder is an Object space: its objects keep their types, and the space is only read, never changed."
 - Full Export: Automated Full Exports (desktop app only); Manual Full Export with Spaces (All Spaces) and
   options Include media, Links as wikilinks (`[[title]]`), Add the title as a top heading; "Export All Spaces".
 

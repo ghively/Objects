@@ -585,6 +585,22 @@ describe('ImportDialog: target, progress and finish', () => {
     expect(within(target).getByRole('textbox', { name: T.location })).toHaveValue('/data')
   })
 
+  test('test M31 remodel preset: the source is the space folder and the target only a new space', async () => {
+    mocked.importPreview.mockImplementation(async (req) => vaultPreview(req))
+    const user = await openDialog({ sourcePath: '/home/gene/Spaces/Work', newSpaceOnly: true, name: 'Work (remodelled)' })
+    expect(screen.getByRole('textbox', { name: T.source })).toHaveValue('/home/gene/Spaces/Work')
+    await user.click(screen.getByRole('button', { name: T.preview }))
+    expect(mocked.importPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ source: { path: '/home/gene/Spaces/Work', kind: 'auto' } }),
+    )
+    await passScan(user)
+    await screen.findByRole('heading', { name: T.summaryHeading })
+    const target = screen.getByRole('group', { name: T.target })
+    expect(within(target).getByRole('radio', { name: T.newSpace })).toBeChecked()
+    expect(within(target).queryByRole('radio', { name: T.thisSpaceNamed('Work') })).toBeNull()
+    expect(within(target).getByRole('textbox', { name: T.name })).toHaveValue('Work (remodelled)')
+  })
+
   test('test import needs a name for a new space', async () => {
     const user = await previewVault()
     await user.clear(within(screen.getByRole('group', { name: T.target })).getByRole('textbox', { name: T.name }))

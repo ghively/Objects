@@ -1,6 +1,6 @@
 // "Import into": a new space (the default; Name and Location) or this space, which is used only
 // when the user picks it here (the contract's rule: an import never writes into an existing space
-// unless it was chosen explicitly).
+// unless it was chosen explicitly). M31: `newSpaceOnly` ("Remodel this space…") offers only a new space.
 import { useId } from 'react'
 import type { ImportTargetKind } from './mapping'
 import { IMPORT_TEXT as T } from './text'
@@ -19,6 +19,7 @@ export function TargetPicker({
   location,
   onLocation,
   spaceName,
+  newSpaceOnly = false,
 }: {
   target: ImportTargetKind
   onTarget(next: ImportTargetKind): void
@@ -28,6 +29,8 @@ export function TargetPicker({
   onLocation(next: string): void
   /** The open space's name, or null while it loads (then "This space" can't be picked yet). */
   spaceName: string | null
+  /** M31: only "A new space" (remodelling the open space never writes into it). */
+  newSpaceOnly?: boolean
 }) {
   const id = useId()
   return (
@@ -65,19 +68,21 @@ export function TargetPicker({
           </label>
         </div>
       )}
-      <label className="flex items-center gap-2 text-[14px]">
-        <input
-          type="radio"
-          name={`${id}-target`}
-          value="currentSpace"
-          checked={target === 'currentSpace'}
-          disabled={spaceName === null}
-          aria-describedby={target === 'currentSpace' ? `${id}-here` : undefined}
-          onChange={() => onTarget('currentSpace')}
-        />
-        {spaceName === null ? T.thisSpace : T.thisSpaceNamed(spaceName)}
-      </label>
-      {target === 'currentSpace' && (
+      {!newSpaceOnly && (
+        <label className="flex items-center gap-2 text-[14px]">
+          <input
+            type="radio"
+            name={`${id}-target`}
+            value="currentSpace"
+            checked={target === 'currentSpace'}
+            disabled={spaceName === null}
+            aria-describedby={target === 'currentSpace' ? `${id}-here` : undefined}
+            onChange={() => onTarget('currentSpace')}
+          />
+          {spaceName === null ? T.thisSpace : T.thisSpaceNamed(spaceName)}
+        </label>
+      )}
+      {target === 'currentSpace' && !newSpaceOnly && (
         <p id={`${id}-here`} className="ml-6 text-[13px] text-fg-muted">
           {T.thisSpaceNote}
         </p>

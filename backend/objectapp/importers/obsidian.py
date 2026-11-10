@@ -9,12 +9,19 @@ other key is a property of the object's type. Inline ``#tags`` outside code also
 embeds are resolved here (``markdown.convert``, the source's `SourceIndex`); the mapping step
 decides the types (top-level folders by default). ``.canvas`` files are skipped
 (``unsupported``).
+
+M31 (remodelling a space): when the folder is an Object space (`Source.is_space`) each page's
+``type`` names its type (``typeSource: key``, ``typeKey: type``, as for Anytype), ``createdAt`` and
+``lastUpdated`` are its dates, and Object's own ``id``, ``template`` and ``importSource`` are left out
+(the new space gives each object its own id and provenance). Every other key is read as above.
 """
 
 from __future__ import annotations
 
+import json
+import os
 from collections import Counter
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from ..frontmatter import FrontmatterError, parse_fm
@@ -29,6 +36,10 @@ __all__ = ["DISPLAY_KEYS", "HTML_WARNING", "read_markdown_folder", "split_list"]
 DISPLAY_KEYS = ("cssclasses", "cssclass", "publish", "permalink")
 HTML_WARNING = "Some pages hold HTML (toggles, tables); it is imported as written."
 NESTED_WARNING = "Some frontmatter values are nested lists or maps; they are kept as written and don't become properties."
+
+SPACE_DROPPED = ("id", "template", "importSource")
+"""M31: an Object space's own bookkeeping keys, not carried into the space it is remodelled into."""
+SPACE_DATES = ("createdAt", "lastUpdated")
 
 _SYSTEM_SOURCES = {
     "title": "title",
@@ -56,6 +67,33 @@ def split_list(value: Any, strip_hash: bool = False) -> list[str]:
     return out
 
 
+_MAX_TYPE_FILE = 1 << 20
+
+
+def space_plurals(root: Path) -> dict[str, str]:
+    """M31: an Object space's type names (casefolded) -> plural names, read from its
+    ``.object/types/*.json`` (read only; a file that isn't a type, a link, or one over 1 MiB is
+    passed over)."""
+    out: dict[str, str] = {}
+    folder = root / ".object" / "types"
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return out
+    for name in names:
+        p = folder / name
+        try:
+            if not name.endswith(".json") or p.is_symlink() or not p.is_file() or p.stat().st_size > _MAX_TYPE_FILE:
+                continue
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict) and isinstance(data.get("name"), str) and isinstance(data.get("pluralName"), str):
+            if data["name"].strip() and data["pluralName"].strip():
+                out.setdefault(data["name"].strip().casefold(), data["pluralName"].strip())
+    return out
+
+
 def _nested(value: Any) -> bool:
     return isinstance(value, dict) or (isinstance(value, list) and any(isinstance(v, (dict, list)) for v in value))
 
@@ -70,6 +108,7 @@ def read_markdown_folder(
     inline_tags: bool = True,
 ) -> ReadResult:
     """Read every Markdown file of ``src`` (Obsidian's rules)."""
+    space = bool(getattr(src, "is_space", False))
     pages = [rel for rel in src.files if is_markdown(rel)]
     others = [rel for rel in src.files if not is_markdown(rel)]
     skipped: list[SkippedItem] = list(src.skipped)
@@ -108,6 +147,12 @@ def read_markdown_folder(
         for key, value in fm.items():
             if not isinstance(key, str):
                 key = str(key)
+            if space and key in SPACE_DROPPED:
+                continue
+            if space and key in SPACE_DATES:
+                if isinstance(value, str) and value.strip():
+                    system[key] = value.strip()
+                continue
             fm_keys[key] += 1
             low = key.lower()
             if low in DISPLAY_KEYS:
@@ -196,7 +241,8 @@ def read_markdown_folder(
         warnings=warnings,
         frontmatterKeys=dict(fm_keys),
         folders=dict(folders),
-        defaultTypeSource="folder",
-        defaultTypeKey=None,
+        defaultTypeSource="key" if space else "folder",
+        defaultTypeKey="type" if space else None,
         entity_items=entity_items,
+        space_plurals=space_plurals(Path(src.path)) if space else None,
     )

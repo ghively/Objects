@@ -385,6 +385,8 @@ def plan(
             return f"folder:{o.group}" if o.group else PAGE_KEY
         if type_source == "key":
             v = _scalar_type_value(o.fm.get(mapping.typeKey)) if mapping.typeKey else None
+            if v and read.space_plurals is not None and v.casefold() == "page":
+                return PAGE_KEY  # M31: a space's own Page objects are Pages
             return f"key:{v}" if v else PAGE_KEY
         return PAGE_KEY
 
@@ -403,7 +405,9 @@ def plan(
             order.append((f"folder:{folder}", _singular(folder), folder, "folder", folder))
     elif type_source == "key":
         for value in sorted((k[4:] for k in members if k.startswith("key:")), key=str.casefold):
-            order.append((f"key:{value}", value, f"{value}s", "key", f"{mapping.typeKey}: {value}"))
+            # M31: a space source names each type's plural (Software, People); else the value + "s".
+            plural = (read.space_plurals or {}).get(value.casefold()) or f"{value}s"
+            order.append((f"key:{value}", value, plural, "key", f"{mapping.typeKey}: {value}"))
     if SOURCE_KEY in members:
         order.append((SOURCE_KEY, source_def.name, source_def.pluralName, "page", SOURCE_ORIGIN))
     if PAGE_KEY in members or not order:

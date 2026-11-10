@@ -5,6 +5,9 @@
 //
 // 2026-11-09: "OCR languages" (the `ocrLanguages` device setting) names the Tesseract languages a
 // scanned PDF is read in; empty means every installed one. The field saves on blur (and on Enter).
+//
+// M31 (IT ops design section 6): "Remodel this space…" opens the import dialog with the open space's
+// folder as the source and a new space as the only target; the space itself is only read.
 import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
@@ -14,6 +17,7 @@ import { AGENT_TEXT } from '@/import/agent/text'
 import { BatchPanel } from '@/import/BatchPanel'
 import { useImportDialog } from '@/import/useImportDialog'
 import { useSettings } from '@/settings/useSettings'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { useSettingsModal } from '../useSettingsModal'
 import { SaveError, SectionHeader, SettingGroup, errorText } from '../controls'
 
@@ -44,11 +48,17 @@ export const IMPORT_CONTENT_TEXT = {
   ocrLanguages: 'OCR languages',
   ocrLanguagesHelp: 'Tesseract language codes joined with +, for example eng+deu. Leave empty to use every installed language.',
   ocrLanguagesPlaceholder: 'Every installed language',
+  // our strings: remodelling the open space (M31)
+  remodel: 'Remodel this space…',
+  remodelHeading: 'Remodel this space',
+  remodelHelp:
+    "Import this space's objects into a new space, to sort them again with the import's rules and AI filing. This space is only read, never changed.",
+  remodelName: (space: string) => `${space} (remodelled)`,
 } as const
 
 const T = IMPORT_CONTENT_TEXT
 
-export const IMPORT_CONTENT_SEARCH: string[] = [T.startImporting, T.notion, T.obsidian, T.anytype, T.ocrLanguages]
+export const IMPORT_CONTENT_SEARCH: string[] = [T.startImporting, T.notion, T.obsidian, T.anytype, T.ocrLanguages, T.remodel]
 
 const SOURCES: { kind: ImportSourceKind; label: string; help: string }[] = [
   { kind: 'notion', label: T.notion, help: T.notionHelp },
@@ -59,6 +69,11 @@ const SOURCES: { kind: ImportSourceKind; label: string; help: string }[] = [
 function openImport(kind: ImportSourceKind | 'auto') {
   useSettingsModal.getState().close()
   useImportDialog.getState().open({ kind })
+}
+
+function remodelSpace(name: string, root: string) {
+  useSettingsModal.getState().close()
+  useImportDialog.getState().open({ sourcePath: root, newSpaceOnly: true, name: T.remodelName(name) })
 }
 
 function reviewImport(batch: string) {
@@ -203,6 +218,21 @@ function OcrLanguages() {
   )
 }
 
+/** M31: "Remodel this space…" (shown once the open space is known). */
+function Remodel() {
+  const space = useSpaceInfo((s) => s.space)
+  if (!space?.root) return null
+  return (
+    <SettingGroup title={T.remodelHeading} help={T.remodelHelp}>
+      <div>
+        <Button type="button" variant="outline" size="sm" onClick={() => remodelSpace(space.name, space.root)}>
+          {T.remodel}
+        </Button>
+      </div>
+    </SettingGroup>
+  )
+}
+
 export function ImportContentSection() {
   return (
     <div>
@@ -239,6 +269,7 @@ export function ImportContentSection() {
           ))}
         </ul>
       </SettingGroup>
+      <Remodel />
       <OcrLanguages />
       <ImportHistory />
     </div>

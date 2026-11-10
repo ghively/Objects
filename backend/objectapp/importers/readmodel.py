@@ -111,6 +111,9 @@ class ReadResult:
     """M27: the "Leave out" patterns the source was listed with."""
     left_out: list[str] = field(default_factory=list)
     """M27: source files those patterns matched (never listed, never read)."""
+    space_plurals: dict[str, str] | None = None
+    """M31: the source is an Object space: its types' names (casefolded) -> their plural names,
+    from its ``.object/types``; None for any other source."""
 
 
 class SourceIndex:
