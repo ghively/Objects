@@ -22,18 +22,18 @@ function items() {
 }
 
 describe('AddPropertyMenu', () => {
-  test('test AddPropertyMenu lists 23 items in order, hides existing Title, and Object Select › Person creates an entity bound to person', async () => {
+  test('test AddPropertyMenu lists 24 items in order, hides existing Title, and Object Select › Person creates an entity bound to person', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<AddPropertyMenu type={typeDef({ id: 'empty' })} types={TYPES} onSave={vi.fn()} />)
     expect(screen.getByText('Add Property')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Search Properties')).toBeInTheDocument()
     expect(items()).toEqual(ADD_PROPERTY_ITEMS.map((i) => i.name))
-    expect(items()).toHaveLength(23)
+    expect(items()).toHaveLength(24)
     unmount()
 
     const onSave = vi.fn()
     render(<AddPropertyMenu type={PROJECT} types={TYPES} onSave={onSave} />)
-    expect(items()).toHaveLength(22)
+    expect(items()).toHaveLength(23)
     expect(items()).not.toContain('Title')
 
     await user.click(screen.getByRole('menuitem', { name: 'Object Select' }))

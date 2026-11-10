@@ -40,6 +40,7 @@ from .exportdoc import Doc, parse_blocks, render_docx, render_html, render_latex
 from .frontmatter import FlowList, FrontmatterError, delete_keys, set_keys
 from .media import Attachment, NotServed, attachment_path, list_attachments
 from .objfile import join_object, split_object
+from .propvalues import TABLE_KIND, decode_value, table_one_line
 from .relink import code_ranges, wikilink_spans, wikilink_targets
 from .synced import synced_props
 from .typedefs import read_raw
@@ -479,7 +480,13 @@ def build_doc(space: Space, rel: str, opts: ExportOptions) -> Doc:
         value = fm.get(p.key)
         if opts.hide_empty and _is_empty(value):
             continue
-        props.append((p.name, "" if _is_empty(value) else _value_text(value)))
+        if _is_empty(value):
+            text = ""
+        elif p.type == TABLE_KIND:  # M31: "Name, Qty; Apple, 3"
+            text = table_one_line(decode_value(p, value))
+        else:
+            text = _value_text(value)
+        props.append((p.name, text))
     blocks = parse_blocks(raw.of.body, _media_resolver(space.root, rel))
     for b in blocks:
         if b.kind != "embed" or not opts.embedded:

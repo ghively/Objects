@@ -50,8 +50,9 @@ __all__ = [
 
 _log = logging.getLogger(__name__)
 
-INDEX_FORMAT = 1
-"""``PRAGMA user_version`` of the index; a mismatch rebuilds it."""
+INDEX_FORMAT = 2
+"""``PRAGMA user_version`` of the index; a mismatch rebuilds it. 2 (M31): simple-table
+properties' cells are in the ``props`` column."""
 DB_NAME = "search.sqlite"
 JOURNAL_NAME = DB_NAME + "-journal"
 CACHE_FOLDER = ".object-cache"

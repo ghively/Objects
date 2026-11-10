@@ -47,6 +47,7 @@ describe('ADD_PROPERTY_ITEMS', () => {
       'Email',
       'Phone',
       'Files',
+      'Table',
       'Button',
       'List',
     ])
@@ -72,15 +73,24 @@ describe('ADD_PROPERTY_ITEMS', () => {
       'email',
       'phone',
       'files',
+      'simpleTableBlock',
       'button',
       'textList',
     ])
+    // M31: Table, after Files (our place and description).
+    expect(ADD_PROPERTY_ITEMS.find((i) => i.type === 'simpleTableBlock')).toMatchObject({
+      key: 'property_simpleTableBlock',
+      action: 'property',
+      name: 'Table',
+      description: 'A small table: a header row of column names, then rows of text.',
+      icon: 'ph-table',
+    })
     const objectSelect = ADD_PROPERTY_ITEMS.find((i) => i.action === 'objectSelect')
     expect(objectSelect?.description).toBe('Points to objects of one chosen type.')
     const cover = ADD_PROPERTY_ITEMS.find((i) => i.action === 'coverImage')
     expect(cover?.description).toBe('One picture shown at the top of the object.')
     // Kinds never offered here.
-    for (const t of ['text', 'url', 'simpleTableBlock', 'datetimeSimple', 'steps', 'floorItems'] as const) {
+    for (const t of ['text', 'url', 'datetimeSimple', 'steps', 'floorItems'] as const) {
       expect(ADD_PROPERTY_ITEMS.some((i) => i.type === t)).toBe(false)
     }
 

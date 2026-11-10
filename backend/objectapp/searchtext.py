@@ -12,7 +12,7 @@ import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from .propvalues import decode_value
+from .propvalues import TABLE_KIND, decode_value, table_plain
 from .rows import (
     _BLOCK_ID_RE,
     _COMMENT_LINE_RE,
@@ -36,8 +36,11 @@ if TYPE_CHECKING:
 
 __all__ = ["SEARCHABLE_KINDS", "display_safe", "plain_body", "property_text"]
 
-SEARCHABLE_KINDS = frozenset({"text", "textBlock", "url", "number", "label", "entity"})
-"""Property kinds the ``props`` column holds (dates, checkboxes and system kinds don't)."""
+SEARCHABLE_KINDS = frozenset(
+    {"text", "textBlock", "url", "number", "label", "entity", TABLE_KIND}
+)
+"""Property kinds the ``props`` column holds (dates, checkboxes and system kinds don't).
+M31: a simple table's cells, header row included."""
 
 _TABLE_SEP_RE = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?\s*$")
 _IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)\s]*)[^)]*\)")
@@ -158,6 +161,8 @@ def _value_text(kind: str, value: Any, link_title: Callable[[str], str]) -> str:
         return ", ".join(t for t in titles if t)
     if kind == "label":
         return ", ".join(str(v) for v in value if v)
+    if kind == TABLE_KIND:
+        return table_plain(value)
     if isinstance(value, bool):
         return ""
     return str(value)
@@ -168,8 +173,9 @@ def property_text(
 ) -> str:
     """The ``props`` column: ``Name: value`` per searchable property with a value.
 
-    A property counts when its kind is text, URL, number, label (option texts)
-    or relation (``link_title`` turns each target into a title), and it is not
+    A property counts when its kind is text, URL, number, label (option texts),
+    simple table (its cells, M31) or relation (``link_title`` turns each target
+    into a title), and it is not
     marked ``isNotSearchable``. Dates, checkboxes and system properties don't, nor do
     synced ones (M29): their values live in the synced store and a sync must not rewrite
     the index, so a hand-typed value under a synced key is never indexed either.

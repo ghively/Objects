@@ -17,7 +17,12 @@ export const KIND_META: Readonly<Record<PropertyType, KindMeta>> = {
     description: 'One paragraph, with formatting and links.',
     icon: 'ph-text-align-left',
   },
-  simpleTableBlock: { name: 'Table', description: '', icon: 'ph-table' },
+  // M31: our description.
+  simpleTableBlock: {
+    name: 'Table',
+    description: 'A small table: a header row of column names, then rows of text.',
+    icon: 'ph-table',
+  },
   number: { name: 'Number', description: 'A number you can format in several ways', icon: 'ph-hash' },
   boolean: { name: 'Checkbox', description: 'A yes-or-no tick box', icon: 'ph-check-square' },
   url: { name: 'URL', description: 'A web address', icon: 'ph-link' },
@@ -137,14 +142,16 @@ const MENU_ORDER = [
   'property_email',
   'property_phone',
   'property_files',
+  // M31: Table, after Files (our choice).
+  'property_simpleTableBlock',
   // M14: after the catalogued items (our choice).
   'property_button',
   // M22: List, after Button (our choice). Steps and Floor items are not in the menu.
   'property_textList',
 ] as const
 
-// The property kinds that become menu items; `text`, `url`, `simpleTableBlock` and
-// `datetimeSimple` can't be added (they come from migration, inference and kind changes).
+// The property kinds that become menu items; `text`, `url` and `datetimeSimple` can't be added
+// (they come from migration, inference and kind changes). M31: `simpleTableBlock` (Table) can.
 const ADDABLE_KINDS: readonly PropertyType[] = [
   'textBlock',
   'blocks',
@@ -165,6 +172,7 @@ const ADDABLE_KINDS: readonly PropertyType[] = [
   'email',
   'phone',
   'files',
+  'simpleTableBlock',
   'button',
   'textList',
 ]
@@ -195,7 +203,7 @@ function buildItems(): AddPropertyItem[] {
   return items.filter((i) => rank(i) >= 0).sort((a, b) => rank(a) - rank(b))
 }
 
-/** The Add Property menu's items, in order: the 15 catalogued ones, then M12's six, then M14's Button, then M22's List. */
+/** The Add Property menu's items, in order: the 15 catalogued ones, then M12's six, M31's Table, M14's Button and M22's List. */
 export const ADD_PROPERTY_ITEMS: readonly AddPropertyItem[] = buildItems()
 
 // Basic types that can't be relation targets.

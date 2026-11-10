@@ -84,6 +84,12 @@ Object has no accounts.
   takes the sub-items and dependencies pairs (Parent item / Sub-items, Blocked by / Blocking; a table or
   timeline view's Customize › Sub-items and dependencies; decision AC-1). Field lists per built-in
   type are in audit item 28.
+  - Add Property › **Table** (M31, after Files; ours: "A small table: a header row of column names, then rows of
+    text."): stored as a Markdown table in a `|-` block (header row first; a hand-written YAML list of rows reads the
+    same). The panel edits cells, "Add row", "Add column", × on a row (never the header row) or a column; a table
+    view or card shows "N rows" (column names on hover), and a table view's opens the table in a peek. Its cells are
+    searchable; a document export lists it as "a, b; c, d". "Change property type": Table to Text or Text block (one
+    line, "a, b; c, d"); Text or Text block to Table (one cell under the property's name, or the table it holds).
 - Task management: "Hide Task Management" per space.
 - Automations (M14): in the rule editor, "Set a property" on a date needs a date or "Now" ticked; with neither it
   shows "Pick a date or tick Now." under the value and Save refuses with the same message (it would write the
