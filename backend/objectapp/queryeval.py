@@ -13,10 +13,10 @@ MCP's ``run_saved_query`` hand an agent the objects the app's query page lists, 
 - `query_scope`, `search_terms_of`, `is_query_ready` and `run_query` port ``runQuery.ts``;
   `apply_sorts` ports ``views/sort.ts`` ``applySorts`` (sorts in order, stable, empties last,
   then the newest ``createdAt`` first).
-- Filters use the view filter engine's port (`automation_filter`), widened here to the kinds
-  ``views/filter.ts`` also filters: formula and rollup values (by their result type), IDs, emails,
-  phones and files, and M28's counterpart rows (a type's computed other sides, which filter and
-  sort as relations).
+- Filters use the view filter engine's port (`automation_filter`), the one engine automation
+  conditions use too: it filters every kind ``views/filter.ts`` filters (formula and rollup values
+  by their result type, IDs, emails, phones and files, and M28's counterpart rows, a type's
+  computed other sides, which filter and sort as relations).
 - Text sorts compare as ``localeCompare(..., {numeric: true, sensitivity: 'base'})`` does: case
   and accents ignored, digit runs by their number, spaces and punctuation before digits before
   letters. It is a close reading of the browser's collation, not ICU itself.
@@ -171,256 +171,29 @@ def _passes_type(row: Mapping[str, Any], s: Mapping[str, Any], collections: list
     return not (left_out and any(i in have for i in left_out))
 
 
-# -- filters: the view engine, widened to every kind filter.ts filters ------------------
+# -- filters: the view filter engine (`automation_filter`), which filters every kind filter.ts does
 
-_EMPTY_OPS = ["isEmpty", "isNotEmpty"]
-_TEXT_OPS = af.FILTER_OPTIONS["text"]
-_NUMBER_OPS = af.FILTER_OPTIONS["number"]
-_BOOLEAN_OPS = af.FILTER_OPTIONS["boolean"]
-_DATE_COMPARE = ["isBefore", "isAfter", "isOnOrBefore", "isOnOrAfter"]
-_COMPUTED_OPS = [*_TEXT_OPS, *_NUMBER_OPS, *_DATE_COMPARE, *_BOOLEAN_OPS]
-_NO_OPERAND = frozenset({"isEmpty", "isNotEmpty", "isChecked", "isNotChecked"})
-_COMPUTED_KINDS = frozenset({"formula", "rollup"})
-_DATE_KINDS = frozenset({"datetime", "datetimeSimple", "entity_createdAt", "entity_lastUpdated"})
-_MORE_OPTIONS: dict[str, list[str]] = {
-    "formula": _COMPUTED_OPS,
-    "rollup": _COMPUTED_OPS,
-    "uniqueId": _TEXT_OPS,
-    "email": _TEXT_OPS,
-    "phone": _TEXT_OPS,
-    "files": _EMPTY_OPS,
-}
-_COMPUTED_TYPES = frozenset({"text", "number", "boolean", "date", "list", "empty", "error"})
+match_group = af.match_group
+"""Whether a row passes a filter group (``matchGroup``): invalid filters are skipped."""
 
-
-def _options_for(d: Mapping[str, Any]) -> list[str]:
-    kind = d.get("type")
-    if isinstance(kind, str) and kind in _MORE_OPTIONS:
-        return _MORE_OPTIONS[kind]
-    return af.filter_options_for(d)
-
-
-def _filter_is_valid(
-    f: Mapping[str, Any], by_id: Mapping[str, Mapping[str, Any]], view_type_ids: list[str] | None
-) -> bool:
-    sid = f.get("typeId")
-    if sid and sid not in by_id:
-        return False
-    pid = f.get("propertyId")
-    if not isinstance(pid, str):
-        return False
-    d = af._find_def(list(by_id.values()), pid, sid or None, view_type_ids)
-    if d is None:
-        return False
-    option = f.get("option")
-    return option in _options_for(d) or option in af._ACCEPTED_EXTRA.get(d.get("type"), [])
-
-
-def _computed_operand(option: Any) -> str:
-    if option in _NO_OPERAND:
-        return "none"
-    if option in _NUMBER_OPS:
-        return "number"
-    if option in _DATE_COMPARE:
-        return "date"
-    return "text"
-
-
-def _as_computed(v: Any) -> Mapping[str, Any] | None:
-    if not isinstance(v, Mapping):
-        return None
-    t = v.get("type")
-    return v if isinstance(t, str) and t in _COMPUTED_TYPES else None
+_COMPUTED_KINDS = af._COMPUTED_KINDS
+_DATE_KINDS = af._DATE_KINDS
+_as_computed = af._as_computed
+_computed_is_empty = af._computed_is_empty
+_computed_text = af._computed_text
+_finite = af._finite
+_js_string = af._js_string
+_resolution_of = af._resolution_of
 
 
 def _is_num(v: Any) -> bool:
     return isinstance(v, int | float) and not isinstance(v, bool)
 
 
-def _finite(v: Any) -> bool:
-    return isinstance(v, int | float) and not isinstance(v, bool) and math.isfinite(v)
-
-
-def _computed_is_empty(v: Any) -> bool:
-    c = _as_computed(v)
-    if c is None:
-        return True
-    t, value = c.get("type"), c.get("value")
-    if t in ("empty", "error"):
-        return True
-    if t in ("text", "date"):
-        return not isinstance(value, str) or value.strip() == ""
-    if t == "number":
-        return not _finite(value)
-    if t == "boolean":
-        return not isinstance(value, bool)
-    if t == "list":
-        return not isinstance(value, list) or not value
-    return True
-
-
-def _js_number(n: float) -> str:
-    """A number as JavaScript's ``String(n)`` writes it (``3``, not ``3.0``)."""
-    if isinstance(n, int):
-        return str(n)
-    return str(int(n)) if n.is_integer() and abs(n) < 1e21 else repr(n)
-
-
-def _js_string(x: Any) -> str:
-    if isinstance(x, bool):
-        return "true" if x else "false"
-    if isinstance(x, int | float):
-        return _js_number(x)
-    return str(x)
-
-
-def _computed_number(v: Any) -> float | None:
-    c = _as_computed(v)
-    return c["value"] if c is not None and c.get("type") == "number" and _finite(c.get("value")) else None
-
-
-def _computed_date(v: Any) -> str | None:
-    c = _as_computed(v)
-    if c is None or c.get("type") != "date":
-        return None
-    value = c.get("value")
-    return value if isinstance(value, str) and value.strip() else None
-
-
-def _computed_list(v: Any) -> list[str] | None:
-    c = _as_computed(v)
-    if c is None or c.get("type") != "list" or not isinstance(c.get("value"), list):
-        return None
-    return [_js_string(x) for x in c["value"] if x is not None]
-
-
-def _computed_text(v: Any) -> str:
-    c = _as_computed(v)
-    if c is None:
-        return ""
-    t, value = c.get("type"), c.get("value")
-    if t in ("text", "date"):
-        return value if isinstance(value, str) else ""
-    if t == "number":
-        return _js_number(value) if _finite(value) else ""
-    if t == "boolean":
-        return _js_string(value) if isinstance(value, bool) else ""
-    if t == "list":
-        return ", ".join(_computed_list(c) or [])
-    return ""
-
-
-def _resolution_of(iso: str) -> str:
-    return "time" if "T" in iso else "day"
-
-
-def _match_computed(value: Any, f: Mapping[str, Any], rng: tuple[str, str] | None, ctx: FilterCtx) -> bool:
-    """``matchComputed``: a formula or rollup value against a filter, by its result type."""
-    option = f.get("option")
-    if option == "isEmpty":
-        return _computed_is_empty(value)
-    if option == "isNotEmpty":
-        return not _computed_is_empty(value)
-    if option in ("isChecked", "isNotChecked"):
-        c = _as_computed(value)
-        on = c is not None and c.get("type") == "boolean" and c.get("value") is True
-        return on if option == "isChecked" else not on
-    operand = _computed_operand(option)
-    if operand == "number":
-        return af._match_number(_computed_number(value), f)
-    if operand == "date":
-        iso = _computed_date(value)
-        point = {"start": iso, "resolution": _resolution_of(iso)} if iso else None
-        return af._match_date(point, f, rng, ctx.tz)
-    items = _computed_list(value)
-    if items is not None and option in ("is", "isNot"):
-        ref = f.get("referenceValue")
-        ref = ref.lower() if isinstance(ref, str) else ""
-        if ref == "":
-            return True
-        hit = any(x.lower() == ref for x in items)
-        return hit if option == "is" else not hit
-    return af._match_text("text", _computed_text(value), f)
-
-
-Test = Callable[[Mapping[str, Any]], bool]
-
-
-def _compile_filter(f: Mapping[str, Any], ctx: FilterCtx, by_id: Mapping[str, Mapping[str, Any]]) -> Test | None:
-    """``compileFilter``: one filter as a test over rows, or None for an invalid one (skipped)."""
-    if not _filter_is_valid(f, by_id, ctx.view_type_ids):
-        return None
-    pid = f["propertyId"]
-    sid = f.get("typeId") or None
-    fallback = af._find_def(ctx.types, pid, sid, ctx.view_type_ids)
-    owns: dict[str, dict[str, Any] | None] = {}
-    rng: list[tuple[str, str] | None] = []
-
-    def reference() -> tuple[str, str] | None:
-        if not rng:
-            rng.append(af._reference_range(f, ctx))
-        return rng[0]
-
-    def test(row: Mapping[str, Any]) -> bool:
-        row_type = af._summary(row).get("type")
-        if sid and row_type != sid:
-            return True
-        key = row_type if isinstance(row_type, str) else ""
-        if key not in owns:
-            owns[key] = af._def_in(by_id.get(key), pid)
-        own = owns[key]
-        d = own if own is not None else fallback
-        if d is None:
-            return True
-        kind = d.get("type")
-        if kind in _DATE_KINDS:
-            if f.get("option") in af._TASK_DATE_KEYS:
-                return af._match_task_date(row, f, own is not None)
-            return af._match_date(af._date_of(row, pid) if own is not None else None, f, reference(), ctx.tz)
-        if kind in _COMPUTED_KINDS:
-            rng_ = reference() if _computed_operand(f.get("option")) == "date" else None
-            return _match_computed(af._row_value(row, pid) if own is not None else None, f, rng_, ctx)
-        if kind in ("uniqueId", "email", "phone"):
-            value = af._row_value(row, pid) if own is not None else None
-            if kind == "uniqueId" and _finite(value):
-                value = _js_number(value)  # an ID without a prefix may come as a number
-            return af._match_text(kind, value, f)
-        return af._match_kind(row, f, d, own is not None, ctx)
-
-    return test
-
-
-def _compile_group(group: Mapping[str, Any], ctx: FilterCtx, by_id: Mapping[str, Mapping[str, Any]]) -> Test | None:
-    tests: list[Test] = []
-    for e in _list(group.get("elements")):
-        if not isinstance(e, Mapping):
-            continue
-        t = _compile_filter(e, ctx, by_id) if e.get("type") == "filter" else _compile_group(e, ctx, by_id)
-        if t is not None:
-            tests.append(t)
-    if not tests:
-        return None
-    if group.get("operator") == "or":
-        return lambda row: any(t(row) for t in tests)
-    return lambda row: all(t(row) for t in tests)
-
-
-def _by_id(ctx: FilterCtx) -> dict[str, dict[str, Any]]:
-    return {t["id"]: t for t in ctx.types if isinstance(t.get("id"), str)}
-
-
-def match_group(row: Mapping[str, Any], group: Mapping[str, Any] | None, ctx: FilterCtx) -> bool:
-    """Whether a row passes a filter group (``matchGroup``): invalid filters are skipped."""
-    if not isinstance(group, Mapping):
-        return True
-    test = _compile_group(group, ctx, _by_id(ctx))
-    return True if test is None else test(row)
-
-
 def _apply_filters(rows: list[Mapping[str, Any]], group: Any, ctx: FilterCtx) -> list[Mapping[str, Any]]:
     if not isinstance(group, Mapping) or not _list(group.get("elements")):
         return rows
-    test = _compile_group(group, ctx, _by_id(ctx))
+    test = af._compile_group(group, ctx, af._by_id(ctx))
     return rows if test is None else [r for r in rows if test(r)]
 
 
@@ -759,18 +532,7 @@ def query_ctx(space: Space, view_type_ids: list[str] | None = None) -> QueryCtx:
     counterpart rows), collections, Tag ids, object ids and titles, now, the zone and week start."""
     from .recurrence import week_start_of
 
-    types = [
-        engine_type(
-            {
-                **type_json(t),
-                "counterparts": [
-                    {"key": c.key, "type": c.type, "options": c.options or {}}
-                    for c in space.counterpart_defs(t.id)
-                ],
-            }
-        )
-        for t in space.types
-    ]
+    types = [type_json(t, space.counterpart_defs(t.id)) for t in space.types]
     summaries = space.list()  # templates excluded
     return QueryCtx(
         types=types,

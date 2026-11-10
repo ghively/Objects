@@ -4,7 +4,9 @@ A port of ``frontend/src/views/filter.ts`` (``matchGroup`` / ``matchFilter`` and
 table ``FILTER_OPTIONS`` / ``filterOptionsFor``), so a rule's conditions mean what the same
 filter group means in a view. Nested AND/OR groups; an empty group passes; an invalid filter
 (an unknown property or operator, a ``typeId`` naming no type) is ignored, and a group
-with nothing effective left passes.
+with nothing effective left passes. Every kind ``filter.ts`` filters is filtered here (M12's
+formula and rollup values by their result type, IDs, emails, phones and files; M28's counterpart
+rows, read from a type's ``counterparts``), and saved queries (`queryeval`) use this one engine.
 
 Everything works on the API's JSON shapes: a row is ``{summary, values, links}`` as
 ``GET /api/rows`` serves it, a type is ``{id, propertyDefinitions: [{id, key, type,
@@ -60,6 +62,14 @@ _TASK_DATE_KEYS = frozenset(TASK_DATE_OPTIONS)
 _RANGE_ONLY = frozenset(k for k in _DATE if k.startswith(("start", "end")))
 _SIMPLE_DATE = [k for k in _DATE if k not in _RANGE_ONLY]
 _BLOCKS = ["isNotEmpty", "isEmpty"]
+_DATE_COMPARE = ["isBefore", "isAfter", "isOnOrBefore", "isOnOrAfter"]
+# M12: a formula's or rollup's operators. Its result type is known only per row, so it offers the
+# text operators, the number and date comparisons and the checkbox ones (``filter.ts`` ``COMPUTED``);
+# each is evaluated against the row's value by its ``type`` (`_match_computed`).
+_COMPUTED = [*_TEXT, *_NUMBER, *_DATE_COMPARE, *_BOOLEAN]
+_NO_OPERAND = frozenset({"isEmpty", "isNotEmpty", "isChecked", "isNotChecked"})
+_COMPUTED_KINDS = frozenset({"formula", "rollup"})
+_COMPUTED_TYPES = frozenset({"text", "number", "boolean", "date", "list", "empty", "error"})
 
 FILTER_OPTIONS: dict[str, list[str]] = {
     "text": _TEXT,
@@ -86,6 +96,13 @@ FILTER_OPTIONS: dict[str, list[str]] = {
     "simpleTableBlock": _BLOCKS,
     "coverImage": _BLOCKS,
     "button": [],
+    # M12
+    "formula": _COMPUTED,
+    "rollup": _COMPUTED,
+    "uniqueId": _TEXT,
+    "email": _TEXT,
+    "phone": _TEXT,
+    "files": _EMPTY,
     # M22: a list matches as Aliases do; steps and floor items are only empty or not.
     "textList": ["contains", "notContains", *_EMPTY],
     "steps": _EMPTY,
@@ -136,14 +153,16 @@ class FilterCtx:
     """'monday' or 'sunday': the "Start of the week" setting (``recurrence.week_start_of``)."""
 
 
-def type_json(t: Any) -> dict[str, Any]:
-    """A `typemodel.TypeDefinition` in the API shape the matchers read."""
+def type_json(t: Any, counterparts: Any = ()) -> dict[str, Any]:
+    """A `typemodel.TypeDefinition` in the API shape the matchers read; ``counterparts`` (M28,
+    `Space.counterpart_defs`) are its computed other sides, read after its definitions."""
     return {
         "id": t.id,
         "propertyDefinitions": [
             {"id": p.id, "key": p.key, "type": p.type, "options": p.options or {}}
             for p in t.propertyDefinitions
         ],
+        "counterparts": [{"key": c.key, "type": c.type, "options": c.options or {}} for c in counterparts],
     }
 
 
@@ -174,6 +193,10 @@ def _def_in(t: Mapping[str, Any] | None, pid: str) -> dict[str, Any] | None:
     for p in t.get("propertyDefinitions") or []:
         if p.get("key") == pid or p.get("id") == pid:
             return p
+    # M28: a computed other side ("Runs" on a Host) filters and sorts as a relation (``defIn``).
+    for c in t.get("counterparts") or []:
+        if isinstance(c, Mapping) and c.get("key") == pid:
+            return {"type": c.get("type"), "options": c.get("options") or {}}
     kind = _BUILTIN_KINDS.get(pid)
     return {"type": kind, "options": {}} if kind else None
 
@@ -396,6 +419,104 @@ def _collection_ids(row: Mapping[str, Any], collections: list[dict[str, Any]]) -
     return out
 
 
+# -- computed values (M12: formulas and rollups) ------------------------------------------
+
+
+def _computed_operand(option: Any) -> str:
+    """What a formula or rollup filter's operator compares against (``computedOperand``)."""
+    if option in _NO_OPERAND:
+        return "none"
+    if option in _NUMBER:
+        return "number"
+    if option in _DATE_COMPARE:
+        return "date"
+    return "text"
+
+
+def _as_computed(v: Any) -> Mapping[str, Any] | None:
+    if not isinstance(v, Mapping):
+        return None
+    t = v.get("type")
+    return v if isinstance(t, str) and t in _COMPUTED_TYPES else None
+
+
+def _finite(v: Any) -> bool:
+    return isinstance(v, int | float) and not isinstance(v, bool) and math.isfinite(v)
+
+
+def _computed_is_empty(v: Any) -> bool:
+    c = _as_computed(v)
+    if c is None:
+        return True
+    t, value = c.get("type"), c.get("value")
+    if t in ("empty", "error"):
+        return True
+    if t in ("text", "date"):
+        return not isinstance(value, str) or value.strip() == ""
+    if t == "number":
+        return not _finite(value)
+    if t == "boolean":
+        return not isinstance(value, bool)
+    if t == "list":
+        return not isinstance(value, list) or not value
+    return True
+
+
+def _js_number(n: float) -> str:
+    """A number as JavaScript's ``String(n)`` writes it (``3``, not ``3.0``)."""
+    if isinstance(n, int):
+        return str(n)
+    return str(int(n)) if n.is_integer() and abs(n) < 1e21 else repr(n)
+
+
+def _js_string(x: Any) -> str:
+    if isinstance(x, bool):
+        return "true" if x else "false"
+    if isinstance(x, int | float):
+        return _js_number(x)
+    return str(x)
+
+
+def _computed_number(v: Any) -> float | None:
+    c = _as_computed(v)
+    return c["value"] if c is not None and c.get("type") == "number" and _finite(c.get("value")) else None
+
+
+def _computed_date(v: Any) -> str | None:
+    c = _as_computed(v)
+    if c is None or c.get("type") != "date":
+        return None
+    value = c.get("value")
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def _computed_list(v: Any) -> list[str] | None:
+    c = _as_computed(v)
+    if c is None or c.get("type") != "list" or not isinstance(c.get("value"), list):
+        return None
+    return [_js_string(x) for x in c["value"] if x is not None]
+
+
+def _computed_text(v: Any) -> str:
+    c = _as_computed(v)
+    if c is None:
+        return ""
+    t, value = c.get("type"), c.get("value")
+    if t in ("text", "date"):
+        return value if isinstance(value, str) else ""
+    if t == "number":
+        return _js_number(value) if _finite(value) else ""
+    if t == "boolean":
+        return _js_string(value) if isinstance(value, bool) else ""
+    if t == "list":
+        return ", ".join(_computed_list(c) or [])
+    return ""
+
+
+def _resolution_of(iso: str) -> str:
+    return "time" if "T" in iso else "day"
+
+
 # -- dates ------------------------------------------------------------------------------
 
 
@@ -585,6 +706,35 @@ def _match_task_date(row: Mapping[str, Any], f: Mapping[str, Any], has: bool) ->
 Test = Callable[[Mapping[str, Any]], bool]
 
 
+def _match_computed(value: Any, f: Mapping[str, Any], rng: tuple[str, str] | None, ctx: FilterCtx) -> bool:
+    """``matchComputed``: a formula or rollup value against a filter, by its result type."""
+    option = f.get("option")
+    if option == "isEmpty":
+        return _computed_is_empty(value)
+    if option == "isNotEmpty":
+        return not _computed_is_empty(value)
+    if option in ("isChecked", "isNotChecked"):
+        c = _as_computed(value)
+        on = c is not None and c.get("type") == "boolean" and c.get("value") is True
+        return on if option == "isChecked" else not on
+    operand = _computed_operand(option)
+    if operand == "number":
+        return _match_number(_computed_number(value), f)
+    if operand == "date":
+        iso = _computed_date(value)
+        point = {"start": iso, "resolution": _resolution_of(iso)} if iso else None
+        return _match_date(point, f, rng, ctx.tz)
+    items = _computed_list(value)
+    if items is not None and option in ("is", "isNot"):
+        ref = f.get("referenceValue")
+        ref = ref.lower() if isinstance(ref, str) else ""
+        if ref == "":
+            return True
+        hit = any(x.lower() == ref for x in items)
+        return hit if option == "is" else not hit
+    return _match_text("text", _computed_text(value), f)
+
+
 def _match_kind(
     row: Mapping[str, Any], f: Mapping[str, Any], d: Mapping[str, Any], has: bool, ctx: FilterCtx
 ) -> bool:
@@ -595,8 +745,11 @@ def _match_kind(
     match kind:
         case "entity_title":
             return _match_text(kind, None, f, _display_title(row))
-        case "text" | "url" | "color" | "textBlock" | "entity_description":
+        case "text" | "url" | "color" | "textBlock" | "entity_description" | "email" | "phone":
             return _match_text(kind, value, f)
+        case "uniqueId":
+            # An ID without a prefix may come as a number.
+            return _match_text(kind, _js_number(value) if _finite(value) else value, f)
         case "number":
             return _match_number(value, f)
         case "boolean":
@@ -680,6 +833,11 @@ def _compile_filter(
     owns: dict[str, dict[str, Any] | None] = {}
     rng: list[tuple[str, str] | None] = []
 
+    def reference() -> tuple[str, str] | None:
+        if not rng:
+            rng.append(_reference_range(f, ctx))
+        return rng[0]
+
     def test(row: Mapping[str, Any]) -> bool:
         row_type = _summary(row).get("type")
         if sid and row_type != sid:
@@ -691,12 +849,14 @@ def _compile_filter(
         d = own if own is not None else fallback
         if d is None:
             return True
-        if d.get("type") in _DATE_KINDS:
+        kind = d.get("type")
+        if kind in _DATE_KINDS:
             if f.get("option") in _TASK_DATE_KEYS:
                 return _match_task_date(row, f, own is not None)
-            if not rng:
-                rng.append(_reference_range(f, ctx))
-            return _match_date(_date_of(row, pid) if own is not None else None, f, rng[0], ctx.tz)
+            return _match_date(_date_of(row, pid) if own is not None else None, f, reference(), ctx.tz)
+        if kind in _COMPUTED_KINDS:
+            at = reference() if _computed_operand(f.get("option")) == "date" else None
+            return _match_computed(_row_value(row, pid) if own is not None else None, f, at, ctx)
         return _match_kind(row, f, d, own is not None, ctx)
 
     return test
