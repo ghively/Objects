@@ -2080,7 +2080,7 @@ def create_app(
         announce(ChangeEvent("types", type_id, None, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
-        return _display_safe(result.to_api())
+        return _display_safe({**result.to_api(), "type": space.type_api(result.type, result.revision)})
 
     @api.post("/types/{type_id}/properties/{pid}/number-existing")
     def number_existing(type_id: str, pid: str, req: NumberExistingRequest):
@@ -2097,7 +2097,7 @@ def create_app(
         announce(ChangeEvent("types", type_id, None, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
-        return _display_safe(result.to_api())
+        return _display_safe({**result.to_api(), "type": space.type_api(result.type, result.revision)})
 
     @api.post("/formula/preview")
     def formula_preview(req: FormulaPreviewRequest):
@@ -2154,7 +2154,7 @@ def create_app(
             announce(ChangeEvent("types", t.id, None, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
-        return _display_safe(result.to_api())
+        return _display_safe({**result.to_api(), "types": [space.type_api(t, result.revisions.get(t.id, "")) for t in result.types]})
 
     @api.post("/types/{type_id}/relation-pair")
     def relation_pair(type_id: str, req: RelationPairRequest):
@@ -2171,7 +2171,7 @@ def create_app(
             return _error(404, f'There is no object type "{type_id}".')
         if result.changed:
             announce(ChangeEvent("types", type_id, None, origin=req.clientId))
-        return _display_safe(result.to_api())
+        return _display_safe({**result.to_api(), "type": space.type_api(result.type, result.revision)})
 
     @api.delete("/types/{type_id}")
     def delete_type(

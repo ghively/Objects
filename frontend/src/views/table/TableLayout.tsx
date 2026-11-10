@@ -596,7 +596,8 @@ export function TableLayout(props: TableLayoutProps) {
                           config={config}
                           onConfig={saveConfig}
                           onClose={close}
-                          onEditProperty={canEditType ? () => setSettingsFor(def.id) : undefined}
+                          // A computed other side has no stored definition to edit (M28).
+                          onEditProperty={canEditType && !isCounterpartDef(def) ? () => setSettingsFor(def.id) : undefined}
                         />
                       )}
                     />

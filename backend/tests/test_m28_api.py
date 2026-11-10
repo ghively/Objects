@@ -262,3 +262,29 @@ def test_reads_write_nothing(env: Env) -> None:
     assert env.snapshot() == before
     assert env.state_files() == before_state
     assert [e for e in env.published if e.kind in ("changed", "created", "deleted")] == []
+
+
+def test_every_type_route_answers_with_counterpart_defs(tmp_path: Path) -> None:
+    """Fix pass: the window adopts the type a route answers with, so every type route's answer
+    carries the type's computed other sides (change kind, number existing, sync, relation pair),
+    as save and create do; else the type's counterpart rows vanish until the next reload."""
+    from objectapp.server import create_app
+    from objectapp.space import Space
+
+    root = tmp_path / "space"
+    shutil.copytree(Path(__file__).parent / "fixtures" / "space-itops", root)
+    space = Space(root)
+    with TestClient(create_app(space, None)) as c:
+        host = next(t for t in c.get("/api/space").json()["types"] if t["id"] == "host")
+        fqdn = next(p for p in host["propertyDefinitions"] if p["key"] == "fqdn")
+        r = c.post(
+            f"/api/types/host/properties/{fqdn['id']}/change-kind",
+            json={"toType": "url", "baseRevision": host["revision"]},
+        )
+        if r.status_code == 428:  # values would be converted: confirm, as the window does
+            r = c.post(
+                f"/api/types/host/properties/{fqdn['id']}/change-kind?confirm=true",
+                json={"toType": "url", "baseRevision": host["revision"]},
+            )
+        assert r.status_code == 200, r.text
+        assert {d["key"] for d in r.json()["type"]["counterparts"]} >= {"runs", "documentedIn"}

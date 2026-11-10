@@ -116,6 +116,7 @@ COUNTERPART_KEY = "The other side's key can't be used."
 COUNTERPART_KIND = "Only a relation can have an other side."
 COUNTERPART_SYNCED = "A relation that syncs both ways can't also have a computed other side."
 COUNTERPART_TAKEN = '{type} already has a property with the key "{key}".'
+COUNTERPART_TAKEN_BY = '{type}\'s "{relation}" already uses the key "{key}" for its other side here.'  # fix pass: a target type's save that newly stores a key a counterpart naming it uses (our string)
 ```
 
 Edit texts (`InvalidValue` → 422, our strings): `NO_COUNTERPART = 'This object has no "{key}" relation from {type}.'`; `WRONG_TYPE = '"{title}" isn\'t of type {type}.'`. A missing other object is reported in `skipped` (`"It's gone."`), a read-only one with its read-only reason.

@@ -339,6 +339,32 @@ describe('TableLayout', () => {
     expect(within(cell).getByText('Payroll')).toBeInTheDocument()
     expect(within(cell).queryByRole('button', { name: 'Edit Runs' })).not.toBeInTheDocument()
   })
+
+  test("a counterpart column's menu has no Edit Property; a stored column's has", async () => {
+    const user = userEvent.setup()
+    const runs = counterpartDef({
+      key: 'runs',
+      name: 'Runs',
+      options: { allowedTypes: ['application'], counterpartOf: [{ typeId: 'application', key: 'runsOn' }] },
+    })
+    const host = typeDef({
+      id: 'host',
+      name: 'Host',
+      pluralName: 'Hosts',
+      propertyDefinitions: [
+        propertyDef({ id: 'title', type: 'entity_title', name: 'Title' }),
+        propertyDef({ id: 'fqdn', key: 'fqdn', type: 'text', name: 'FQDN' }),
+      ],
+      counterparts: [runs],
+    })
+    const h = row({ summary: objectSummary({ path: 'Hosts/H1.md', title: 'H1', type: 'host' }), values: {} })
+    render(<Harness types={[host]} rows={[h]} init={base({ tableConfigs: { host: { wrapAllContent: false, properties: [] } } })} />)
+    await user.click(screen.getByText('FQDN'))
+    expect(screen.getByRole('button', { name: 'Edit Property' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByText('Runs'))
+    expect(screen.queryByRole('button', { name: 'Edit Property' })).not.toBeInTheDocument()
+  })
 })
 
 describe('TableLayout Content column and row numbers (polish item 14)', () => {
