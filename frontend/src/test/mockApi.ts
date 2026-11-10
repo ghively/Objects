@@ -20,6 +20,7 @@ import type {
   CalendarDay,
   CalendarRange,
   Collection,
+  CounterpartRow,
   CreateAgentRequest,
   DeviceSettings,
   LearningSettings,
@@ -120,6 +121,30 @@ export function propertyDef(partial: Partial<PropertyDef> & Pick<PropertyDef, 'i
     visibility: 'alwaysShow',
     options: {},
     ...partial,
+  }
+}
+
+/** M28: a counterpart row (Application "Runs on" seen from a Host, no objects); `partial` overrides. */
+export function counterpartRow(partial: Partial<CounterpartRow> = {}): CounterpartRow {
+  return { key: 'runs', name: 'Runs', sourceTypeId: 'application', sourcePropertyKey: 'runsOn', paths: [], ...partial }
+}
+
+/**
+ * M28: a virtual counterpart definition as `GET /api/space` serves it in `TypeDef.counterparts`
+ * (id `counterpart:<key>`); `partial` overrides, and `partial.options` is merged over the defaults.
+ */
+export function counterpartDef(partial: Partial<PropertyDef> = {}): PropertyDef {
+  const key = partial.key ?? 'runs'
+  return {
+    id: `counterpart:${key}`,
+    key,
+    name: key,
+    type: 'entity',
+    description: '',
+    icon: { type: 'iconify', val: 'ph-arrows-left-right' },
+    visibility: 'hideWhenEmpty',
+    ...partial,
+    options: { isArray: true, allowedTypes: [], hasFixedSet: false, fixedSet: [], counterpartOf: [], ...partial.options },
   }
 }
 
@@ -806,6 +831,7 @@ function defaults(): Api {
       relinked: [],
       skipped: [],
     }),
+    editCounterpart: async () => ({ counterparts: [], written: [], skipped: [] }),
     createObject: async (typeId: string, opts: { title?: string } = {}) => ({
       path: `${typeId}/${opts.title || 'Untitled'}.md`,
       version: 'v1',

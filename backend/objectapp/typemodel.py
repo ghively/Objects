@@ -24,7 +24,7 @@ from typing import Any
 
 from .keycompat import upgrade_keys
 from .textfile import atomic_write, decode
-from .typedefs import slug
+from .typedefs import SYSTEM_KEYS, slug
 
 __all__ = [
     "BASIC_MEDIA_TYPES",
@@ -234,7 +234,8 @@ _V1_PROP_KEYS = frozenset({"id", "key", "name", "type", "isArray"})
 _V2_PROP_KEYS = frozenset(
     {"id", "key", "name", "type", "description", "icon", "visibility", "options"}
 )
-_API_ONLY_KEYS = frozenset({"revision", "readOnlyReason"})
+# `counterparts` (M28): the computed other sides `GET /api/space` serves per type; never saved.
+_API_ONLY_KEYS = frozenset({"revision", "readOnlyReason", "counterparts"})
 
 
 class RevisionConflict(Exception):
@@ -365,6 +366,30 @@ def _str_list(v: Any) -> bool:
     return isinstance(v, list) and all(isinstance(x, str) for x in v)
 
 
+# M28: a counterpart's key (the computed other side of a relation; plan 2026-11-09-m28, Contract).
+_COUNTERPART_KEY_RE = re.compile(r"[A-Za-z][A-Za-z0-9]{0,59}")
+_COUNTERPART_RESERVED = SYSTEM_KEYS | {"backlinks", "title", "type", "tags", "aliases", "id"}
+
+
+def valid_counterpart(value: Any) -> bool:
+    """Whether `value` is a well-shaped ``options.counterpart``: ``{"name": str, "key": str}``.
+
+    ``name`` is one line of 1 to 60 characters (not only spaces); ``key`` is a letter, then
+    letters and digits, at most 60 in all, and not a system key. Whether the key is free on the
+    target types is `counterparts.check_type`'s question, not this one.
+    """
+    if not isinstance(value, dict):
+        return False
+    name, key = value.get("name"), value.get("key")
+    if not isinstance(name, str) or not name.strip() or len(name) > 60:
+        return False
+    if name.splitlines() != [name]:
+        return False
+    if not isinstance(key, str) or not _COUNTERPART_KEY_RE.fullmatch(key):
+        return False
+    return key not in _COUNTERPART_RESERVED
+
+
 def option_shape_problems(options: Any) -> list[str]:
     """The option keys whose value has the wrong shape (see `normalize_options`)."""
     if not isinstance(options, dict):
@@ -392,6 +417,9 @@ def option_shape_problems(options: Any) -> list[str]:
         sync = options["propertySyncing"]
         if not (isinstance(sync, dict) and _str_list(sync.get("propertyIds", []))):
             bad.append("propertySyncing")
+    # M28: `null` means no other side; anything else must be a valid counterpart.
+    if options.get("counterpart") is not None and not valid_counterpart(options["counterpart"]):
+        bad.append("counterpart")
     return bad
 
 
