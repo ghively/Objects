@@ -140,3 +140,31 @@ def test_create_itops_type_from_the_gallery(tmp_path: Path) -> None:
     assert stored["templateKey"] == "application"
     # The new Host gets the Application's "Runs" as its other side.
     assert [d.key for d in counterpart_defs(host.id, sp.types)] == ["runs"]
+
+
+def test_gallery_type_without_a_source_type_has_no_sources(tmp_path: Path) -> None:
+    """Fix pass, finding 11: with no Source type in the space, a gallery IT ops type leaves its
+    Sources relation out (else it is open to any type, and whatever it links shows a "Distilled
+    into" row); M30 adds it when it makes Source. With a Source type it is kept, pointing at it."""
+    space_dir = tmp_path / "s"
+    space_dir.mkdir()
+    sp = Space(space_dir)
+    host = sp.create_type("", "", template="host")
+    assert host.prop("sources") is None
+    stored = json.loads((space_dir / ".object" / "types" / f"{host.id}.json").read_text("utf-8"))
+    assert "sources" not in [p["key"] for p in stored["propertyDefinitions"]]
+    from objectapp.counterparts import counterpart_specs
+
+    assert all(s.key != "distilledInto" for s in counterpart_specs(sp.types))
+    assert host.prop("notes") is not None and host.prop("ownedBy") is not None
+
+    with_source = tmp_path / "t"
+    with_source.mkdir()
+    (with_source / ".object" / "types").mkdir(parents=True)
+    from objectapp.basicsetup import write_type_json
+
+    write_type_json(with_source, source_type(), "")
+    sp = Space(with_source)
+    host = sp.create_type("", "", template="host")
+    assert host.prop("sources") is not None
+    assert host.prop("sources").options["allowedTypes"] == ["source"]

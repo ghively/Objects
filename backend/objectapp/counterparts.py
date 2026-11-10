@@ -16,7 +16,8 @@ Rules:
   the row always (``hideWhenEmpty`` on the virtual definition); "any" targets only while it has a
   value.
 - A counterpart key that is a stored property key on T gives T no row (the stored property wins);
-  saving S with it, when T is an explicit target, is refused.
+  saving S with it new (or its key or that target newly given), when T is an explicit target, is
+  refused, and so is saving T with that key newly stored.
 - Rows with the same key from several sources are separate `CounterpartRow`s; the UI and the
   virtual definition merge them by key.
 - A path counts when it is a non-template object of type S whose resolved value of P includes the
@@ -40,6 +41,7 @@ __all__ = [
     "COUNTERPART_NAME",
     "COUNTERPART_SYNCED",
     "COUNTERPART_TAKEN",
+    "COUNTERPART_TAKEN_BY",
     "GONE",
     "NO_COUNTERPART",
     "WRONG_TYPE",
@@ -64,6 +66,8 @@ COUNTERPART_KEY = "The other side's key can't be used."
 COUNTERPART_KIND = "Only a relation can have an other side."
 COUNTERPART_SYNCED = "A relation that syncs both ways can't also have a computed other side."
 COUNTERPART_TAKEN = '{type} already has a property with the key "{key}".'
+COUNTERPART_TAKEN_BY = '{type}\'s "{relation}" already uses the key "{key}" for its other side here.'
+"""The other direction: a target type newly storing a key a counterpart naming it uses."""
 
 # -- edit texts (`InvalidValue` -> 422; our strings) ----------------------------------------------
 
@@ -228,16 +232,23 @@ def _shape_text(cp: Any) -> str:
     return COUNTERPART_KEY
 
 
-def check_type(t: TypeDefinition, types: Iterable[TypeDefinition]) -> str | None:
+def check_type(
+    t: TypeDefinition, types: Iterable[TypeDefinition], old: TypeDefinition | None = None
+) -> str | None:
     """The save text for `t`'s counterparts (`types` with `t` in place), or None when they're fine.
 
-    Only explicit targets are checked for a taken key: a relation open to any type never is (a
-    type holding the key just gets no row for it).
+    `old` is `t` as stored (None: a new type, everything counts as new). Only what the save
+    changes is checked for a taken key, so a key some target came to hold since (a hand edit, the
+    gallery) never blocks an unrelated edit: a counterpart of `t` is refused for an explicit target
+    holding its key when the counterpart, its key or that target is new; and `t` is refused for a
+    stored key it newly holds that a counterpart naming `t` explicitly uses (`COUNTERPART_TAKEN_BY`).
+    A relation open to any type is never checked (a type holding the key just gets no row for it).
     """
     by_id: dict[str, TypeDefinition] = {}
     for x in types:
         by_id.setdefault(x.id, x)
     by_id[t.id] = t
+    before = {p.id: p for p in old.propertyDefinitions} if old is not None else {}
     for p in t.propertyDefinitions:
         cp = p.options.get("counterpart")
         if cp is None:
@@ -248,10 +259,29 @@ def check_type(t: TypeDefinition, types: Iterable[TypeDefinition]) -> str | None
             return _shape_text(cp)
         if _synced(p):
             return COUNTERPART_SYNCED
+        prev = before.get(p.id)
+        prev_cp = prev.options.get("counterpart") if prev is not None else None
+        same_key = (
+            prev is not None
+            and prev.type == "entity"
+            and valid_counterpart(prev_cp)
+            and not _synced(prev)
+            and prev_cp["key"] == cp["key"]
+        )
+        prev_targets = _targets(prev) if same_key and prev is not None else ()
         for target_id in _targets(p):
+            if same_key and target_id in prev_targets:
+                continue
             target = by_id.get(target_id)
             if target is not None and target.prop(cp["key"]) is not None:
                 return COUNTERPART_TAKEN.format(type=target.name, key=cp["key"])
+    had = {p.key for p in old.propertyDefinitions} if old is not None else set()
+    added = {p.key for p in t.propertyDefinitions} - had
+    if added:
+        for s in counterpart_specs(by_id.values()):
+            if s.key in added and t.id in s.targets:
+                source = by_id[s.source_type_id]
+                return COUNTERPART_TAKEN_BY.format(type=source.name, relation=s.source_name, key=s.key)
     return None
 
 

@@ -109,8 +109,9 @@ def test_space_types_have_counterpart_defs(env: Env) -> None:
     types = {t["id"]: t for t in env.c.get("/api/space").json()["types"]}
     host = types["host"]
     keys = [d["key"] for d in host["counterparts"]]
-    assert sorted(keys) == sorted(["runs", "configuredBy", "documentedIn", "affectedBy"])
-    # First seen over the space's types (sorted by name), then their properties.
+    # First seen over the space's types in name order (Application, Command, Configuration,
+    # Container, ..., Incident), then their properties: the order served, not sorted.
+    assert keys == ["runs", "documentedIn", "configuredBy", "affectedBy"]
     assert keys == [d.key for d in env.space.counterpart_defs("host")]
     assert host["counterparts"] == [d.to_json() for d in env.space.counterpart_defs("host")]
     runs = next(d for d in host["counterparts"] if d["key"] == "runs")
@@ -125,6 +126,32 @@ def test_space_types_have_counterpart_defs(env: Env) -> None:
     assert res.status_code == 200, res.text
     saved = json.loads((env.root / ".object" / "types" / "host.json").read_text(encoding="utf-8"))
     assert "counterparts" not in saved
+
+
+def test_type_saves_answer_with_counterpart_defs(env: Env) -> None:
+    """Fix pass, finding 6: ``PUT /api/types/{id}`` and ``POST /api/types`` answer the type as
+    ``GET /api/space`` serves it (``counterparts`` included), so the window keeps the rows."""
+    host = next(t for t in env.c.get("/api/space").json()["types"] if t["id"] == "host")
+    host["description"] = "Changed."
+    res = env.c.put("/api/types/host", json={"type": host, "baseRevision": host["revision"]})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert set(body) == {"type", "rewritten", "skipped"}
+    served = next(t for t in env.c.get("/api/space").json()["types"] if t["id"] == "host")
+    assert body["type"] == served
+    assert [d["key"] for d in body["type"]["counterparts"]] == [d["key"] for d in host["counterparts"]]
+
+    res = env.c.post("/api/types", json={"name": "Place", "pluralName": "Places", "template": "location"})
+    assert res.status_code == 201, res.text
+    made = res.json()
+    served = next(t for t in env.c.get("/api/space").json()["types"] if t["id"] == made["id"])
+    assert made == served
+    assert [(d["key"], d["options"]["counterpartOf"]) for d in made["counterparts"]] == [
+        ("contains", [{"typeId": made["id"], "key": "partOf"}]),
+    ]
+    res = env.c.post("/api/types", json={"name": "Widget", "pluralName": "Widgets"})
+    assert res.status_code == 201, res.text
+    assert res.json()["counterparts"] == []
 
 
 def test_post_counterpart(env: Env) -> None:

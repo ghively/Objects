@@ -2011,7 +2011,10 @@ def create_app(
         if req.template:
             # The template's saved query: no origin, so the creating window reloads its queries too.
             announce(ChangeEvent("queries", "*", None))
-        return JSONResponse(t.to_api(type_revision(space.root, t.id)), status_code=201)
+        # M28: as `GET /api/space` serves it, its computed other sides (`counterparts`) included.
+        return JSONResponse(
+            _display_safe(space.type_api(t, type_revision(space.root, t.id))), status_code=201
+        )
 
     @api.put("/types/{type_id}")
     def save_type(type_id: str, req: SaveTypeRequest):
@@ -2059,7 +2062,8 @@ def create_app(
         announce(ChangeEvent("types", type_id, None, origin=req.clientId))
         for path in result.rewritten:
             announce(ChangeEvent("changed", path, space.cached_version(path), origin=req.clientId))
-        return _display_safe(result.to_api())
+        # M28: the type as `GET /api/space` serves it, its computed other sides included.
+        return _display_safe({**result.to_api(), "type": space.type_api(result.type, result.revision)})
 
     @api.post("/types/{type_id}/properties/{pid}/change-kind")
     def change_kind(type_id: str, pid: str, req: ChangeKindRequest):

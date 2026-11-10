@@ -104,11 +104,15 @@ def test_type_icons_and_colours():
         "command": ("ph-terminal-window", "gray"),
         "runbook": ("ph-book-open-text", "lime"),
         "prompt": ("ph-chat-text", "fuchsia"),
-        "source": ("ph-file-text", "slate"),
+        "source": ("ph-file-text", "gray"),
         "project": basic["project"],
         "incident": ("ph-warning-octagon", "red"),
         "meeting": basic["meeting"],
     }
+    # Every colour is one Object knows (fix pass, finding 5: Source was "slate").
+    from objectapp.typemodel import THEME_COLORS
+
+    assert all(color in THEME_COLORS for _icon, color in got.values()), got
 
 
 def test_host_properties():

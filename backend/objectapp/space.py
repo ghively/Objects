@@ -4846,7 +4846,8 @@ class Space:
         template's properties replace "Content", its name, plural, description,
         icon and colour fill whatever isn't given, and the key is stored as
         ``templateKey`` (the template it was made from). M28: an IT ops entry (a key in
-        `basicsetup.ITOPS_TYPE_IDS`) also gets its default template (`_add_itops_template`).
+        `basicsetup.ITOPS_TYPE_IDS`) also gets its default template (`_add_itops_template`), and
+        no Sources relation while the space has no Source type to point it at.
         """
         tpl = None
         if template is not None:
@@ -4890,6 +4891,15 @@ class Space:
                     icon=parsed, color=color, extra={"templateKey": tpl.key},
                 )
                 custom = build_template(tpl.key, [itself, *self.types])
+                if tpl.section == "itOperations":
+                    # M28 fix pass: with no Source type to point at, Sources would be open to any
+                    # type, giving whatever it links a "Distilled into" row: it is left out (M30
+                    # adds it when it creates Source).
+                    custom = [
+                        p
+                        for p in custom
+                        if p.key != "sources" or p.options.get("allowedTypes")
+                    ]
             else:
                 custom = [
                     PropertyDefinition(
@@ -5083,8 +5093,11 @@ class Space:
             new.name = " ".join(str(new.name or "").split())
             new.pluralName = " ".join(str(new.pluralName or "").split())
             # M28: a counterpart must be well shaped, on a relation that doesn't sync both ways,
-            # with a key no explicit target type holds (checked with `new` in place).
-            problem = check_counterparts(new, [new if x.id == new.id else x for x in self.types])
+            # with a key no explicit target type holds, and a newly stored key no counterpart
+            # naming this type uses (checked with `new` in place; only what changes from `old`).
+            problem = check_counterparts(
+                new, [new if x.id == new.id else x for x in self.types], old
+            )
             if problem is not None:
                 raise InvalidValue(problem)
 
