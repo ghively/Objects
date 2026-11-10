@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { AutomationRule } from '@/api/types'
-import { agentSchedule, automationRule, automationRun, collection, propertyDef, typeDef } from '@/test/mockApi'
+import { agentSchedule, automationRule, automationRun, collection, counterpartDef, propertyDef, typeDef } from '@/test/mockApi'
 import {
   RULE_TEXT,
   actionKindsFor,
@@ -15,9 +15,11 @@ import {
   ruleInputOf,
   ruleProblem,
   schedulesOf,
+  scopeChoices,
   showTime,
   triggerOfKind,
   triggerSummary,
+  watchableChoices,
   writableDefs,
 } from './ruleModel'
 
@@ -241,5 +243,23 @@ describe('M21 agent schedules', () => {
     expect(RULE_TEXT.actions.runAgent).toBe('Run an agent')
     expect(RULE_TEXT.runsAgent('Researcher')).toBe('Runs “Researcher”')
     expect(RULE_TEXT.runsMissingAgent).toBe("Runs an agent that isn't listed")
+  })
+})
+
+describe('M28 counterparts', () => {
+  test('test the automation scope leaves out computed other sides (review #3)', () => {
+    // The server's automation filter has no counterpart definitions: a condition on one would be
+    // dropped and a trigger on it would never fire.
+    const runs = counterpartDef({ key: 'runs', name: 'Runs', options: { counterpartOf: [{ typeId: 'application', key: 'runsOn' }] } })
+    const host = typeDef({
+      id: 'host',
+      name: 'Host',
+      propertyDefinitions: [propertyDef({ id: 'fqdn', key: 'fqdn', type: 'text' })],
+      counterparts: [runs],
+    })
+    const keys = scopeChoices({ kind: 'type', id: 'host' }, [host], []).map((c) => c.key)
+    expect(keys).toContain('fqdn')
+    expect(keys).not.toContain('runs')
+    expect(watchableChoices(scopeChoices(null, [host], [])).map((c) => c.key)).not.toContain('runs')
   })
 })

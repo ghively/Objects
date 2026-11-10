@@ -116,9 +116,15 @@ export function scopeName(scope: AutomationScope, types: readonly TypeDef[], col
   return collections.find((c) => c.id === scope.id)?.name ?? scope.id
 }
 
-/** The properties a scope's objects have (the union over its types, then the system ones). */
+/**
+ * The properties a scope's objects have (the union over its types, then the system ones). M28: not
+ * the computed other sides (`options.counterpartOf`): the server's automation filter has none, so a
+ * condition on one would be dropped and a trigger on one would never fire.
+ */
 export function scopeChoices(scope: AutomationScope | null, types: readonly TypeDef[], collections: readonly Collection[]): PropChoice[] {
-  return propertyChoices(scopeTypes(scope, types, collections))
+  return propertyChoices(scopeTypes(scope, types, collections).map((t) => ({ ...t, counterparts: [] }))).filter(
+    (c) => !c.def.options?.counterpartOf,
+  )
 }
 
 /** The properties a "property changes" trigger can watch. */
