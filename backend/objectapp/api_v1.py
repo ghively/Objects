@@ -2,7 +2,11 @@
 
 Every ``/api/v1`` route needs ``Authorization: Bearer <token>`` (see `tokens`). A
 ``read`` token reaches the GET routes and ``POST /v1/query``; the write routes need a
-``read-write`` token. The routes act through the same `Space` methods as the app, so
+``read-write`` token. M29: a ``sync`` token reads like a ``read`` one and writes only synced
+facts (``POST /v1/synced/{typeId}``, in `api_v1_synced`, which a ``read-write`` token may use
+too); any other write answers 403 "This token can only write synced facts." Rows, peeks and
+reads of an object whose type has synced properties carry its synced values in ``values`` and
+``syncedAt`` (when they were last refreshed, or null). The routes act through the same `Space` methods as the app, so
 version checks (409 with ``currentVersion``), the trash, version history and change
 events all hold. A write announces its `ChangeEvent` with ``origin: "api:<token name>"``
 and is added to the activity log.
@@ -41,6 +45,7 @@ local-only guard already refuses other hosts and cross-origin writes):
 
 - ``GET    /integrations/tokens`` -> ``{tokens, mcp}``
 - ``POST   /integrations/tokens`` ``{name, scope}`` -> 201 ``{token, secret, mcpConfig}``
+  (``scope``: ``read``, ``read-write`` or ``sync``; 422 for another)
 - ``DELETE /integrations/tokens/{id}``
 """
 
@@ -69,6 +74,7 @@ from .apiquery import (
 from .propvalues import InvalidValue
 from .recurrence import week_start_of
 from .space import Conflict, ReadOnly
+from .synced import synced_props
 from .tokens import ActivityLog, TokenStore
 from .v1guard import V1Guard, guarded
 
@@ -225,6 +231,12 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             "lastUpdated": s.lastUpdated,
         }
 
+    def synced_at(row) -> dict[str, Any]:
+        """M29: ``{"syncedAt": ...}`` for a row whose type has synced properties, else ``{}``."""
+        if row is None or not synced_props(space.type_by_id(row.summary.type)):
+            return {}
+        return {"syncedAt": row.syncedAt}
+
     def resolve_type(name_or_id: str):
         t = space.type_by_id(name_or_id)
         if t is None:
@@ -369,7 +381,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         return {
             "rows": [
                 {**summary_out(x.summary), "version": x.version,
-                 "values": without_hidden(x.values, hidden)}
+                 "values": without_hidden(x.values, hidden), **synced_at(x)}
                 for x in page
             ],
             "total": total,
@@ -449,14 +461,14 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
         of, fm, version = space.read(rel)
         rows = space.rows(None, None, [rel], None, False)
         values = rows[0].values if rows else {}
-        return rel, of, fm, version, values
+        return rel, of, fm, version, values, synced_at(rows[0] if rows else None)
 
     @r.get("/v1/object/peek")
     @guarded
     def peek(request: Request, path: str):
         auth(request)
         try:
-            rel, of, fm, version, values = read_visible(path)
+            rel, of, fm, version, values, synced = read_visible(path)
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
@@ -472,6 +484,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
                         **summary_out(space.get(rel)),
                         "version": version,
                         "values": without_hidden(values, hidden),
+                        **synced,
                         "outline": outline(body),
                         "size": {"characters": len(body), "words": len(body.split())},
                         "links": links,
@@ -487,7 +500,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
     def read(request: Request, path: str, section: str | None = Query(default=None)):
         auth(request)
         try:
-            rel, of, _fm, version, values = read_visible(path)
+            rel, of, _fm, version, values, synced = read_visible(path)
         except ValueError as exc:
             return _error(400, str(exc))
         except (KeyError, FileNotFoundError):
@@ -503,7 +516,7 @@ def router(ctx: ApiContext, state_folder: Path | None = None) -> APIRouter:
             json.loads(
                 json.dumps(
                     {**summary_out(space.get(rel)), "version": version,
-                     "values": without_hidden(values, hidden), "body": body,
+                     "values": without_hidden(values, hidden), **synced, "body": body,
                      "counterparts": counterparts_without_hidden(space.counterparts(rel), hidden)},
                     default=str,
                 )

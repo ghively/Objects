@@ -199,7 +199,9 @@ class Computer:
             summary = space._summaries.get(path)
         o = None
         if raw is not None and summary is not None and summary.template is None:
-            o = Obj(path, raw.fm, summary, self.type_of(summary.type))
+            t = self.type_of(summary.type)
+            # M29: a related object's synced facts come from the store, never from its file.
+            o = Obj(path, space.synced.overlay(t, raw.fm), summary, t)
         self._objs[path] = o
         return o
 

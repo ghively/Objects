@@ -8,6 +8,9 @@ holds for every tool an agent has.
 - `V1Guard.auth` checks ``Authorization: Bearer <token>``: 401 without a valid token for this
   space, 403 "This token can only read." for a write with a ``read`` token, and 403 with the
   first message a `WRITE_GUARDS` entry returns (M24 appends its read-only guard).
+- M29: a ``sync`` token reads like a ``read`` one; any write but a sync answers 403 `SYNC_ONLY`.
+  `V1Guard.auth_sync` is the sync route's auth: a ``read-write`` or ``sync`` token (403
+  `CANT_SYNC` for a ``read`` one), then the `WRITE_GUARDS`.
 - Objects marked "Exclude from AI" and templates are invisible: `visible_rel` raises
   ``KeyError`` (the routes answer 404), `hidden_paths` lists them, `visible_only` filters a
   path list and counts what it left out (``hiddenCount``), and `trash_entry_hidden` tells
@@ -42,9 +45,11 @@ if TYPE_CHECKING:
     from .trash import TrashItem
 
 __all__ = [
+    "CANT_SYNC",
     "LEARNING_WRITE_TOOLS",
     "NOT_AN_AGENT",
     "NO_LEARNING_WRITES",
+    "SYNC_ONLY",
     "WRITE_GUARDS",
     "Denied",
     "V1Guard",
@@ -59,6 +64,8 @@ WRITE_GUARDS: list[Callable[[TokenRecord, Request], str | None]] = []
 403's ``detail``. Empty in M17; M24 appends its read-only guard."""
 
 NOT_AN_AGENT = "This token isn't an agent's."
+SYNC_ONLY = "This token can only write synced facts."  # our string (M29): a v1 write with a sync token
+CANT_SYNC = "This token can't write synced facts."  # our string (M29): a read token on the sync route
 
 
 class Denied(Exception):
@@ -111,12 +118,25 @@ class V1Guard:
             raise Denied(429, f"This run has used its {token.budget} tool steps.")  # our string
         if write:
             if token.scope != "read-write":
-                raise Denied(403, "This token can only read.")
-            for check in list(WRITE_GUARDS):
-                message = check(token, request)
-                if message:
-                    raise Denied(403, message)
+                raise Denied(403, SYNC_ONLY if token.scope == "sync" else "This token can only read.")
+            self._write_guards(token, request)
         return token
+
+    def auth_sync(self, request: Request) -> TokenRecord:
+        """M29: the sync route's token: ``read-write`` or ``sync`` (403 `CANT_SYNC` otherwise),
+        then every `WRITE_GUARDS` check; raises `Denied` (401, 403, 429) as `auth` does."""
+        token = self.auth(request)
+        if token.scope not in ("read-write", "sync"):
+            raise Denied(403, CANT_SYNC)
+        self._write_guards(token, request)
+        return token
+
+    @staticmethod
+    def _write_guards(token: TokenRecord, request: Request) -> None:
+        for check in list(WRITE_GUARDS):
+            message = check(token, request)
+            if message:
+                raise Denied(403, message)
 
     # -- visibility -------------------------------------------------------------
 
