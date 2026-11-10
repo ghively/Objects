@@ -10,12 +10,14 @@ otherwise), so these tests need neither the agent nor the filing pass.
 from __future__ import annotations
 
 import copy
+import os
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
-from m30_helpers import decisions, import_as_sources, itops_space, make_itops_source
+from m30_helpers import decisions, import_as_sources, itops_space, make_itops_source, result
 
 from objectapp import basicsetup
 from objectapp.importers import batches, distill, entities, entitycheck, entitywrite, filing, sources
@@ -427,3 +429,65 @@ def test_sources_property_added_to_other_types(tmp_path: Path, monkeypatch: pyte
     assert [r["path"] for r in _values(w, widget)["sources"]] == [rack]
     assert sorted(_row(w, rack, "Distilled into")) == sorted([widget, _path(w, "gadget", "Gizmo")])
     assert PurePosixPath(widget).parent.name == "Gadgets"
+
+
+# -- the fix pass: distillation across batches, and resuming each step -------------------------------
+
+
+def _legacy_batch(w: W, base: Path, modified: str) -> tuple[str, str, dict[str, dict[str, Any]]]:
+    """A second import (another source, one page about APP01 with its own IP address) and its result."""
+    src = base / "legacy-source"
+    page = src / "Notes" / "Legacy APP01.md"
+    page.parent.mkdir(parents=True)
+    page.write_text("APP01 IP address: 10.0.0.7. It is a legacy box.\n", encoding="utf-8")
+    when = datetime.fromisoformat(modified).replace(tzinfo=UTC).timestamp()
+    os.utime(page, (when, when))
+    batch = import_as_sources(w.root, src)
+    w.space = Space(w.root)
+    _data, items = batches.load_batch(w.root, batch)
+    legacy = items[0]["path"]
+    r = result(legacy, entities=[{"type": "Host", "name": "APP01",
+                                  "values": [{"key": "ipAddress", "value": "10.0.0.7", "quote": "APP01 IP address: 10.0.0.7"}],
+                                  "lines": [{"text": "A legacy box.", "quote": "It is a legacy box"}]}])  # fmt: skip
+    return batch, legacy, {legacy: r}
+
+
+@pytest.mark.parametrize(("modified", "kept"), [("2024-01-01", "10.0.0.5"), ("2026-11-01", "10.0.0.7")])
+def test_second_batch_distils_from_all_sources(tmp_path: Path, modified: str, kept: str) -> None:
+    w = _setup(tmp_path)
+    _write(w, _results(w))
+    app01 = _path(w, "host", "APP01")
+    first = _section(_body(w, app01))
+    said = [ln for ln in first.split(distill.DISAGREE_HEADING)[0].splitlines() if ln.startswith("- ")]
+    assert said
+
+    batch, legacy, results = _legacy_batch(w, tmp_path, modified)
+    res = entities.resolve(w.space, results)
+    assert [e.existing for e in res.entities] == [app01]
+    out = entitywrite.write_entities(w.space, batch, "markdown", IMPORTED_AT, [(e, e.name) for e in res.entities],
+                                     res, results, [])  # fmt: skip
+    # the newest Source of both imports wins; an older one never replaces it
+    assert _values(w, app01)["ipAddress"] == kept
+    record = distill.load_record(w.root, w.space.read(app01)[1]["id"])
+    assert record is not None
+    ip = record["values"]["ipAddress"]
+    assert ip["value"] == ip["setByImport"] == kept
+    others = sorted({"10.0.0.5", "10.0.0.6", "10.0.0.7"} - {kept})
+    assert sorted(c["value"] for c in ip["conflict"]) == others
+    row = next(c for c in out["conflicts"] if c["key"] == "ipAddress")
+    assert row["kept"]["value"] == kept and sorted(o["value"] for o in row["others"]) == others
+    # the section keeps the first import's lines and citations, and lists every value
+    section = _section(_body(w, app01))
+    for ln in said:
+        assert ln in section, (ln, section)
+    assert "- A legacy box. (" in section
+    line = next(ln for ln in section.splitlines() if ln.startswith("- IP address:"))
+    assert all(v in line for v in ("10.0.0.5", "10.0.0.6", "10.0.0.7")) and f"{kept} kept" in line
+    assert "[[Old APP01 notes]]" in line and "Legacy APP01" in line
+    assert set(record["section"]["cites"]) >= {w.paths["APP01"], w.paths["Old APP01 notes"], legacy}
+
+    # the second Write again: nothing changes
+    snap = (w.root / app01).read_bytes()
+    entitywrite.write_entities(w.space, batch, "markdown", IMPORTED_AT, [(e, e.name) for e in res.entities],
+                               res, results, [])  # fmt: skip
+    assert (w.root / app01).read_bytes() == snap

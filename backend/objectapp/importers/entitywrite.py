@@ -24,6 +24,7 @@ from __future__ import annotations
 import copy
 import json
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from ..frontmatter import set_keys
@@ -75,6 +76,21 @@ def _same(a: Any, b: Any) -> bool:
         return False
 
 
+def _time(modified: Any) -> float:
+    """A Source's modified time as a number; None (or unreadable) is the oldest (as `distill` ranks)."""
+    if not modified:
+        return float("-inf")
+    try:
+        t = datetime.fromisoformat(str(modified))
+    except ValueError:
+        return float("-inf")
+    return (t if t.tzinfo else t.replace(tzinfo=UTC)).timestamp()
+
+
+def _newest(refs: Any) -> float:
+    return max((_time(r.get("modified")) for r in refs or [] if isinstance(r, dict)), default=float("-inf"))
+
+
 class _Writer:
     def __init__(self, space: Space, batch: str, system: str, imported_at: str,
                  chosen: list[tuple[Entity, str]], res: Resolution, results: dict[str, dict[str, Any]],
@@ -96,6 +112,8 @@ class _Writer:
         """`norm_name` of every title and alias of the space's objects but Sources -> their paths."""
         self._typed: set[str] = set()
         """Types checked for the Sources relation in this run."""
+        self.picked: dict[str, dict[str, Any]] = {}
+        """Entity id -> its values merged with an earlier Write's (`_merged_values`)."""
 
     # -- the record -------------------------------------------------------------------------------
 
@@ -175,6 +193,95 @@ class _Writer:
 
     def _ident(self, e: Entity) -> str:
         return f"entity:{e.typeId}:{norm_name(e.name)}"
+
+    # -- earlier Writes: the entity is distilled from all its Sources, not only this batch's -------
+
+    def _earlier(self, e: Entity, page: Any) -> bool:
+        """A Source an earlier Write cited that this batch didn't read (what it said still stands)."""
+        p = str(page or "")
+        return bool(p) and p not in self.res.pages and p not in e.pages and self._summary(p) is not None
+
+    def _merged_values(self, e: Entity, before: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        """Per key, `distill.pick_values` over this batch's values and those the record keeps from
+        Sources this batch didn't read: the newest Source wins, equal values from several Sources
+        are one value, and the recorded winner stays on a tie (a value is replaced only by a newer
+        Source's). Keys only an earlier Write found keep their record entry."""
+        from . import filing
+
+        main = set(e.mainPages)
+        out: dict[str, dict[str, Any]] = {}
+        for key, old in before.items():
+            if key not in e.values and isinstance(old, dict):
+                out[key] = {"value": old.get("value"), "sources": list(old.get("sources") or []),
+                            "conflict": old.get("conflict") or None}  # fmt: skip
+        for key, pv in e.values.items():
+            old = before.get(key) if isinstance(before.get(key), dict) else None
+            rows: list[dict[str, Any]] = []
+            earlier = False
+
+            def add(value: Any, refs: Any, fresh: bool, rows: list[dict[str, Any]] = rows) -> bool:
+                added = False
+                for r in refs if isinstance(refs, list) else []:
+                    if isinstance(r, dict) and r.get("path") and (fresh or self._earlier(e, r["path"])):
+                        rows.append({"value": value, "quote": r.get("quote") or "", "page": str(r["path"]),
+                                     "modified": r.get("modified")})  # fmt: skip
+                        added = True
+                return added
+
+            if old is not None:
+                earlier = add(old.get("value"), old.get("sources"), False)
+                for c in old.get("conflict") or []:
+                    if isinstance(c, dict):
+                        earlier = add(c.get("value"), c.get("sources"), False) or earlier
+            if not earlier:
+                out[key] = pv
+                continue
+            add(pv["value"], pv["sources"], True)
+            for c in pv.get("conflict") or []:
+                add(c["value"], c["sources"], True)
+            picked = dict(distill.pick_values({key: rows}, main)[key])
+            if old is not None and filing._norm(str(picked["value"])) != filing._norm(str(old.get("value"))):
+                rest = list(picked["conflict"] or [])
+                prior = next((c for c in rest if filing._norm(str(c["value"])) == filing._norm(str(old.get("value")))), None)
+                if prior is not None and _newest(prior["sources"]) >= _newest(picked["sources"]):
+                    rest.remove(prior)  # a tie: the recorded winner stays
+                    rest.insert(0, {"value": picked["value"], "sources": picked["sources"]})
+                    picked = {"value": prior["value"], "sources": prior["sources"], "conflict": rest}
+            out[key] = picked
+        return out
+
+    def _merged_section(self, e: Entity, sec: dict[str, Any] | None,
+                        plain: list[dict[str, Any]]) -> tuple[list[Any], list[str], list[dict[str, Any]]]:  # fmt: skip
+        """The section's lines, main pages and plain links: this batch's merged with what the record
+        keeps from Sources this batch didn't read (`distill.summary_lines`: main pages first, then
+        the newest Source, at most `distill.MAX_LINES`)."""
+        sec = sec or {}
+        old_main = [str(p) for p in sec.get("mainPages") or [] if self._earlier(e, p)]
+        main = [*e.mainPages, *(p for p in old_main if p not in e.mainPages)]
+        rows: list[dict[str, Any]] = []
+        for ln in sec.get("lines") or []:
+            if not isinstance(ln, dict):
+                continue
+            for r in ln.get("sources") or []:
+                if isinstance(r, dict) and self._earlier(e, r.get("path")):
+                    rows.append({"text": str(ln.get("text") or ""), "quote": r.get("quote") or "",
+                                 "page": str(r["path"]), "modified": r.get("modified")})  # fmt: skip
+        lines: list[Any] = list(e.lines)
+        if rows:
+            for ln in e.lines:
+                for r in ln["sources"]:
+                    rows.append({"text": ln["text"], "quote": r.get("quote") or "", "page": r["path"],
+                                 "modified": r.get("modified")})  # fmt: skip
+            lines = list(distill.summary_lines(rows, set(main)))
+        links = [p for p in sec.get("plain") or [] if isinstance(p, dict) and self._earlier(e, p.get("page"))]
+        seen = {(str(p.get("link")), str(p.get("relation")).casefold()) for p in plain}
+        merged = list(plain)
+        for p in links:
+            k = (str(p.get("link")), str(p.get("relation")).casefold())
+            if k not in seen:
+                seen.add(k)
+                merged.append(p)
+        return lines, main, merged
 
     # -- 1. place ---------------------------------------------------------------------------------
 
@@ -344,7 +451,7 @@ class _Writer:
                     seen.add(key)
                     self.plain_count += 1
                     self.plain.setdefault(at, []).append(
-                        {"link": self._link(other, paths[at]), "relation": " ".join(relation.split())})
+                        {"link": self._link(other, paths[at]), "relation": " ".join(relation.split()), "page": page})
                 continue
             key = ("stored", holder, match.property_key, target)
             if key not in seen:
@@ -426,7 +533,9 @@ class _Writer:
         before = record.get("values") if isinstance(record.get("values"), dict) else {}
         updates: dict[str, Any] = {}
         kept: dict[str, Any] = {}
-        for key, pv in e.values.items():
+        merged = self._merged_values(e, before)
+        for key in e.values:
+            pv = merged[key]
             pdef = t.prop(key) if t is not None else None
             if pdef is None or pdef.type == "entity" or key == "sources" or getattr(pdef, "synced", None):
                 continue
@@ -503,14 +612,20 @@ class _Writer:
         rid = self._record_id(path)
         record = distill.load_record(space.root, rid) or {"id": rid, "path": path, "batch": self.batch}
         sec = record.get("section") if isinstance(record.get("section"), dict) else None
-        cites: dict[str, str] = {}
+        before = record.get("values") if isinstance(record.get("values"), dict) else {}
+        picked = self._merged_values(e, before)
+        self.picked[e.id] = picked
+        recorded = sec.get("cites") if sec is not None and isinstance(sec.get("cites"), dict) else {}
+        # the versions of this batch's Sources; an earlier Write's other Sources keep their recorded ones
+        cites: dict[str, str] = {p: v for p, v in recorded.items() if self._earlier(e, p)}
+        fresh: dict[str, str] = {}
         for p in e.pages:
             try:
-                cites[p] = space.read(p)[2]
+                fresh[p] = space.read(p)[2]
             except (KeyError, ValueError, OSError):
                 continue
-        recorded = sec.get("cites") if sec is not None and isinstance(sec.get("cites"), dict) else {}
-        if sec is not None and all(recorded.get(p) == v for p, v in cites.items()):
+        cites.update(fresh)
+        if sec is not None and set(cites) == set(recorded) and all(recorded.get(p) == v for p, v in fresh.items()):
             self.rec["sections"][e.id] = "kept"
             self._mark(e.id, "section")
             return
@@ -520,9 +635,9 @@ class _Writer:
             p = t.prop(key) if t is not None else None
             return p.name if p is not None else key
 
-        plain = self.plain.get(e.id, [])
-        text = distill.build_section(e.lines, e.values, plain, lambda p: self._link(p, path), label)
-        empty = not e.lines and not plain and not any(pv.get("conflict") for pv in e.values.values())
+        lines, main, plain = self._merged_section(e, sec, self.plain.get(e.id, []))
+        text = distill.build_section(lines, picked, plain, lambda p: self._link(p, path), label)
+        empty = not lines and not plain and not any(pv.get("conflict") for pv in picked.values())
         outcome: list[str] = ["kept"]
 
         def edit(of: Any, _fm: dict) -> Any:
@@ -549,7 +664,8 @@ class _Writer:
         elif outcome[0] == "empty":
             self.rec["sections"][e.id] = "kept"
         else:
-            record["section"] = {"hash": distill.section_hash(text), "cites": cites}
+            record["section"] = {"hash": distill.section_hash(text), "cites": cites, "lines": lines,
+                                 "mainPages": main, "plain": plain}  # fmt: skip
             record.update({"id": rid, "path": path, "batch": self.batch})
             distill.save_record(space.root, rid, record)
             self.rec["sections"][e.id] = outcome[0]
@@ -599,7 +715,11 @@ class _Writer:
             if p is None:
                 continue
             t = self.space.type_by_id(self._type_id(p))
-            for key, pv in e.values.items():
+            if e.id not in self.picked:  # its steps were done by an earlier, interrupted run
+                record = distill.load_record(self.space.root, self._record_id(p)) or {}
+                before = record.get("values") if isinstance(record.get("values"), dict) else {}
+                self.picked[e.id] = self._merged_values(e, before)
+            for key, pv in self.picked[e.id].items():
                 if not pv.get("conflict"):
                     continue
                 pdef = t.prop(key) if t is not None else None
