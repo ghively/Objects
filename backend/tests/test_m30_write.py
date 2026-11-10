@@ -10,12 +10,14 @@ otherwise), so these tests need neither the agent nor the filing pass.
 from __future__ import annotations
 
 import copy
+import os
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 import pytest
-from m30_helpers import decisions, import_as_sources, itops_space, make_itops_source
+from m30_helpers import decisions, import_as_sources, itops_space, make_itops_source, result
 
 from objectapp import basicsetup
 from objectapp.importers import batches, distill, entities, entitycheck, entitywrite, filing, sources
@@ -427,3 +429,155 @@ def test_sources_property_added_to_other_types(tmp_path: Path, monkeypatch: pyte
     assert [r["path"] for r in _values(w, widget)["sources"]] == [rack]
     assert sorted(_row(w, rack, "Distilled into")) == sorted([widget, _path(w, "gadget", "Gizmo")])
     assert PurePosixPath(widget).parent.name == "Gadgets"
+
+
+# -- the fix pass: distillation across batches, and resuming each step -------------------------------
+
+
+def _legacy_batch(w: W, base: Path, modified: str) -> tuple[str, str, dict[str, dict[str, Any]]]:
+    """A second import (another source, one page about APP01 with its own IP address) and its result."""
+    src = base / "legacy-source"
+    page = src / "Notes" / "Legacy APP01.md"
+    page.parent.mkdir(parents=True)
+    page.write_text("APP01 IP address: 10.0.0.7. It is a legacy box.\n", encoding="utf-8")
+    when = datetime.fromisoformat(modified).replace(tzinfo=UTC).timestamp()
+    os.utime(page, (when, when))
+    batch = import_as_sources(w.root, src)
+    w.space = Space(w.root)
+    _data, items = batches.load_batch(w.root, batch)
+    legacy = items[0]["path"]
+    r = result(legacy, entities=[{"type": "Host", "name": "APP01",
+                                  "values": [{"key": "ipAddress", "value": "10.0.0.7", "quote": "APP01 IP address: 10.0.0.7"}],
+                                  "lines": [{"text": "A legacy box.", "quote": "It is a legacy box"}]}])  # fmt: skip
+    return batch, legacy, {legacy: r}
+
+
+@pytest.mark.parametrize(("modified", "kept"), [("2024-01-01", "10.0.0.5"), ("2026-11-01", "10.0.0.7")])
+def test_second_batch_distils_from_all_sources(tmp_path: Path, modified: str, kept: str) -> None:
+    w = _setup(tmp_path)
+    _write(w, _results(w))
+    app01 = _path(w, "host", "APP01")
+    first = _section(_body(w, app01))
+    said = [ln for ln in first.split(distill.DISAGREE_HEADING)[0].splitlines() if ln.startswith("- ")]
+    assert said
+
+    batch, legacy, results = _legacy_batch(w, tmp_path, modified)
+    res = entities.resolve(w.space, results)
+    assert [e.existing for e in res.entities] == [app01]
+    out = entitywrite.write_entities(w.space, batch, "markdown", IMPORTED_AT, [(e, e.name) for e in res.entities],
+                                     res, results, [])  # fmt: skip
+    # the newest Source of both imports wins; an older one never replaces it
+    assert _values(w, app01)["ipAddress"] == kept
+    record = distill.load_record(w.root, w.space.read(app01)[1]["id"])
+    assert record is not None
+    ip = record["values"]["ipAddress"]
+    assert ip["value"] == ip["setByImport"] == kept
+    others = sorted({"10.0.0.5", "10.0.0.6", "10.0.0.7"} - {kept})
+    assert sorted(c["value"] for c in ip["conflict"]) == others
+    row = next(c for c in out["conflicts"] if c["key"] == "ipAddress")
+    assert row["kept"]["value"] == kept and sorted(o["value"] for o in row["others"]) == others
+    # the section keeps the first import's lines and citations, and lists every value
+    section = _section(_body(w, app01))
+    for ln in said:
+        assert ln in section, (ln, section)
+    assert "- A legacy box. (" in section
+    line = next(ln for ln in section.splitlines() if ln.startswith("- IP address:"))
+    assert all(v in line for v in ("10.0.0.5", "10.0.0.6", "10.0.0.7")) and f"{kept} kept" in line
+    assert "[[Old APP01 notes]]" in line and "Legacy APP01" in line
+    assert set(record["section"]["cites"]) >= {w.paths["APP01"], w.paths["Old APP01 notes"], legacy}
+
+    # the second Write again: nothing changes
+    snap = (w.root / app01).read_bytes()
+    entitywrite.write_entities(w.space, batch, "markdown", IMPORTED_AT, [(e, e.name) for e in res.entities],
+                               res, results, [])  # fmt: skip
+    assert (w.root / app01).read_bytes() == snap
+
+
+def test_place_resumes_a_created_renamed_entity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    w = _setup(tmp_path)
+    results = _results(w)
+    res = entities.resolve(w.space, results)
+    chosen = [(e, "Payroll app" if e.name == "Payroll" else e.name) for e in res.entities]
+    real = w.space.create_object
+
+    def dies(type_id: str, title: str = "", *a: Any, **kw: Any) -> tuple[str, str]:
+        out = real(type_id, title, *a, **kw)
+        if title == "Payroll app":
+            raise RuntimeError("power cut")  # created, but not yet recorded
+        return out
+
+    monkeypatch.setattr(w.space, "create_object", dies)
+    with pytest.raises(RuntimeError):
+        entitywrite.write_entities(w.space, w.batch, "markdown", IMPORTED_AT, chosen, res, results, w.items)
+    monkeypatch.setattr(w.space, "create_object", real)
+    out = entitywrite.write_entities(w.space, w.batch, "markdown", IMPORTED_AT, chosen, res, results, w.items)
+    hits = [s.path for s in w.space.list("application") if s.title == "Payroll app"]
+    assert len(hits) == 1, hits
+    assert w.space.read(hits[0])[1]["importSource"]["id"] == "entity:application:payroll"
+    assert len([it for it in w.items if it.get("path") == hits[0] and it.get("action") == "created"]) == 1
+    assert out["existing"] == 0 and out["created"] == len(chosen)
+
+
+def test_section_resumes_after_its_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    w = _setup(tmp_path)
+    _write(w, _results(w))
+    app01 = _path(w, "host", "APP01")
+    src = w.paths["APP01"]
+    with w.space.source_writes():
+        of, _fm, version = w.space.read(src)
+        w.space.save_body(src, of.body.rstrip("\n") + " It is patched monthly.\n", version)
+
+    def patched(title: str, d: dict[str, Any]) -> None:
+        if title == "APP01":
+            d["mainEntity"]["lines"].append({"text": "Patched monthly.", "quote": "It is patched monthly"})
+
+    real = w.space._write
+
+    def dies(path: str, *a: Any, **kw: Any) -> Any:
+        out = real(path, *a, **kw)
+        if path == app01 and "Patched monthly." in (w.root / app01).read_text(encoding="utf-8"):
+            raise RuntimeError("power cut")  # the section written, its record not yet
+        return out
+
+    monkeypatch.setattr(w.space, "_write", dies)
+    with pytest.raises(RuntimeError):
+        _write(w, _results(w, patched), batch="second", items=[])
+    monkeypatch.setattr(w.space, "_write", real)
+    out = _write(w, _results(w, patched), batch="second", items=[])
+    assert out["sectionsLeft"] == 0 and out["sectionsLeftList"] == []
+    assert out["sections"] == 1
+    section = _section(_body(w, app01))
+    assert "Patched monthly." in section
+    record = distill.load_record(w.root, w.space.read(app01)[1]["id"])
+    assert record is not None and record["section"]["hash"] == distill.section_hash(section)
+
+
+def test_values_resume_after_their_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    w = _setup(tmp_path)
+    real = entitywrite._Writer._write_props
+
+    def dies(self: Any, e: Any, name: str, path: str, updates: dict[str, Any]) -> None:
+        real(self, e, name, path, updates)
+        if e is not None and e.name == "APP01":
+            raise RuntimeError("power cut")  # the values written, their record not yet
+
+    monkeypatch.setattr(entitywrite._Writer, "_write_props", dies)
+    with pytest.raises(RuntimeError):
+        _write(w, _results(w))
+    monkeypatch.setattr(entitywrite._Writer, "_write_props", real)
+    _write(w, _results(w))
+    host = _path(w, "host", "APP01")
+    assert _values(w, host)["ipAddress"] == "10.0.0.5"
+    record = distill.load_record(w.root, w.space.read(host)[1]["id"])
+    assert record is not None and record["values"]["ipAddress"]["setByImport"] == "10.0.0.5"
+
+    # so a later Write with a newer Source still follows it
+    real_modified = entities._modified
+    old, new = w.paths["Old APP01 notes"], w.paths["APP01"]
+
+    def swapped(space: Space, page: str) -> str | None:
+        return real_modified(space, new if page == old else old if page == new else page)
+
+    monkeypatch.setattr(entities, "_modified", swapped)
+    _write(w, _results(w), batch="second", items=[])
+    assert _values(w, host)["ipAddress"] == "10.0.0.6"
