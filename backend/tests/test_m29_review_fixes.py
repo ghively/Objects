@@ -134,6 +134,32 @@ def test_sync_messages_are_full_sentences(root: Path) -> None:
     assert raised.value.reason == expected
 
 
+# -- finding 5: a synced property can't start an automation ----------------------------------
+
+
+def test_a_synced_property_cant_start_an_automation(root: Path) -> None:
+    from objectapp.automations import check_rule
+    from objectapp.propvalues import InvalidValue
+
+    space = _space(root)
+    rule = {
+        "name": "Patch failed",
+        "trigger": {
+            "kind": "propertyChanged",
+            "scope": {"kind": "type", "id": "host"},
+            "propertyKey": "patchState",
+        },
+        "actions": [{"kind": "setProperty", "key": "fqdn", "value": "x.example.test"}],
+    }
+    with pytest.raises(InvalidValue) as e:
+        check_rule(space, rule)
+    assert str(e.value) == (
+        '"Patch state" is filled by Inventory script, so a change to it can\'t start an automation.'
+    )
+    ordinary = {**rule, "trigger": {**rule["trigger"], "propertyKey": "ipAddress"}}
+    check_rule(space, ordinary)  # an ordinary property of the type still can
+
+
 # -- finding 3: a hand-typed value under a synced key never shows ---------------------------
 
 
