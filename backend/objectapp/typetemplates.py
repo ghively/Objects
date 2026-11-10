@@ -24,6 +24,8 @@ those are **our choice**:
   Runbook, Prompt, Incident), each exactly as `basicsetup.itops_types` defines it, other sides
   (``counterpart``) included. Person, Meeting and Project stay the basic entries; Source is not
   offered (imports make it and its objects). Plan ``2026-11-09-m28-itops-starter-and-relations.md``.
+  M29: so the gallery's Host has the starter's five synced facts, and Host, Network and Software
+  carry the starter's name patterns (`TypeTemplate.namePatterns`).
 
 A relation names the template key of its target ("person"); when the type is created it
 points at the space's type made from that template (or named like it), else at any type. An IT
@@ -68,6 +70,15 @@ class TypeTemplate:
     icon: str
     color: str
     props: Callable[[], list[PropertyDefinition]]
+
+    @property
+    def namePatterns(self) -> tuple[str, ...]:
+        """M29: the name patterns (`typesuggest`) a type made from this entry starts with: an IT
+        ops entry's are the starter's (`basicsetup.ITOPS_NAME_PATTERNS`), every other entry has
+        none."""
+        if self.section != "itOperations":
+            return ()
+        return _b().ITOPS_NAME_PATTERNS.get(self.key, ())
 
 
 def _b():

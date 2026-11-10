@@ -83,7 +83,10 @@ def test_built_relations_resolve() -> None:
     # Fresh definitions each time.
     a = {p.key: p.id for p in build_template("host", [])}
     b = {p.key: p.id for p in build_template("host", [])}
-    assert a.keys() == b.keys() and all(a[k] != b[k] for k in a)
+    # M29: Host's synced facts keep ``id == key`` (Contract); the rest are fresh.
+    synced = {"lastBoot", "diskFree", "patchState", "rebootPending", "lastSeen"}
+    assert a.keys() == b.keys() and all(a[k] != b[k] for k in a if k not in synced)
+    assert all(a[k] == b[k] == k for k in synced)
 
 
 @pytest.mark.parametrize("key", ITOPS_KEYS)

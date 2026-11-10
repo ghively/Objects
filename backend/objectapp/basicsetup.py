@@ -54,6 +54,15 @@ calls"):
 - Seed Tags are coloured ``bg-<THEME_COLORS[i % 18]>`` by their index in `ITOPS_TAGS`. The Task
   statuses and priorities of the vocabulary are already the built-in Task's (nothing written).
 
+M29 (plan ``2026-11-09-m29-synced-facts-and-type-suggestion.md``, Contract "The starter's patterns
+and synced facts"; design section 3 and 4): Host ends with five **synced** facts filled by an
+inventory script through ``/api/v1`` (`host_synced_properties`: Last boot, Disk free, Patch state,
+Reboot pending, Last seen; ``id == key``, source "Inventory script", stale after 7 days, always
+shown), and Host, Network and Software get **name patterns** (`ITOPS_NAME_PATTERNS`, matched by
+`typesuggest`). Patch state's options (Current, Pending, Failed, Unknown) and Host's patterns
+beyond the design's examples are **our choice**. A space whose types were written before M29 keeps
+them as they are (no top-up).
+
 Nothing here replaces a file: a type JSON, template or Tag that exists already is kept.
 """
 
@@ -72,9 +81,11 @@ from .textfile import create_new
 from .typedefs import iter_object_paths, read_raw
 from .typemodel import (
     PROPERTY_ICONS,
+    SYNCED_STALE_DEFAULT,
     THEME_COLORS,
     Icon,
     PropertyDefinition,
+    SyncedSpec,
     TypeDefinition,
     _task_field_defs,
     label_options,
@@ -86,6 +97,7 @@ from .workfields import field_defs
 __all__ = [
     "BASIC_TYPE_IDS",
     "ITOPS_DEPARTMENTS",
+    "ITOPS_NAME_PATTERNS",
     "ITOPS_PRIORITIES",
     "ITOPS_PROJECT_STATUSES",
     "ITOPS_TAGS",
@@ -97,6 +109,7 @@ __all__ = [
     "itops_types",
     "source_type",
     "sources_property",
+    "host_synced_properties",
     "write_basic_types",
     "write_itops_tags",
     "write_itops_types",
@@ -382,6 +395,38 @@ def _ops_relation(
     return p
 
 
+# M29: the synced facts an inventory script fills on Host, and the starter's name patterns.
+_INVENTORY = "Inventory script"
+_SYNCED_TIME = {"constraints": {"resolutionPreference": "time", "endTimeSettings": "notAllowed"}}
+_PATCH_STATE_COLORS = ("green", "amber", "red", "gray")
+
+ITOPS_NAME_PATTERNS: dict[str, tuple[str, ...]] = {
+    "host": ("{ip}", "{fqdn}", "SRV-*", "@@##", "@@@##", "@@@@##", "@*-##"),
+    "network": ("{cidr}",),
+    "software": ("{version}",),
+}
+"""The name patterns (`typesuggest`) of the three starter types that have any."""
+
+
+def _synced(p: PropertyDefinition) -> PropertyDefinition:
+    p.id = p.key
+    p.visibility = "alwaysShow"
+    p.synced = SyncedSpec(_INVENTORY, SYNCED_STALE_DEFAULT)
+    return p
+
+
+def host_synced_properties() -> list[PropertyDefinition]:
+    """Host's five synced facts (M29), in order; ``id == key``, filled by the "Inventory script"."""
+    return [
+        _synced(_date("lastBoot", "Last boot", _SYNCED_TIME)),
+        _synced(_prop("diskFree", "Disk free", "number", description="Free disk space, in GB")),
+        _synced(_ops_label("patchState", "Patch state", ("Current", "Pending", "Failed", "Unknown"),
+                           colors=_PATCH_STATE_COLORS)),
+        _synced(_prop("rebootPending", "Reboot pending", "boolean")),
+        _synced(_date("lastSeen", "Last seen", _SYNCED_TIME)),
+    ]  # fmt: skip
+
+
 def _department() -> PropertyDefinition:
     return _ops_label("department", "Department", ITOPS_DEPARTMENTS, colors=_DEPARTMENT_COLORS)
 
@@ -661,6 +706,10 @@ def itops_types() -> list[TypeDefinition]:
         _itops_meeting(basic["meeting"]),
     ]  # fmt: skip
     assert tuple(t.id for t in types) == ITOPS_TYPE_IDS
+    for t in types:
+        if t.id == "host":
+            t.propertyDefinitions.extend(host_synced_properties())  # M29, after Notes
+        t.namePatterns = list(ITOPS_NAME_PATTERNS.get(t.id, ()))
     return types
 
 
