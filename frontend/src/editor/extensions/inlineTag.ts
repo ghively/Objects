@@ -9,7 +9,7 @@
  * What counts as a tag follows the importer's reading of inline tags (`importers/markdown.py`
  * `inline_tags`): a `#` at the start of the text or after a space, `(` or `,`, then characters
  * that are not spaces or punctuation (`-`, `_` and `/` stay in it). A tag made of digits (and
- * `-`, `_`, `/`) only is not one (`#123`, `#2024-11`). Not read: code blocks, inline code, link
+ * `-`, `_`, `/`) only is not one (a hash before only digits, such as a ticket number or `#2024-11`). Not read: code blocks, inline code, link
  * text (so a URL's `#anchor` is never a tag), and a wikilink's label. Paragraphs and headings
  * are read wherever they sit (lists, quotes, toggles, table cells).
  *
