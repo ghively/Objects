@@ -109,8 +109,9 @@ def test_space_types_have_counterpart_defs(env: Env) -> None:
     types = {t["id"]: t for t in env.c.get("/api/space").json()["types"]}
     host = types["host"]
     keys = [d["key"] for d in host["counterparts"]]
-    assert sorted(keys) == sorted(["runs", "configuredBy", "documentedIn", "affectedBy"])
-    # First seen over the space's types (sorted by name), then their properties.
+    # First seen over the space's types in name order (Application, Command, Configuration,
+    # Container, ..., Incident), then their properties: the order served, not sorted.
+    assert keys == ["runs", "documentedIn", "configuredBy", "affectedBy"]
     assert keys == [d.key for d in env.space.counterpart_defs("host")]
     assert host["counterparts"] == [d.to_json() for d in env.space.counterpart_defs("host")]
     runs = next(d for d in host["counterparts"] if d["key"] == "runs")

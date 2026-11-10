@@ -175,7 +175,7 @@ export interface CounterpartEditRequest { path: string; key: string; sourceTypeI
 export interface CounterpartEditResult { counterparts: CounterpartRow[]; written: { path: string; version: string }[]; skipped: { path: string; reason: string }[] }
 ```
 
-A virtual definition (one per counterpart key on a type; `counterparts.counterpart_defs`): `{id: "counterpart:<key>", key, name, type: "entity", description: "", icon: {type: "iconify", val: "ph-arrows-left-right"}, visibility: "hideWhenEmpty", options: {isArray: true, allowedTypes: [<source type ids>], hasFixedSet: false, fixedSet: [], counterpartOf: [{typeId, key}, …]}}`. `_API_ONLY_KEYS` gains `"counterparts"`, so `PUT /api/types/{id}` ignores it.
+A virtual definition (one per counterpart key on a type; `counterparts.counterpart_defs`): `{id: "counterpart:<key>", key, name, type: "entity", description: "", icon: {type: "iconify", val: "ph-arrows-left-right"}, visibility: "hideWhenEmpty", options: {isArray: true, allowedTypes: [<source type ids>], hasFixedSet: false, fixedSet: [], counterpartOf: [{typeId, key}, …]}}`. The definitions come in the order each key is first seen over the space's types in name order, then each type's properties (fix pass; Host in the starter: `runs`, `documentedIn`, `configuredBy`, `affectedBy`). `_API_ONLY_KEYS` gains `"counterparts"`, so `PUT /api/types/{id}` ignores it.
 
 ### Routes and events
 
