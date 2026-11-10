@@ -7,6 +7,9 @@
   (our choice): sent again with the same path and kind while the source's fingerprint is
   unchanged, the preview re-plans without reading the source again. A read is dropped when an
   import starts from one of its previews (the job keeps what it needs until it ends).
+- M30: both take ``keepAsSources`` ("Keep pages as Sources"). The preview plans every page as a
+  Source only when it is true; the start resolves it with `sources.keep_as_sources` (absent: on),
+  plans and writes with it, and the batch records it.
 - ``POST /api/import/start`` `StartImportRequest` -> ``202`` `StartImportResponse`: checks the
   target (``409`` the new space's folder exists, another import runs or the source changed since
   the preview; ``422`` bad name, a target inside the source or the source inside the target;
@@ -38,7 +41,7 @@ from fastapi.responses import JSONResponse
 
 from .apictx import ApiContext
 from .appstate import state_dir
-from .importers import agentwire, batches, provenance
+from .importers import agentwire, batches, proposal, provenance, sources
 from .importers.detect import read_source
 from .importers.jobs import Busy, JobHandle, Jobs
 from .importers.model import (
@@ -170,6 +173,7 @@ def router(ctx: ApiContext) -> APIRouter:
         finally:
             src.close()
         target = Target("currentSpace", ctx.space) if req.target == "currentSpace" else Target("newSpace")
+        as_sources = bool(req.keepAsSources)  # M30: absent, the preview plans the mapped types
         reuse: dict[str, str] = {}
         mapping = req.mapping
         if req.target == "currentSpace":
@@ -178,11 +182,11 @@ def router(ctx: ApiContext) -> APIRouter:
                 mapping = _last_mapping(ctx.space, c.read)
         try:
             try:
-                planned = plan(c.read, mapping, target, reuse=reuse)
+                planned = plan(c.read, mapping, target, reuse=reuse, keep_as_sources=as_sources)
             except MappingProblem:
                 if mapping is req.mapping:
                     raise
-                planned = plan(c.read, None, target, reuse=reuse)  # the remembered mapping no longer fits
+                planned = plan(c.read, None, target, reuse=reuse, keep_as_sources=as_sources)  # the remembered mapping no longer fits
         except MappingProblem as exc:
             return _error(422, str(exc))
         preview_id = secrets.token_hex(8)
@@ -247,8 +251,11 @@ def router(ctx: ApiContext) -> APIRouter:
         previewed = read
         read = agentwire.apply_leave_out(read, req, draft_patterns)
         reuse = _reuse(ctx.space, read) if target.kind == "currentSpace" else {}
+        # M30 "Keep pages as Sources": resolved once here, planned and recorded with the batch.
+        has_proposal = bool(req.batch) and proposal.load_proposal(ctx.space.root, req.batch) is not None
+        as_sources = sources.keep_as_sources(req.keepAsSources, req.requireApproved, has_proposal)
         try:
-            planned = plan(read, req.mapping, target, reuse=reuse, lenient=read is not previewed)
+            planned = plan(read, req.mapping, target, reuse=reuse, lenient=read is not previewed, keep_as_sources=as_sources)
         except MappingProblem as exc:
             return _error(422, str(exc))
         if req.requireApproved:  # an agent's import, into this space or a new one alike (Gene, 2026-11-08)
@@ -279,7 +286,8 @@ def router(ctx: ApiContext) -> APIRouter:
                     src.close()
                     raise
                 try:
-                    state = WriteState(progress=h.progress, cancelled=h.cancelled, keep_originals=req.keepOriginals)
+                    state = WriteState(progress=h.progress, cancelled=h.cancelled, keep_originals=req.keepOriginals,
+                                       keep_as_sources=as_sources)
                     agentwire.prepare(state, read, req, Path(folder), ctx.space.root)
                     result = write_import(planned, Space(folder), state, src)
                 finally:
@@ -294,7 +302,8 @@ def router(ctx: ApiContext) -> APIRouter:
         else:
 
             def work(h: JobHandle) -> ImportResult:
-                state = WriteState(progress=h.progress, cancelled=h.cancelled, keep_originals=req.keepOriginals)
+                state = WriteState(progress=h.progress, cancelled=h.cancelled, keep_originals=req.keepOriginals,
+                                   keep_as_sources=as_sources)
                 agentwire.prepare(state, read, req, ctx.space.root, ctx.space.root)
                 try:
                     result = write_import(planned, ctx.space, state)

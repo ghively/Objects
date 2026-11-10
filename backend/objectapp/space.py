@@ -31,7 +31,8 @@ import shutil
 import threading
 import time
 from collections import deque
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path, PurePosixPath
@@ -130,6 +131,7 @@ from .synced import (
     is_synced,
     synced_props,
 )
+from .importers.sources import SOURCE_READ_ONLY, is_imported_source
 from .trash import Trash, TrashItem
 from .typedefs import (
     DEFAULT_TYPE,
@@ -1047,6 +1049,8 @@ class Space:
         self.own_deletes: dict[str, str] = {}
         """Path -> version of a file the app moved away (to the trash); the watcher stays silent."""
         self.trash = Trash(self.root)
+        self._source_tl = threading.local()
+        """M30: this thread's `source_writes` depth (imported Sources are writable inside)."""
         synced_store = self.store(SYNCED_FOLDER)
         synced_store.before_write = None  # synced facts keep no version history
         self.synced = SyncedStore(synced_store)
@@ -1489,7 +1493,8 @@ class Space:
         return WriteNotice("created", rel, None, dict(raw.fm), writeorigin.current())
 
     def _write_exact(self, rel: str, base_version: str, data: bytes) -> bool:
-        """Put ``data`` back at ``rel`` if it is still at ``base_version``; False when it changed."""
+        """Put ``data`` back at ``rel`` if it is still at ``base_version``; False when it changed.
+        Raises `ReadOnly` for an imported Source (M30)."""
         full = self.root / rel
         new_version = version_of(data)
 
@@ -1502,6 +1507,9 @@ class Space:
                 raise Conflict(now)
 
         with self._lock:
+            known = self._raw.get(rel)
+            if known is not None:
+                self._refuse_source(known)
             try:
                 current = full.read_bytes()
             except OSError:
@@ -2200,17 +2208,20 @@ class Space:
 
     def _summarize(self, raw: RawObject) -> ObjectSummary:
         fm = raw.fm
+        type_id = self._type_id(raw.typeName)
+        # M30: an imported Source opens read-only (only its import's re-run writes it).
+        source = not raw.readOnly and is_imported_source(type_id, fm)
         return ObjectSummary(
             path=raw.path,
             id=_str_or_none(fm.get("id")),
-            type=self._type_id(raw.typeName),
+            type=type_id,
             title=_title_of(raw),
             icon=_str_or_none(fm.get("icon")),
             createdAt=_str_or_none(fm.get("createdAt")),
             lastUpdated=_str_or_none(fm.get("lastUpdated")),
             tags=_str_list(fm.get("tags")),
-            readOnly=raw.readOnly,
-            readOnlyReason=raw.readOnlyReason,
+            readOnly=raw.readOnly or source,
+            readOnlyReason=SOURCE_READ_ONLY if source else raw.readOnlyReason,
             description=_str_or_none(fm.get("description")),
             aliases=_str_list(fm.get("aliases")),
             coverImage=_str_or_none(fm.get("coverImage")),
@@ -2374,6 +2385,25 @@ class Space:
 
     # -- the write engine -----------------------------------------------------
 
+    @contextmanager
+    def source_writes(self) -> Iterator[None]:
+        """M30: while inside, this thread (only) may write imported Sources; nests.
+
+        Only the M25 re-run of a Source's own source uses it (`writer._write_one`)."""
+        tl = self._source_tl
+        tl.depth = getattr(tl, "depth", 0) + 1
+        try:
+            yield
+        finally:
+            tl.depth -= 1
+
+    def _refuse_source(self, raw: RawObject) -> None:
+        """M30: `ReadOnly` ("Imported source") for an imported Source outside `source_writes`."""
+        if getattr(self._source_tl, "depth", 0) > 0:
+            return
+        if is_imported_source(self._type_id(raw.typeName), raw.fm):
+            raise ReadOnly(SOURCE_READ_ONLY)
+
     def _write(
         self,
         rel: str,
@@ -2415,6 +2445,7 @@ class Space:
             of = edit(raw.of, dict(raw.fm))
             if of is None or join_object(of) == join_object(raw.of):
                 return current
+            self._refuse_source(raw)
             stamped: dict[str, str] | None = None
             # M14: a stamped write that changes the frontmatter is announced to `after_write`
             # (a body-only save changes it only by its own stamp; unstamped rewrites never).
@@ -4982,6 +5013,25 @@ class Space:
         for rel in created:
             self.rescan_file(rel)
         return created
+
+    def add_type(self, t: TypeDefinition) -> TypeDefinition:
+        """M30: write the ready-made type ``t`` (its id, folder and properties as given) and
+        load it. Raises `InvalidValue` when its id or its name is in use."""
+        with self._lock:
+            types_dir = self.root / ".object" / "types"
+            taken = {x.id for x in self.types} | {u.id for u in self.unreadable_types}
+            if types_dir.is_dir():
+                taken |= {f.stem for f in types_dir.glob("*.json")}
+            if t.id in taken:
+                raise InvalidValue(f'An object type with the id "{t.id}" already exists.')
+            if self._name_taken(t.name):
+                raise InvalidValue(f'An object type named "{t.name}" already exists.')
+            t = copy.deepcopy(t)
+            self._write_type_json(t, "")
+            self.types.append(t)
+            self._sort_types()
+            self._types_changed(t.id)
+            return self.type_by_id(t.id) or t
 
     def create_type(
         self,

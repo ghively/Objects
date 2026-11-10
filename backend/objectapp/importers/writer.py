@@ -13,19 +13,26 @@ stops where it happened; the report is still written. A file that can't be writt
 the file system refuses, permissions) is skipped and listed; the import goes on. New files
 are LF without a BOM, as `Space.create_object` writes them; no template is applied.
 
+M30 "Keep pages as Sources" (`WriteState.keep_as_sources`, recorded in ``batch.json``): the types
+phase ensures the Source type (`sources.ensure_source_type`); each page is written as a Source
+whose body is the page's own bytes after its frontmatter (BOM and line endings kept; nothing
+converted or linked), with its Category and System. A re-run updates an imported Source inside
+``Space.source_writes()``, keeping the previous bytes in version history.
+
 Nothing is announced per object or type: an import can write thousands of files, so the
 caller announces one resync when the job ends (`WriteState.wrote_anything`).
 """
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import io
 import json
 import logging
 import os
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -47,9 +54,10 @@ from . import batches, markdown, provenance
 from .files import FilePage, file_page
 from .model import ImportResult, SkippedItem
 from .notion import page_heading, split_property_lines
-from .planner import Planned
+from .planner import SOURCE_KEY, Planned
 from .readmodel import read_page_text
 from .report import REPORT_TITLE, build_report
+from .sources import SOURCE_TYPE_ID, category_for, ensure_source_type, is_imported_source, system_label
 from .source import (
     MAX_TEXT_FILE,
     LimitExceeded,
@@ -131,6 +139,9 @@ class WriteState:
     """Source paths left out (by pattern or by choice): never read or imported."""
     images: int = 0
     """Image objects this run created (AC-2)."""
+    # -- M30: Keep pages as Sources --
+    keep_as_sources: bool = False
+    """The option's resolved value (`sources.keep_as_sources`), recorded in ``batch.json``."""
 
     @property
     def wrote_anything(self) -> bool:
@@ -253,6 +264,12 @@ def _types(planned: Planned, space: Space, state: WriteState) -> None:
         if pt.skip or (pt.key not in used and pt.key not in databases):
             continue
         tw = planned.type_writes[pt.key]
+        if pt.key == SOURCE_KEY:  # M30: the space's Source type, made once when it has none
+            had = space.type_by_id(SOURCE_TYPE_ID) is not None
+            st = space.type_by_id(ensure_source_type(space))
+            state.type_names[pt.key] = st.name if st is not None else tw.name
+            state.types += 0 if had else 1
+            continue
         if tw.existingTypeId is None and tw.basic:
             state.type_names[pt.key] = tw.name  # the space's own Page type
             continue
@@ -633,13 +650,13 @@ def _native_body(
 
 
 def _frontmatter(w: Any, type_name: str, block: dict[str, Any] | None = None, keep_id: str | None = None,
-                 created: str | None = None, exclude_ai: bool = False) -> str:
+                 created: str | None = None, exclude_ai: bool = False, source: dict[str, Any] | None = None) -> str:
     fm = set_keys(
         f"type: {yaml_single_quoted(type_name)}\n",
         {"title": w.obj.title},
         insert_first={"id": keep_id or new_ulid()},
     )
-    values: dict[str, Any] = {}
+    values: dict[str, Any] = {k: v for k, v in (source or {}).items() if v is not None}  # M30: Category, System
     for k, v in w.values:
         values[k] = v
     if w.tags:
@@ -766,6 +783,9 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
         with space._lock:
             ex_raw = space._raw.get(w.existing)
     ex_block = provenance.read_block(ex_raw.fm) if ex_raw is not None else None
+    # M30: a page kept as a Source, and a Source an earlier batch of this source made (it stays one).
+    ex_source = ex_raw is not None and is_imported_source(space._type_id(ex_raw.typeName), ex_raw.fm)
+    as_source = ex_source or (w.obj.typeKey == SOURCE_KEY and ex_raw is None)
     # AC-2: an image becomes an Image object, but one an earlier import made into a Page stays that
     # Page (matched by (system, id); never duplicated, never migrated silently).
     as_image = w.media == "image"
@@ -777,7 +797,8 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
         state.written[sp] = w.existing
         extra: dict[str, Any] = {}
         if ex_block.get("source") in state.moved_from:
-            version = _restamp_source(space, state, w.existing, ex_block, provenance.scope(planned.read, o))
+            with _source_writes(space, ex_source):  # the run's own Source: only its block line
+                version = _restamp_source(space, state, w.existing, ex_block, provenance.scope(planned.read, o))
             if version is not None:
                 extra["version"] = version
         _record(state, w, system, ident_, "unchanged", path=w.existing, contentHash=chash, **extra)
@@ -788,7 +809,11 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
     orig_rel: str | None = None
     file_obj: str | None = None
     extra_fm: dict[str, Any] = {}
-    if as_image:
+    source_text: tuple[bool, str, bytes] | None = None
+    if as_source and not as_image and not o.native and o.hasBody and entry is not None and data is not None:
+        source_text = _source_text(data)  # M30: the page's text exactly as imported
+        body = source_text[2].decode("utf-8", errors="surrogateescape").replace("\r\n", "\n")
+    elif as_image:
         name = PurePosixPath(sp).name
         if data is not None:
             page = file_page(name, data)  # its EXIF date fills importSource.created
@@ -825,11 +850,24 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
         created = ex_raw.fm.get("createdAt") if isinstance(ex_raw.fm.get("createdAt"), str) else None
     # A re-run never drops the flag: once an object is excluded from AI it stays so.
     kept_flag = ex_raw is not None and ex_raw.fm.get("excludeFromAI") is True
-    fm = _frontmatter(w, type_name, blk, keep_id, created, exclude_ai=sp in state.exclude_ai or kept_flag)
+    source_fields: dict[str, Any] | None = None
+    if as_source:
+        source_fields = {"category": category_for(blk, sp), "system": system_label(blk)}
+        if ex_raw is not None:  # a re-run keeps the Source's type, Category and System
+            if isinstance(ex_raw.fm.get("type"), str):
+                type_name = ex_raw.fm["type"]
+            for key in ("category", "system"):
+                if ex_raw.fm.get(key) is not None:
+                    source_fields[key] = ex_raw.fm[key]
+    fm = _frontmatter(w, type_name, blk, keep_id, created, exclude_ai=sp in state.exclude_ai or kept_flag,
+                      source=source_fields)
     if extra_fm:
         fm = set_keys(fm, extra_fm)
     new_of = ObjectFile(fm, body, True, None)
-    out = join_object(new_of).encode("utf-8")
+    if source_text is not None:
+        out = _source_bytes(fm, source_text)
+    else:
+        out = join_object(new_of).encode("utf-8")
 
     if ex_raw is not None and ex_block is not None:
         from ..space import Conflict
@@ -844,13 +882,16 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
             _record(state, w, system, ident_, "conflict", path=rel, contentHash=chash, pending=f"pending/{name}")
 
         cur = (space.root / rel).read_bytes()
-        if _edited_since_import(space, rel, state, ex_block):
+        # M30: a Source can't be edited in the app (a hand-edit outside it is in version history),
+        # so it is updated whatever its bytes, keeping the previous text in version history.
+        if not ex_source and _edited_since_import(space, rel, state, ex_block):
             changed_in_both()
             return
         batches.snapshot(space, rel, cur)
         try:
             # at the version checked: a save made since is never overwritten
-            space._write(rel, version_of(cur), lambda _of, _fm, o2=new_of: o2, stamp=False, history=False)
+            with _source_writes(space, ex_source):
+                space._write(rel, version_of(cur), lambda _of, _fm, o2=new_of: o2, stamp=False, history=ex_source)
         except Conflict:
             changed_in_both()
             return
@@ -870,6 +911,45 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
     state.objects += 1
     state.images += 1 if as_image else 0
     _record(state, w, system, ident_, "created", path=rel, contentHash=chash, version=version_of(out), original=orig_rel)
+
+
+@contextlib.contextmanager
+def _source_writes(space: Space, on: bool) -> Iterator[None]:
+    """`Space.source_writes` when ``on`` (the object written is the run's own imported Source)."""
+    if not on:
+        yield
+        return
+    with space.source_writes():
+        yield
+
+
+def _source_text(data: bytes) -> tuple[bool, str, bytes]:
+    """M30: (BOM, line ending, the bytes after the page's own frontmatter) of a page's file: a
+    Source's body is these bytes, byte for byte (its fields are its frontmatter keys)."""
+    from ..textfile import BOM, decode
+
+    tf = decode(data)
+    raw = data[len(BOM) :] if tf.bom else data
+    of = split_object(tf.text)
+    if of.frontmatter_src is None:
+        return tf.bom, tf.eol, raw
+    if not of.closing_fence_newline:
+        return tf.bom, tf.eol, b""
+    pos = 0
+    for _line in range(2 + of.frontmatter_src.count("\n")):  # both fences and the lines between
+        pos = raw.index(b"\n", pos) + 1
+    return tf.bom, tf.eol, raw[pos:]
+
+
+def _source_bytes(fm: str, text: tuple[bool, str, bytes]) -> bytes:
+    """A new Source's file: its frontmatter in the page's line ending (and BOM), then the page's bytes."""
+    from ..textfile import BOM
+
+    bom, eol, body = text
+    head = f"---\n{fm}---\n"
+    if eol == "\r\n":
+        head = head.replace("\n", "\r\n")
+    return (BOM if bom else b"") + head.encode("utf-8") + body
 
 
 def _restamp_source(space: Space, state: WriteState, rel: str, block: dict[str, Any], here: str | None) -> str | None:
@@ -976,6 +1056,7 @@ def _records(planned: Planned, space: Space, state: WriteState, started: str) ->
             "leftOutFiles": sorted(state.left_out_files),
             "excludedFromAi": sorted(state.exclude_ai),
             "movedFrom": list(state.moved_from),
+            "keepAsSources": state.keep_as_sources,
         },
     )
     batches.write_json(d / "items.json", state.items)

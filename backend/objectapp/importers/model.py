@@ -131,6 +131,8 @@ class PreviewRequest(BaseModel):
     """Which target the preview is for: ``currentSpace`` matches types and titles against the open space."""
     leaveOut: list[str] = Field(default_factory=list)
     """M27: "Leave out" folders and patterns (design section 6): matching files are never read."""
+    keepAsSources: bool | None = None
+    """M30: plan every page as a Source (absent: off, as the preview of a mapped import)."""
 
 
 class NewSpaceTarget(BaseModel):
@@ -181,6 +183,8 @@ class StartImportRequest(BaseModel):
     """M27: the scan step's choices (absent: nothing left out, nothing flagged is excluded)."""
     requireApproved: bool = False
     """M27: refuse a mapping that makes a type no approved proposal makes (the MCP start sets it)."""
+    keepAsSources: bool | None = None
+    """M30: "Keep pages as Sources" (None: `sources.keep_as_sources`' default rule, on)."""
 
 
 # -- API: responses -----------------------------------------------------------------
