@@ -53,6 +53,7 @@ import { editCollectionViews, flushCollectionViews, saveCollectionEdit } from '.
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { queryTitle, type TitleCtx } from '@/queries/autoTitle'
 import { useTitleCtx } from '@/queries/QueryPage'
+import { DEV_INFO_TEXT, DevInfo } from '@/settings/DevInfo'
 
 export const COLLECTION_PAGE_TEXT = {
   empty: 'Nothing in this collection yet. Add a new object or an existing one.',
@@ -654,6 +655,13 @@ export function CollectionPage({ id, mode = 'page', typeId, onExpand, footer }: 
 
   const notices = (
     <>
+      <DevInfo
+        className="mx-4 mb-2 max-w-md"
+        rows={[
+          { label: DEV_INFO_TEXT.collectionId, value: c.id },
+          { label: DEV_INFO_TEXT.view, value: tab },
+        ]}
+      />
       {readOnly && (
         <p role="status" className="px-4 pb-2 text-[13px] text-fg-muted">
           {`This collection's file couldn't be read, so it opens read-only. Fix the file to edit it.`}

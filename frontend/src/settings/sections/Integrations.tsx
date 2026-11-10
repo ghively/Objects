@@ -14,7 +14,8 @@ import { Input } from '@/components/ui/input'
 import { useAiHidden } from '@/ai/store'
 import { McpServersGroup } from '@/mcp/McpServersGroup'
 import { MCP_TEXT } from '@/mcp/mcpText'
-import { OptionCards, SaveError, SectionHeader, SettingGroup, errorText } from '../controls'
+import { useSettings } from '@/settings/useSettings'
+import { OptionCards, SaveError, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
 
 // the Integrations section's strings
 export const INTEGRATIONS_TEXT = {
@@ -24,7 +25,7 @@ export const INTEGRATIONS_TEXT = {
   tokensHelp:
     'Each token gives one program access to this space through the local API. Objects marked "Exclude from AI" (a tag or the excludeFromAI property) are never shown to it.',
   empty: 'No tokens yet.',
-  newToken: 'New token',
+  newToken: 'New API token',
   nameLabel: 'Token name',
   namePlaceholder: 'e.g. Claude Code',
   scope: 'Access',
@@ -49,11 +50,16 @@ export const INTEGRATIONS_TEXT = {
   mcp: 'Connect an AI assistant',
   mcpHelp:
     'Add this to your MCP client config (Claude Code: .mcp.json, Claude Desktop: claude_desktop_config.json) with the token in place of <token>. Object must be running.',
+  // M31 (catalog: Developer settings: "Show developer information"); the help is ours.
+  developer: 'Developer settings',
+  devInfo: 'Show developer information',
+  devInfoHelp:
+    "Show ids and developer details in the app: an object's id and file path under its properties, a type's id, folder and property keys in its settings, a property's key, and the ids of queries and collections. Each has a copy button.",
 } as const
 
 const T = INTEGRATIONS_TEXT
 
-export const INTEGRATIONS_SEARCH: string[] = [T.tokens, T.mcp, 'MCP', 'API', MCP_TEXT.heading, MCP_TEXT.secretVariables]
+export const INTEGRATIONS_SEARCH: string[] = [T.tokens, T.newToken, T.mcp, 'MCP', 'API', MCP_TEXT.heading, MCP_TEXT.secretVariables, T.developer, T.devInfo]
 
 const SCOPE_LABEL: Record<ApiTokenScope, string> = { read: T.read, 'read-write': T.readWrite, sync: T.sync }
 
@@ -229,6 +235,31 @@ export function IntegrationsSection() {
       )}
       {/* M19: the machine's outside MCP servers and secret variables, after the token groups */}
       {!aiHidden && <McpServersGroup />}
+      <DeveloperSettings />
     </div>
+  )
+}
+
+/** M31: "Developer settings" > "Show developer information" (a device setting). */
+function DeveloperSettings() {
+  const on = useSettings((s) => s.settings.showDeveloperInfo === true)
+  const [error, setError] = useState<string | null>(null)
+  return (
+    <>
+      <SettingGroup title={T.developer} className="pb-0" />
+      <SwitchRow
+        title={T.devInfo}
+        help={T.devInfoHelp}
+        checked={on}
+        onChange={(showDeveloperInfo) => {
+          setError(null)
+          useSettings
+            .getState()
+            .patch({ showDeveloperInfo })
+            .catch((e: unknown) => setError(errorText(e)))
+        }}
+      />
+      <SaveError error={error} />
+    </>
   )
 }

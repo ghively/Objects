@@ -51,6 +51,9 @@ Object has no accounts.
 - Appearance: Light theme (Light, Light Dimmed), Dark theme (Dark, Dark Dimmed), App icon (colored icon per
   device). Layout (ours, 2026-11-09): "Show the sidebar when Object opens" (on by default; off opens Object with
   the left sidebar collapsed, "Toggle sidebar" or Ctrl+Shift+Left shows it; device setting `showSidebarOnStart`).
+  App icon (M31): a row of swatches (Default, Red, Orange, Green, Blue, Purple, Pink, Gray; device setting
+  `appIcon`), each showing the bolt in its colour; the choice recolours the browser tab's icon at once and the
+  app window's from the next start (the window takes an icon only when it opens).
 - AI Assistant: "Hide AI features" switch.
 - Editor: Disable spellcheck; Spellcheck language (Experimental); Open objects as a full page (Alt+Shift click
   opens the preview instead); Show properties by default (ours, 2026-11-09; on by default; off: objects open with
@@ -77,6 +80,13 @@ Object has no accounts.
 - Offline & Sync: sync status and cloud media storage are **(out of scope)** (no sync). The local parts apply:
   "Rebuild search index"; Local Storage (size estimate); Media loading (Everything | Required only);
   Clear media cache.
+  Local rows (M31): "Local Storage" lists the space folder, its cache (`.object-cache`) and Object's data for the
+  space in the state folder (saved versions and the per-space files), and the total (`GET /api/storage`, read
+  only). "Media loading" (device setting `mediaLoading`): "Required only" shows images, video, audio and PDF
+  blocks in pages as a placeholder with "Load" until clicked; "Everything" loads them at once. "Clear media
+  cache" asks first ("Clear the media cache?"), then removes only the cache's media parts (`media/`,
+  `thumbnails/`; Object keeps no media copies of its own, so normally nothing) and has the pages load their
+  media again from the files, past the browser's cache; it says what it freed. Notes and files are never touched.
 - Import Content: migration guides per source tool (Notion, Obsidian, Evernote, Apple Notes, Tana, Other tool);
   Bulk import "Start importing" (upload files, review mappings).
 - Full Export: Automated Full Exports (desktop app only); Manual Full Export with Spaces (All Spaces) and
@@ -110,6 +120,11 @@ Object has no accounts.
 - Calendar Integrations; Task actions.
 - API: scoped API tokens per space (name, masked token, space, last used, Delete) and "New API token";
   Developer settings: "Show developer information" (IDs and developer details in the UI).
+  Developer information (M31; device setting `showDeveloperInfo`, off by default): while on, a small read-only
+  "Developer information" box with a copy button per value shows an object's id and file path under its
+  properties, a type's id, folder and each property's key in type settings, a property's key and id in property
+  settings, a query's id on its page, and a collection's id and the open view's key on its page. Views have no
+  ids of their own (they live inside their type, collection or query).
   A token's scope is "Read only", "Read and write" or "Synced facts only" (Object's own, M29: reads, and fills synced
   properties; section 10f).
 - Web Extension: Chrome, Edge, Safari, Firefox capture extension; Web Highlights.

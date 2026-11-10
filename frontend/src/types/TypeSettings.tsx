@@ -47,6 +47,7 @@ import { DeleteTypeDialog } from './DeleteTypeDialog'
 import { PageLayoutCards } from './PageLayoutCards'
 import { TemplateManager, TEMPLATE_TEXT } from './TemplateManager'
 import { WorkFieldsSection, WORK_FIELDS_TEXT } from './WorkFieldsSection'
+import { DEV_INFO_TEXT, DevInfo } from '@/settings/DevInfo'
 
 /** Put a type the server saved outside the type editor (Add work fields) into the index. */
 function adoptSavedType(t: TypeDef) {
@@ -637,6 +638,14 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
             </Section>
           )}
         </fieldset>
+        <DevInfo
+          className="mt-8"
+          rows={[
+            { label: DEV_INFO_TEXT.typeId, value: type.id },
+            { label: DEV_INFO_TEXT.folder, value: type.folder },
+            ...type.propertyDefinitions.map((d) => ({ label: d.name, value: d.key })),
+          ]}
+        />
       </div>
 
       {settingsFor && (

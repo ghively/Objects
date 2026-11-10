@@ -25,6 +25,7 @@ import { PropertyMenu } from '@/properties/PropertyMenu'
 import { isSynced, syncedStale, SyncedLine } from '@/properties/synced'
 import { DeletePropertySection, PropertySettings } from '@/properties/PropertySettings'
 import { useSettings } from '@/settings/useSettings'
+import { DEV_INFO_TEXT, DevInfo } from '@/settings/DevInfo'
 import { LAYOUT_KEYS, removeProperty } from '@/properties/typeEdits'
 import { CounterpartRows, mergeCounterparts } from './CounterpartRows'
 import type { TypeEditor } from './useTypeEditor'
@@ -659,6 +660,15 @@ export function PropertyPanel({
         )}
       </Popover>
       {footer && <div data-panel-footer="" className="mt-4">{footer}</div>}
+      {summary && (
+        <DevInfo
+          className="mt-4"
+          rows={[
+            { label: DEV_INFO_TEXT.objectId, value: summary.id },
+            { label: DEV_INFO_TEXT.filePath, value: summary.path },
+          ]}
+        />
+      )}
       {type && settingsFor && (
         <PropertySettings
           typeId={type.id}

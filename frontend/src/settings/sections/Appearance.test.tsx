@@ -9,7 +9,8 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
-import { AppearanceSection } from './Appearance'
+import { appIconHref } from '@/settings/appIcon'
+import { APPEARANCE_SEARCH, AppearanceSection } from './Appearance'
 
 const mocked = vi.mocked(api)
 
@@ -99,6 +100,33 @@ describe('AppearanceSection', () => {
     expect(within(light).getByText('Light, with softer contrast.')).toBeInTheDocument()
     expect(within(dark).getByText('The standard dark theme.')).toBeInTheDocument()
     expect(within(dark).getByText('Dark, with softer contrast.')).toBeInTheDocument()
+  })
+
+  test('test app icon swatches pick a colour per device', async () => {
+    const user = userEvent.setup()
+    render(<AppearanceSection />)
+    const group = screen.getByRole('radiogroup', { name: 'App icon' })
+    expect(within(group).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
+      'Default',
+      'Red',
+      'Orange',
+      'Green',
+      'Blue',
+      'Purple',
+      'Pink',
+      'Gray',
+    ])
+    expect(within(group).getByRole('radio', { name: 'Default' })).toHaveAttribute('aria-checked', 'true')
+    // Each swatch shows the icon in its colour.
+    const red = within(group).getByRole('radio', { name: 'Red' })
+    expect(red.querySelector('img')?.getAttribute('src')).toBe(appIconHref('red'))
+    await user.click(red)
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ appIcon: 'red' }, { baseRevision: 'r0' })
+    expect(within(group).getByRole('radio', { name: 'Red' })).toHaveAttribute('aria-checked', 'true')
+    expect(
+      screen.getByText("The color of Object's icon on this device: the browser tab at once, the app window from the next start."),
+    ).toBeInTheDocument()
+    expect(APPEARANCE_SEARCH).toContain('App icon')
   })
 
 })
