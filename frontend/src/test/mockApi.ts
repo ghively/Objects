@@ -24,6 +24,7 @@ import type {
   CounterpartRow,
   CreateAgentRequest,
   DeviceSettings,
+  EntitiesView,
   LearningSettings,
   LearningState,
   LedgerSummary,
@@ -214,6 +215,23 @@ export function references(partial: Partial<References> = {}): References {
 /** Graph data with every contract field; `partial` overrides. */
 export function graphData(partial: Partial<GraphData> = {}): GraphData {
   return { nodes: [], links: [], tagged: [], ...partial }
+}
+
+/** M30: an entities view with every contract field (the mock's answer: nothing collected yet); `partial` overrides. */
+export function emptyEntitiesView(partial: Partial<EntitiesView> = {}): EntitiesView {
+  return {
+    state: 'collecting',
+    entities: [],
+    leftOut: [],
+    suggestedMerges: [],
+    relations: { total: 0, lowConfidence: 0, plain: 0 },
+    sources: 0,
+    conflicts: 0,
+    review: { decisions: {}, merges: [], splits: [] },
+    undecided: 0,
+    written: null,
+    ...partial,
+  }
 }
 
 const emptyGroup = () => ({ type: 'filterGroup' as const, operator: 'and' as const, elements: [] })
@@ -1062,10 +1080,14 @@ function defaults(): Api {
     saveProposalReview: async () => ({ ok: true }),
     applyProposal: async () => ({ created: [], extended: [] }),
     startFiling: async () => ({ ok: true }),
-    filingStatus: async () => ({ state: 'idle', trial: { items: [], rightShare: null }, normalise: [] }),
+    filingStatus: async () => ({ state: 'idle', trial: { items: [], rightShare: null }, normalise: [], keepAsSources: false }),
     markFiling: async () => ({ ok: true }),
     continueFiling: async () => ({ ok: true }),
     normaliseFiling: async () => ({ ok: true }),
+    // M30
+    importEntities: async () => emptyEntitiesView(),
+    saveEntitiesReview: async () => ({ ok: true, view: emptyEntitiesView() }),
+    writeEntities: async () => ({ ok: true }),
     importBatch: async (id: string) => ({
       batch: { id, startedAt: '', source: { path: '', kind: '', system: '' }, counts: {} },
       items: [],
