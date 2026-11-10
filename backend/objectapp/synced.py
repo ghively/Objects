@@ -269,7 +269,8 @@ class SyncedStore:
         from .space import ReadOnly  # space imports this module
 
         if self._read(type_id)[0] is None:
-            raise ReadOnly(f"{self._store.rel(type_id)} is not a valid JSON object.")
+            rel = self._store.rel(type_id)
+            raise ReadOnly(f"The synced facts file {rel} is not a valid JSON object.")
 
     def data(self, type_id: str) -> dict[str, Any]:
         """The type's whole file ({} when there is none, or it isn't readable); cached by the
@@ -329,7 +330,8 @@ class SyncedStore:
         with self._store._lock:
             current, revision = self._read(type_id)
             if current is None:
-                raise ReadOnly(f"{self._store.rel(type_id)} is not a valid JSON object.")
+                rel = self._store.rel(type_id)
+                raise ReadOnly(f"The synced facts file {rel} is not a valid JSON object.")
             data = copy.deepcopy(current)
             for object_id, changes in updates.items():
                 old = data.get(object_id)

@@ -16,7 +16,12 @@ Python's ``str.isspace``. A **character** is a Unicode code point (TypeScript it
 ``for...of`` / ``Array.from``, not UTF-16 units), and a pattern's length is counted the same way.
 
 **The name** is normalised once: strip `WHITESPACE` from both ends (``trim()``), then lowercase
-it (``str.lower()`` / ``toLowerCase()``). Nothing else (inner runs of spaces are kept).
+it (``str.lower()`` / ``toLowerCase()``). Nothing else (inner runs of spaces are kept). The two
+lowercasings follow each runtime's Unicode tables, so they differ on the ~55 letters added in
+Unicode 16 and 17 that one side doesn't know yet (negligible: no pattern names them).
+
+**A name over `NAME_MAX` (300) characters** (code points, counted before the trim) matches no
+pattern, so a pasted page of text never runs a pattern at all.
 
 **Validity** is checked on the raw pattern: a string, 1-100 characters, and either exactly one
 of `TOKENS` (case-sensitive: ``{IP}`` is invalid) or a glob that contains no ``{`` or ``}``
@@ -71,6 +76,7 @@ from .typemodel import TypeDefinition
 __all__ = [
     "MAX_PATTERN",
     "MAX_PATTERNS",
+    "NAME_MAX",
     "TOKENS",
     "WHITESPACE",
     "NamePattern",
@@ -86,7 +92,9 @@ MAX_PATTERNS = 20
 """Name patterns a type can have (refused on save beyond this)."""
 MAX_PATTERN = 100
 """Characters of one name pattern."""
-TOKENS = ("{ip}", "{cidr}", "{fqdn}", "{version}")
+NAME_MAX = 300
+"""Characters of a name patterns are tested on: a longer name matches none (our value)."""
+TOKENS =("{ip}", "{cidr}", "{fqdn}", "{version}")
 
 WHITESPACE = (
     "\t\n\v\f\r              "
@@ -309,8 +317,12 @@ def pattern_problems(patterns: Any) -> list[str]:
 
 
 def matches(name: str, patterns: Sequence[str]) -> bool:
-    """Whether `name` matches any valid pattern of `patterns` (invalid ones are ignored)."""
+    """Whether `name` matches any valid pattern of `patterns` (invalid ones are ignored).
+
+    A name over `NAME_MAX` characters matches none."""
     if not isinstance(patterns, (list, tuple)) or not isinstance(name, str):
+        return False
+    if len(name) > NAME_MAX:
         return False
     norm = normalize_name(name)
     for p in patterns:

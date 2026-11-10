@@ -382,6 +382,12 @@ def _check_against_space(space: Space, rule: AutomationRule) -> None:
             )
         if pdef.type in _UNWATCHABLE_KINDS or trigger.propertyKey in ("type", "id", "template"):
             raise InvalidValue(f'"{pdef.name}" can\'t start an automation.')
+        if is_synced(pdef):
+            # M29: a sync announces no change and no write notice, so it would never fire.
+            source = pdef.synced.source if pdef.synced is not None else ""
+            raise InvalidValue(
+                f'"{pdef.name}" is filled by {source}, so a change to it can\'t start an automation.'
+            )  # our string
         if trigger.to is not None:
             options = filter_options_for({"type": pdef.type, "options": pdef.options or {}})
             if trigger.to.option not in options:

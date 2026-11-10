@@ -38,6 +38,7 @@ from .appstate import space_key, state_dir
 from .localtime import from_local, to_local
 from .notify import Notifier
 from .propvalues import decode_value, label_lookup
+from .synced import is_synced
 from .taskhook import status_key_of
 from .taskmodel import ReminderRule, parse_remind
 from .textfile import atomic_write
@@ -212,13 +213,13 @@ def task_infos(space) -> list[TaskInfo]:
             continue
         task = is_task_type(t)
         wanted: list[tuple[str, str, bool]] = []
-        if task and has_remind:
+        if task and has_remind and not is_synced(t.prop("date")):
             wanted.append(("date", remind, True))
         for key, text in entries.items():
             if task and key == "date":
                 continue  # the Task `date` keeps M4's `remind` key
-            if supports_reminders(t.prop(key)):
-                wanted.append((key, text, False))
+            if supports_reminders(t.prop(key)) and not is_synced(t.prop(key)):
+                wanted.append((key, text, False))  # M29: a synced date reminds of nothing
         if not wanted:
             continue
         done = _status_done(t, fm) if task else False

@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from .propvalues import KIND_TRANSFORMS, InvalidValue, convert_value
+from .synced import is_synced
 from .typedefs import SYSTEM_KEYS
 from .typemodel import BASIC_MEDIA_TYPES, PropertyDefinition, TypeDefinition
 from .uistate import _read as _read_ui
@@ -156,10 +157,15 @@ def is_lossy(src: PropertyDefinition, dst: PropertyDefinition, raw: Any) -> bool
 
 
 def mapping_sources(src: TypeDefinition, fm: dict) -> list[PropertyDefinition]:
-    """The properties of ``src`` that hold a value in ``fm`` and don't simply carry over."""
+    """The properties of ``src`` that hold a value in ``fm`` and don't simply carry over.
+
+    Not a synced property (M29): its value in ``fm`` is a hand-typed one the app ignores.
+    """
     out: list[PropertyDefinition] = []
     for p in src.propertyDefinitions:
         if p.key in CARRIED_KEYS or p.type.startswith("entity_") or p.key not in fm:
+            continue
+        if is_synced(p):
             continue
         raw = fm.get(p.key)
         if raw is None or raw == "" or raw == []:
@@ -169,11 +175,12 @@ def mapping_sources(src: TypeDefinition, fm: dict) -> list[PropertyDefinition]:
 
 
 def mapping_targets(dst: TypeDefinition) -> list[PropertyDefinition]:
-    """The properties of ``dst`` a value can be mapped to."""
+    """The properties of ``dst`` a value can be mapped to (M29: never a synced one, which only
+    a sync fills)."""
     return [
         q
         for q in dst.propertyDefinitions
-        if q.key not in CARRIED_KEYS and not q.type.startswith("entity_")
+        if q.key not in CARRIED_KEYS and not q.type.startswith("entity_") and not is_synced(q)
     ]
 
 
