@@ -2,9 +2,9 @@
 // configured properties as compact read-only cells. The wall variant shows the type label, the icon
 // and title, the description, then one labelled row per card-view property ("Empty" when unset).
 import type { MouseEvent, ReactNode } from 'react'
-import { api } from '@/api/client'
 import type { PropertyDef, Row, TypeDef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
+import { SpaceImage } from '@/components/SpaceImage'
 import { cn } from '@/lib/utils'
 import { cellForDef } from '@/properties/cellFor'
 import { asComputed, computedIsEmpty } from '@/properties/computed'
@@ -294,7 +294,7 @@ export function SmallCard({
       }}
       className={cn(CARD_BASE, className)}
     >
-      {image && <img src={api.fileUrl(image)} alt="" className="h-28 w-full object-cover" />}
+      {image && <SpaceImage path={image} compact className="h-28 w-full object-cover" />}
       {leading == null && trailing == null ? (
         <div className="flex min-w-0 flex-col gap-1.5 p-3">
           <Parts row={row} type={type} props={props} hide={hide} />

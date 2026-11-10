@@ -12,8 +12,9 @@
  *   `api.attachments()`), "Open {type} on system"
  *   and "Download {mediaType}"; caption.
  * - a missing attachment shows "File not found." (our string).
- * - M31: with "Media loading: Required only" (a device setting) image, PDF, audio and video show a
- *   placeholder with "Load" until clicked; space files carry the media token (`settings/mediaLoading.ts`).
+ * - M31: with "Media loading: Required only" (a device setting) image, PDF, audio and video show the
+ *   placeholder with "Load" (`components/SpaceImage.tsx`'s `MediaPlaceholder`) until clicked; space
+ *   files carry the media token (`settings/mediaToken.ts`).
  * Every block has a `…` menu with "Remove Block".
  *
  * The bookmark is a card with the link title, the domain and the URL, opened
@@ -25,7 +26,8 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { Attachment } from '@/api/types'
 import { Icon } from '@/components/Icon'
-import { MEDIA_TEXT, useMediaOnRequest, useMediaToken, withMediaToken } from '@/settings/mediaLoading'
+import { MediaPlaceholder } from '@/components/SpaceImage'
+import { useMediaOnRequest, useMediaToken, withMediaToken } from '@/settings/mediaLoading'
 import type { AttachmentKind, Option } from '../annotations'
 import { EmbedMenu, ResizableEmbed, type EmbedMenuItem, type ResizableEmbedProps } from './ResizableEmbed'
 import { cachedAttachments, decodeMarkdownPath, findAttachment, isExternalUrl, showToast } from './upload'
@@ -197,24 +199,7 @@ export function MediaView({ node, editor, getPos, selected }: NodeViewProps) {
       { captionable: true },
     )
   } else if (onRequest && !asked && kind !== 'file') {
-    content = frame(
-      <div className="flex items-center gap-3 rounded-lg border border-dashed border-line px-3 py-2.5 text-[13px]" data-testid="media-placeholder">
-        <Icon name={PLACEHOLDER_ICON[kind]} size={18} />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-fg">{name}</div>
-          <div className="text-fg-muted">{MEDIA_TEXT.notLoaded}</div>
-        </div>
-        <button
-          type="button"
-          contentEditable={false}
-          onClick={() => setAsked(true)}
-          className="shrink-0 rounded-md border border-line bg-raised px-2.5 py-1 text-[13px] font-medium text-fg hover:bg-hover"
-        >
-          {MEDIA_TEXT.load}
-        </button>
-      </div>,
-      { captionable: true },
-    )
+    content = frame(<MediaPlaceholder name={name} icon={PLACEHOLDER_ICON[kind]} onLoad={() => setAsked(true)} />, { captionable: true })
   } else if (kind === 'image') {
     content = frame(
       failed ? (

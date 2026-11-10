@@ -135,6 +135,7 @@ import type {
   WorkWins,
 } from './types'
 import type { WhiteboardSettings } from './whiteboardTypes'
+import { getMediaToken, withMediaToken } from '@/settings/mediaToken'
 
 /** Any non-2xx response that is not a conflict or a read-only refusal. */
 export class ApiError extends Error {
@@ -1013,9 +1014,12 @@ export const api = {
     return res
   },
 
-  /** URL of an image file in the space (`GET /api/file`). */
+  /**
+   * URL of an image file in the space (`GET /api/file`), with the media token "Clear media cache"
+   * bumps once it has been cleared (`settings/mediaToken.ts`; the server ignores it).
+   */
   fileUrl(path: string): string {
-    return `${BASE}/file${qs({ path })}`
+    return withMediaToken(`${BASE}/file${qs({ path })}`, getMediaToken())
   },
 
   /** Resolve a `[[link]]` to a path, or `null` when nothing matches (404). */

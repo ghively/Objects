@@ -83,10 +83,14 @@ Object has no accounts.
   Local rows (M31): "Local Storage" lists the space folder, its cache (`.object-cache`) and Object's data for the
   space in the state folder (saved versions and the per-space files), and the total (`GET /api/storage`, read
   only). "Media loading" (device setting `mediaLoading`): "Required only" shows images, video, audio and PDF
-  blocks in pages as a placeholder with "Load" until clicked; "Everything" loads them at once. "Clear media
-  cache" asks first ("Clear the media cache?"), then removes only the cache's media parts (`media/`,
-  `thumbnails/`; Object keeps no media copies of its own, so normally nothing) and has the pages load their
-  media again from the files, past the browser's cache; it says what it freed. Notes and files are never touched.
+  as a placeholder with "Load" until clicked, wherever they show: blocks in pages, cover images (and the
+  profile picture and a presentation's title slide), card and gallery pictures (the Page link view card
+  too), image property cells and whiteboard media; small pictures get a compact "Load" in the picture's box
+  (our call); the image picker shows its thumbnails, as opening it asks for them (our call). "Everything" loads
+  them at once. "Clear media cache" asks first ("Clear the media cache?"), then removes only the cache's media
+  parts (`media/`, `thumbnails/`; Object keeps no media copies of its own, so normally nothing) and has every
+  space image and file load again from the files, past the browser's cache (a token on every file URL); it
+  says what it freed. Notes and files are never touched.
 - Import Content: migration guides per source tool (Notion, Obsidian, Evernote, Apple Notes, Tana, Other tool);
   Bulk import "Start importing" (upload files, review mappings).
   "Remodel this space…" (M31, IT ops design section 6; our strings): the import dialog opens with the open space's

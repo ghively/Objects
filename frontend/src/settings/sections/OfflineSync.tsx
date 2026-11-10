@@ -42,7 +42,8 @@ export const OFFLINE_SYNC_TEXT = {
   storageTotal: 'Total',
   storageLoading: 'Measuring…',
   mediaLoading: 'Media loading',
-  mediaLoadingDescription: 'When images, video, audio and PDFs in your pages load.',
+  mediaLoadingDescription:
+    'When images, video, audio and PDFs load: in pages, cover images, cards and galleries, image properties and whiteboards.',
   mediaEverything: 'Everything',
   mediaEverythingDescription: 'Media loads as soon as a page opens.',
   mediaRequired: 'Required only',
