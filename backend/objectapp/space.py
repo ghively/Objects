@@ -2273,7 +2273,8 @@ class Space:
         if t is None:
             raise KeyError(type_id)
         if not synced_props(t):
-            raise InvalidValue(f"{t.name} has no synced properties.")
+            what = t.name  # a type's name: a capitalised subject
+            raise InvalidValue(f"{what} has no synced properties.")
         if len(items) > MAX_SYNC_ITEMS:
             raise InvalidValue(f"At most {MAX_SYNC_ITEMS} items per call.")
         self.synced.check_readable(t.id)

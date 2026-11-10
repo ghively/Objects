@@ -112,6 +112,28 @@ def test_the_one_time_id_insert_keeps_crlf_and_bom(root: Path) -> None:
     assert after.replace(f"id: {outcome.results[0].objectId}\r\n".encode(), b"", 1) == without
 
 
+# -- finding 4: the sync's messages are full sentences ----------------------------------------
+
+
+def test_sync_messages_are_full_sentences(root: Path) -> None:
+    from objectapp.propvalues import InvalidValue
+    from objectapp.space import ReadOnly
+
+    space = _space(root)
+    with pytest.raises(InvalidValue, match=r"^Page has no synced properties\.$"):
+        space.sync_facts("page", [], set())
+    folder = root / ".object" / "synced"
+    folder.mkdir(parents=True)
+    (folder / "host.json").write_bytes(b"[1, 2")
+    expected = "The synced facts file .object/synced/host.json is not a valid JSON object."
+    with pytest.raises(ReadOnly) as raised:
+        space.sync_facts("host", [_item("title", "APP01", {"diskFree": 1})], set())
+    assert raised.value.reason == expected
+    with pytest.raises(ReadOnly) as raised:
+        space.synced.apply("host", {"01KM2900000000000000000001": {"diskFree": 1}}, "x")
+    assert raised.value.reason == expected
+
+
 # -- finding 3: a hand-typed value under a synced key never shows ---------------------------
 
 
