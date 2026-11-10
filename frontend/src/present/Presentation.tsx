@@ -79,10 +79,10 @@ function useFullscreen(active: boolean, onLeft: () => void) {
  * left out on a slide: our choice), each drawn by its read-only cell.
  */
 function TitleProperties({ detail, type }: { detail: ObjectDetail; type?: TypeDef }) {
-  const { frontmatter, links, summary, backlinks, computed } = detail
+  const { frontmatter, links, summary, backlinks, computed, synced } = detail
   const rows = propertyRows(type, frontmatter)
     .filter((d) => d.type !== 'entity_title' && d.visibility !== 'hidden')
-    .map((def) => ({ def, value: cellValue(def, frontmatter, links, summary, backlinks ?? [], computed) }))
+    .map((def) => ({ def, value: cellValue(def, frontmatter, links, summary, backlinks ?? [], computed, synced) }))
     .filter(({ def, value }) => !propertyIsEmpty(def, value))
   if (!rows.length) return null
   return (

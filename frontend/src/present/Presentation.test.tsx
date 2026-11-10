@@ -2,7 +2,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ObjectDetail } from '@/api/types'
-import { objectDetail, objectSummary } from '@/test/mockApi'
+import { objectDetail, objectSummary, propertyDef, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
@@ -10,6 +10,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { PRESENTATION_TEXT, Presentation } from './Presentation'
@@ -89,6 +90,36 @@ describe('Presentation', () => {
     expect(document.querySelector('[data-presentation-title]')!.textContent).toBe('')
     // Reading only: nothing is saved while presenting.
     expect(mocked.saveBody).not.toHaveBeenCalled()
+  })
+
+  test("the title slide shows a synced fact's value (M29 review #8)", async () => {
+    const host = typeDef({
+      id: 'host',
+      name: 'Host',
+      propertyDefinitions: [
+        propertyDef({ id: 'title', type: 'entity_title', name: 'Title' }),
+        propertyDef({ id: 'osVersion', type: 'text', name: 'OS version', synced: { source: 'Inventory script', staleAfterDays: 7 } }),
+      ],
+    })
+    resetLinkIndex()
+    useLinkIndex.setState({ types: [host], loaded: true })
+    mocked.object.mockResolvedValue(
+      objectDetail({
+        summary: objectSummary({ path: 'Hosts/APP01.md', type: 'host', title: 'APP01' }),
+        frontmatter: { type: 'host', title: 'APP01' },
+        body: 'Notes.\n',
+        version: 'v1',
+        synced: { values: { osVersion: 'Windows Server 2022' }, refreshedAt: '2026-11-09T09:55:00.000Z' },
+      }),
+    )
+    render(<Presentation />)
+    act(() => usePresentation.getState().start('Hosts/APP01.md'))
+    expect(await screen.findByRole('heading', { name: 'APP01' })).toBeTruthy()
+    const props = document.querySelector('[data-slide-properties]')
+    expect(props).not.toBeNull()
+    expect(props!.textContent).toContain('OS version')
+    expect(props!.innerHTML).toContain('Windows Server 2022')
+    resetLinkIndex()
   })
 
   test('test arrow keys and escape navigate and exit', async () => {
