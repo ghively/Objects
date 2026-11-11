@@ -104,5 +104,12 @@ export function usePanelShortcuts({ toggleLeftSidebar }: { toggleLeftSidebar: ()
   useGlobalShortcut('toggleLeftSidebar', toggleLeftSidebar)
   useGlobalShortcut('toggleCalendarSidebar', () => void toggleCalendarSidebar())
   // M32: also with the caret in a note's text or title (no editor binds Ctrl+Shift+D).
-  useGlobalShortcut('openTodaysNote', () => void openTodaysNote(), { allowInEditable: true })
+  // A key held down asks once: its repeats would each ask the server for the note again.
+  useGlobalShortcut(
+    'openTodaysNote',
+    (e) => {
+      if (!e.repeat) void openTodaysNote()
+    },
+    { allowInEditable: true },
+  )
 }

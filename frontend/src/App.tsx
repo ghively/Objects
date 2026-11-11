@@ -102,15 +102,15 @@ function countsByType(s: { objects: ObjectSummary[]; loaded: boolean }): Record<
 export { isEditableTarget }
 
 /**
- * The type the new-note key makes: the open type, else the open note's type, else a Note (M32:
- * never the last type made). A daily note is made by its date, so from one the key makes a Note.
+ * The type the new-note key makes: a Note, as the "New" button does (M32: never the last type
+ * made). One exception: on a type's own page, where its notes are listed, it makes one more of
+ * that type, as that page's own "New" button does. On a single note's or task's page it makes a
+ * Note (the walk's W5: it made a Task on a task's page). A daily note is made by its date, so on
+ * the Daily notes page the key makes a Note too.
  */
 function currentTypeId(types: TypeDef[]): string {
   const target = currentTarget(useTabs.getState())
-  let id: string | undefined
-  if (target?.kind === 'type' || target?.kind === 'typeSettings') id = target.typeId
-  else if (target?.kind === 'object') id = useLinkIndex.getState().objects.find((o) => o.path === target.path)?.type
-  const type = id ? types.find((x) => x.id === id) : undefined
+  const type = target?.kind === 'type' ? types.find((x) => x.id === target.typeId) : undefined
   return type && !isDailyNoteType(type) ? type.id : noteTypeId(types)
 }
 
@@ -302,7 +302,8 @@ export default function App() {
   const tasksHidden = useTasksHidden()
 
   // Shortcuts (their keys are in `lib/shortcuts.ts`): the New menu (Ctrl+U, Alt+Shift+N), a new
-  // note, or one more of the type in view (Ctrl+N, Alt+N), and Ctrl+Backspace "Delete this …?".
+  // note, or on a type's page one more of that type (Ctrl+N, Alt+N), and Ctrl+Backspace "Delete
+  // this …?". A key held down acts once: its repeats are swallowed and make nothing more.
   // M32: the two "new" keys also work with the caret in a note's text or title (`newKeyAllowed`
   // keeps each key's own editing meaning); Delete stays out of editable elements, where
   // Ctrl+Backspace deletes a word.
@@ -316,12 +317,14 @@ export default function App() {
       if (matches(e, keysFor('openAddEntityMenu'))) {
         if (!newKeyAllowed('openAddEntityMenu', e)) return
         e.preventDefault()
+        if (e.repeat) return
         // What gets made opens in the tab: a note popped out over it steps aside.
         usePeek.getState().close()
         setNewMenuOpen(true)
       } else if (matches(e, keysFor('createNewEntityOfType'))) {
         if (!newKeyAllowed('createNewEntityOfType', e)) return
         e.preventDefault()
+        if (e.repeat) return
         usePeek.getState().close()
         void newNote({}, currentTypeId(typesRef.current))
       } else if (matches(e, keysFor('deleteCurrentPage'))) {

@@ -192,8 +192,10 @@ Ctrl means Cmd on Mac. "Shift" is written as Shift here. "(not in Object)" marks
 unbound on purpose; "(not bound)" one whose key is taken by another action (decision D3).
 
 **General**: Open settings Ctrl+, | Create new task Ctrl+Shift+T | Add new content Ctrl+U or Alt+Shift+N (M32) |
-New note, or one more of the type in view Ctrl+N or Alt+N (M32: Alt+N is the key a browser tab lets through, where
-Ctrl+N opens a browser window) | Search
+New note Ctrl+N or Alt+N (M32: Alt+N is the key a browser tab lets through, where Ctrl+N opens a browser window;
+the key makes a Note everywhere, as the "New" button does, also on a single note's or task's page, with one
+exception: on a type's own page, where its notes are listed, it makes one more of that type, as that page's
+own "New" button does) | Search
 this space Ctrl+P or Ctrl+K | Open extended search Ctrl+Shift+P (not in Object) | Toggle dark mode Ctrl+Shift+L |
 Toggle focus mode Ctrl+Shift+M | Toggle left sidebar Ctrl+Shift+Left | Toggle right side panel
 Ctrl+Shift+Right (in Object both panel keys stay out of text fields, where Ctrl+Shift+Left/Right select by word; our call) | Toggle side panel entry list Ctrl+Shift+Down (not in Object) | Toggle media sidebar Ctrl+Alt+Right (not in Object) | Close
@@ -243,7 +245,8 @@ Left/Right | Toggle calendar sidebar Ctrl+Alt+S | Pop out today's daily note Ctr
 
 **Keys that work while you type (M32)**: with the caret in a note's text or title, the new-note keys (Ctrl+N,
 Alt+N), the New menu's (Ctrl+U, Alt+Shift+N) and today's note (Ctrl+Shift+D) all work; a note popped out in the
-peek closes first, so what is made is seen. Each key was checked against the editors' own: none is bound in the
+peek closes first, so what is made is seen. A key held down acts once (its repeats make nothing more), and
+"New" pressed twice while a note is being made makes one note. Each key was checked against the editors' own: none is bound in the
 rich editor or the title; in raw mode Ctrl+U stays the editor's "undo selection" (our call: the menu has
 Alt+Shift+N there); on macOS the second keys are Ctrl+N and Ctrl+Shift+N, which stay "next line" inside a text
 field (⌘N works there). In other fields (a dialog's input, a quick-add box) the two "new" keys stay off.
