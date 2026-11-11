@@ -26,8 +26,8 @@ export const REFERENCES_TEXT = {
   mentionsInText: 'Mentions in text',
   /** our string */
   via: (property: string) => `via ${property}`,
+  /** M32: an empty section is this one quiet line (its explanation went). */
   backlinksEmptyTitle: 'No backlinks yet',
-  backlinksEmptyDescription: 'Backlinks show up here once another page links to this one.',
   link: 'Link',
   linkCreated: 'Link created',
   /** our string (as M3) */
@@ -40,8 +40,6 @@ export const REFERENCES_TEXT = {
   /** Paged lists; the backlinks list shows 50 at a time */
   loadMore: 'Load more',
   relatedEmptyTitle: 'No related content yet',
-  /** our string: the stand-in is lexical, not semantic */
-  relatedEmptyDescription: 'Objects that share words with this one will appear here.',
   /** our string */
   relatedTagsEmpty: 'No related tags',
   /** The per-backlink toggle's group name */

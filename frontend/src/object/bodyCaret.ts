@@ -39,6 +39,21 @@ export function focusBody(root: ParentNode | null | undefined, at: BodyCaret): b
   return true
 }
 
+/**
+ * A click in the empty space below the text: the caret goes to the end of the text. Under a last
+ * block that holds no text (an image, a divider, an embed) a new empty line takes it, so there is
+ * somewhere to type.
+ */
+export function focusBodyEnd(root: ParentNode | null | undefined): boolean {
+  const ed = bodyEditorOf(root)
+  if (ed?.isEditable && !Selection.atEnd(ed.state.doc).$head.parent.isTextblock) {
+    ed.chain().insertContentAt(ed.state.doc.content.size, { type: 'paragraph' }).focus('end').run()
+    ed.view.focus()
+    return true
+  }
+  return focusBody(root, 'end')
+}
+
 /** The caret (nothing selected) is at the body's very first position: there is nowhere to go up to. */
 export function caretAtBodyStart(ed: TiptapEditor): boolean {
   const { selection, doc } = ed.state

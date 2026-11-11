@@ -3,7 +3,7 @@
  * sharing this one's strongest terms). "Show more" asks for 20 more.
  */
 import type { ObjectSummary, RelatedEntry } from '@/api/types'
-import { EmptyState, EntryHeader } from './BacklinksTab'
+import { EmptyLine, EntryHeader } from './BacklinksTab'
 import { REFERENCES_TEXT } from './referencesUi'
 
 export interface RelatedTabProps {
@@ -15,9 +15,7 @@ export interface RelatedTabProps {
 }
 
 export function RelatedTab({ entries, summaries, limit, onShowMore }: RelatedTabProps) {
-  if (entries.length === 0) {
-    return <EmptyState title={REFERENCES_TEXT.relatedEmptyTitle} description={REFERENCES_TEXT.relatedEmptyDescription} />
-  }
+  if (entries.length === 0) return <EmptyLine text={REFERENCES_TEXT.relatedEmptyTitle} />
   const list = entries.map((e) => e.path)
   return (
     <div className="flex flex-col gap-2">

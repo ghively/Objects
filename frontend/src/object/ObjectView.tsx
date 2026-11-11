@@ -70,7 +70,17 @@ import { keyIsForView, usePageShortcuts } from './pageShortcuts'
 import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
 import { ImportSourceLine, importSourceOf } from './ImportSourceLine'
 import { counterpartEditor } from './CounterpartRows'
-import { bodyEditorOf, caretAtBodyStart, caretInTopLevelBlock, carryCaret, focusBody, focusedBodySelection, takeCarriedCaret } from './bodyCaret'
+import {
+  bodyEditorOf,
+  caretAtBodyStart,
+  caretInTopLevelBlock,
+  carryCaret,
+  focusBody,
+  focusBodyEnd,
+  focusedBodySelection,
+  takeCarriedCaret,
+} from './bodyCaret'
+import { typeHasOwnProperties } from './ownProperties'
 import { PropertyPanel } from './PropertyPanel'
 import { SaveMark } from './SaveMark'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
@@ -1041,14 +1051,16 @@ export function ObjectView({
   // default), hiding saves `hideProperties: true` and showing removes the key; off (2026-11-09),
   // the pane starts hidden, showing saves `hideProperties: false` and hiding removes the key.
   // Read-only: this view only.
+  // M32, item 11: the pane also starts hidden for a type with no properties of its own (the Note
+  // and the Daily note: system rows only), so the text gets the room; the same two saved values
+  // decide for the object (`true` hides, `false` shows), and a toggle back to the start removes it.
   const hideProperties = detail?.frontmatter.hideProperties
-  const panelOpen = paneToggled ?? (propertiesByDefault ? hideProperties !== true : hideProperties === false)
+  const startsOpen = propertiesByDefault && typeHasOwnProperties(type)
+  const panelOpen = paneToggled ?? (typeof hideProperties === 'boolean' ? !hideProperties : startsOpen)
   const togglePanel = () => {
     const next = !panelOpen
     setPaneToggled(next)
-    if (!propsReadOnly && detail) {
-      writeProperties({ hideProperties: propertiesByDefault ? (next ? null : true) : next ? false : null })
-    }
+    if (!propsReadOnly && detail) writeProperties({ hideProperties: next === startsOpen ? null : !next })
   }
   const onTypeChange = (next: TypeDef) => typeEditor.save(next)
   const onOpenTag = (name: string) => void openTag(name).catch(() => undefined)
@@ -1712,7 +1724,17 @@ export function ObjectView({
                 This object's file was deleted or moved on disk. Edits here aren't saved.
               </div>
             )}
-            <div className="object-body-text" onKeyDownCapture={onBodyKeyDown}>
+            {/* M32, item 11: the text has at least 60% of the window (not while the properties sit
+                under it in a narrow layout), and a click in the empty space below it is a click at
+                its end. */}
+            <div
+              className="object-body-text min-h-[60vh] cursor-text [[data-properties=inline]_&]:min-h-0"
+              onKeyDownCapture={onBodyKeyDown}
+              onMouseDown={(e) => {
+                if (e.target !== e.currentTarget || e.button !== 0) return
+                if (focusBodyEnd(viewRootRef.current)) e.preventDefault()
+              }}
+            >
               {raw ? (
                 <Suspense fallback={null}>
                   <RawMode
@@ -1739,9 +1761,9 @@ export function ObjectView({
                 />
               )}
             </div>
-            <ReferencesSection path={path} summary={summary} type={type} />
           </>
         }
+        below={<ReferencesSection path={path} summary={summary} type={type} />}
       >
         {overlays}
       </PageLayout>

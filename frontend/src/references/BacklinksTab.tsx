@@ -84,7 +84,19 @@ export function EntryHeader({
   )
 }
 
-/** An empty tab: a title and an optional line. */
+/**
+ * An empty section: one quiet line (M32, the note page is for writing; it was a title over an
+ * explanation). Marked so the section can lay empty parts close together.
+ */
+export function EmptyLine({ text }: { text: string }) {
+  return (
+    <p data-references-empty="" className="px-1 text-[13px] leading-6 text-fg-muted">
+      {text}
+    </p>
+  )
+}
+
+/** A notice with a title and an optional line (the side panel's "Backlinks not available"). */
 export function EmptyState({ title, description }: { title: string; description?: string }) {
   return (
     <div className="flex flex-col gap-0.5 px-1 py-3">
@@ -221,9 +233,7 @@ export function BacklinksTab({
 }: BacklinksTabProps) {
   // Paged: an object with hundreds of backlinks must not render them all at once (`loadMore`).
   const [shown, setShown] = useState(BACKLINKS_PAGE)
-  if (entries.length === 0) {
-    return <EmptyState title={REFERENCES_TEXT.backlinksEmptyTitle} description={REFERENCES_TEXT.backlinksEmptyDescription} />
-  }
+  if (entries.length === 0) return <EmptyLine text={REFERENCES_TEXT.backlinksEmptyTitle} />
   const list = entries.map((e) => e.path)
   const page = entries.length > shown ? entries.slice(0, shown) : entries
   return (

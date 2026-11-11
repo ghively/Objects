@@ -199,6 +199,7 @@ describe('narrow layouts', () => {
           return <aside aria-label="Properties" data-variant={variant}>props</aside>
         }}
         body={<p>Body text</p>}
+        below={<section aria-label="References">refs</section>}
       />,
     )
     return { ...r, drawn }
@@ -222,18 +223,40 @@ describe('narrow layouts', () => {
     expect((container.querySelector('[data-page-layout]') as HTMLElement).dataset.properties).toBe('beside')
   })
 
-  test('test a narrow standard page puts the property panel inline under the title', () => {
+  // M32, item 11: the text comes first. A narrow page (the side panel open, a small window) used
+  // to stack the properties above the text; now they follow it, before the references.
+  test('test a narrow standard page puts the property panel inline under the text', () => {
     const { container } = sized(767)
     const props = screen.getByRole('complementary', { name: 'Properties' })
     expect(props.dataset.variant).toBe('card')
     const inline = container.querySelector('[data-properties-inline]') as HTMLElement
     expect(inline.contains(props)).toBe(true)
-    // Under the header, before the body.
     const title = container.querySelector('[data-page-title]') as HTMLElement
     const body = container.querySelector('[data-page-body]') as HTMLElement
-    expect(title.compareDocumentPosition(inline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(inline.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const below = container.querySelector('[data-page-below]') as HTMLElement
+    const follows = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(title, body)).toBe(true)
+    expect(follows(body, inline)).toBe(true)
+    expect(follows(inline, below)).toBe(true)
+    expect(body.contains(inline)).toBe(false)
     expect((container.querySelector('[data-page-layout]') as HTMLElement).dataset.properties).toBe('inline')
+  })
+
+  test('test what follows the text (the references) comes right after the body in every design, wide or narrow', () => {
+    for (const design of [null, 'indexCard', 'profile', 'encyclopedia'] as const) {
+      for (const width of [1052, 500]) {
+        const { container, unmount } = sized(width, design)
+        const body = container.querySelector('[data-page-body]') as HTMLElement
+        const below = container.querySelector('[data-page-below]') as HTMLElement
+        expect(below).toHaveTextContent('refs')
+        expect(body.contains(below)).toBe(false)
+        expect(body.compareDocumentPosition(below) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        // Narrow: the inline properties sit between them, never above the text.
+        const inline = container.querySelector('[data-properties-inline]')
+        if (inline) expect(body.compareDocumentPosition(inline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+        unmount()
+      }
+    }
   })
 
   test('test profile and encyclopedia keep their placement from 768 px and go inline below', () => {

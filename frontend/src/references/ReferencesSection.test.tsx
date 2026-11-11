@@ -106,11 +106,89 @@ describe('ReferencesSection', () => {
 
     const panel = screen.getByRole('tabpanel')
     expect(within(panel).getByText('No backlinks yet')).toBeInTheDocument()
-    expect(within(panel).getByText('Backlinks show up here once another page links to this one.')).toBeInTheDocument()
     expect(within(panel).getByText('No related content yet')).toBeInTheDocument()
-    expect(within(panel).getByText('Objects that share words with this one will appear here.')).toBeInTheDocument()
     expect(within(panel).getByText('No unlinked mentions')).toBeInTheDocument()
     expect(within(panel).getByText('No related tags')).toBeInTheDocument()
+  })
+
+  // M32, item 11: an empty note's references are four quiet lines, not four headings with blocks.
+  test('an empty section is one quiet line: no heading and no explanation (M32)', async () => {
+    mocked.references.mockResolvedValue(
+      references({ tabs: ['all', 'backlinks', 'related', 'mentions', 'relatedTags'], summaries }),
+    )
+    const user = userEvent.setup()
+    await renderSection()
+    const panel = screen.getByRole('tabpanel')
+    const lines = [...panel.querySelectorAll('[data-references-empty]')].map((el) => el.textContent)
+    expect(lines).toEqual(['No backlinks yet', 'No related content yet', 'No unlinked mentions', 'No related tags'])
+    expect(within(panel).queryAllByRole('heading')).toEqual([])
+    expect(within(panel).queryByText(/show up here|will appear here/)).toBeNull()
+    // Each part is still there, in tab order, marked empty.
+    const parts = [...panel.querySelectorAll('[data-all-part]')]
+    expect(parts.map((el) => el.getAttribute('data-all-part'))).toEqual(['backlinks', 'related', 'mentions', 'relatedTags'])
+    expect(parts.every((el) => el.hasAttribute('data-part-empty'))).toBe(true)
+    // Every tab stays, each with its count; a tab on its own shows the same single line.
+    expect(screen.getAllByRole('tab').map((t) => t.getAttribute('data-tab'))).toEqual(['all', 'backlinks', 'related', 'mentions', 'relatedTags'])
+    await user.click(tab(/^Backlinks/))
+    const own = screen.getByRole('tabpanel')
+    expect(own.textContent).toBe('No backlinks yet')
+  })
+
+  // Ground rule: unlinked mentions are never removed or hidden.
+  test('the Mentions tab stays on an empty note and says so in one line (M32)', async () => {
+    mocked.references.mockResolvedValue(references({ tabs: ['all', 'backlinks', 'related', 'mentions'], summaries }))
+    const user = userEvent.setup()
+    await renderSection()
+    expect(tab(/^Mentions/).querySelector('[data-tab-count]')?.textContent).toBe('0')
+    expect(tab(/^Mentions/).querySelector('[title="Unlinked name matches"]')).not.toBeNull()
+    await user.click(tab(/^Mentions/))
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('data-tabpanel', 'mentions')
+    expect(screen.getByRole('tabpanel').textContent).toBe('No unlinked mentions')
+  })
+
+  test('unlinked mentions always show when there are any, under their heading, among empty sections (M32)', async () => {
+    mocked.references.mockResolvedValue(
+      references({ tabs: ['all', 'backlinks', 'related', 'mentions', 'relatedTags'], mentions: FULL.mentions, summaries }),
+    )
+    const user = userEvent.setup()
+    await renderSection()
+    expect(tab(/^Mentions/).querySelector('[data-tab-count]')?.textContent).toBe('1')
+    const panel = screen.getByRole('tabpanel')
+    // The one section with content keeps its heading and its list; the empty ones are lines.
+    expect(within(panel).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Mentions'])
+    const part = panel.querySelector('[data-all-part="mentions"]') as HTMLElement
+    expect(part).not.toHaveAttribute('data-part-empty')
+    const mention = part.querySelector('[data-mention="Pages/Gamma.md"]') as HTMLElement
+    expect(within(mention).getByText('Gamma')).toBeInTheDocument()
+    expect(mention.querySelector('[data-occurrence] .search-highlights')?.textContent).toBe('talk about self here')
+    expect(within(mention).getByRole('button', { name: 'Link' })).toBeEnabled()
+    expect(panel.querySelectorAll('[data-references-empty]')).toHaveLength(3)
+    expect(within(panel).queryByText('No unlinked mentions')).toBeNull()
+    // And "Link" still works from here.
+    await user.click(within(mention).getByRole('button', { name: 'Link' }))
+    await waitFor(() =>
+      expect(mocked.linkMention).toHaveBeenCalledWith({
+        path: 'Pages/Gamma.md',
+        target: SELF.path,
+        start: 10,
+        end: 14,
+        text: 'self',
+        baseVersion: 'vg1',
+      }),
+    )
+  })
+
+  test('a section the user closed still shows its mentions heading, so they can be opened again (M32)', async () => {
+    localStorage.setItem(referencesKey('self-id'), JSON.stringify({ tab: 'all', closed: false, parts: { mentions: false } }))
+    mocked.references.mockResolvedValue(references({ tabs: ['all', 'backlinks', 'mentions'], mentions: FULL.mentions, summaries }))
+    const user = userEvent.setup()
+    await renderSection()
+    const panel = screen.getByRole('tabpanel')
+    const toggle = within(panel).getByRole('button', { name: 'Mentions' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(panel.querySelector('[data-mention]')).toBeNull()
+    await user.click(toggle)
+    expect(panel.querySelector('[data-mention="Pages/Gamma.md"]')).not.toBeNull()
   })
 
   test('tab counts are shown muted', async () => {

@@ -320,6 +320,15 @@ Each starter template pre-fills the new type's properties.
 - **Full page**: the same content, with the property pane docked on the left (Status, Time frame,
   Collaborators... one block per property, each "Empty" when unset) and the outline as a column of short
   dashes at the right edge (hover opens the outline popover). The browser tab title is the object title.
+- **The note page is for writing** (M32): the property pane starts closed for a type with no properties of its
+  own (the Note and the Daily note, which have only the system rows Collections, Description, Created at, Last
+  updated, Tags, Icon, Aliases; a Daily note's Date and Reviewed show in its header) and open for every other
+  type. "Show properties by default" off still closes it everywhere, and the toggle on a note wins and is kept in
+  that note (`hideProperties: false` shows, `true` hides; toggling back to where the note starts removes the key).
+  The body is at least 60% of the window's height, and a click in the empty space below the text puts the caret
+  at the end of the text (under a last block that holds no text, a divider or an image, on a new empty line). In a
+  narrow layout (the side panel open, a small window) the properties card follows the text, before the
+  references, where it used to sit above the text; the 60% minimum does not apply there, so the card stays near.
 - **Save mark** (M32): in a note's toolbar (page and peek), left of its buttons: "Saving…" while typed text waits
   for its save or a save runs, then a check and "Saved", which fades to the check alone after two seconds. A note
   nobody typed in shows nothing. A failed save keeps the editor's "Changes not saved. Retrying…" and adds nothing.
@@ -609,7 +618,9 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   dropdown, date icon, priority pill) plus the line that links here ("Parent project: <object chip>"); other
   objects show the linking block with its parent context. A leading radio-dot marks each reference; hovering shows
   small action icons (expand, `...`, and three more at the right). Unlinked Mentions is a separate section
-  (section 11).
+  (section 11). An empty section (M32) is one quiet line with no heading and no explanation ("No backlinks
+  yet", "No related content yet", "No unlinked mentions", "No related tags"), in the page's references, in a tab
+  on its own and in the side panel's Backlinks entry; every tab stays, with its count.
 - **Backlinks stay live**: when another object gains or loses a link to the open one (Link on a mention, an
   outside edit adding `[[X]]`), the Properties panel's Backlinks chips and the Tasks dashboard's Context grouping
   update without a reload (a change to any other object re-reads them).
@@ -1008,7 +1019,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 An "Unlinked Mentions" section sits under Backlinks on an object's page; it lists text elsewhere that matches
 this object's title or an alias without being a link ("Unlinked name matches", section label "Mentions"; an
 alias counts as a mention of the original object). Settings > Editor > "Backlink sections start as"
-has Backlinks Open | Closed and Unlinked Mentions Open | Closed | Hidden.
+has Backlinks Open | Closed and Unlinked Mentions Open | Closed | Hidden. With no mentions (M32) the section is
+the one line "No unlinked mentions" and the Mentions tab stays; when there are any they always show, under their
+heading, each with its "Link" button.
 
 Object builds it in full (M5): `backend/objectapp/references.py` (matching on Unicode word
 boundaries, titles and aliases of at least a minimum length, longest name first, linking a mention from the

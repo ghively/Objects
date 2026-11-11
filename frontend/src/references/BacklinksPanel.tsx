@@ -4,7 +4,8 @@
  * tab's main view shows, so the entry follows the tab as it navigates; with no object there, or one
  * whose type has no references section, it says "Backlinks not available". Backlinks render with
  * the same settings as the references section; the section defaults and hiding apply to object
- * pages only (our reading), so both lists always show here.
+ * pages only (our reading), so both lists always show here. M32: an empty list is its one quiet
+ * line, with no heading over it.
  */
 import { useMemo, useState } from 'react'
 import { useSettings } from '@/settings/useSettings'
@@ -46,7 +47,7 @@ function PanelContent({ path }: { path: string }) {
         </p>
       )}
       <div className="flex flex-col gap-2">
-        <h3 className="text-[13px] font-semibold text-fg-muted">{TAB_META.backlinks.label}</h3>
+        {data.backlinks.length > 0 && <h3 className="text-[13px] font-semibold text-fg-muted">{TAB_META.backlinks.label}</h3>}
         <BacklinksTab
           entries={data.backlinks}
           summaries={data.summaries}
@@ -56,7 +57,7 @@ function PanelContent({ path }: { path: string }) {
       </div>
       {data.tabs.includes('mentions') && (
         <div className="flex flex-col gap-2">
-          <h3 className="text-[13px] font-semibold text-fg-muted">{TAB_META.mentions.label}</h3>
+          {data.mentions.length > 0 && <h3 className="text-[13px] font-semibold text-fg-muted">{TAB_META.mentions.label}</h3>}
           <MentionsTab target={path} entries={data.mentions} summaries={data.summaries} reload={reload} onToast={setToast} />
         </div>
       )}
