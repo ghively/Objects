@@ -129,6 +129,36 @@ describe.each(['page', 'peek'] as const)('title to body, in the %s', (mode) => {
 })
 
 describe('title to body', () => {
+  // The editor's state follows the DOM selection a moment later (on `selectionchange`), and the key
+  // is read before the editor sees it: ArrowLeft, ArrowLeft, ArrowUp in quick succession (found
+  // in a real browser).
+  test('the caret is read where it is now, not where the editor last saw it', async () => {
+    const { editor, title } = await open()
+    act(() => {
+      editor.commands.focus(4)
+      editor.view.focus()
+    })
+    // The caret moves in the DOM; the editor has not heard yet.
+    const text = editor.view.dom.querySelector('p')!.firstChild!
+    document.getSelection()!.collapse(text, 0)
+    expect(editor.state.selection.from).toBe(4)
+    fireEvent.keyDown(editor.view.dom, { key: 'ArrowUp' })
+    expect(title).toHaveFocus()
+  })
+
+  test('and a caret the DOM has moved away from the start is not at the start', async () => {
+    const { editor, title } = await open()
+    act(() => {
+      editor.commands.focus('start')
+      editor.view.focus()
+    })
+    const text = editor.view.dom.querySelector('p')!.firstChild!
+    document.getSelection()!.collapse(text, 3)
+    expect(editor.state.selection.from).toBe(1)
+    fireEvent.keyDown(editor.view.dom, { key: 'ArrowUp' })
+    expect(title).not.toHaveFocus()
+  })
+
   test('Shift+Tab at the start of a list item is the editor\'s (it unindents); ArrowUp still goes to the title', async () => {
     files[PATH] = file(PATH, 'Notes', '- one\n- two\n', 'v1')
     const { editor, title } = await open()
@@ -184,9 +214,10 @@ describe('body focus requests', () => {
 describe('a rename that moves the file', () => {
   const NEW = 'Pages/Plans.md'
 
-  test('what was typed in the body meanwhile is saved under the new path, and the caret follows', async () => {
+  /** Open the note as the active tab's page, retitle it and press Enter; the rename is held open. */
+  async function renameAndStayInBody(body: string) {
     const user = userEvent.setup()
-    files[PATH] = file(PATH, 'Notes', '', 'v1')
+    files[PATH] = file(PATH, 'Notes', body, 'v1')
     let finishRename!: (r: RenameResult) => void
     mocked.renameObject.mockImplementation(
       () =>
@@ -194,50 +225,80 @@ describe('a rename that moves the file', () => {
           finishRename = resolve
         }),
     )
-    mocked.saveBody.mockImplementation(async (p: string, body: string) => {
-      files[p] = file(p, 'Plans', body, 'v3')
-      return { version: 'v3' }
-    })
     useTabs.getState().open({ kind: 'object', path: PATH })
     const utils = render(<ObjectPageOfTab />)
     const editor = await waitFor(() => pm(utils.container))
+    await waitFor(() => expect(serializeBody(editor)).toBe(body))
     const title = screen.getByRole('textbox', { name: 'Title' })
     await user.clear(title)
     await user.type(title, 'Plans{Enter}')
     await waitFor(() => expect(mocked.renameObject).toHaveBeenCalledWith(PATH, 'Plans', 'v1'))
-    // The rename is still on its way; the caret is already in the body, and the words land there.
+    // The rename is still on its way; the caret is already in the body.
     expect(bodyHasFocus(editor)).toBe(true)
+    const finish = async () => {
+      // The file has moved: only the new path can be read or written.
+      files[NEW] = file(NEW, 'Plans', body, 'v2')
+      delete files[PATH]
+      mocked.object.mockClear()
+      await act(async () => {
+        finishRename({ path: NEW, version: 'v2', relinked: [], skipped: [] })
+      })
+    }
+    return { ...utils, editor, finish }
+  }
+
+  test('what was typed in the body meanwhile is shown at once, saved under the new path, and the caret stays', async () => {
+    mocked.saveBody.mockImplementation(async (p: string, body: string) => {
+      files[p] = file(p, 'Plans', body, 'v3')
+      return { version: 'v3' }
+    })
+    const { container, editor, finish } = await renameAndStayInBody('')
     act(() => {
       editor.commands.insertContent('Hello')
     })
     const typed = serializeBody(editor)
     expect(mocked.saveBody).not.toHaveBeenCalled()
 
-    files[NEW] = file(NEW, 'Plans', '', 'v2')
-    delete files[PATH]
-    await act(async () => {
-      finishRename({ path: NEW, version: 'v2', relinked: [], skipped: [] })
-    })
-    // Saved under the new path on the rename's version; never under the old one.
+    await finish()
+    // No moment without an editor: the view that took over is there with the words and the
+    // caret after them (nothing was loaded again), so the next key lands in the right place.
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: NEW })
+    const next = pm(container)
+    expect(next).not.toBe(editor)
+    expect(serializeBody(next)).toBe(typed)
+    expect(bodyHasFocus(next)).toBe(true)
+    expect(next.state.selection.from).toBe(1 + 'Hello'.length)
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Plans')
+    // Saved once, under the new path on the rename's version; never under the old path.
     await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(NEW, typed, 'v2'))
     expect(mocked.saveBody).toHaveBeenCalledTimes(1)
-    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: NEW }))
-    // The view that takes over shows the text and has the caret where it was (after "Hello").
-    const next = await waitFor(() => {
-      const ed = pm(utils.container)
-      expect(ed).not.toBe(editor)
-      expect(serializeBody(ed)).toBe(typed)
-      return ed
+    // What is typed next is saved on the version that save answered.
+    act(() => {
+      next.commands.insertContent(' there')
     })
-    await waitFor(() => expect(bodyHasFocus(next)).toBe(true))
-    expect(next.state.selection.from).toBe(1 + 'Hello'.length)
-    expect(mocked.saveBody).toHaveBeenCalledTimes(1)
+    const more = serializeBody(next)
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(NEW, more, 'v3'), { timeout: 4000 })
+    expect(mocked.saveBody.mock.calls.every(([p]) => p === NEW)).toBe(true)
     expect(keptUnsaved(PATH)).toBeNull()
     expect(keptUnsaved(NEW)).toBeNull()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   }, 15000)
 
-  test('a body nobody typed in moves at once, with the caret', async () => {
+  test('a body nobody typed in moves at once, with the caret, and nothing is saved', async () => {
+    const { container, editor, finish } = await renameAndStayInBody(BODY)
+    act(() => {
+      editor.commands.setTextSelection(4)
+    })
+    await finish()
+    const next = pm(container)
+    expect(next).not.toBe(editor)
+    expect(serializeBody(next)).toBe(BODY)
+    expect(bodyHasFocus(next)).toBe(true)
+    expect(next.state.selection.from).toBe(4)
+    expect(mocked.saveBody).not.toHaveBeenCalled()
+  }, 15000)
+
+  test('a title committed by clicking elsewhere moves the note without taking the focus into the body', async () => {
     const user = userEvent.setup()
     mocked.renameObject.mockImplementation(async () => {
       files[NEW] = file(NEW, 'Plans', BODY, 'v2')
@@ -247,19 +308,33 @@ describe('a rename that moves the file', () => {
     useTabs.getState().open({ kind: 'object', path: PATH })
     const utils = render(<ObjectPageOfTab />)
     const editor = await waitFor(() => pm(utils.container))
-    await waitFor(() => expect(serializeBody(editor)).toBe(BODY))
     const title = screen.getByRole('textbox', { name: 'Title' })
     await user.clear(title)
-    await user.type(title, 'Plans{Enter}')
+    await user.type(title, 'Plans')
+    act(() => title.blur())
     const next = await waitFor(() => {
       const ed = pm(utils.container)
       expect(ed).not.toBe(editor)
-      expect(serializeBody(ed)).toBe(BODY)
       return ed
     })
-    await waitFor(() => expect(bodyHasFocus(next)).toBe(true))
-    expect(next.state.selection.from).toBe(1)
-    expect(mocked.saveBody).not.toHaveBeenCalled()
+    expect(serializeBody(next)).toBe(BODY)
+    expect(bodyHasFocus(next)).toBe(false)
+  }, 15000)
+
+  test('text that cannot be saved under the new path is kept and offered, never dropped', async () => {
+    mocked.saveBody.mockRejectedValue(new Error('disk full'))
+    const { container, editor, finish } = await renameAndStayInBody('')
+    act(() => {
+      editor.commands.insertContent('Hello')
+    })
+    const typed = serializeBody(editor)
+    await finish()
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(NEW, typed, 'v2'))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Hello')
+    expect(keptUnsaved(NEW)).toBe(typed)
+    // The editor is back on what the file holds; the offered text is one click from saved.
+    expect(serializeBody(pm(container))).toBe('')
   }, 15000)
 })
 

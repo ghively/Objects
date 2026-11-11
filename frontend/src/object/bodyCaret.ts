@@ -54,37 +54,47 @@ export function focusBodyEnd(root: ParentNode | null | undefined): boolean {
   return focusBody(root, 'end')
 }
 
+/**
+ * The caret's document position while nothing is selected (null with a selection), read from the
+ * DOM where it is in the editor: the editor's own state follows the DOM selection a moment later,
+ * and these keys are read before the editor sees them, so a key pressed right after a caret move
+ * (ArrowLeft, ArrowLeft, ArrowUp) must find the caret where it is now.
+ */
+function caretPosition(ed: TiptapEditor): number | null {
+  const sel = ed.view.dom.ownerDocument.getSelection()
+  if (sel?.anchorNode && ed.view.dom.contains(sel.anchorNode)) {
+    if (!sel.isCollapsed) return null
+    try {
+      return ed.view.posAtDOM(sel.anchorNode, sel.anchorOffset)
+    } catch {
+      /* a node the editor can't place: its own selection below */
+    }
+  }
+  return ed.state.selection.empty ? ed.state.selection.from : null
+}
+
 /** The caret (nothing selected) is at the body's very first position: there is nowhere to go up to. */
 export function caretAtBodyStart(ed: TiptapEditor): boolean {
-  const { selection, doc } = ed.state
-  return selection.empty && !getBlockSelection(ed.state) && selection.from <= Selection.atStart(doc).from
+  const pos = caretPosition(ed)
+  return pos !== null && !getBlockSelection(ed.state) && pos <= Selection.atStart(ed.state.doc).from
 }
 
 /** The caret's block is a top-level one, so Shift+Tab has nothing to unindent (a list item has). */
 export function caretInTopLevelBlock(ed: TiptapEditor): boolean {
-  return ed.state.selection.$from.depth <= 1
+  const pos = caretPosition(ed) ?? ed.state.selection.from
+  return ed.state.doc.resolve(Math.min(pos, ed.state.doc.content.size)).depth <= 1
 }
 
-/** The body's selection, when the body has the focus. */
-export function focusedBodySelection(root: ParentNode | null | undefined): { anchor: number; head: number } | null {
+/**
+ * Where the caret of the body under `root` is, when the body has the focus: the formatted
+ * editor's selection, or (raw mode) just that the body has it.
+ */
+export function focusedBodyCaret(root: ParentNode | null | undefined): BodyCaret | null {
   const ed = bodyEditorOf(root)
-  if (!ed || document.activeElement !== ed.view.dom) return null
-  const { anchor, head } = ed.state.selection
-  return { anchor, head }
-}
-
-// A rename moves the file, and the page and the peek are keyed by path: the view that had the
-// caret is replaced. It leaves the selection here for the view that takes over (one-shot).
-const carried = new Map<string, { anchor: number; head: number }>()
-
-/** Leave the body's selection for the view that opens `path` next. */
-export function carryCaret(path: string, selection: { anchor: number; head: number }): void {
-  carried.set(path, selection)
-}
-
-/** Take (and clear) the selection left for `path`, or null. */
-export function takeCarriedCaret(path: string): { anchor: number; head: number } | null {
-  const sel = carried.get(path) ?? null
-  carried.delete(path)
-  return sel
+  if (ed && document.activeElement === ed.view.dom) {
+    const { anchor, head } = ed.state.selection
+    return { anchor, head }
+  }
+  const area = root?.querySelector('.object-body-text')
+  return area && document.activeElement && area.contains(document.activeElement) ? 'start' : null
 }

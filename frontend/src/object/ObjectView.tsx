@@ -76,12 +76,11 @@ import {
   bodyEditorOf,
   caretAtBodyStart,
   caretInTopLevelBlock,
-  carryCaret,
   focusBody,
   focusBodyEnd,
-  focusedBodySelection,
-  takeCarriedCaret,
+  focusedBodyCaret,
 } from './bodyCaret'
+import { dropHandover, handOver, peekHandover } from './renameHandover'
 import { typeHasOwnProperties } from './ownProperties'
 import { PropertyPanel } from './PropertyPanel'
 import { SaveMark } from './SaveMark'
@@ -340,7 +339,13 @@ export function ObjectView({
   onDeleted,
   workHeader,
 }: ObjectViewProps) {
-  const [detail, setDetail] = useState<ObjectDetail | null>(null)
+  /**
+   * M32: what the view this one replaces left for it when its own rename moved the file
+   * (`renameHandover.ts`): the note as it stands, the caret, and text not yet saved. With it the
+   * first render already shows the editor; nothing is loaded again.
+   */
+  const [handed] = useState(() => (mode === 'inline' ? null : peekHandover(path)))
+  const [detail, setDetail] = useState<ObjectDetail | null>(handed?.detail ?? null)
   /** Mirrors `detail` for callbacks that must not wait for a render (a work write's result). */
   const detailRef = useRef<ObjectDetail | null>(null)
   detailRef.current = detail
@@ -351,7 +356,7 @@ export function ObjectView({
    * with `api.workItem` (the front matter holds them as stored), for the raw values in `raw`.
    */
   const [decoded, setDecoded] = useState<{ path: string; raw: string; fields: Record<string, unknown> } | null>(null)
-  const [version, setVersion] = useState('')
+  const [version, setVersion] = useState(handed?.detail.version ?? '')
   const [error, setError] = useState<string | null>(null)
   const [raw, setRaw] = useState(false)
   /** The pane toggled in this view; until then the object's own `hideProperties` decides. */
@@ -390,7 +395,7 @@ export function ObjectView({
 
   const editorRef = useRef<BodyEditorHandle | null>(null)
   /** The version the editor's next save is based on (mirrors `version` without waiting for a render). */
-  const versionRef = useRef('')
+  const versionRef = useRef(handed?.detail.version ?? '')
   const onVersionRef = useRef(onVersion)
   onVersionRef.current = onVersion
   const onDetailRef = useRef(onDetail)
@@ -416,38 +421,31 @@ export function ObjectView({
 
   /**
    * M32: our own rename moved the file. The page and the peek are keyed by path, so this view and
-   * its editor are about to be replaced, and Enter in the title has already put the caret in the
-   * body: what was typed there while the rename ran is saved under the new path first (the old
-   * one is gone), and the caret is left for the view that takes over. Text that can't be saved is
-   * kept and offered there (`RecoveryDialog`). A body nobody typed in moves at once.
+   * its editor are replaced at once (here, and by the app on the rename's event), and Enter in the
+   * title has already put the caret in the body. So that nothing typed meanwhile is lost and the
+   * caret stays, the view that takes over is handed the note as it stands, the caret, and the
+   * text this editor has not saved; it shows them in its first render and saves the text.
    */
   const viewRootRef = useRef<HTMLDivElement | null>(null)
-  const followRename = async (res: RenameResult, oldPath: string) => {
-    const h = mode === 'inline' ? null : editorRef.current
-    const dirty = !!h && h.isDirty()
-    let unsaved = dirty ? h.getBody() : null
-    let version = res.version
-    try {
-      for (let i = 0; h && unsaved !== null && i < 3; i++) {
-        h.hold()
-        version = (await api.saveBody(res.path, unsaved, version)).version
-        adoptVersion(version)
-        const now = h.getBody()
-        unsaved = now === null || now === unsaved ? null : now
-      }
-    } catch {
-      /* kept below */
-    }
-    if (h) {
-      const caret = focusedBodySelection(viewRootRef.current)
-      if (caret) carryCaret(res.path, caret)
-      const shown = h.getBody()
-      if (unsaved !== null && shown !== null) keepUnsaved(res.path, shown, objectIdRef.current)
-      // Nothing is left for this editor to save: leaving, it must not write to the old path.
-      if (dirty && shown !== null) h.reload(shown, version)
-    }
-    renamedToRef.current = res.path
-    useTabs.getState().retarget(oldPath, res.path)
+  const handOverTo = (res: RenameResult, title: string) => {
+    const d = detailRef.current
+    const h = editorRef.current
+    if (mode === 'inline' || !d || !h) return
+    const shown = h.getBody()
+    const onDisk = h.savedBody() ?? d.body
+    handOver(res.path, {
+      detail: {
+        ...d,
+        body: onDisk,
+        version: res.version,
+        frontmatter: { ...d.frontmatter, title },
+        summary: { ...d.summary, path: res.path, title },
+      },
+      caret: focusedBodyCaret(viewRootRef.current),
+      unsaved: shown !== null && shown !== onDisk ? shown : null,
+    })
+    // This editor is leaving: what it holds is handed over, and it must not write to the old path.
+    if (shown !== null && shown !== onDisk) h.reload(shown, res.version)
   }
 
   const bodyControl = useRef<BodyControl>({
@@ -673,7 +671,11 @@ export function ObjectView({
             }
           : d,
       )
-      if (res.path !== oldPath) void followRename(res, oldPath)
+      if (res.path !== oldPath) {
+        handOverTo(res, title)
+        renamedToRef.current = res.path
+        useTabs.getState().retarget(oldPath, res.path)
+      }
     },
   })
 
@@ -848,6 +850,16 @@ export function ObjectView({
     pendingRef.current = false
     setPending(null)
     setRecovery(null)
+    if (handed && handed.detail.summary.path === path) {
+      // M32: handed over by the view our own rename replaced: the note is already shown, at the
+      // version the rename answered. Only what the server works out is read again.
+      adoptVersion(versionRef.current)
+      void ensureLinkIndex()
+      refreshComputed()
+      return () => {
+        alive = false
+      }
+    }
     if (renamedToRef.current === path) {
       // Our own rename: keep showing the object while its new path loads.
       renamedToRef.current = null
@@ -880,7 +892,7 @@ export function ObjectView({
     return () => {
       alive = false
     }
-  }, [path, adoptVersion, markDeleted, offerKept])
+  }, [path, adoptVersion, markDeleted, offerKept, handed, refreshComputed])
 
   const toggleRaw = async () => {
     // Save everything first (and wait for saves already in flight or queued),
@@ -1477,13 +1489,44 @@ export function ObjectView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, autoFocus, hasDetail, loadFailed])
 
-  // M32: a body-focus request for this note ("Today's note": the end of its text), or the caret
-  // our own rename left for it, is taken once, when the editor shows the loaded body.
+  // M32: once the editor shows the loaded body, the view takes what was left for it: after our
+  // own rename the text typed meanwhile (shown at once, saved here) and the caret; otherwise a
+  // body-focus request for this note ("Today's note": the end of its text). Each is taken once.
+  const takenRef = useRef(false)
   useEffect(() => {
-    if (mode === 'inline' || !hasDetail) return
-    const at = takeCarriedCaret(path) ?? takeBodyFocus(path)
+    if (mode === 'inline' || !hasDetail || takenRef.current) return
+    takenRef.current = true
+    dropHandover(path)
+    const h = editorRef.current
+    const text = handed?.unsaved
+    if (h && text != null) {
+      // Shown now, saved by this view; the editor's own saving waits for the answer.
+      h.reload(text, versionRef.current)
+      h.hold()
+      api
+        .saveBody(path, text, versionRef.current)
+        .then((res) => {
+          setDetail((d) => (d && d.summary.path === path ? { ...d, body: text, version: res.version } : d))
+          adoptVersion(res.version)
+          // Anything typed since is saved on that version.
+          void editorRef.current?.resume(res.version)
+        })
+        .catch((err: unknown) => {
+          // It could not be written (the file changed again): the editor goes back to the file
+          // and the text is kept and offered, as text left unsaved always is.
+          const d = detailRef.current
+          const kept = editorRef.current?.getBody() ?? text
+          keepUnsaved(path, kept, d?.summary.id)
+          if (d) {
+            editorRef.current?.reload(d.body, versionRef.current)
+            setRecovery({ kept, onDisk: d.body, error: null })
+          }
+          if (err instanceof ConflictError) enqueueRef.current(false)
+        })
+    }
+    const at = handed?.caret ?? takeBodyFocus(path)
     if (at) focusBody(viewRootRef.current, at)
-  }, [mode, hasDetail, path])
+  }, [mode, hasDetail, path, handed, adoptVersion])
 
   /** M32, item 2: Enter, ArrowDown or Tab in the title: the caret goes to the start of the body. */
   const enterBody = useCallback(() => focusBody(viewRootRef.current, 'start'), [])
