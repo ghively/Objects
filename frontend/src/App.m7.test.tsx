@@ -179,10 +179,11 @@ describe('App, M7 tabs', () => {
     expect(await screen.findByRole('textbox', { name: 'Search tabs' })).toBeInTheDocument()
     act(() => useTabMenu.getState().setOpen(false))
 
-    // openNewTab (Mod+T) and closeTab (Mod+W).
+    // openNewTab (Mod+T) and closeTab (Mod+W). M32: a new tab is empty, which shows Home.
     key('t', { ctrlKey: true })
     expect(s().tabs).toHaveLength(3)
-    expect(currentTarget(s())).toEqual({ kind: 'allNotes' })
+    expect(currentTarget(s())).toBeNull()
+    expect(await screen.findByRole('region', { name: 'Home' })).toBeInTheDocument()
     key('w', { ctrlKey: true })
     expect(s().tabs).toHaveLength(2)
 

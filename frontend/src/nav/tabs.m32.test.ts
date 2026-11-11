@@ -106,3 +106,19 @@ describe('a plain click opens a full page (M32)', () => {
     expect(currentTarget(useTabs.getState())).toEqual(objT('Pages/A.md'))
   })
 })
+
+describe('a new tab is Home (M32)', () => {
+  test('test newTab opens an empty tab beside the others, whatever page was in view', () => {
+    useTabs.getState().open(objT('Pages/A.md'))
+    const first = useTabs.getState().activeId
+    useTabs.getState().newTab()
+    expect(useTabs.getState().tabs).toHaveLength(2)
+    expect(useTabs.getState().activeId).not.toBe(first)
+    // No page: the shell shows Home there.
+    expect(currentTarget(useTabs.getState())).toBeNull()
+    expect(activeTab(useTabs.getState())?.history).toEqual([])
+    // The first page is still in its own tab; opening something fills the new one.
+    useTabs.getState().open(objT('Pages/B.md'))
+    expect(useTabs.getState().tabs.map((t) => t.history.at(-1))).toEqual([objT('Pages/A.md'), objT('Pages/B.md')])
+  })
+})

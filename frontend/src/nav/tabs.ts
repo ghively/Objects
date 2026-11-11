@@ -140,7 +140,7 @@ export interface TabsState {
   close(id: string): void
   /** Make `id` the active tab. */
   activate(id: string): void
-  /** Open a new tab showing the active tab's current target (or nothing). */
+  /** M32: open a new, empty tab, which shows Home (it used to copy the active tab's page). */
   newTab(): void
   /**
    * M32: show Home (a tab with no page) in the active tab. A persistent or pinned tab keeps its
@@ -446,8 +446,7 @@ export const useTabs = create<TabsState>()(
 
       newTab() {
         const s = get()
-        const target = currentTarget(s)
-        const t = freshTab(target)
+        const t = freshTab(null)
         set({ tabs: sortPinned([...s.tabs, t]), activeId: t.id })
       },
 

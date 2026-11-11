@@ -274,7 +274,9 @@ Each starter template pre-fills the new type's properties.
   the line "Nothing due today."; an empty space shows "Nothing here yet. Start a note, or open today." and the
   two buttons only. Opening Home writes no file. Its tab reads "Home". "When this space opens" › "Home" shows it
   in the active tab (our call: that tab starts over; a persistent or pinned tab keeps its page and an empty tab
-  is used, a new one only when there is none); "Where I left off" with nothing to restore is Home.
+  is used, a new one only when there is none); "Where I left off" with nothing to restore is Home. The tab strip's `+`
+  ("Create new tab") and Ctrl+T open a new, empty tab, so they land on Home (our call, M32: they used to copy the
+  page in view; Ctrl/Cmd+click still opens anything in a new tab).
 
 - **A click opens a full page (M32)**: while "Open notes as a full page" is on (it starts on), a plain click on a
   note anywhere (a list, card or table row, a `[[link]]`, a tag or backlink chip, a graph node, the Calendar's
