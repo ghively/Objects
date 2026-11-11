@@ -1,14 +1,16 @@
 """M32 item 10 (back end): the Work switch.
 
 ``space.json``'s ``workEnabled`` (true / false) wins. Absent, Work reads as **on** when the space
-already holds work data (a Capture or an Alert type, a Ticket ID on any note, or the IT
-operations starter) and **off** otherwise; reading it never writes.
+already holds work data (a Capture or an Alert type, a value for a ticket or work field on a
+Task or a work type's note, or the IT operations starter) and **off** otherwise; reading it
+never writes.
 
-With Work off the built-in Task is not topped up with the ticket and work fields in memory,
-except that a field stays when it is saved in ``task.json`` or any Task holds a value for it
-(Steps and Project follow the same rule); the Tickets saved search is not listed; the work
-hook of a property write and the Work loop's notice do not run. With Work on everything is as
-before M32.
+With Work off the built-in Task is not topped up with the ticket and work fields in memory, and
+(the fix pass, `test_m32_fix_fields.py`) a ticket or work field is listed on the Task or a work
+type only when some note of the type holds a value for it or its stored definition was changed
+(Steps and Project follow the same rule); the Tickets saved search is not listed; the work hook
+of a property write and the Work loop's notice do not run. With Work on everything is as before
+M32.
 """
 
 from __future__ import annotations
@@ -26,9 +28,16 @@ from objectapp.captures import ensure_capture_type
 from objectapp.server import create_app
 from objectapp.space import Space
 from objectapp.spaces import create_space
+from objectapp.typemodel import PROPERTY_ICONS
 from objectapp.typetemplates import build_template, template_catalog
 from objectapp.watcher import ChangeEvent
-from objectapp.workfields import FIELD_KEYS, TICKET_KEYS, is_work_type, with_work_fields
+from objectapp.workfields import (
+    FIELD_KEYS,
+    TICKET_KEYS,
+    field_defs,
+    is_work_type,
+    with_work_fields,
+)
 from objectapp.workview import TICKETS_ID
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -101,7 +110,7 @@ def test_a_new_space_has_work_off_and_reading_writes_nothing(plain: Path):
     assert _snapshot(plain) == before
 
 
-def test_a_ticket_id_on_any_note_turns_the_default_on(plain: Path):
+def test_a_ticket_id_on_a_task_turns_the_default_on(plain: Path):
     _task(plain, "Printer", "ticketId: 'INC0012345'")
     before = _snapshot(plain)
     sp = Space(plain)
@@ -121,7 +130,7 @@ def test_an_empty_ticket_id_is_not_work_data(plain: Path):
 
 def test_the_default_follows_a_ticket_id_written_later(plain: Path):
     sp = Space(plain)
-    rel, version = sp.create_object("page", "A note")
+    rel, version = sp.create_object("task", "A task")
     assert sp.work_on() is False
     sp.update_properties(rel, {"ticketId": "ABC-12"}, version)
     assert sp.work_on() is True and _work_keys(sp) == FIELD_KEYS
@@ -183,21 +192,30 @@ def test_the_stored_switch_wins_over_work_data(plain: Path):
 # -- the fields with Work off -----------------------------------------------------------------
 
 
-def test_a_field_with_a_value_or_saved_in_the_type_stays(plain: Path):
-    # `rank` is saved in task.json; `blockedOn` and `steps` have values; the rest have neither.
+def test_a_field_with_a_value_or_changed_in_the_type_stays(plain: Path):
+    """The fix pass (findings 2 and 3): a definition saved in ``task.json`` as the built-in one
+    is no reason to list the field (it used to be); one the user changed is."""
+    # `rank` is saved in task.json renamed, `area` as the built-in one; `blockedOn` and `steps`
+    # have values; the rest have neither.
     path = plain / ".object" / "types" / "task.json"
     data = json.loads(path.read_text("utf-8"))
+    icon = {"type": "iconify", "val": PROPERTY_ICONS["number"]}
     data["propertyDefinitions"].append(
-        {"id": "rank", "key": "rank", "name": "Rank", "type": "number", "description": "",
-         "icon": {"type": "iconify", "val": "ph-hash"}, "visibility": "hideWhenEmpty", "options": {}}
+        {"id": "rank", "key": "rank", "name": "Order", "type": "number", "description": "",
+         "icon": icon, "visibility": "hideWhenEmpty", "options": {}}
+    )
+    data["propertyDefinitions"].append(
+        next(d for d in field_defs(task=True, project_type_ids=[]) if d.key == "area").to_json()
     )
     path.write_text(json.dumps(data, indent=2) + "\n", "utf-8")
     _task(plain, "Waiting", "blockedOn: 'Pat'", "steps:", "  - 'Ask Pat'")
     _task(plain, "Bare", "confidence: ''")  # an empty value is no value
+    _set_config(plain, workEnabled=False)  # the values are work data: the default would be on
     before = _snapshot(plain)
     sp = Space(plain)
     assert sp.work_on() is False
     assert _work_keys(sp) == {"rank", "blockedOn", "steps"}
+    assert sp.type_by_id("task").prop("rank").name == "Order"
     blocked = sp.type_by_id("task").prop("blockedOn")
     assert (blocked.name, blocked.type, blocked.id) == ("Blocked on", "text", "blockedOn")
     assert sp.type_by_id("task").prop("steps").type == "steps"
@@ -206,6 +224,7 @@ def test_a_field_with_a_value_or_saved_in_the_type_stays(plain: Path):
 
 def test_the_switch_adds_and_takes_the_fields_in_memory_only(plain: Path):
     _task(plain, "Waiting", "blockedOn: 'Pat'")
+    _set_config(plain, workEnabled=False)  # a value on a Task is work data: the default is on
     before = _snapshot(plain)
     sp = Space(plain)
     with TestClient(create_app(sp, None, watch=False)) as c:
@@ -287,7 +306,8 @@ def _work_type_space(root: Path) -> tuple[Space, str]:
 def test_the_work_hook_runs_only_with_work_on(plain: Path):
     _set_config(plain, workEnabled=False)
     sp, type_id = _work_type_space(plain)
-    assert is_work_type(sp.type_by_id(type_id))  # its saved fields stay with Work off
+    # Its saved fields stay in its file with Work off; none is listed while none has a value.
+    assert sp._is_work_kind(sp.type_by_id(type_id)) and _work_keys(sp, type_id) == set()
     rel, version = sp.create_object(type_id, "Reset a password")
     sp.update_properties(rel, {"ticketId": "ABC-12"}, version)
     assert "system" not in sp.read(rel)[1]
@@ -298,9 +318,16 @@ def test_the_work_hook_runs_only_with_work_on(plain: Path):
 
 
 def test_a_work_service_write_keeps_its_hook_with_work_off(plain: Path):
-    """The work routes answer as before when they are called."""
+    """The work routes answer as before when they are called, for a type that lists its Steps
+    (with Work off: some note of the type has a step)."""
     _set_config(plain, workEnabled=False)
     sp, type_id = _work_type_space(plain)
+    (plain / "Requests").mkdir(exist_ok=True)
+    (plain / "Requests" / "Badge.md").write_text(
+        "---\ntype: 'Request'\ntitle: 'Badge'\nsteps:\n  - 'Ask Pat'\n---\n", "utf-8", newline="\n"
+    )
+    sp.rescan_file("Requests/Badge.md")
+    assert is_work_type(sp.type_by_id(type_id))
     rel, _version = sp.create_object(type_id, "Reset a password")
     sp.write_work(rel, None, updates={"ticketId": "ABC-12"})
     assert sp.read(rel)[1]["system"] == "Jira"

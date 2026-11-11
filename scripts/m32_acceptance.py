@@ -26,11 +26,13 @@ can show is Gene's hand checks in ``m32-acceptance.md``):
     ``completed`` (only ``status``, ``completed`` and ``lastUpdated`` lines change; a space that
     has no ``space.json`` is not given one by an edit);
  3. the Work switch's default (item 10): off on a plain space; on, with nothing stored and
-    nothing written, for a space whose notes carry a Ticket ID (``space-work``), for the IT
-    starter's space (``space-itops``, and a new space made with ``setup: 'itops'``, which stores
-    ``workEnabled: true``), once a type named Capture exists, and from the moment a note gets a
-    Ticket ID until it loses it; the default is never stored (``space.json`` gains no
-    ``workEnabled``; the first edit of a space adds only its ``spaceId``, as before M32);
+    nothing written, for a space whose tasks carry ticket and work values (``space-work``), for
+    the IT starter's space (``space-itops``, and a new space made with ``setup: 'itops'``, which
+    stores ``workEnabled: true``), once a type named Capture exists, from the moment a Task gets
+    a Ticket ID until it loses it, and while a task has steps; a "Ticket ID" on a note of the
+    user's own type (or on a Note) does not turn it on; the default is never stored
+    (``space.json`` gains no ``workEnabled``; the first edit of a space adds only its
+    ``spaceId``, as before M32);
  4. the Work switch set by hand (item 10): ``PUT /api/space`` ``{patch: {workEnabled}}`` writes
     only ``.object/space.json``; with Work off the Task lists no ticket or work field without a
     value, keeps the one a task holds a value for (the value is read back), and no "Tickets"
@@ -346,15 +348,39 @@ def check_work_default(run: Run, spaces: Spaces, tmp: Path) -> None:
     served = Served(root)
     try:
         run.report(info(served)["workOn"] is False and work_keys(served) == set(), "a plain new space: Work is off")
+        # A "Ticket ID" property on a type of the user's own, or on a note, is not work data.
+        code, flight_type = served.http("POST", "/types", {"name": "Flight", "pluralName": "Flights"})
+        assert code == 201, (code, flight_type)
+        flight = create(served, flight_type["id"], title="To Lisbon")
         note = create(served, "page", title="Printer")
-        code, _res = set_props(served, note["path"], {"ticketId": "INC0012345"})
+        code, _res = set_props(served, flight["path"], {"ticketId": "TP1337"})
+        code2, _res = set_props(served, note["path"], {"ticketId": "INC0012345"})
+        res = info(served)
+        run.report(code == 200 and code2 == 200 and res["workOn"] is False and work_keys(served) == set()
+                   and fm_of(root, flight["path"]).get("ticketId") == "TP1337",
+                   "a \"Ticket ID\" on a note of the user's own type (a Flight) or on a Note does not turn Work on",
+                   f"{code}, {code2}; workOn {res['workOn']!r}")
+        # A Ticket ID on a Task does, and taking it off turns the default off again.
+        task = create(served, "task", title="Printer jams", body="")
+        code, _res = set_props(served, task["path"], {"ticketId": "INC0012345"})
         res = info(served)
         run.report(code == 200 and res["workOn"] is True and res["workEnabled"] is None and work_keys(served) == FIELD_KEYS,
-                   "a Ticket ID on a note turns the default on (the Task gains the fields in memory)",
+                   "a Ticket ID on a Task turns the default on (the Task gains the fields in memory)",
                    f"{code}; workOn {res['workOn']!r}")
-        code, _res = set_props(served, note["path"], {}, remove=["ticketId"])
+        code, _res = set_props(served, task["path"], {}, remove=["ticketId"])
         run.report(code == 200 and info(served)["workOn"] is False and work_keys(served) == set(),
                    "and off again when the last Ticket ID is gone", f"{code}; workOn {info(served)['workOn']!r}")
+        # Steps on a task, with no Ticket ID, are work data too (a file written outside the app).
+        stepped = root / "Tasks" / "Badge audit.md"
+        stepped.write_text("---\ntype: 'Task'\ntitle: 'Badge audit'\nsteps:\n  - id: q4m2xa\n    kind: do\n"
+                           "    state: open\n    text: Walk the east door\n---\n", encoding="utf-8", newline="\n")
+        served.space.rescan_file("Tasks/Badge audit.md")
+        res = info(served)
+        run.report(res["workOn"] is True and res["workEnabled"] is None,
+                   "steps on a task turn the default on without a Ticket ID", f"workOn {res['workOn']!r}")
+        stepped.unlink()
+        served.space.rescan_file("Tasks/Badge audit.md")
+        run.report(info(served)["workOn"] is False, "and off again when that task is gone", f"workOn {info(served)['workOn']!r}")
         code, _res = served.http("POST", "/types", {"name": "Capture", "pluralName": "Captures"})
         res = info(served)
         run.report(code == 201 and res["workOn"] is True and res["workEnabled"] is None,
