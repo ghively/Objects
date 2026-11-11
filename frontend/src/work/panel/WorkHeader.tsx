@@ -10,6 +10,8 @@
 // editor never loses a line or 409s. The header adopts the returned item. A write made elsewhere
 // (a Work view's step action, another window) announces a change of the path, and the header reads
 // the item again.
+//
+// M32: while Work is off for the space the header fetches nothing and shows nothing.
 import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react'
 import { api, isResync } from '@/api/client'
 import type { StepAction, WorkItem, WorkWriteResult } from '@/api/types'
@@ -22,6 +24,7 @@ import { ResolutionNote } from '../ResolutionNote'
 import { StepList, type StepActionExtra } from '../StepList'
 import { useWorkOverlay } from '../state/useWorkOverlay'
 import type { WorkRunner } from '../state/workActions'
+import { useWorkOn } from '../useWorkOn'
 import { WORK_ICONS } from '../workIcons'
 import { WORK_TEXT } from '../workText'
 import { ActivityList } from './ActivityList'
@@ -55,6 +58,7 @@ function Part({ part, title, children }: { part: string; title: string; children
 
 export function WorkHeader({ path, work }: { path: string; work: ObjectWrites['work'] }): JSX.Element | null {
   const [item, setItem] = useState<WorkItem | null>(null)
+  const on = useWorkOn()
   /** The version the shown item belongs to: a change event at it is already shown. */
   const versionRef = useRef<string | null>(null)
   /** Bumped by every read and adopted write: a read that a later one overtook is dropped. */
@@ -68,6 +72,8 @@ export function WorkHeader({ path, work }: { path: string; work: ObjectWrites['w
 
   const load = useCallback(() => {
     const mine = ++seq.current
+    // M32: Work is off for this space: no work item is fetched.
+    if (!on) return
     Promise.resolve()
       .then(() => api.workItem(path))
       .then((it) => {
@@ -83,7 +89,7 @@ export function WorkHeader({ path, work }: { path: string; work: ObjectWrites['w
         // Not a work item (422), gone (404) or unreadable: no header.
         if (mine === seq.current) setItem(null)
       })
-  }, [path])
+  }, [path, on])
 
   // The page is keyed by its path (`ObjectPage`), so a header lives for one path.
   useEffect(() => {
@@ -118,7 +124,7 @@ export function WorkHeader({ path, work }: { path: string; work: ObjectWrites['w
     [work, adopt],
   )
 
-  if (!item) return null
+  if (!on || !item) return null
 
   const current = item.steps.find((s) => s.current) ?? item.current
   const ticketUrl = safeUrl(item.ticket?.url)

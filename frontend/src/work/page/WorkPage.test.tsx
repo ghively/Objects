@@ -37,6 +37,10 @@ import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { registerWorkView, resetWorkViews, workViews } from '../views/registry'
 import { WorkPage } from './WorkPage'
 import { clearWorkSearch } from './WorkTopBar'
+import { setWorkOn } from '@/test/workOn'
+
+// M32: Work is on for the space in these tests (while it is off, nothing of the Work page runs).
+beforeEach(() => setWorkOn())
 
 const mocked = vi.mocked(api)
 // Read before any beforeEach resets the registry: the views the page's glob registered at import (M24).
@@ -83,7 +87,8 @@ describe('WorkPage', () => {
       if (!switcher().querySelector(`[data-work-view="${id}"]`) && more) await user.click(more)
       await user.click(switcher().querySelector(`[data-work-view="${id}"]`) as HTMLElement)
       expect(selectedView()).toBe(id)
-      expect(screen.getByRole('heading', { level: 1, name: 'Tasks' })).toBeInTheDocument()
+      // M32: the dashboard is the Work page; its own words stay ("Search work", "Create task").
+      expect(screen.getByRole('heading', { level: 1, name: 'Work' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Create task' })).toBeInTheDocument()
       expect(screen.getByRole('group', { name: 'Energy' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /Just one thing/ })).toBeInTheDocument()
@@ -149,7 +154,7 @@ describe('WorkPage', () => {
     registerWorkView({ id: 'list-inbox', label: 'Inbox', icon: 'ph-tray', key: null, count: () => 0, Component: () => null })
     registerWorkView({ id: 'list-all', label: 'All', icon: 'ph-list', key: null, count: () => 0, Component: () => null })
     useSpaceInfo.setState({
-      space: { name: 's', root: '/s', types: [], icon: null, description: null, hideTaskManagement: true, revision: 'r' },
+      space: { name: 's', root: '/s', types: [], icon: null, description: null, hideTaskManagement: true, workOn: true, revision: 'r' },
       loaded: true,
     })
     try {

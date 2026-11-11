@@ -15,6 +15,10 @@ import { resetWorkData, useWorkData } from '../state/useWorkData'
 import { resetWorkToasts } from '../state/workToasts'
 import { KeepOnTopButton } from './KeepOnTopButton'
 import { WorkMini } from './WorkMini'
+import { setWorkOn } from '@/test/workOn'
+
+// M32: Work is on for the space in these tests (while it is off, nothing of the Work page runs).
+beforeEach(() => setWorkOn())
 
 const mocked = vi.mocked(api)
 const BOARD = boardJson as unknown as WorkBoard

@@ -1,15 +1,17 @@
-// What a task row shows besides its title: the checkbox before it; after it the date (with its
-// repeat and reminder icons), the deadline label, the priority pill and one badge per calendar
-// entry kind. Owners pass `rowExtras={(row) => taskRowExtras(row, typesById[row.summary.type], …)}`.
+// What a task row shows besides its title: the checkbox before it; after it the date chip (with
+// its repeat and reminder icons; M32: it opens the small date picker, and an overdue date is in the
+// danger colour), the deadline label, the priority pill and one badge per calendar entry kind.
+// Owners pass `rowExtras={(row) => taskRowExtras(row, typesById[row.summary.type], …)}`: the Tasks
+// page's rows (`TaskList`), the task lists and the Calendar's day list all draw these.
 import type { DateValue, LabelOption, PropertyDef, Row, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
-import { formatDate } from '@/properties/format'
 import { LabelPill } from '@/properties/LabelMenu'
 import type { RowExtras } from '@/views/DataView'
 import { DeadlineLabel } from './DeadlineLabel'
 import { describeRepeat, parseRepeat } from './repeat'
 import { parseRemind } from './remind'
 import { TaskCheckbox } from './TaskCheckbox'
+import { TaskDateChip } from './TaskDateChip'
 import type { TaskOutcome } from './taskActions'
 
 export type TaskBadge = 'date' | 'deadline' | 'occurrence' | 'overdue'
@@ -20,7 +22,7 @@ export interface TaskRowExtrasOptions {
    * "Deadline" badge, `occurrence` a repeat icon; `date` and `overdue` need none (the section says it).
    */
   badges?: TaskBadge[]
-  /** The checkbox wrote and reloaded: the owner patches its list and shows the toast. */
+  /** The checkbox or the date chip wrote and reloaded: the owner patches its list and shows the toast. */
   onResult?(outcome: TaskOutcome): void
   /** The day "N days left" counts from (tests); now otherwise. */
   today?: Date
@@ -57,21 +59,18 @@ export function taskRowExtras(row: Row, type: TypeDef | undefined, opts: TaskRow
           </span>
         ),
       )}
-      {date && (
-        <span data-testid="task-date" className="inline-flex items-center gap-1 text-[13px] text-fg-muted">
-          {formatDate(date)}
-          {repeat && (
-            <span data-testid="task-repeat" title={describeRepeat(repeat, date.start)} className="inline-flex">
-              <Icon name="ph-repeat" size={13} />
-            </span>
-          )}
-          {remind && (
-            <span data-testid="task-reminder" title={String(row.values.remind)} className="inline-flex">
-              <Icon name="ph-bell" size={13} />
-            </span>
-          )}
-        </span>
-      )}
+      <TaskDateChip row={row} type={type} onResult={opts.onResult} today={opts.today}>
+        {date && repeat && (
+          <span data-testid="task-repeat" title={describeRepeat(repeat, date.start)} className="inline-flex">
+            <Icon name="ph-repeat" size={13} />
+          </span>
+        )}
+        {date && remind && (
+          <span data-testid="task-reminder" title={String(row.values.remind)} className="inline-flex">
+            <Icon name="ph-bell" size={13} />
+          </span>
+        )}
+      </TaskDateChip>
       <DeadlineLabel deadline={deadline} date={date} today={opts.today} />
       {priority && <LabelPill option={priority} />}
     </>

@@ -30,6 +30,10 @@ import { useFind } from '@/find/useFind'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from '@/object/ObjectPage'
 import { stepAction } from '../state/workActions'
+import { setWorkOn } from '@/test/workOn'
+
+// M32: Work is on for the space in these tests (while it is off, nothing of the Work page runs).
+beforeEach(() => setWorkOn())
 
 const mocked = vi.mocked(api)
 
@@ -143,7 +147,7 @@ beforeEach(() => {
   item = printer()
   vi.mocked(showToast).mockReset()
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
-  mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [WORK, PAGE] } satisfies SpaceInfo)
+  mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [WORK, PAGE], workOn: true } satisfies SpaceInfo)
   mocked.objects.mockResolvedValue([detail(ORIGINAL, 'v1').summary])
   mocked.object.mockImplementation(async (p: string) =>
     p === PLAIN

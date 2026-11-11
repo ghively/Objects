@@ -2,7 +2,8 @@
 // hook completes, reopens or advances it), then one `api.rows` reload, because the returned
 // frontmatter is raw and can't patch a decoded `Row`. A 409 reloads only, never retries.
 import { api as realApi, ConflictError, type Api } from '@/api/client'
-import type { DateValue, Row, TaskResult, TypeDef } from '@/api/types'
+import type { DateValue, LabelOption, Row, TaskResult, TypeDef } from '@/api/types'
+import { useLinkIndex } from '@/links/linkIndex'
 import { zonedParts, zonedToday } from '@/lib/zonedTime'
 import { parseRepeat } from './repeat'
 import { firstOptionOf, isOpen, statusDef } from './statusCategory'
@@ -57,6 +58,60 @@ export async function toggleDone(api: TaskApi, row: Row, type: TypeDef | undefin
   const target = firstOptionOf(type, isOpen(row, type) ? 'done' : 'not-started')
   if (!target) return { result: undefined, row: undefined, conflict: false, error: 'This type has no status for that.' }
   return setStatus(api, row, type, target.text)
+}
+
+/**
+ * M32: whether the checkbox has nothing to complete a task with: the type has a status property
+ * and none of its options is in the Done category (the checkbox then offers "Add a Done status").
+ */
+export const lacksDoneStatus = (type: TypeDef | undefined): boolean => !!statusDef(type) && !firstOptionOf(type, 'done')
+
+/** The status "Add a Done status" adds (the basic Task type's own Done: green, in the Done category). */
+export const DONE_STATUS: Omit<LabelOption, 'id'> = { text: 'Done', color: 'green', icon: null, statusCategory: 'done' }
+
+const newOptionId = (): string =>
+  globalThis.crypto?.randomUUID?.() ?? `opt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+
+/**
+ * M32, "Add a Done status": add `DONE_STATUS` to the type's status property through the type API
+ * (one `saveType` with the type's revision) and put the saved type in the index. Returns the saved
+ * type; a type that already has a done status is returned as it is. Throws what `saveType` throws.
+ */
+export async function addDoneStatus(type: TypeDef): Promise<TypeDef> {
+  const def = statusDef(type)
+  if (!def || firstOptionOf(type, 'done')) return type
+  // An option already named "Done" (in another category) keeps its name, colour and id.
+  const set = def.options.set ?? []
+  const named = set.find((o) => o.text.trim().toLowerCase() === DONE_STATUS.text.toLowerCase())
+  const nextSet = named
+    ? set.map((o) => (o === named ? { ...o, statusCategory: DONE_STATUS.statusCategory } : o))
+    : [...set, { id: newOptionId(), ...DONE_STATUS }]
+  const next: TypeDef = {
+    ...type,
+    propertyDefinitions: type.propertyDefinitions.map((d) => (d.id === def.id ? { ...d, options: { ...d.options, set: nextSet } } : d)),
+  }
+  const res = await realApi.saveType(next, { baseRevision: type.revision })
+  const saved = res?.type ?? next
+  useLinkIndex.setState((s) => ({
+    types: s.types.some((t) => t.id === saved.id) ? s.types.map((t) => (t.id === saved.id ? saved : t)) : [...s.types, saved],
+    revision: s.revision + 1,
+  }))
+  return saved
+}
+
+/**
+ * M32, a row's date chip: write the task's `date` (null: no date) with the row's version, then one
+ * reload. The date alone, as a table cell writes it; a 409 reloads only.
+ */
+export async function setDate(api: TaskApi, row: Row, date: DateValue | null): Promise<TaskOutcome> {
+  const path = row.summary.path
+  try {
+    const res = await api.updateProperties(path, { date }, row.version)
+    return { result: res.task ?? undefined, row: await reload(api, path), conflict: false }
+  } catch (err) {
+    if (err instanceof ConflictError) return { result: undefined, row: await reload(api, path), conflict: true }
+    return { result: undefined, row: undefined, conflict: false, error: err instanceof Error ? err.message : 'Could not save.' }
+  }
 }
 
 /**

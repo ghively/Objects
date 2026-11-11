@@ -14,6 +14,10 @@ import { agent, automationRule, deskSyncStatus, workAgentSettings } from '@/test
 import { resetWorkToasts, useWorkToasts } from '@/work/state/workToasts'
 import { WorkAgentSettings } from './WorkAgentSettings'
 import { WORK_AGENT_TEXT as T } from './workAgentText'
+import { setWorkOn } from '@/test/workOn'
+
+// M32: Work is on for the space in these tests (while it is off, nothing of the Work page runs).
+beforeEach(() => setWorkOn())
 
 const mocked = vi.mocked(api)
 const WORK = agent({ id: 'w1', name: 'Work' })

@@ -1,11 +1,15 @@
 // M23 Task 8: the Work section's toasts (problems, and the 5-second Undo). Mounted once by App.
+// M32: nothing is drawn while Work is off for the space.
 import type { JSX } from 'react'
+import { useWorkOn } from '../useWorkOn'
 import { WORK_TEXT } from '../workText'
 import { runUndo, useWorkToasts } from './workToasts'
 
 /** The work toasts; mounted once by App. */
-export function WorkToasts(): JSX.Element {
+export function WorkToasts(): JSX.Element | null {
   const toasts = useWorkToasts((s) => s.toasts)
+  const on = useWorkOn()
+  if (!on) return null
   return (
     <div
       data-work-toasts=""

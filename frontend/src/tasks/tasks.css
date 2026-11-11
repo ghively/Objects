@@ -1,0 +1,9 @@
+/* M32: a done task's title is struck through wherever a list row or a card of `views/` carries
+   the task checkbox before its title (the task lists, the Calendar's day list, a kanban card):
+   the checkbox marks itself `data-task-done`, and the row's title follows. The Tasks page's own
+   rows (`TaskList`) strike theirs themselves. */
+li:has(> [data-slot='leading'] [data-task-done]) > button .truncate,
+div:has(> [data-slot='leading'] [data-task-done]) [data-testid='card-title'] {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}

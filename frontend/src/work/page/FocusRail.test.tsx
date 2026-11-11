@@ -18,6 +18,10 @@ import { focusLineToday, loadWorkUi, useWorkUi } from '../state/useWorkUi'
 import { nowPoolOf, resetWorkViews } from '../views/registry'
 import { WorkPage } from './WorkPage'
 import { clearWorkSearch } from './WorkTopBar'
+import { setWorkOn } from '@/test/workOn'
+
+// M32: Work is on for the space in these tests (while it is off, nothing of the Work page runs).
+beforeEach(() => setWorkOn())
 
 const mocked = vi.mocked(api)
 const board = boardJson as unknown as WorkBoard

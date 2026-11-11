@@ -1,7 +1,9 @@
-// The Tasks dashboard (Gene's redesign of M23's Work page): one page for every task — the Tasks
-// header (search, Create task), the brain-dump bar, the focus rail (when today has focus lines),
-// then the grouped view switcher, and the selected view. The task lists (Inbox, Scheduled, ...) are
-// views here too (`work/tasklists/registerView.ts`); Today is the day timeline with today's tasks.
+// The Work page (M32: the dashboard is its own, optional page again, the `work` target while Work
+// is on for the space; the plain Tasks page is `tasks/TasksPage`). As Gene's redesign of M23 left
+// it: the header ("Work", search, Create task), the brain-dump bar, the focus rail (when today has
+// focus lines), then the grouped view switcher, and the selected view. The task lists (Inbox,
+// Scheduled, ...) are views here too (`work/tasklists/registerView.ts`); Today is the day timeline
+// with today's tasks.
 // The Task rows load once for the page (`useTaskRowsFeed`). Every
 // dashboard view is computed from `useWorkData`; the page's own state (energy, Just one thing,
 // view, the focus line) is `useWorkUi`, browser storage only. While the space hides task management
@@ -19,6 +21,7 @@ import { DEFAULT_PARTS, useWorkData, useWorkEvents, type WorkDataState, type Wor
 import { useWorkUi } from '../state/useWorkUi'
 import { isTaskListView } from '../tasklists/registerView'
 import { workViews } from '../views/registry'
+import { WORK_TEXT } from '../workText'
 import { BrainDumpBar, focusBrainDumpField } from './BrainDumpBar'
 import { FocusRail } from './FocusRail'
 import { ViewSwitcher } from './ViewSwitcher'
@@ -136,7 +139,7 @@ export function WorkPage({ view }: { view?: WorkViewId }): JSX.Element {
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-hover-2">
             <Icon name="ph-check-circle" size={20} />
           </span>
-          <h1 className="dataview-heading min-w-0 shrink-0 text-[20px] font-bold md:text-[22px]">{TASKS_TEXT.heading}</h1>
+          <h1 className="dataview-heading min-w-0 shrink-0 text-[20px] font-bold md:text-[22px]">{WORK_TEXT.work}</h1>
           <div className="ml-auto flex min-w-0 shrink items-center">
             <WorkSearch />
           </div>

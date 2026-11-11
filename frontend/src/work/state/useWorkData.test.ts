@@ -13,6 +13,10 @@ import type { ChangeEvent } from '@/api/types'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { propertyDef, typeDef, workBoard, workBoardItem } from '@/test/mockApi'
 import { EVENTS_DEBOUNCE_MS, partsForEvent, resetWorkData, useWorkData, useWorkEvents } from './useWorkData'
+import { setWorkOn } from '@/test/workOn'
+
+// M32: Work is on for the space in these tests (while it is off, nothing of the Work page runs).
+beforeEach(() => setWorkOn())
 
 const mocked = vi.mocked(api)
 
@@ -113,7 +117,7 @@ describe('useWorkData', () => {
 
   test('test events reload the right parts once per burst', async () => {
     vi.useFakeTimers()
-    useSpaceInfo.setState({ space: { name: 'Work', root: 'C:/Spaces/Work', types: TYPES }, loaded: true })
+    useSpaceInfo.setState({ space: { name: 'Work', root: 'C:/Spaces/Work', types: TYPES, workOn: true }, loaded: true })
     let emit: (e: ChangeEvent) => void = () => undefined
     mocked.onChange.mockImplementation((cb) => {
       emit = cb

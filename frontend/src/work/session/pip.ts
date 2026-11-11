@@ -1,8 +1,10 @@
 // M23 Task 15: Keep on top in a browser: a Document Picture-in-Picture window (340x430, ported)
 // with the page's style sheets and `<html>` theme attributes copied in, showing `WorkMini`.
 // The window shares this page's JS, so the mini page reads the same work stores.
+// M32: no window opens while Work is off for the space.
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
+import { isWorkOn } from '../useWorkOn'
 
 /** The window's size (ported from the old dashboard). */
 export const PIP_SIZE = { width: 340, height: 430 } as const
@@ -48,7 +50,7 @@ function copyHtmlAttrs(from: Element, to: Element): void {
 /** Open the picture-in-picture window with `WorkMini` in it. */
 export async function openWorkPip(): Promise<void> {
   const pip = pipApi()
-  if (!pip) return
+  if (!pip || !isWorkOn()) return
   // Loaded here, not at the top: WorkMini reaches the views, and a view holds the button that calls this.
   const { WorkMini } = await import('./WorkMini')
   const w = await pip.requestWindow({ width: PIP_SIZE.width, height: PIP_SIZE.height })

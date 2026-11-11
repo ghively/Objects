@@ -22,12 +22,14 @@ vi.mock('@/api/client', async (orig) => ({
 import { api, ConflictError } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { resetPinned } from '@/shell/usePinned'
+import { setWorkOn } from '@/test/workOn'
 import { useDefs } from '@/types/useDefinitions'
 import { FULL_VIEW_LAYOUTS } from '@/views/model'
 import { TASK_TYPE, taskRow } from './taskFixtures'
 import type { TaskSectionKey } from '@/api/types'
-import { TASKS_PAGE_TABS, TaskSectionPanel, TasksPage } from './TasksPage'
+import { TASKS_PAGE_TABS, TaskSectionPanel, TasksPage, tasksListForWorkView } from './TasksPage'
 import { resetTaskRows, useTaskRowsFeed } from './useTaskRows'
 
 const mocked = vi.mocked(api)
@@ -69,6 +71,7 @@ beforeEach(() => {
   resetLinkIndex()
   resetPinned()
   resetTaskRows()
+  resetSpaceInfo()
   useTabs.getState().reset()
   usePeek.getState().close()
   dragEnd = undefined
@@ -304,36 +307,209 @@ describe('Task list views (TaskSectionPanel)', () => {
   })
 })
 
-// M32 contract: the plain Tasks page is its own page again (a stub over the lists; lane C builds it).
-describe('TasksPage (M32 contract stub)', () => {
+// M32, item 9: the plain Tasks page.
+describe('TasksPage (M32)', () => {
+  const groupsShown = () =>
+    [...document.querySelectorAll('[data-task-group]')].map((g) => [g.querySelector('h2')?.textContent ?? null, titlesIn(g as HTMLElement)])
+
   test('test the Tasks page has the tabs Today, Upcoming, Inbox, All, Done and opens on Today', async () => {
     render(<TasksPage />)
+    expect(document.querySelector('[data-tasks-page]')).not.toBeNull()
     expect(screen.getByRole('heading', { level: 1, name: 'Tasks' })).toBeInTheDocument()
     const tabs = within(screen.getByRole('tablist', { name: 'Tasks' })).getAllByRole('tab')
     expect(tabs.map((t) => t.textContent)).toEqual(['Today', 'Upcoming', 'Inbox', 'All', 'Done'])
     expect(TASKS_PAGE_TABS.map((t) => t.section)).toEqual(['today', 'scheduled', 'inbox', 'all', 'completed'])
     expect(screen.getByRole('tab', { name: 'Today' })).toHaveAttribute('aria-selected', 'true')
-    // Today's list, from the page's own rows feed (one fetch).
-    expect(document.querySelector('[data-task-section="today"]')).not.toBeNull()
-    const view = await screen.findByTestId('data-view')
-    await waitFor(() => expect(titlesIn(view)).toEqual(['Overdue', 'Working', 'Finished']))
+    // The header: search and New task; under it the quick add.
+    expect(screen.getByRole('searchbox', { name: 'Search tasks' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New task' })).toBeEnabled()
+    expect(screen.getByRole('textbox', { name: 'Add a task' })).toBeInTheDocument()
+    // Today: Overdue, then Today, each count shown once; from the page's own rows feed (one fetch).
+    await waitFor(() =>
+      expect(groupsShown()).toEqual([
+        ['Overdue (1)', ['Overdue']],
+        ['Today (2)', ['Working', 'Finished']],
+      ]),
+    )
     expect(mocked.rows).toHaveBeenCalledTimes(1)
+    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['task'], preview: false })
+    // Opening the page writes nothing.
+    expect(mocked.patchUi).not.toHaveBeenCalled()
+    expect(mocked.updateProperties).not.toHaveBeenCalled()
     // None of the dashboard is here.
     expect(screen.queryByRole('textbox', { name: 'Brain dump' })).toBeNull()
     expect(screen.queryByRole('navigation', { name: 'Work views' })).toBeNull()
   })
 
-  test('test a tab shows its section’s list', async () => {
+  test('test each tab shows its list: Upcoming by day, Inbox the undated, All, Done', async () => {
     const user = userEvent.setup()
     render(<TasksPage />)
-    await screen.findByTestId('data-view')
+    await screen.findByText('Overdue (1)')
+    await user.click(screen.getByRole('tab', { name: 'Upcoming' }))
+    expect(screen.getByRole('tab', { name: 'Upcoming' })).toHaveAttribute('aria-selected', 'true')
+    const upcoming = groupsShown()
+    expect(upcoming.map(([, titles]) => titles)).toEqual([['Weekly'], ['Waiting']])
+    expect(upcoming[0][0]).toBe('Tomorrow (1)')
+    expect(upcoming[1][0]).toMatch(/^\w+day, .+ \(1\)$/)
     await user.click(screen.getByRole('tab', { name: 'Inbox' }))
-    expect(screen.getByRole('tab', { name: 'Inbox' })).toHaveAttribute('aria-selected', 'true')
-    expect(document.querySelector('[data-task-section="inbox"]')).not.toBeNull()
-    await waitFor(() => expect(titlesIn(screen.getByTestId('data-view'))).toEqual(['Fresh']))
+    expect(groupsShown()).toEqual([[null, ['Fresh']]])
+    await user.click(screen.getByRole('tab', { name: 'All' }))
+    expect(titlesIn(screen.getByTestId('task-list')).sort()).toEqual(['Finished', 'Fresh', 'Overdue', 'Waiting', 'Weekly', 'Working'])
     await user.click(screen.getByRole('tab', { name: 'Done' }))
-    expect(document.querySelector('[data-task-section="completed"]')).not.toBeNull()
-    await waitFor(() => expect(titlesIn(screen.getByTestId('data-view'))).toEqual(['Finished']))
+    expect(groupsShown()).toEqual([[null, ['Finished']]])
+    // No view is saved by moving between tabs.
+    expect(mocked.patchUi).not.toHaveBeenCalled()
+  })
+
+  test('test a done task’s title is struck through and an overdue date uses the danger colour', async () => {
+    render(<TasksPage />)
+    const list = await screen.findByTestId('task-list')
+    expect(within(list).getByText('Finished').className).toContain('line-through')
+    expect(within(list).getByText('Working').className).not.toContain('line-through')
+    const late = within(list).getByText('Overdue').closest('li') as HTMLElement
+    expect(within(late).getByTestId('task-date').className).toContain('var(--danger)')
+    const now = within(list).getByText('Working').closest('li') as HTMLElement
+    expect(within(now).getByTestId('task-date').className).not.toContain('var(--danger)')
+  })
+
+  test('test the tick completes a task and the list follows', async () => {
+    const user = userEvent.setup()
+    mocked.updateProperties.mockResolvedValueOnce({
+      version: 'v2b',
+      frontmatter: {},
+      links: {},
+      synced: [],
+      skipped: [],
+      task: { completed: true, advanced: false },
+    })
+    render(<TasksPage />)
+    await screen.findByText('Overdue (1)')
+    mocked.rows.mockResolvedValueOnce([taskRow('Tasks/Overdue.md', { status: ['Done'], date: day(-3) }, 'v2b')])
+    const late = screen.getByText('Overdue').closest('li') as HTMLElement
+    await user.click(within(late).getByRole('checkbox'))
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/Overdue.md', { status: ['Done'] }, 'v2'))
+    // Done and dated before today: it leaves Today (it is under Done now).
+    await waitFor(() => expect(groupsShown()).toEqual([['Today (2)', ['Working', 'Finished']]]))
+  })
+
+  test('test a row’s date chip moves the task', async () => {
+    const user = userEvent.setup()
+    mocked.updateProperties.mockResolvedValueOnce({ version: 'v1b', frontmatter: {}, links: {}, synced: [], skipped: [], task: null })
+    render(<TasksPage />)
+    await screen.findByText('Overdue (1)')
+    await user.click(screen.getByRole('tab', { name: 'Inbox' }))
+    const row = screen.getByText('Fresh').closest('li') as HTMLElement
+    mocked.rows.mockResolvedValueOnce([taskRow('Tasks/Fresh.md', { status: ['Not Started'], date: day(0) }, 'v1b')])
+    await user.click(within(row).getByRole('button', { name: 'Date: No date' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Today' }))
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/Fresh.md', { date: day(0) }, 'v1'))
+    await waitFor(() => expect(screen.getByText('No tasks without a date')).toBeInTheDocument())
+  })
+
+  test('test Search tasks filters the shown list as you type', async () => {
+    const user = userEvent.setup()
+    render(<TasksPage />)
+    await screen.findByText('Overdue (1)')
+    await user.type(screen.getByRole('searchbox', { name: 'Search tasks' }), 'work')
+    expect(groupsShown()).toEqual([['Today (1)', ['Working']]])
+    await user.type(screen.getByRole('searchbox', { name: 'Search tasks' }), 'zzz')
+    expect(screen.getByText('No tasks match your search')).toBeInTheDocument()
+    await user.clear(screen.getByRole('searchbox', { name: 'Search tasks' }))
+    expect(screen.getByText('Overdue (1)')).toBeInTheDocument()
+  })
+
+  test('test Add a task adds without opening, with the date its words name', async () => {
+    const user = userEvent.setup()
+    render(<TasksPage />)
+    await screen.findByText('Overdue (1)')
+    const box = screen.getByRole('textbox', { name: 'Add a task' })
+    await user.type(box, 'Call Pat tomorrow{Enter}')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', { title: 'Call Pat', body: '', values: { date: day(1) } }))
+    await waitFor(() => expect(box).toHaveFocus())
+    expect(usePeek.getState().path).toBeNull()
+    expect(useTabs.getState().tabs.length).toBeLessThanOrEqual(1)
+  })
+
+  test('test New task creates a task and opens it', async () => {
+    const user = userEvent.setup()
+    render(<TasksPage />)
+    await screen.findByText('Overdue (1)')
+    await user.click(screen.getByRole('button', { name: 'New task' }))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', {}))
+    await waitFor(() => {
+      const tab = useTabs.getState().tabs.find((t) => t.id === useTabs.getState().activeId)
+      const target = tab?.history[tab.index]
+      expect(usePeek.getState().path === 'Tasks/New.md' || (target?.kind === 'object' && target.path === 'Tasks/New.md')).toBe(true)
+    })
+  })
+
+  test('test More holds Status, Deadline, Recurring, Reminders, Tags and Context, each the existing list', async () => {
+    const user = userEvent.setup()
+    render(<TasksPage />)
+    await screen.findByText('Overdue (1)')
+    await user.click(screen.getByRole('button', { name: 'More' }))
+    const items = await screen.findAllByRole('menuitemradio')
+    expect(items.map((i) => i.textContent)).toEqual(['Status', 'Deadline', 'Recurring', 'Reminders', 'Tags', 'Context'])
+    await user.click(screen.getByRole('menuitemradio', { name: 'Status' }))
+    // The Status list as it is today: the kanban by status category; no tab is selected.
+    await screen.findAllByTestId('kanban-column')
+    expect(document.querySelector('[data-task-section="status"]')).not.toBeNull()
+    expect(screen.getAllByRole('tab').every((t) => t.getAttribute('aria-selected') === 'false')).toBe(true)
+    expect(screen.getByRole('button', { name: 'More' })).toHaveTextContent('Status')
+    // One quick add on the page, the one on top.
+    expect(screen.getAllByRole('textbox', { name: 'Add a task' })).toHaveLength(1)
+    await user.click(screen.getByRole('tab', { name: 'Today' }))
+    expect(await screen.findByText('Overdue (1)')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'More' })).toHaveTextContent('More')
+  })
+
+  test('test the last tab is remembered per space, in the browser', async () => {
+    const user = userEvent.setup()
+    setWorkOn(false) // a loaded space (root /space)
+    const first = render(<TasksPage />)
+    await screen.findByText('Overdue (1)')
+    await user.click(screen.getByRole('tab', { name: 'Inbox' }))
+    expect(localStorage.getItem('object.tasksTab:/space')).toBe('inbox')
+    expect(mocked.patchUi).not.toHaveBeenCalled()
+    first.unmount()
+    render(<TasksPage />)
+    expect(screen.getByRole('tab', { name: 'Inbox' })).toHaveAttribute('aria-selected', 'true')
+    // Another space starts on Today.
+    act(() => useSpaceInfo.setState({ space: { ...useSpaceInfo.getState().space!, root: '/other' } }))
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Today' })).toHaveAttribute('aria-selected', 'true'))
+  })
+
+  test('test `list` opens the page on that list without changing what is remembered', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('object.tasksTab', 'inbox')
+    const { rerender } = render(<TasksPage list="today" />)
+    expect(screen.getByRole('tab', { name: 'Today' })).toHaveAttribute('aria-selected', 'true')
+    expect(localStorage.getItem('object.tasksTab')).toBe('inbox')
+    // A pick still wins, and is remembered.
+    await user.click(screen.getByRole('tab', { name: 'Done' }))
+    expect(screen.getByRole('tab', { name: 'Done' })).toHaveAttribute('aria-selected', 'true')
+    expect(localStorage.getItem('object.tasksTab')).toBe('completed')
+    // Asked for another list: that one shows.
+    rerender(<TasksPage list="scheduled" />)
+    expect(screen.getByRole('tab', { name: 'Upcoming' })).toHaveAttribute('aria-selected', 'true')
+    // The Work views a Tasks list stands in for while Work is off.
+    expect(tasksListForWorkView('today')).toBe('today')
+    expect(tasksListForWorkView('list-inbox')).toBe('inbox')
+    expect(tasksListForWorkView('list-status')).toBe('status')
+    expect(tasksListForWorkView('list-open')).toBeUndefined()
+    expect(tasksListForWorkView('now')).toBeUndefined()
+    expect(tasksListForWorkView(undefined)).toBeUndefined()
+  })
+
+  test('test a space with no Task type can still add: the type id falls back to task', async () => {
+    const user = userEvent.setup()
+    useLinkIndex.setState({ types: [], objects: [], loaded: true })
+    mocked.rows.mockResolvedValue([])
+    render(<TasksPage />)
+    expect(await screen.findByText('No tasks today')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New task' })).toBeEnabled()
+    await user.type(screen.getByRole('textbox', { name: 'Add a task' }), 'First task{Enter}')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', { title: 'First task', body: '' }))
   })
 })
 

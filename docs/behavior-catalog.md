@@ -215,7 +215,8 @@ Left/Right | Toggle calendar sidebar Ctrl+Alt+S | Pop out today's daily note Ctr
 **AI Assistant**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; send a message to the daily
 note; retry Ctrl+Alt+R; close chat Ctrl+Alt+X; rephrase Ctrl+Alt+U.
 
-**Work** (M23; on the Work page only, never while typing in a field or editor): Search work / |
+**Work** (M23; on the Work page only, never while typing in a field or editor; (M32) none of them acts while Work
+is off for the space): Search work / |
 Brain dump B | Go to Now, Flow, Projects map, Today, On the floor, Your queues, Agent queue, Stuck, Wins,
 Alerts, Everything, Inbox, Captures: G then N, W, P, T, O, Q, H, S, Y, L, E, I, C (I and C: decision D3; the other task
 lists and Tickets have no key; G then I does nothing while task management is hidden; within 1.5 s; in Just one thing only G then N) |
@@ -275,11 +276,36 @@ Each starter template pre-fills the new type's properties.
 - Agents (M17), a section of its own with the standard section header, directly below the main navigation;
   it lists only the user's own agents (the built-in Assistant is not in it), and the header's `+` menu —
   not a "+ New agent" row — is the way to add one.
-- **Tasks dashboard** (Gene's redesign of M23's Work page): the sidebar's Tasks entry opens one page for
-  every task — Gene's rationale: the dashboard was never about tickets; tickets are tasks carrying desk
-  fields, so the task lists and the work dashboard are one domain and get one entry (there is no separate
-  Work entry; the `tasks` and `work` targets both open it, tab title "Tasks"). Top to bottom: the Tasks
-  header (icon, title, Search work, Create task); the brain-dump bar with Energy, Just one thing and the
+- **Tasks** (M32): the sidebar's Tasks entry opens the plain Tasks page (the `tasks` target; the `work` target
+  too while Work is off for the space). Header: icon, "Tasks", "Search tasks" (filters the shown list by title as
+  you type; Esc clears it) and "New task" (creates a task and opens it). Under it "Add a task": Enter (or "Add
+  task") adds without opening and keeps focus. Date words anywhere in the text — today, tomorrow, a weekday
+  ("friday", "next friday"), "next week", "in 3 days", "nov 20", `2026-11-20` — set the task's date and show as a
+  chip beside the field while typing; the words (and an "on", "by" or "due" just before them) are left out of the
+  title, and a month and day already past this year means next year's. Backspace at the start of the field, or
+  the chip's ×, removes the chip, and the words then stay in the title as typed. The new task's file has an empty
+  body: the title is not repeated in it (a default template's body is kept). Tabs: **Today** (two groups,
+  "Overdue (n)" — open tasks whose date ended before today — then "Today (n)" — the date covers today or the
+  deadline is today, done ones kept under the open ones; together the Calendar Day view's list for today,
+  decision T1), **Upcoming** (open tasks dated after today, one group per day for the next 14 days — "Tomorrow",
+  then the weekday and date — then "Later"), **Inbox** (open tasks with no date, newest first), **All** (every
+  task, open ones first) and **Done** (latest first); then a "More" menu with the other plain lists as they were
+  (Status, Deadline, Recurring, Reminders, Tags, Context: each a list view with its own layouts, filters and
+  saved view). The page opens on Today and comes back on the list last shown, kept per space in the browser:
+  opening the page or changing tabs writes no file. A group's header shows its count once ("Overdue (1)"). Rows:
+  the circle (a click completes the task), the title (a click opens the task; a done task's is struck through),
+  the date chip (a click opens Today / Tomorrow / Next week / No date and "Pick a date", the date picker; an
+  overdue date is in the theme's danger colour; a task with no date shows the chip's calendar icon), the deadline
+  label and the priority pill; 50 rows, then "Load more". On a type whose status has no Done option, the circle
+  offers "Add a Done status" — one click adds it to the type and completes the task — instead of "This type has
+  no status for that." A space with no Task type yet can still add: the type is made with the first task. The
+  Task rows load once for the page.
+- **Work** (M32; optional): the dashboard that used to be the Tasks page is its own page, off until "Use the Work
+  page in this space" is turned on (Settings > Work; a space that already holds work data reads as on). On: a
+  "Work" entry under Tasks opens it (the `work` target), unchanged apart from its heading ("Work"). Off: nothing
+  of it runs — no page (a `work` target shows Tasks), no Work keys (Brain dump B and the rest), no work toasts or
+  overlays, no keep-on-top window, no dashboard request. Top to bottom: the
+  header (icon, "Work", Search work, Create task); the brain-dump bar with Energy, Just one thing and the
   agent pill beside it; the focus rail (only when today has focus lines; Now's Focus card keeps Edit); the
   view row; the view. Views are grouped so the page opens calm on Now: **Drive** on one row (Now, Inbox,
   Today, Your queues, Agent queue, Captures), and **More views** folds **Plan** (Scheduled, Flow, Projects
@@ -294,12 +320,12 @@ Each starter template pre-fills the new type's properties.
   open overdue ones under "Overdue (n)"; done ones stay, struck; "N open, M done" and the `+` menu (Create task,
   Move all open tasks to); "Open in Calendar" under it opens the Calendar's Day view on today. Today's badge
   counts that list's open tasks, Inbox's counts the inbox. While the space hides task management ("Hide Task
-  Management"), the Tasks entry stays — the dashboard is the work dashboard too — and the dashboard leaves
-  out the task lists (the list views and Today's tasks) instead; the work views and the timeline stay. On
+  Management"), the Work page leaves out the task lists (the list views and Today's tasks); the work views and
+  the timeline stay. On
   Today's timeline a block too short for its label and time (the 24-minute Morning brief) shows the two on
   one line under the track (the next row down when two would meet; the tooltip stays). The Task rows load
-  once for the page. The old Tasks page (header and section tabs) is retired. Controls use the app's pill style
-  (14px, `bg-hover-2` when on).
+  once for the page. (M32) The plain Tasks page is its own page again (above); the task lists stay views of the
+  Work page too. Controls use the app's pill style (14px, `bg-hover-2` when on).
 - Object Types header: fold chevron, count, a `...` menu (Sort manually with a check, Sort alphabetically) and
   a `+` (the gallery above) on hover.
 - "Add section" opens a small form (a one-line explanation that a section is a named heading for pages
@@ -309,7 +335,9 @@ Each starter template pre-fills the new type's properties.
   **(out of scope)**.)
 - The calendar's Tasks rows: circle checkbox, title, status chip with a dropdown (Next Up, Someday/Maybe,
   In Progress), a due-date chip (red when overdue, with a calendar icon), a priority pill (!, !!, !!!) and a
-  `...` row menu. Section toolbar: "N open" count, layout picker, settings, snooze-style arrow, `+`.
+  `...` row menu. Section toolbar: "N open" count, layout picker, settings, snooze-style arrow, `+`. (M32) The
+  row parts are the Tasks page's: the date chip opens the same small picker (Today / Tomorrow / Next week / No
+  date, "Pick a date"), an overdue date is in the danger colour and a done task's title is struck through.
 
 ## 5. Object page and peek
 

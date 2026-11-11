@@ -37,14 +37,14 @@ describe('taskSections', () => {
       today: ['Today', 'Tasks that matter today'],
       scheduled: ['Scheduled', 'Tasks coming up, ordered by date'],
       status: ['Status', 'Every task, grouped by status'],
-      source: ['Context', 'Tasks grouped by the object that mentions them.'],
+      source: ['Context', 'Tasks grouped by the note that mentions them.'],
       tags: ['Tags', 'Every task, grouped by tag'],
       open: ['Open', 'All tasks not done yet'],
       deadline: ['Deadline', 'Open tasks that have a deadline, soonest first'],
       recurring: ['Recurring', 'Open repeating tasks, grouped by date'],
       reminders: ['Reminders', 'Open tasks with a reminder set, grouped by date'],
       completed: ['Completed', 'Tasks that are finished'],
-      all: ['All', 'Every object of this type, ready to filter and sort.'],
+      all: ['All', 'Every task, ready to filter and sort.'],
     }
     expect(TASK_SECTION_KEYS).toEqual(Object.keys(want))
     expect(DEFAULT_TASK_SECTION).toBe('inbox')

@@ -1,7 +1,7 @@
 // M23 Task 16: the Work page's keyboard shortcuts (spec section 5, keyboard), one `keydown`
 // listener while the Work page is mounted. Keys never act while Gene types: not in a field or an
 // editor, not while a dialog or the peek is open, and Space and Enter on a focused button, link
-// or checkbox stay that control's.
+// or checkbox stay that control's. M32: none of them acts while Work is off for the space.
 import { useEffect } from 'react'
 import { isEditableTarget } from '@/lib/shortcuts'
 import { entriesOf } from '@/nav/sidepanel'
@@ -13,6 +13,7 @@ import { openItemPanel } from '../state/workActions'
 import { useWorkSelection } from '../state/useWorkSelection'
 import { useWorkUi } from '../state/useWorkUi'
 import { isTaskListView } from '../tasklists/registerView'
+import { isWorkOn } from '../useWorkOn'
 import { workViews } from '../views/registry'
 import { G_SEQUENCE_MS } from './workShortcuts'
 
@@ -58,6 +59,11 @@ export function useWorkKeys(): void {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return
+      // M32: Work is off for this space: no brain-dump key, no view keys, nothing.
+      if (!isWorkOn()) {
+        gAt = null
+        return
+      }
       if (e.ctrlKey || e.metaKey || e.altKey || isEditableTarget(e.target) || isEditableTarget(document.activeElement)) {
         gAt = null
         return
