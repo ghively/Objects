@@ -14,6 +14,7 @@ import { setEditorObject } from './nodes/blockRef'
 import { BlockSelectionBar } from './selectionBar/BlockSelectionBar'
 import { TokensMenu } from './tokens/TokensMenu'
 import { SlashMenu } from './slash/SlashMenu'
+import { clearSaveState, setSaveState } from './saveStateStore'
 import { useAutosave, type BodyEditorHandle } from './useAutosave'
 import './editor.css'
 import './handles/handles.css'
@@ -66,7 +67,9 @@ export type EditorProps = {
 
 /**
  * Formatted block editor for an object's body. Unedited blocks are saved
- * byte-for-byte; saves happen 1000 ms after the last change and on blur.
+ * byte-for-byte; saves happen 1000 ms after the last change (at most 3000 ms after the first
+ * unsaved one), on blur, when the window loses focus or is hidden or closed, and on leaving the
+ * note (`useAutosave`). M32: the save state is published by path (`saveStateStore`).
  */
 export function Editor({
   path,
@@ -118,6 +121,11 @@ export function Editor({
   useEffect(() => {
     editor?.setEditable(!readOnly, false)
   }, [editor, readOnly])
+
+  // M32: the note page's "Saving… / Saved" mark reads this (`useSaveState(path)`).
+  const saveState = autosave.saveState
+  useEffect(() => setSaveState(path, saveState), [path, saveState])
+  useEffect(() => () => clearSaveState(path), [path])
 
   // A space switch flushes every open editor's pending save first (read-only ones resolve at once).
   const settleRef = useRef(autosave.settle)

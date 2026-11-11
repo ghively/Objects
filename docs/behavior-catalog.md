@@ -384,6 +384,12 @@ Each starter template pre-fills the new type's properties.
   - `()` always gives the same icon (Object keeps no last-used icon).
   - "Turn off automatic numbered lists" removes `1.` as a mark, alone and combined.
 - **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).
+- **Saving (M32)**: a note is saved 1 s after the last key and, while typing continues, at most 3 s after the
+  first unsaved key. It is also saved at once when the text or the window loses focus, when the window is hidden
+  or closing (`pagehide`: a request the browser finishes after the page is gone, for a note up to 60 KB; the text
+  is also kept for a reload until the save lands), on a note or tab switch and when the editor closes. Nothing is
+  sent when nothing changed, and never two saves at once: a save asked for while one runs follows it with the
+  latest text. Conflicts, read-only files and "Changes not saved. Retrying…" are as before.
 - **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves.
 - **Edited lines are written in the editor's standard Markdown form**: the line of a block you edit is rewritten
   that way (`_b_` becomes `*b*`, `[X]` becomes `[x]`, a setext heading becomes ATX `#`, a bare URL becomes
