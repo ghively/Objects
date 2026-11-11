@@ -347,8 +347,27 @@ export function TasksPage({ list }: { list?: TaskSectionKey } = {}) {
         </header>
         <QuickAddTask taskTypeId={taskTypeId} />
         <div className="flex flex-wrap items-center gap-1">
-          <div role="tablist" aria-label={TASKS_TEXT.heading} className="flex flex-wrap items-center gap-1">
-            {TASKS_PAGE_TABS.map((t) => (
+          {/* A tab list's keys: one stop for Tab (the selected tab, or the first while a "More"
+              list is shown); Left and Right move to the next tab and show its list, Home and End
+              go to the first and the last. */}
+          <div
+            role="tablist"
+            aria-label={TASKS_TEXT.heading}
+            className="flex flex-wrap items-center gap-1"
+            onKeyDown={(e) => {
+              if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+              const tabs = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')]
+              const at = tabs.indexOf(document.activeElement as HTMLElement)
+              const n = tabs.length
+              const to =
+                e.key === 'ArrowRight' ? (at + 1) % n : e.key === 'ArrowLeft' ? (at - 1 + n) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1
+              if (at < 0 || to < 0) return
+              e.preventDefault()
+              tabs[to].focus()
+              show(TASKS_PAGE_TABS[to].section)
+            }}
+          >
+            {TASKS_PAGE_TABS.map((t, i) => (
               <button
                 key={t.key}
                 type="button"
@@ -356,6 +375,7 @@ export function TasksPage({ list }: { list?: TaskSectionKey } = {}) {
                 id={`tasks-tab-${t.key}`}
                 aria-selected={t.section === active}
                 aria-controls="tasks-panel"
+                tabIndex={(tab ? t.section === active : i === 0) ? 0 : -1}
                 onClick={() => show(t.section)}
                 className={cn(TAB, t.section === active ? TAB_ON : TAB_OFF)}
               >

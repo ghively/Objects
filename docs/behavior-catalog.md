@@ -398,10 +398,13 @@ Each starter template pre-fills the new type's properties.
   then the weekday and date — then "Later"), **Inbox** (open tasks with no date, newest first), **All** (every
   task, open ones first) and **Done** (latest first); then a "More" menu with the other plain lists as they were
   (Status, Deadline, Recurring, Reminders, Tags, Context: each a list view with its own layouts, filters and
-  saved view). The page opens on Today and comes back on the list last shown, kept per space in the browser:
+  saved view). The tab row is one stop for the Tab key; Left and Right move to the next tab and show its list,
+  Home and End go to the first and the last. The page opens on Today and comes back on the list last shown, kept per space in the browser:
   opening the page or changing tabs writes no file. A group's header shows its count once ("Overdue (1)"). Rows:
   the circle (a click completes the task), the title (a click opens the task; a done task's is struck through),
-  the date chip (a click opens Today / Tomorrow / Next week / No date and "Pick a date", the date picker; an
+  the date chip (a click opens Today / Tomorrow / Next week / No date and "Pick a date", the date picker, which
+  opens with the caret in its date field and the date shown selected, so "friday" and Enter set it at once; Up
+  and Down move through the chip's menu, Home and End jump; an
   overdue date is in the theme's danger colour; a task with no date shows the chip's calendar icon), the deadline
   label and the priority pill; 50 rows, then "Load more". On a type whose status has no Done option, the circle
   offers "Add a Done status" — one click adds it to the type and completes the task — instead of "This type has

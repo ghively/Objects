@@ -341,6 +341,37 @@ describe('TasksPage (M32)', () => {
     expect(screen.queryByRole('navigation', { name: 'Work views' })).toBeNull()
   })
 
+  // The M32 review, F8: the row says it is a tab list, so it answers a tab list's keys.
+  test('test the tab row is one stop for Tab, and the arrow keys, Home and End move through it', async () => {
+    const user = userEvent.setup()
+    render(<TasksPage />)
+    const tab = (name: string) => screen.getByRole('tab', { name })
+    const stops = () => within(screen.getByRole('tablist', { name: 'Tasks' })).getAllByRole('tab').map((t) => t.getAttribute('tabindex'))
+    expect(stops()).toEqual(['0', '-1', '-1', '-1', '-1'])
+    act(() => tab('Today').focus())
+    await user.keyboard('{ArrowRight}')
+    expect(tab('Upcoming')).toHaveFocus()
+    expect(tab('Upcoming')).toHaveAttribute('aria-selected', 'true')
+    expect(stops()).toEqual(['-1', '0', '-1', '-1', '-1'])
+    await user.keyboard('{End}')
+    expect(tab('Done')).toHaveFocus()
+    expect(tab('Done')).toHaveAttribute('aria-selected', 'true')
+    await user.keyboard('{ArrowRight}')
+    expect(tab('Today')).toHaveFocus() // round to the first
+    await user.keyboard('{ArrowLeft}')
+    expect(tab('Done')).toHaveFocus()
+    await user.keyboard('{ArrowLeft}')
+    expect(tab('All')).toHaveFocus()
+    await user.keyboard('{Home}')
+    expect(tab('Today')).toHaveFocus()
+    expect(tab('Today')).toHaveAttribute('aria-selected', 'true')
+    // With a list from "More" shown no tab is selected: the first is the row's stop.
+    await user.click(screen.getByRole('button', { name: 'More' }))
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Status' }))
+    await waitFor(() => expect(tab('Today')).toHaveAttribute('aria-selected', 'false'))
+    expect(stops()).toEqual(['0', '-1', '-1', '-1', '-1'])
+  })
+
   test('test each tab shows its list: Upcoming by day, Inbox the undated, All, Done', async () => {
     const user = userEvent.setup()
     render(<TasksPage />)
