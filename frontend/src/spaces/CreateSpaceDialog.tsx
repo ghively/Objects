@@ -172,7 +172,7 @@ export function CreateSpaceDialog() {
             </div>
           </div>
         ) : (
-          <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3">
+          <form onSubmit={(e) => void submit(e)} className="flex min-w-0 flex-col gap-3">
             <input
               autoFocus
               aria-label={T.namePlaceholder}
@@ -223,7 +223,7 @@ export function CreateSpaceDialog() {
               </div>
             </aside>
             {error && (
-              <p role="alert" className="text-[13px] text-danger">
+              <p role="alert" className="text-[13px] [overflow-wrap:anywhere] text-danger">
                 {error}
               </p>
             )}

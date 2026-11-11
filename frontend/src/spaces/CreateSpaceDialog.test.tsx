@@ -159,7 +159,11 @@ describe('CreateSpaceDialog', () => {
     // The server's answer for a location that is no folder (missing, or a file).
     mocked.createSpace.mockRejectedValueOnce(new ApiError(404, '"/home/gene/Spaces/Second" is not a folder.'))
     await user.click(screen.getByRole('button', { name: 'Create space' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('The folder "/home/gene/Spaces/Second" does not exist.')
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('The folder "/home/gene/Spaces/Second" does not exist.')
+    // It names a path, which may be one long unbreakable word: it wraps inside the box, as the created path does.
+    expect(alert).toHaveClass('[overflow-wrap:anywhere]')
+    expect(alert.closest('form')).toHaveClass('min-w-0')
     expect(screen.queryByText(/is not a folder/)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Switch space' })).toBeNull()
     // Another 404 of the route keeps the server's own words.
