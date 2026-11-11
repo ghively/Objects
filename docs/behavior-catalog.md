@@ -328,7 +328,13 @@ Each starter template pre-fills the new type's properties.
   large bold; the Description property as a paragraph under the title; a "Tags" row of colored tag chips with a
   small list icon; a divider; the body. A freshly created object (the New menu, a type's `+`, Ctrl+U and the
   other create buttons) opens with its title focused and selected, in the peek and on the full page, so typing
-  names it; "Add description" puts the caret in the description it reveals. Renaming an object (its title, a
+  names it; "Add description" puts the caret in the description it reveals. Title to body (M32): Enter, ArrowDown
+  or Tab in the title puts the caret at the start of the body (page and peek; Tab never walks the property pane
+  first), and the typed title is committed as the caret leaves; ArrowUp, or Shift+Tab, with the caret at the
+  body's very first position goes back to the end of the title (Shift+Tab in a list item or an indented block
+  still unindents). Words typed in the body while the rename runs are kept: they are saved under the note's new
+  file name and the caret stays where it was. A note opened with a request for its body (Today's note: the end of
+  its text) takes the caret there once its editor is ready. Renaming an object (its title, a
   table's title cell, a whiteboard's name) rewrites the links to it in other objects and then says so with a short
   notice, "Updated links in 3 objects" ("1 object"); nothing is shown when no other object linked to it.
 - **Whiteboard changed outside** (its `.whiteboard.json` edited in another program while the board is open): the

@@ -4,7 +4,7 @@
  * calendar's daily note) renders only the body editor and its autosave.
  */
 import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { api, ConflictError, isResync } from '@/api/client'
 import { openAiChat, useAiHidden } from '@/ai/store'
@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Editor } from '@/editor/Editor'
 import { RecoveryDialog } from '@/editor/RecoveryDialog'
-import { dropUnsaved, keptUnsaved } from '@/editor/unsaved'
+import { dropUnsaved, keepUnsaved, keptUnsaved } from '@/editor/unsaved'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { FindBar } from '@/find/FindBar'
 import { useFind } from '@/find/useFind'
@@ -46,6 +46,7 @@ import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
 import { formatKeys, isEditableTarget, keysFor, matches } from '@/lib/shortcuts'
 import { cn } from '@/lib/utils'
 import { revealMenuLabel } from '@/lib/platformText'
+import { takeBodyFocus } from '@/nav/focusRequest'
 import { canGoBack, usePeek, useTabs, type Target } from '@/nav/tabs'
 import { ReferencesSection } from '@/references/ReferencesSection'
 import { byPluralName, TypeChip } from '@/shell/Sidebar'
@@ -69,6 +70,7 @@ import { keyIsForView, usePageShortcuts } from './pageShortcuts'
 import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
 import { ImportSourceLine, importSourceOf } from './ImportSourceLine'
 import { counterpartEditor } from './CounterpartRows'
+import { bodyEditorOf, caretAtBodyStart, caretInTopLevelBlock, carryCaret, focusBody, focusedBodySelection, takeCarriedCaret } from './bodyCaret'
 import { PropertyPanel } from './PropertyPanel'
 import { SaveMark } from './SaveMark'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
@@ -390,6 +392,42 @@ export function ObjectView({
   /** The path our own rename moved this object to (its reload keeps the view on screen). */
   const renamedToRef = useRef<string | null>(null)
 
+  /**
+   * M32: our own rename moved the file. The page and the peek are keyed by path, so this view and
+   * its editor are about to be replaced, and Enter in the title has already put the caret in the
+   * body: what was typed there while the rename ran is saved under the new path first (the old
+   * one is gone), and the caret is left for the view that takes over. Text that can't be saved is
+   * kept and offered there (`RecoveryDialog`). A body nobody typed in moves at once.
+   */
+  const viewRootRef = useRef<HTMLDivElement | null>(null)
+  const followRename = async (res: RenameResult, oldPath: string) => {
+    const h = mode === 'inline' ? null : editorRef.current
+    const dirty = !!h && h.isDirty()
+    let unsaved = dirty ? h.getBody() : null
+    let version = res.version
+    try {
+      for (let i = 0; h && unsaved !== null && i < 3; i++) {
+        h.hold()
+        version = (await api.saveBody(res.path, unsaved, version)).version
+        adoptVersion(version)
+        const now = h.getBody()
+        unsaved = now === null || now === unsaved ? null : now
+      }
+    } catch {
+      /* kept below */
+    }
+    if (h) {
+      const caret = focusedBodySelection(viewRootRef.current)
+      if (caret) carryCaret(res.path, caret)
+      const shown = h.getBody()
+      if (unsaved !== null && shown !== null) keepUnsaved(res.path, shown, objectIdRef.current)
+      // Nothing is left for this editor to save: leaving, it must not write to the old path.
+      if (dirty && shown !== null) h.reload(shown, version)
+    }
+    renamedToRef.current = res.path
+    useTabs.getState().retarget(oldPath, res.path)
+  }
+
   const bodyControl = useRef<BodyControl>({
     flush: async () => {
       if (!blockedRef.current) {
@@ -613,10 +651,7 @@ export function ObjectView({
             }
           : d,
       )
-      if (res.path !== oldPath) {
-        renamedToRef.current = res.path
-        useTabs.getState().retarget(oldPath, res.path)
-      }
+      if (res.path !== oldPath) void followRename(res, oldPath)
     },
   })
 
@@ -966,7 +1001,6 @@ export function ObjectView({
   // The menu's page keys for the active view (`keyIsForView`: the view holding focus, or the main
   // page with focus on the body and nothing open over it): Ctrl+E Export and Ctrl+I Import outside
   // the editor (inside it they are code and italic), Ctrl+Shift+* pins or unpins, the editor included.
-  const viewRootRef = useRef<HTMLDivElement | null>(null)
   const pageKeysRef = useRef({ summary, type })
   pageKeysRef.current = { summary, type }
   useEffect(() => {
@@ -1419,6 +1453,38 @@ export function ObjectView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, autoFocus, hasDetail, loadFailed])
 
+  // M32: a body-focus request for this note ("Today's note": the end of its text), or the caret
+  // our own rename left for it, is taken once, when the editor shows the loaded body.
+  useEffect(() => {
+    if (mode === 'inline' || !hasDetail) return
+    const at = takeCarriedCaret(path) ?? takeBodyFocus(path)
+    if (at) focusBody(viewRootRef.current, at)
+  }, [mode, hasDetail, path])
+
+  /** M32, item 2: Enter, ArrowDown or Tab in the title: the caret goes to the start of the body. */
+  const enterBody = useCallback(() => focusBody(viewRootRef.current, 'start'), [])
+
+  /**
+   * M32, item 2: ArrowUp or Shift+Tab with the caret at the body's very first position goes back
+   * to the end of the title. Shift+Tab in a list item or an indented block stays the editor's
+   * (it unindents). Capture phase: the editor never sees the key.
+   */
+  const onBodyKeyDown = (e: ReactKeyboardEvent) => {
+    if (e.nativeEvent.isComposing || e.ctrlKey || e.metaKey || e.altKey) return
+    const up = e.key === 'ArrowUp' && !e.shiftKey
+    const back = e.key === 'Tab' && e.shiftKey
+    if (!up && !back) return
+    const ed = bodyEditorOf(viewRootRef.current)
+    // Only the body's own caret: not a field inside a block (a table cell's formula, a code block).
+    if (!ed || e.target !== ed.view.dom || !caretAtBodyStart(ed) || (back && !caretInTopLevelBlock(ed))) return
+    const title = viewRootRef.current?.querySelector<HTMLInputElement>('[data-page-title] input[aria-label="Title"]')
+    if (!title) return
+    e.preventDefault()
+    e.stopPropagation()
+    title.focus()
+    title.setSelectionRange(title.value.length, title.value.length)
+  }
+
   const recoveryDialog = (
     <RecoveryDialog
       open={recovery !== null}
@@ -1615,6 +1681,7 @@ export function ObjectView({
               onRename={(title) => void writes.rename(title)}
               onPropertiesChange={writeProperties}
               onOpenTag={onOpenTag}
+              onEnterBody={enterBody}
             />
           </>
         }
@@ -1645,7 +1712,7 @@ export function ObjectView({
                 This object's file was deleted or moved on disk. Edits here aren't saved.
               </div>
             )}
-            <div className="object-body-text">
+            <div className="object-body-text" onKeyDownCapture={onBodyKeyDown}>
               {raw ? (
                 <Suspense fallback={null}>
                   <RawMode

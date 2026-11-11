@@ -256,4 +256,52 @@ describe('ObjectHeader', () => {
     expect(mocked.ensureTag).toHaveBeenCalledWith('Physics')
     expect(mocked.ensureTag).not.toHaveBeenCalledWith('Docs')
   })
+
+  // M32, item 2: the title hands over to the body.
+  test.each(['Enter', 'ArrowDown', 'Tab'])('%s in the title asks for the body, and the title commits as the focus leaves', async (key) => {
+    const user = userEvent.setup()
+    const onRename = vi.fn()
+    const body = document.createElement('textarea')
+    document.body.append(body)
+    const onEnterBody = vi.fn(() => {
+      body.focus()
+      return true
+    })
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={onRename} onPropertiesChange={vi.fn()} onEnterBody={onEnterBody} />)
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    await user.clear(title)
+    await user.type(title, 'Plans')
+    expect(fireEvent.keyDown(title, { key })).toBe(false)
+    expect(onEnterBody).toHaveBeenCalledTimes(1)
+    expect(body).toHaveFocus()
+    expect(onRename).toHaveBeenCalledWith('Plans')
+    body.remove()
+  })
+
+  test('with a modifier, with the #tag picker open, or in Escape, the body is not asked', async () => {
+    const onEnterBody = vi.fn(() => true)
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={vi.fn()} onPropertiesChange={vi.fn()} onEnterBody={onEnterBody} />)
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    title.focus()
+    expect(fireEvent.keyDown(title, { key: 'Tab', shiftKey: true })).toBe(true)
+    expect(fireEvent.keyDown(title, { key: 'ArrowDown', altKey: true })).toBe(true)
+    fireEvent.keyDown(title, { key: 'Escape' })
+    expect(onEnterBody).not.toHaveBeenCalled()
+    title.focus()
+    fireEvent.change(title, { target: { value: 'Notes #do', selectionStart: 9 } })
+    await screen.findByRole('listbox', { name: 'Tags' })
+    fireEvent.keyDown(title, { key: 'ArrowDown' })
+    expect(onEnterBody).not.toHaveBeenCalled()
+  })
+
+  test('a body that cannot take the caret: Enter leaves the field as before, Tab is the browser\'s', async () => {
+    const onEnterBody = vi.fn(() => false)
+    render(<ObjectHeader summary={page()} type={PAGE} onRename={vi.fn()} onPropertiesChange={vi.fn()} onEnterBody={onEnterBody} />)
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    title.focus()
+    expect(fireEvent.keyDown(title, { key: 'Tab' })).toBe(true)
+    expect(title).toHaveFocus()
+    fireEvent.keyDown(title, { key: 'Enter' })
+    expect(title).not.toHaveFocus()
+  })
 })
