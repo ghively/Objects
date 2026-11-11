@@ -265,7 +265,7 @@ export function Sidebar({
   }, [])
   // M32: the Work entry exists only while the Work page is on for this space.
   const workOn = useWorkOn()
-  // M32: "Hide Tasks in this space" takes the Tasks entry, and Work under it, off the sidebar.
+  // M32: "Hide Tasks in this space" takes the Tasks entry off the sidebar; Work, when it is on, stays.
   const tasksHidden = useTasksHidden()
   // A type's collections sit under its row in the object types block.
   const { collections } = useCollections()

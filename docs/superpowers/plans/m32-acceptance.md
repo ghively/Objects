@@ -4,7 +4,7 @@ Status (2026-11-11): built 2026-11-11 (the contract `37f189c7` and `c5e8fdbe`, t
 file ownership, all merged at `ea0c2ebb`), integrated in two steps (the back end's: the title heading,
 `scripts/m32_acceptance.py`, this file, the acceptance sweep and the back-end suite; and the front end's cross-lane
 fixes, merged at `ebaee077`), then one whole-milestone review (three reviewers at once, read-only), one fix pass
-(three lanes by file ownership, merged at `aeda6e71`) and the full gate at `GATE_HEAD` (the numbers are under
+(three lanes by file ownership, merged at `aeda6e71`) and the full gate at `aeda6e71` (the numbers are under
 "Automated results", "The gate"). M32 is on `master`. Gene's hand checks below are unticked, and twelve choices are
 left for him ("Choices left for Gene").
 
@@ -127,14 +127,14 @@ The front-end suite, `tsc`, lint and the build are the front end's integrate ste
 
 ### The gate (after the fix pass)
 
-Run on 2026-11-11 at `GATE_HEAD`, after the review and the fix pass below:
+Run on 2026-11-11 at `aeda6e71`, after the review and the fix pass below:
 
 | What | Result |
 |---|---|
-| The back-end suite | GATE_BACKEND |
-| The front-end suite | GATE_FRONTEND |
+| The back-end suite | 4274 passed, 19 skipped, 3 xpassed (28 minutes) |
+| The front-end suite | 618 files, 5028 passed, 1 skipped |
 | `tsc`, lint, build | clean |
-| The acceptance sweep | GATE_SWEEP |
+| The acceptance sweep | 58 of 58 PASS |
 | M32 acceptance | RESULT: PASS (94 checks) |
 
 The fix pass took `scripts/m32_acceptance.py` from 75 checks to 94 (the parts marked "the fix pass" in checks 2, 3,
