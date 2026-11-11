@@ -24,13 +24,16 @@ export function SaveMark({ path }: { path: string }) {
   const busy = state === 'saving' || state === 'unsaved'
   /** Something was typed in this view: only then is "Saved" worth saying. */
   const [edited, setEdited] = useState(false)
-  const [quiet, setQuiet] = useState(false)
-  useEffect(() => {
-    if (busy) setEdited(true)
-  }, [busy])
+  if (busy && !edited) setEdited(true)
   const saved = state === 'saved' && edited
-  useEffect(() => {
+  /** "Saved" has faded to the check; written out again with each new save. */
+  const [quiet, setQuiet] = useState(false)
+  const [wasSaved, setWasSaved] = useState(saved)
+  if (wasSaved !== saved) {
+    setWasSaved(saved)
     setQuiet(false)
+  }
+  useEffect(() => {
     if (!saved) return
     const t = setTimeout(() => setQuiet(true), SAVED_TEXT_MS)
     return () => clearTimeout(t)
