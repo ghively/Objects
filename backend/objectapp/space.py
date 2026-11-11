@@ -5466,9 +5466,9 @@ class Space:
             if types_dir.is_dir():
                 taken |= {f.stem for f in types_dir.glob("*.json")}
             if t.id in taken:
-                raise InvalidValue(f'An object type with the id "{t.id}" already exists.')
+                raise InvalidValue(f'A type with the id "{t.id}" already exists.')
             if self._name_taken(t.name):
-                raise InvalidValue(f'An object type named "{t.name}" already exists.')
+                raise InvalidValue(f'A type named "{t.name}" already exists.')
             t = copy.deepcopy(t)
             self._write_type_json(t, "")
             self.types.append(t)
@@ -5505,7 +5505,7 @@ class Space:
 
             tpl = get_template(template)
             if tpl is None:
-                raise InvalidValue(f'Unknown object type template "{template}".')
+                raise InvalidValue(f'Unknown type template "{template}".')
             name = name or tpl.name
             plural_name = plural_name or tpl.pluralName
             icon = icon if icon is not None else tpl.icon
@@ -5513,7 +5513,7 @@ class Space:
         name = " ".join(str(name or "").split())
         plural = " ".join(str(plural_name or "").split())
         if not name or not plural:
-            raise InvalidValue("An object type needs a name and a plural name.")
+            raise InvalidValue("A type needs a name and a plural name.")
         color = color or "gray"
         if color not in THEME_COLORS:
             raise InvalidValue(f'Unknown color "{color}".')
@@ -5522,7 +5522,7 @@ class Space:
             raise InvalidValue("Unknown icon.")
         with self._lock:
             if self._name_taken(name):
-                raise InvalidValue(f'An object type named "{name}" already exists.')
+                raise InvalidValue(f'A type named "{name}" already exists.')
             types_dir = self.root / ".object" / "types"
             taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
             if types_dir.is_dir():
@@ -5616,7 +5616,7 @@ class Space:
 
         with self._lock:
             if self._name_taken(name):
-                raise InvalidValue(f'An object type named "{name}" already exists.')
+                raise InvalidValue(f'A type named "{name}" already exists.')
             types_dir = self.root / ".object" / "types"
             taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
             if types_dir.is_dir():
@@ -5870,7 +5870,7 @@ class Space:
         Returns (ops, whether a property is deleted).
         """
         if not new.name or not new.pluralName:
-            raise InvalidValue("An object type needs a name and a plural name.")
+            raise InvalidValue("A type needs a name and a plural name.")
         if new.color != old.color and new.color not in THEME_COLORS:
             raise InvalidValue(f'Unknown color "{new.color}".')
         ops: list[_TypeOp] = []
@@ -5880,7 +5880,7 @@ class Space:
             if old.basic:
                 raise InvalidValue(BASIC_LOCKED)
             if self._name_taken(new.name, except_id=old.id):
-                raise InvalidValue(f'An object type named "{new.name}" already exists.')
+                raise InvalidValue(f'A type named "{new.name}" already exists.')
             former = [f for f in old.formerNames if f.lower() != new.name.lower()]
             if old.name.lower() != new.name.lower() and old.name.lower() not in (
                 f.lower() for f in former
@@ -6148,7 +6148,7 @@ class Space:
             if t is None:
                 raise KeyError(type_id)
             if t.basic:
-                raise InvalidValue("Basic object types cannot be deleted.")
+                raise InvalidValue("Basic types cannot be deleted.")
             objects = self._type_members(type_id, templates=False)
             if not confirm:
                 n = len(objects)

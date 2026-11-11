@@ -148,7 +148,7 @@ def test_a_day_type_made_from_the_old_template_keeps_working(tmp_path: Path):
     day = reopened.type_by_id(t.id)
     assert day is not None and day.extra["templateKey"] == "day"
     assert [p["name"] for p in template_catalog(list(reopened.types)) if p["added"]] == []
-    with pytest.raises(InvalidValue, match='Unknown object type template "day"'):
+    with pytest.raises(InvalidValue, match='Unknown type template "day"'):
         reopened.create_type("", "", template="day")
 
 
