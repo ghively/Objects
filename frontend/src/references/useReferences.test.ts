@@ -73,6 +73,58 @@ describe('useReferences', () => {
     expect(mocked.references).toHaveBeenCalledTimes(1)
   })
 
+  // The walk's W19: deleting the open note asked for its references once more, and got a 404.
+  test('test a note that was just deleted is not asked for again; one that comes back is', async () => {
+    const { result } = renderHook(() => useReferences('Pages/A.md', 20))
+    await flush()
+    mocked.references.mockClear()
+    act(() => {
+      fire(ev('changed')) // a reload was already waiting
+      fire(ev('deleted', 'Pages/A.md'))
+    })
+    act(() => {
+      vi.advanceTimersByTime(RELOAD_DEBOUNCE_MS * 2)
+    })
+    await flush()
+    expect(mocked.references).not.toHaveBeenCalled()
+    // What it showed stays (the page says the note was deleted and offers Undo).
+    expect(result.current.data).not.toBeNull()
+    // Nothing else asks for it either while it is gone: the notes that linked to it change next.
+    act(() => {
+      fire(ev('changed'))
+      fire(ev('deleted'))
+      vi.advanceTimersByTime(RELOAD_DEBOUNCE_MS * 2)
+    })
+    await flush()
+    expect(mocked.references).not.toHaveBeenCalled()
+    // Undo Delete (or the file put back): its references are read again.
+    act(() => {
+      fire(ev('created', 'Pages/A.md'))
+      vi.advanceTimersByTime(RELOAD_DEBOUNCE_MS)
+    })
+    await flush()
+    expect(mocked.references).toHaveBeenCalledTimes(1)
+    // And changes count again.
+    act(() => {
+      fire(ev('changed'))
+      vi.advanceTimersByTime(RELOAD_DEBOUNCE_MS)
+    })
+    await flush()
+    expect(mocked.references).toHaveBeenCalledTimes(2)
+  })
+
+  test('test another note deleted still reloads (a backlink may be gone)', async () => {
+    renderHook(() => useReferences('Pages/A.md', 20))
+    await flush()
+    mocked.references.mockClear()
+    act(() => {
+      fire(ev('deleted', 'Pages/B.md'))
+      vi.advanceTimersByTime(RELOAD_DEBOUNCE_MS)
+    })
+    await flush()
+    expect(mocked.references).toHaveBeenCalledTimes(1)
+  })
+
   test('ignores event kinds that cannot change references', async () => {
     renderHook(() => useReferences('Pages/A.md', 20))
     await flush()
