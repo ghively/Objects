@@ -373,6 +373,14 @@ Each starter template pre-fills the new type's properties.
 - **Inline code** renders as a purple monospace token with a tinted background; **tables** are bordered with a
   header row; the empty body's placeholder reads "Start writing, or type / for blocks..."; the title placeholder "Untitled".
 - **Slash menu**, **@ picker**: see audit items 41-43 and section 2.
+- **Editor wording (M32, the glossary)**: the slash groups read "Create a block", "New" (was "Create an object";
+  its rows "Create Note", "Create Task" and so on, the built-in Page type reading "Note"), "Link to a date" and
+  "Embed" (was "Reuse any content", the group and its first row; a saved search's row says "Embed this saved
+  search"). The selection toolbar's `+` reads "Make a new note out of the selected text.", its `@` "Point the
+  selected text at a note you already have.", their fields "Search types" and "Search notes", an empty list "No
+  matches". The block menu's to-do row reads "Turn into task", the selection bar's Move menu "New note" ("Move the
+  selection onto a new note"), a missing embedded saved search "Saved search not found.". The AI rows of the slash
+  menu, the block menu and both toolbars are where they were (decision 1).
 - **Markdown list shortcuts** (decision C11; `editor/extensions/markdownShortcuts.ts`, `editor/document.ts`):
   - At a block's start, typed marks followed by Space convert: `|` quote, `>` toggle, `*` or `-` bullet, `1.`
     numbered, `a)` alphabetical, `i)` roman, `[]` to-do, `()` icon, `#`-`####` heading. `---` makes a horizontal

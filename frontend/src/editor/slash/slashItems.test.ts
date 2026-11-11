@@ -51,7 +51,7 @@ const ctx = (query = '', extra: Partial<SlashContext> = {}): SlashContext => ({ 
 describe('slash items', () => {
   test('slash menu sections and item names', () => {
     const sections = slashSections(ctx())
-    expect(sections.map((s) => s.label)).toEqual(['Create a block', 'Create an object', 'Link to a date', 'Reuse any content'])
+    expect(sections.map((s) => s.label)).toEqual(['Create a block', 'New', 'Link to a date', 'Embed'])
     // The menu order (reference check 2026-10-28, 2d).
     expect(sections[0].items.map((i) => [i.name, i.description ?? null])).toEqual([
       ['Standard', 'Show this block as ordinary text'],
@@ -74,11 +74,11 @@ describe('slash items', () => {
       ['Record audio', 'Record from the microphone and drop the clip here'],
       ['Math', 'An equation on its own line'],
       ['Code', 'A code block'],
-      ['Horizontal line', 'A divider line between parts of the page'],
+      ['Horizontal line', 'A divider line between parts of the note'],
       ['Two Columns', 'Lay groups of blocks out side by side'],
       ['Table', 'Rows and columns of cells'],
       ['Create bookmark', null], // ours: Object's only way to insert a bookmark
-      ['Button', 'A button that runs an automation on this object'], // M14 (ours)
+      ['Button', 'A button that runs an automation on this note'], // M14 (ours)
     ])
     // The expected icons.
     expect(Object.fromEntries(sections[0].items.map((i) => [i.id, i.icon]))).toMatchObject({
@@ -92,9 +92,12 @@ describe('slash items', () => {
       columns: 'ph-columns',
     })
     // One item per type (whiteboards are created from "+ New").
-    expect(sections[1].items.map((i) => i.name)).toEqual(['Create Page', 'Create Person'])
+    expect(sections[1].items.map((i) => i.name)).toEqual(['Create Note', 'Create Person'])
+    // M32: a type the user renamed keeps their name; only the built-in Page type reads "Note".
+    const renamed = slashSections({ query: '', types: [typeDef({ id: 'page', name: 'Doc', basic: true })], twentyFourHourTime: true })
+    expect(renamed[1].items.map((i) => i.name)).toEqual(['Create Doc'])
     expect(slashSections(ctx('Q3 plan'))[1].items.map((i) => i.name)).toEqual([
-      'Create Page with title "Q3 plan"',
+      'Create Note with title "Q3 plan"',
       'Create Person with title "Q3 plan"',
     ])
     // Catalog item 41: Time, Now, Today, Tomorrow, Yesterday, In a week, A week ago.
@@ -109,7 +112,7 @@ describe('slash items', () => {
     ])
     // No description ends with a full stop (they are labels, not sentences).
     for (const s of sections) for (const i of s.items) expect(i.description ?? '', i.id).not.toMatch(/\.$/)
-    expect(sections[3].items.map((i) => i.name)).toEqual(['Reuse any content'])
+    expect(sections[3].items.map((i) => i.name)).toEqual(['Embed'])
   })
 
   test('slash filter matches names and descriptions; no match shows No results', () => {
@@ -118,11 +121,11 @@ describe('slash items', () => {
     // Best match first: the name hits come before loose description hits.
     expect(names('head', []).slice(0, 4)).toEqual(['Heading 1', 'Heading 2', 'Heading 3', 'Heading 4'])
     expect(names('roman', [])[0]).toBe('Roman list')
-    // By description: "A divider line between parts of the page".
+    // By description: "A divider line between parts of the note".
     expect(names('between parts', [])).toContain('Horizontal line')
     expect(names('zzqx', [])).toEqual([])
     // The object items carry the query as the title, so they stay.
-    expect(names('zzqx')).toEqual(['Create Page with title "zzqx"', 'Create Person with title "zzqx"'])
+    expect(names('zzqx')).toEqual(['Create Note with title "zzqx"', 'Create Person with title "zzqx"'])
     expect(hasRealMatch(slashSections(ctx('zzqx ')), 'zzqx ')).toBe(false)
     expect(hasRealMatch(slashSections(ctx('tab')), 'tab')).toBe(true)
   })
@@ -284,9 +287,9 @@ describe('m8 typed dates and reuse items', () => {
     )
     const reuse = sections.find((s) => s.id === 'reuse')!
     expect(reuse.items.map((i) => [i.name, i.description ?? null])).toEqual([
-      ['Reuse any content', null],
+      ['Embed', null],
       ['Reading list', 'Embed this collection'],
-      ['Open tasks', 'Embed this query'],
+      ['Open tasks', 'Embed this saved search'],
     ])
     const editor = headless('Hello\n')
     editor.commands.setTextSelection(6)

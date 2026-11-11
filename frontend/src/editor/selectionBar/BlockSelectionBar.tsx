@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { NEW_NOTE } from '@/lib/words'
 import { plainText, TEXT_STATS_TEXT, textStats, type TextStats } from '@/object/textStats'
 import {
   blockSelectionRange,
@@ -87,8 +88,8 @@ export const BLOCK_BAR_TEXT = {
   todayHint: "Move the selection into today's daily note",
   tomorrow: 'Tomorrow',
   tomorrowHint: "Move the selection into tomorrow's daily note",
-  newPage: 'New page',
-  newPageHint: 'Move the selection onto a new page',
+  newPage: NEW_NOTE, // M32 (the glossary): was "New page"
+  newPageHint: 'Move the selection onto a new note',
   delete: 'Delete selected blocks',
   ai: AI_TEXT.ai,
   clear: 'Clear selection',

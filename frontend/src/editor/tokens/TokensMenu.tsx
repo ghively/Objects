@@ -3,12 +3,12 @@
  * selection, in the live app's order (catalog section 6): Bold, Italic,
  * Strikethrough, Underline, Bullet list, To-do, Link, Code, Formula,
  * "Highlight text" (the colour panel, `ColorMenu`), `+` ("Create object from
- * text selection."), `@` ("Point the selected text at an object you already have.") and the
+ * text selection."), `@` ("Point the selected text at a note you already have.") and the
  * AI sparkle ("AI", M10; gone while "Hide AI features" is on). The two list buttons turn the block
  * into that list and back to text (the catalog read the second icon as
  * numbered or to-do; To-do is our choice).
  *
- * - Create: pick a type ("Search Object Types"); a new object of it is titled
+ * - Create: pick a type ("Search types"); a new object of it is titled
  *   with the selection, the selection becomes `[[Title]]`, and the object opens
  *   where the click's modifier keys say (`createAndOpen`).
  * - Link existing: pick an object; the selection becomes a link to it, keeping
@@ -45,6 +45,7 @@ import { useAiHidden } from '@/ai/store'
 import type { ObjectSummary, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { createAndOpen, type OpenMods } from '@/create/createAndOpen'
+import { typeLabel } from '@/lib/typeLabel'
 import { cn } from '@/lib/utils'
 import { ensureLinkIndex, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { fuzzyMatch, fuzzyScore } from '@/links/LinkPicker'
@@ -67,12 +68,12 @@ export const TOKENS_MENU_TEXT = {
   todo: 'To-do',
   link: 'Link',
   highlight: COLOR_MENU_TEXT.title,
-  create: 'Make a new object out of the selected text.',
-  reuse: 'Point the selected text at an object you already have.',
+  create: 'Make a new note out of the selected text.',
+  reuse: 'Point the selected text at a note you already have.',
   ai: AI_TEXT.ai,
-  searchTypes: 'Search Object Types',
-  searchObjects: 'Search objects', // our string
-  noObjects: 'No matching objects', // our string (as the link picker)
+  searchTypes: 'Search types',
+  searchObjects: 'Search notes', // our string
+  noObjects: 'No matches', // our string
   addLink: 'Add a link',
   updateLink: 'Update link',
   removeLink: 'Remove link',
@@ -131,7 +132,7 @@ export function linkSelectionTo(editor: Editor, title: string, label?: string | 
     .run()
 }
 
-/** "Make a new object out of the selected text.": the selection becomes `[[Title]]` and a new object of `typeId` gets that title. */
+/** "Make a new note out of the selected text.": the selection becomes `[[Title]]` and a new object of `typeId` gets that title. */
 export async function createObjectFromSelection(editor: Editor, typeId: string, mods: OpenMods = {}): Promise<boolean> {
   const text = selectionText(editor)
   if (text === null) return false
@@ -143,7 +144,7 @@ export async function createObjectFromSelection(editor: Editor, typeId: string, 
   return true
 }
 
-/** "Point the selected text at an object you already have.": the selection becomes a link to `object` (by path when its title cannot be a target). */
+/** "Point the selected text at a note you already have.": the selection becomes a link to `object` (by path when its title cannot be a target). */
 export function linkSelectionToObject(editor: Editor, object: Pick<ObjectSummary, 'title' | 'path'>): boolean {
   const text = selectionText(editor)
   if (text === null) return false
@@ -407,7 +408,7 @@ export function TokensMenu({ editor }: TokensMenuProps) {
       const list = types.filter((t: TypeDef) => !t.readOnlyReason)
       if (!q) return list
       return list
-        .map((t) => ({ t, s: fuzzyScore(q, t.name) }))
+        .map((t) => ({ t, s: fuzzyScore(q, typeLabel(t)) }))
         .filter((x) => x.s !== null)
         .sort((a, b) => (b.s as number) - (a.s as number))
         .map((x) => x.t)
@@ -527,7 +528,7 @@ export function TokensMenu({ editor }: TokensMenuProps) {
           render={(t) => (
             <>
               <TypeChip type={t} size={20} />
-              <span className="tokens-list-label">{t.name}</span>
+              <span className="tokens-list-label">{typeLabel(t)}</span>
             </>
           )}
           onPick={(t, e) => {
@@ -552,7 +553,7 @@ export function TokensMenu({ editor }: TokensMenuProps) {
               <>
                 {type && <TypeChip type={type} size={20} />}
                 <span className="tokens-list-label">{o.title}</span>
-                {type && <span className="tokens-list-meta">{type.name}</span>}
+                {type && <span className="tokens-list-meta">{typeLabel(type)}</span>}
               </>
             )
           }}

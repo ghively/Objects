@@ -3,7 +3,7 @@
  * 2026-10-28, 2d).
  *
  * Images, PDFs, audio, video and files are not slash items: they are dropped or pasted into the editor (`extensions/fileDrop`).
- * "Reuse any content" is ours (not one of CreateMenu's sections): it is the
+ * "Embed" (before M32 "Reuse any content") is ours (not one of CreateMenu's sections): it is the
  * only way to insert an object, collection or query embed.
  *
  * Each item's `run` is called after the `/query` text has been removed. It may
@@ -15,6 +15,8 @@ import { api } from '@/api/client'
 import type { Collection, Query, TypeDef } from '@/api/types'
 import { useDefs } from '@/types/useDefinitions'
 import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
+import { typeLabel } from '@/lib/typeLabel'
+import { SAVED_SEARCH_LOWER } from '@/lib/words'
 import { zonedToday } from '@/lib/zonedTime'
 import { addDays as addDayStr } from '@/calendar/dates'
 import { recordAudio } from '../media/recordAudio'
@@ -57,9 +59,11 @@ export interface SlashSection {
 
 export const SLASH_TEXT = {
   blocks: 'Create a block',
-  types: 'Create an object',
+  // M32 (the glossary): was "Create an object".
+  types: 'New',
   dates: 'Link to a date',
-  reuse: 'Reuse any content',
+  // M32 (the glossary): was "Reuse any content", the group and its first item.
+  reuse: 'Embed',
   noResults: 'No results',
   pasteUrl: 'Paste URL',
   /** M14 (our string): insert a button block without an automation yet. */
@@ -77,7 +81,7 @@ export interface SlashContext {
   twentyFourHourTime: boolean
   /** "Now" (tests pass a fixed date). */
   now?: Date
-  /** M8: the collections and queries "Reuse any content" offers (default: the definitions store). */
+  /** M8: the collections and queries "Embed" offers (default: the definitions store). */
   collections?: Pick<Collection, 'id' | 'name'>[]
   queries?: Pick<Query, 'id' | 'name'>[]
   /** M10: "Hide AI features" is on (the AI items are left out). */
@@ -148,7 +152,7 @@ export const BLOCK_ITEMS: readonly SlashItem[] = [
   block('code', 'Code', 'A code block', 'ph-code', (e) => {
     e.chain().focus().setCodeBlock().run()
   }),
-  block('hr', 'Horizontal line', 'A divider line between parts of the page', 'ph-minus', (e) => {
+  block('hr', 'Horizontal line', 'A divider line between parts of the note', 'ph-minus', (e) => {
     // Horizontal line: below the block (in place of it when empty).
     e.chain()
       .focus()
@@ -167,7 +171,7 @@ export const BLOCK_ITEMS: readonly SlashItem[] = [
   }),
   block('bookmark', 'Create bookmark', undefined, 'ph-bookmark-simple', () => 'bookmark'), // pasteInput.bookmark (ours in this menu)
   // M14 (our item): a button that runs an automation; the sub-view picks the automation.
-  block('button', 'Button', 'A button that runs an automation on this object', 'ph-cursor-click', () => 'button'),
+  block('button', 'Button', 'A button that runs an automation on this note', 'ph-cursor-click', () => 'button'),
 ]
 
 /**
@@ -261,7 +265,7 @@ export function typedDateItems(query: string, today: string): SlashItem[] {
   ]
 }
 
-/** The types offered in "Create an object" (whiteboards are created from "+ New"). */
+/** The types offered in "New" (before M32 "Create an object") (whiteboards are created from "+ New"). */
 export function creatableTypes(types: TypeDef[]): TypeDef[] {
   return types.filter((t) => !isWhiteboardType(t))
 }
@@ -301,7 +305,8 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
       label: SLASH_TEXT.types,
       items: creatableTypes(ctx.types).map((t) => ({
         id: `type:${t.id}`,
-        name: title ? SLASH_TEXT.withPotentialTitle(t.name, title) : SLASH_TEXT.withEmptyTitle(t.name),
+        // M32: the type's name as the screen shows it ("Create Note" for the built-in Page type).
+        name: title ? SLASH_TEXT.withPotentialTitle(typeLabel(t), title) : SLASH_TEXT.withEmptyTitle(typeLabel(t)),
         icon: t.icon?.type === 'iconify' ? t.icon.val : 'ph-file-plus',
         run: (e: Editor) => createAndLink(e, t, title),
       })),
@@ -349,7 +354,7 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
           }),
         ),
         ...queries.map((q) =>
-          block(`query:${q.id}`, q.name, 'Embed this query', 'ph-funnel', (e) => {
+          block(`query:${q.id}`, q.name, `Embed this ${SAVED_SEARCH_LOWER}`, 'ph-funnel', (e) => {
             e.chain().focus().insertDataViewEmbed('query', q.id).run()
           }),
         ),
@@ -368,7 +373,7 @@ export function itemScore(query: string, item: SlashItem): number | null {
 
 /**
  * The sections with only the items matching `query`, best match first within
- * each section. The "Create an object" items carry the query as the new title,
+ * each section. The "New" items carry the query as the new title,
  * so they always match while there is one.
  */
 export function filterSections(sections: SlashSection[], query: string): SlashSection[] {
@@ -388,7 +393,7 @@ export function filterSections(sections: SlashSection[], query: string): SlashSe
     .filter((s) => s.items.length > 0)
 }
 
-/** Whether `query` matches any item other than the "Create an object" ones (a space then closes the menu). */
+/** Whether `query` matches any item other than the "New" ones (a space then closes the menu). */
 export function hasRealMatch(sections: SlashSection[], query: string, now: Date = new Date()): boolean {
   // M8: a phrase that is (or may still become) a date keeps the menu open.
   if (couldBeDate(query, dailyNoteTitle(now))) return true

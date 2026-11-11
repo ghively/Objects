@@ -154,11 +154,11 @@ describe('turn into (M8 Task 27)', () => {
       return within(sub).getAllByRole('menuitem').map((m) => m.textContent?.replace(/(Ctrl|Alt|Shift).*$/, ''))
     }
     const view = render(<BlockMenu editor={editor} open onOpenChange={() => {}} anchor={{ left: 0, top: 0, width: 10, height: 10 }} />)
-    expect(await turnIntoNames()).toEqual(expect.arrayContaining(['Turn into task object', 'Turn into whiteboard']))
+    expect(await turnIntoNames()).toEqual(expect.arrayContaining(['Turn into task', 'Turn into whiteboard']))
     view.unmount()
     selectBlocks(editor, editor.state.doc.child(0).nodeSize)
     render(<BlockMenu editor={editor} open onOpenChange={() => {}} anchor={{ left: 0, top: 0, width: 10, height: 10 }} />)
-    expect(await turnIntoNames()).not.toContain('Turn into task object')
+    expect(await turnIntoNames()).not.toContain('Turn into task')
   })
 
   test('test turn into task from any block', async () => {

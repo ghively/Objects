@@ -65,12 +65,12 @@ describe('<SlashMenu>', () => {
     const menu = await openMenu(editor)
     expect(within(menu).getAllByRole('group').map((g) => g.getAttribute('aria-label'))).toEqual([
       'Create a block',
-      'Create an object',
+      'New',
       'Link to a date',
-      'Reuse any content',
+      'Embed',
     ])
     expect(within(menu).getByRole('note', { name: 'Keyboard hints' })).toHaveTextContent('↑↓ to navigate')
-    expect(within(menu).getByRole('option', { name: /Create Page/ })).toBeInTheDocument()
+    expect(within(menu).getByRole('option', { name: /Create Note/ })).toBeInTheDocument()
 
     type(editor, 'head')
     await waitFor(() => expect(within(menu).getAllByRole('option')[0]).toHaveTextContent('Heading 1'))

@@ -7,7 +7,7 @@
  *   body, and the block becomes
  *   `![[Title]]` shown as a Link block (`view=inline`, our choice).
  * - `turnIntoTask` ("Turn into task"): the same with the Task type.
- * - `turnTodoIntoTask` ("Turn into task object"): a
+ * - `turnTodoIntoTask` ("Turn into task"; before M32 "Turn into task object"): a
  *   to-do becomes a Task titled with its text, status Done when it was checked; with a block
  *   selection, every to-do in it (our choice). Not a to-do: nothing happens.
  * - `turnLineIntoTask` (M32, "Make this line a task", Ctrl+Shift+T): the line holding the caret,
@@ -304,7 +304,7 @@ export async function turnLineIntoTask(editor: Editor, opts: TurnIntoOptions = {
   return turnIntoTask(editor, opts)
 }
 
-/** Is there a to-do at the selection (the block menu shows "Turn into task object" then)? */
+/** Is there a to-do at the selection (the block menu shows "Turn into task" then)? */
 export function hasTodoAt(editor: Editor): boolean {
   return todosAt(editor).length > 0
 }

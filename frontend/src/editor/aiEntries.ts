@@ -45,7 +45,7 @@ export const AI_TEXT = {
   /** Selection toolbar's sparkle and the block-selection bar's button (catalog section 6). */
   ai: 'AI',
   /** Our string: an answer accepted after its page was closed. */
-  closed: 'The page was closed, so the AI answer was not applied',
+  closed: 'The note was closed, so the AI answer was not applied',
 }
 
 /** The icon of every AI entry (the catalog's "AI sparkle"). */
