@@ -1023,6 +1023,9 @@ def create_app(
         async def pump() -> None:
             while True:
                 hub.publish(await watcher.events.get())
+                if watcher.events.empty():
+                    # M32: a change made outside the app can move the Work default too.
+                    await asyncio.to_thread(announce_work_moved)
 
         task = asyncio.create_task(pump())
         try:
@@ -1139,7 +1142,6 @@ def create_app(
 
     @api.put("/space")
     def put_space(req: PatchSpaceRequest):
-        work_before = space.work_on()
         try:
             patch_space_config(space.root, req.patch, req.baseRevision)
         except SpaceConfigProblem as exc:
@@ -1149,12 +1151,9 @@ def create_app(
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
         info = space_info()
-        if info["workOn"] != work_before:
-            # M32: the Work switch moved, so the Task type's fields and the saved searches
-            # (Tickets) did too, in memory: the windows read both again.
-            announce(ChangeEvent("types", "*", None))
-            announce(ChangeEvent("queries", TICKETS_ID, None))
-            wake_for(space)  # what the Work agent left waiting while Work was off
+        # M32: when the Work switch moved, the types' fields and the saved searches (Tickets)
+        # did too, in memory: the windows read both again (and the Work loop is woken).
+        announce_work_moved()
         return info
 
     @api.get("/settings")
@@ -1326,10 +1325,38 @@ def create_app(
                 event = replace(event, linked=space.links.take_linked())
             except Exception:  # the write is done; an index problem must not fail the request
                 logging.getLogger(__name__).exception("Reading the links changed by %s failed", event.path)
+        publish(event)
+        announce_work_moved()
+        return event
+
+    def publish(event: ChangeEvent) -> None:
         loop = hub.loop
         if loop is not None and loop.is_running() and not hub.closed:
             loop.call_soon_threadsafe(hub.publish, event)
-        return event
+
+    work_seen = [(space.work_on(), space.work_listing_rev)]
+
+    def announce_work_moved() -> None:
+        """M32 (fix pass): tell the windows when the Work switch's effect moved. The default
+        follows the space's data, so any write can flip it (a Ticket ID put on a task, the last
+        one removed, a Capture type made, a file changed outside the app), and with Work off a
+        value that comes or goes changes which ticket and work fields a type lists. The types
+        and the saved searches (Tickets) changed in memory then, with no event of their own:
+        every announce (and the watcher's pump) asks here, which compares two values kept in
+        memory with the ones last announced. ``PUT /api/space`` announces through it as well."""
+        try:
+            now = (space.work_on(), space.work_listing_rev)
+        except Exception:  # the write is done; this must not fail the request
+            logging.getLogger(__name__).exception("Reading the Work switch failed")
+            return
+        seen = work_seen[0]
+        if now == seen:
+            return
+        work_seen[0] = now
+        publish(ChangeEvent("types", "*", None))
+        if now[0] != seen[0]:
+            publish(ChangeEvent("queries", TICKETS_ID, None))
+            wake_for(space)  # what the Work agent left waiting while Work was off
 
     def gene_edited(event: ChangeEvent) -> None:
         """Decision S3 (fix pass 2026-11-09): Gene's own edit of a work item, a body save or a
