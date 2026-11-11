@@ -1,6 +1,6 @@
 import type { Editor as TiptapEditor } from '@tiptap/core'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ChangeEvent, ObjectDetail, SpaceInfo } from '@/api/types'
 import { objectDetail, objectSummary, typeDef } from '@/test/mockApi'
 
@@ -15,7 +15,7 @@ import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from '@/object/ObjectPage'
 import { flushAll } from '@/lib/flush'
-import { keepUnsaved, keptUnsaved, resetUnsaved } from './unsaved'
+import { keepUnsaved, keptUnsaved, resetUnsaved, setUnsavedSpace } from './unsaved'
 
 const mocked = vi.mocked(api)
 
@@ -245,5 +245,92 @@ describe('the recovery dialog', () => {
     await waitFor(() =>
       expect(within(dialog).getByLabelText('Version on disk')).toHaveTextContent(/edited in VS Code/),
     )
+  })
+})
+
+// The M32 review, F2 (decision): a note the closing window could not save (too long for a
+// keepalive request, or more was typed while a save was in flight) is not silently gone. The
+// kept text is in local storage, so the next window finds it; a storage entry written here by
+// hand is what a window that has been closed left behind.
+describe('text a closed window left unsaved', () => {
+  const CUT = 'First paragraph, and the words the close cut off.\n\nSecond paragraph.\n'
+  const leftBy = (root: string, body: string, id: string | null = null) =>
+    localStorage.setItem(`object.unsaved:${root}\n${PATH}`, JSON.stringify({ body, id }))
+
+  beforeEach(() => setUnsavedSpace('/s'))
+  afterEach(() => setUnsavedSpace(null))
+
+  test('test it is offered when the note next opens, and saving it clears it', async () => {
+    leftBy('/s', CUT)
+    const { editor } = await openPage()
+    const dialog = await screen.findByRole('dialog', { name: 'Recover unsaved changes' })
+    expect(within(dialog).getByText(/the words the close cut off/)).toBeInTheDocument()
+    // Nothing is written until the user says so.
+    expect(mocked.saveBody).not.toHaveBeenCalled()
+    expect(serializeBody(editor)).toBe(ORIGINAL)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(PATH, CUT, 'v1'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(serializeBody(editor)).toBe(CUT)
+    expect(keptUnsaved(PATH)).toBeNull()
+    expect(localStorage.getItem(`object.unsaved:/s\n${PATH}`)).toBeNull()
+  })
+
+  test('test text the file already holds (its save landed after the window had gone) is not offered, and is cleared', async () => {
+    onDisk = detail(CUT, 'v2')
+    leftBy('/s', CUT)
+    await openPage(CUT)
+    await act(async () => new Promise((r) => setTimeout(r, 50)))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(localStorage.getItem(`object.unsaved:/s\n${PATH}`)).toBeNull()
+    expect(mocked.saveBody).not.toHaveBeenCalled()
+  })
+
+  test('test a note that changed on disk since is never written by itself: both texts are shown and the save is checked', async () => {
+    // Something else changed the file after the window closed.
+    onDisk = detail(THEIRS, 'v2')
+    leftBy('/s', CUT)
+    const { editor } = await openPage(THEIRS)
+    const dialog = await screen.findByRole('dialog', { name: 'Recover unsaved changes' })
+    // The editor shows the file; the dialog shows the version on disk beside the kept text.
+    expect(serializeBody(editor)).toBe(THEIRS)
+    expect(within(dialog).getByText(/the words the close cut off/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Second paragraph, edited in VS Code/)).toBeInTheDocument()
+    expect(mocked.saveBody).not.toHaveBeenCalled()
+    // It changes again before the choice: the save stands on the version that was shown, is
+    // refused, writes nothing, and the dialog asks again with the newest version.
+    const NEWER = 'First paragraph.\n\nSecond paragraph, edited twice.\n'
+    onDisk = detail(NEWER, 'v3')
+    mocked.saveBody.mockRejectedValueOnce(new ConflictError('v3'))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(PATH, CUT, 'v2'))
+    await waitFor(() => expect(within(screen.getByRole('dialog')).getByText(/edited twice/)).toBeInTheDocument())
+    expect(mocked.saveBody).toHaveBeenCalledTimes(1)
+    expect(keptUnsaved(PATH)).toBe(CUT)
+    // Discard leaves the file alone.
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Discard' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(mocked.saveBody).toHaveBeenCalledTimes(1)
+    expect(serializeBody(editor)).toBe(NEWER)
+    expect(keptUnsaved(PATH)).toBeNull()
+  })
+
+  test("test another space's note at the same path is never offered", async () => {
+    leftBy('/other', CUT)
+    leftBy('/s/nested', CUT)
+    await openPage()
+    await act(async () => new Promise((r) => setTimeout(r, 50)))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(keptUnsaved(PATH)).toBeNull()
+    // Theirs is still there for their own space.
+    expect(localStorage.getItem(`object.unsaved:/other\n${PATH}`)).not.toBeNull()
+  })
+
+  test('test text left for another object that was at this path is not offered', async () => {
+    onDisk = { ...onDisk, summary: { ...onDisk.summary, id: 'id-new' } }
+    leftBy('/s', CUT, 'id-old')
+    await openPage()
+    await act(async () => new Promise((r) => setTimeout(r, 50)))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

@@ -462,6 +462,16 @@ function newClientId(): string {
  */
 export const CLIENT_ID = newClientId()
 
+/**
+ * M32: the most bytes of body saves sent with `keepalive` at one time. Browsers allow 64 KiB over
+ * all the keepalive requests in flight and refuse one that would go over, so a save that does not
+ * fit (a longer note, or one sent while others are in flight) goes as a normal request, which a
+ * closing page may cut off (the editor keeps its text for the next open: `editor/unsaved.ts`).
+ */
+export const KEEPALIVE_MAX_BYTES = 60 * 1024
+/** The bytes of the keepalive body saves that have no answer yet. */
+let keepaliveInFlight = 0
+
 function emit(e: ChangeEvent) {
   for (const cb of [...listeners]) cb(e)
 }
@@ -642,13 +652,28 @@ export const api = {
    * `changed` event, after the caller has handled the result: the server doesn't
    * echo the app's own writes back to the window that made them, and other views
    * of the same object (a peek over its page) must not go stale.
+   *
+   * M32: every save that fits is sent with `keepalive`, so the browser completes it even when
+   * the window is closed or reloaded right after (whatever asked for it: a pause in typing, a
+   * blur, `pagehide`). One that does not fit `KEEPALIVE_MAX_BYTES` with the saves already in
+   * flight is a normal request.
    */
   async saveBody(path: string, body: string, baseVersion: string): Promise<SaveResult> {
-    const res = await request<SaveResult>('/object/body', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, body, baseVersion, clientId: CLIENT_ID }),
-    })
+    const payload = JSON.stringify({ path, body, baseVersion, clientId: CLIENT_ID })
+    const bytes = new TextEncoder().encode(payload).length
+    const keepalive = keepaliveInFlight + bytes <= KEEPALIVE_MAX_BYTES
+    if (keepalive) keepaliveInFlight += bytes
+    let res: SaveResult
+    try {
+      res = await request<SaveResult>('/object/body', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        ...(keepalive ? { keepalive: true } : {}),
+      })
+    } finally {
+      if (keepalive) keepaliveInFlight -= bytes
+    }
     if (res && res.version && res.version !== baseVersion) {
       // `linked` lets a backlink-keyed view in this window (the Tasks dashboard) refresh
       // only the rows this save may have linked, as the SSE event does for other windows.

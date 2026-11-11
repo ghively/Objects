@@ -480,35 +480,23 @@ describe('<Editor> autosave', () => {
     expect(saveBody).toHaveBeenCalledTimes(1)
   })
 
-  test('test pagehide sends the pending edit as a keepalive request (M32)', async () => {
-    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, statusText: '', json: async () => ({ version: 'v2' }) }) as Response)
-    vi.stubGlobal('fetch', fetchMock)
-    try {
-      const { editor, onSaved } = mount()
-      act(() => {
-        editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' a')
-      })
-      await act(async () => {
-        window.dispatchEvent(new Event('pagehide'))
-        await vi.advanceTimersByTimeAsync(0)
-      })
-      expect(saveBody).not.toHaveBeenCalled()
-      expect(fetchMock).toHaveBeenCalledTimes(1)
-      const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
-      expect(url).toBe('/api/object/body')
-      expect(init.keepalive).toBe(true)
-      expect(JSON.parse(String(init.body))).toMatchObject({
-        path: 'Pages/Notes.md',
-        body: BODY.replace('First paragraph.', 'First paragraph. a'),
-        baseVersion: 'v1',
-      })
-      expect(onSaved).toHaveBeenCalledWith('v2')
-      await act(async () => vi.advanceTimersByTimeAsync(5000))
-      expect(fetchMock).toHaveBeenCalledTimes(1)
-      expect(saveBody).not.toHaveBeenCalled()
-    } finally {
-      vi.unstubAllGlobals()
-    }
+  // The request is `api.saveBody`'s (a keepalive one whenever the text fits: `api/client.test.ts`).
+  test('test pagehide saves the pending edit at once (M32)', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const { editor, onSaved } = mount()
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' a')
+    })
+    expect(saveBody).not.toHaveBeenCalled()
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'))
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    expect(saveBody).toHaveBeenCalledWith('Pages/Notes.md', BODY.replace('First paragraph.', 'First paragraph. a'), 'v1')
+    expect(onSaved).toHaveBeenCalledWith('v2')
+    await act(async () => vi.advanceTimersByTimeAsync(5000))
+    expect(saveBody).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -160,4 +160,23 @@ describe('kept unsaved text (end review of the second audit fix pass)', () => {
     expect(keptUnsaved('Projects/Renamed.md', 'id1')).toBe('mine\n')
     resetUnsaved()
   })
+
+  // M32 fix pass, F2: a window that closed with its save on the way never cleared its entry.
+  test('text the file already holds is forgotten when the space opens; text it does not hold stays', async () => {
+    const { keptUnsaved, resetUnsaved } = await import('@/editor/unsaved')
+    const { objectDetail, objectSummary } = await import('@/test/mockApi')
+    const left = (path: string, body: string) => localStorage.setItem(`object.unsaved:/s\n${path}`, JSON.stringify({ body, id: null }))
+    left('Projects/Landed.md', 'saved after the window had gone\n')
+    left('Projects/Cut.md', 'words the close cut off\n')
+    const disk: Record<string, string> = { 'Projects/Landed.md': 'saved after the window had gone\n', 'Projects/Cut.md': 'before\n' }
+    mocked.object.mockImplementation(async (path: string) => {
+      if (!(path in disk)) throw new Error('Not found')
+      return objectDetail({ summary: objectSummary({ path }), body: disk[path], version: 'v1' })
+    })
+    render(<App />)
+    await screen.findByRole('button', { name: 'New' })
+    await waitFor(() => expect(keptUnsaved('Projects/Landed.md')).toBeNull())
+    expect(keptUnsaved('Projects/Cut.md')).toBe('words the close cut off\n')
+    resetUnsaved()
+  })
 })

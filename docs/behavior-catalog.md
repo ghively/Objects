@@ -587,10 +587,16 @@ Each starter template pre-fills the new type's properties.
     the note starts with a to-do (the browser's own key did nothing there).
 - **Saving (M32)**: a note is saved 1 s after the last key and, while typing continues, at most 3 s after the
   first unsaved key. It is also saved at once when the text or the window loses focus, when the window is hidden
-  or closing (`pagehide`: a request the browser finishes after the page is gone, for a note up to 60 KB; the text
-  is also kept for a reload until the save lands), on a note or tab switch and when the editor closes. Nothing is
-  sent when nothing changed, and never two saves at once: a save asked for while one runs follows it with the
-  latest text. Conflicts, read-only files and "Changes not saved. Retrying…" are as before.
+  or closing (`pagehide`), on a note or tab switch and when the editor closes. Every save of a note up to 60 KB is
+  a request the browser finishes after the page is gone, whichever of these started it (on a close the first of
+  them is the one in flight). Nothing is sent when nothing changed, and never two saves at once: a save asked for
+  while one runs follows it with the latest text. Conflicts, read-only files and "Changes not saved. Retrying…"
+  are as before.
+  - Text the window could not save before it went (a longer note whose request the close cut off, or words typed
+    while an earlier save was still running) is kept in the browser's storage for that space, outlives the
+    window, and is offered the next time the note opens ("Recover unsaved changes": the kept text beside the
+    version on disk, "Save changes" / "Discard"; nothing is written without that choice). Kept text the file
+    already holds is cleared when the space opens, and never offered.
 - **Make this line a task (M32)**, Ctrl+Shift+T with the caret in a note: the line holding the caret becomes a
   Task titled with its text and is replaced by the task's link card, whatever the line is: a paragraph, a heading,
   a list line (the list is split around it; nested lines become the task's body) or a to-do (a ticked one is made

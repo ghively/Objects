@@ -13,7 +13,7 @@ import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage } from '@/queries/QueryPage'
 import { LinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, refreshLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { moveUnsaved, setUnsavedSpace } from '@/editor/unsaved'
+import { forgetSaved, moveUnsaved, setUnsavedSpace } from '@/editor/unsaved'
 import { setLastTypeSpace } from '@/create/lastType'
 import { setRecentSpace } from '@/nav/recent'
 import { isSidepanelShown } from '@/nav/sidepanel'
@@ -226,6 +226,12 @@ export default function App() {
     fetchSpace()
       .then(async (s) => {
         setUnsavedSpace(s.root)
+        // Text a closed window kept while its save was still on its way: what the file now holds
+        // is forgotten here, so it is not offered as unsaved later (`editor/unsaved.ts`).
+        void forgetSaved(async (path) => {
+          const d = await api.object(path)
+          return { body: d.body, id: d.summary.id ?? null }
+        })
         await Promise.all([setTabsSpace(s.root), setRecentSpace(s.root), setLastTypeSpace(s.root), settingsReady])
         if (!live) return
         // "When this space opens" (per space, on this device).
