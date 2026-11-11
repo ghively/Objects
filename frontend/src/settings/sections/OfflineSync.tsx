@@ -43,20 +43,20 @@ export const OFFLINE_SYNC_TEXT = {
   storageLoading: 'Measuring…',
   mediaLoading: 'Media loading',
   mediaLoadingDescription:
-    'When images, video, audio and PDFs load: in pages, cover images, cards and galleries, image properties and whiteboards.',
+    'When images, video, audio and PDFs load: in notes, cover images, cards and galleries, image properties and whiteboards.',
   mediaEverything: 'Everything',
-  mediaEverythingDescription: 'Media loads as soon as a page opens.',
+  mediaEverythingDescription: 'Media loads as soon as a note opens.',
   mediaRequired: 'Required only',
   mediaRequiredDescription: 'Media shows a placeholder and loads when you click Load.',
   clearMedia: 'Clear media cache',
   clearMediaDescription:
-    'Object reads media straight from your files and keeps no copies of its own, so this clears only cached media and makes pages load media again from your files. Your notes and files are never touched.',
+    'Object reads media straight from your files and keeps no copies of its own, so this clears only cached media, and media loads again from your files. Your notes and files are never touched.',
   clearConfirmTitle: 'Clear the media cache?',
   clearConfirmDescription:
-    'Cached media is removed and pages load images, video, audio and PDFs again from your files. Notes and files are not touched.',
+    'Cached media is removed, and images, video, audio and PDFs load again from your files. Notes and files are not touched.',
   cancel: 'Cancel',
-  cleared: (files: number, size: string) => `Cleared ${files} cached ${files === 1 ? 'file' : 'files'} (${size}). Pages load media again from your files.`,
-  nothingCleared: 'There was no cached media to clear. Pages load media again from your files.',
+  cleared: (files: number, size: string) => `Cleared ${files} cached ${files === 1 ? 'file' : 'files'} (${size}). Media loads again from your files.`,
+  nothingCleared: 'There was no cached media to clear. Media loads again from your files.',
 } as const
 
 const T = OFFLINE_SYNC_TEXT

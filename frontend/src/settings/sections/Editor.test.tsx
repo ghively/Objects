@@ -107,7 +107,7 @@ describe('EditorSection', () => {
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ startupSpacePath: '/other/Work' }, expect.anything())
   })
 
-  test('a Backlinks or Related Content section stored as "hidden" shows "Closed" checked (no Hidden there any more)', async () => {
+  test('a Backlinks or Related section stored as "hidden" shows "Closed" checked (no Hidden there any more)', async () => {
     const user = userEvent.setup()
     useSettings.setState({
       settings: { ...settingsDefaults, backlinkSectionsDefault: { backlinks: 'hidden', relatedContent: 'hidden', unlinkedMentions: 'hidden' } },
@@ -115,7 +115,7 @@ describe('EditorSection', () => {
       loaded: true,
     })
     render(<EditorSection />)
-    for (const name of ['Backlinks', 'Related Content']) {
+    for (const name of ['Backlinks', 'Related']) {
       const g = screen.getByRole('radiogroup', { name })
       expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Open', 'Closed'])
       expect(within(g).getByRole('radio', { name: 'Closed' })).toHaveAttribute('aria-checked', 'true')
@@ -141,7 +141,7 @@ describe('EditorSection', () => {
       screen.getByText('Whether each section is expanded or collapsed when a note opens. Each note can still override it.'),
     ).toBeInTheDocument()
     // Only Unlinked Mentions can be hidden from here (catalog: Backlinks Open | Closed; Unlinked Mentions Open | Closed | Hidden).
-    for (const name of ['Backlinks', 'Related Content']) {
+    for (const name of ['Backlinks', 'Related']) {
       const g = screen.getByRole('radiogroup', { name })
       expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Open', 'Closed'])
       expect(within(g).getByRole('radio', { name: 'Open' })).toHaveAttribute('aria-checked', 'true')
@@ -149,7 +149,7 @@ describe('EditorSection', () => {
     const unlinked = screen.getByRole('radiogroup', { name: 'Unlinked Mentions' })
     expect(within(unlinked).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Open', 'Closed', 'Hidden'])
     expect(within(unlinked).getByRole('radio', { name: 'Open' })).toHaveAttribute('aria-checked', 'true')
-    await user.click(within(screen.getByRole('radiogroup', { name: 'Related Content' })).getByRole('radio', { name: 'Closed' }))
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Related' })).getByRole('radio', { name: 'Closed' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith(
       { backlinkSectionsDefault: { backlinks: 'open', relatedContent: 'closed', unlinkedMentions: 'open' } },
       expect.anything(),

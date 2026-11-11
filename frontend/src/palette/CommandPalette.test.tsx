@@ -514,7 +514,7 @@ describe('actions in the list', () => {
     const { user } = setup()
     const input = await openSearch(user)
     await user.type(input, 'create')
-    await waitFor(() => expect(actionLabels()).toEqual(['Create Note', 'Create Person', 'Create Tag', 'Create Task']))
+    await waitFor(() => expect(actionLabels()).toEqual(['New note', 'New task', 'Create Person', 'Create Tag']))
     for (const row of document.querySelectorAll('[data-action]')) expect(row.lastElementChild?.textContent).toBe('Action')
     await user.clear(input)
     await user.type(input, 'toggle')
@@ -522,13 +522,13 @@ describe('actions in the list', () => {
   })
 
   // M32: "Hide Tasks in this space" takes the task command off the palette; the other types stay.
-  test('test while the space hides Tasks the palette offers no Create Task', async () => {
+  test('test while the space hides Tasks the palette offers no New task', async () => {
     useSpaceInfo.setState({ space: { name: 's', root: '/s', types: [], hideTaskManagement: true }, loaded: true })
     try {
       const { user } = setup()
       const input = await openSearch(user)
       await user.type(input, 'create')
-      await waitFor(() => expect(actionLabels()).toEqual(['Create Note', 'Create Person', 'Create Tag']))
+      await waitFor(() => expect(actionLabels()).toEqual(['New note', 'Create Person', 'Create Tag']))
       await user.clear(input)
       await user.type(input, 'task')
       await waitFor(() => expect(mocked.search).toHaveBeenLastCalledWith('task', expect.anything()))
@@ -537,7 +537,7 @@ describe('actions in the list', () => {
       act(() => useSpaceInfo.setState({ space: { name: 's', root: '/s', types: [], hideTaskManagement: false }, loaded: true }))
       await user.clear(input)
       await user.type(input, 'create')
-      await waitFor(() => expect(actionLabels()).toEqual(['Create Note', 'Create Person', 'Create Tag', 'Create Task']))
+      await waitFor(() => expect(actionLabels()).toEqual(['New note', 'New task', 'Create Person', 'Create Tag']))
     } finally {
       resetSpaceInfo()
     }
@@ -614,10 +614,53 @@ describe('actions in the list', () => {
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'allNotes' })
   })
 
-  test('"Pop out today\'s daily note" opens today\'s note in the peek (2026-11-09)', async () => {
+  // W17: it reads "Today's note" now; the name it had still finds it.
+  test('"Today\'s note" (was "Pop out today\'s daily note") opens today\'s note in the peek (2026-11-09)', async () => {
     const { user } = setup()
-    await user.click(await findAction(user, 'pop out today', 'openTodaysNote'))
+    const row = await findAction(user, 'pop out today', 'openTodaysNote')
+    expect(row.querySelector('[data-action-label]')?.textContent).toBe("Today's note")
+    await user.click(row)
     await waitFor(() => expect(usePeek.getState().path).toMatch(/^DailyNotes\/\d{4}-\d{2}-\d{2}\.md$/))
+  })
+
+  // Fix pass W17: "Find notes and commands" finds the three everyday commands by their own words.
+  test('test "new" finds New note and New task, "today" finds Today\'s note (W17)', async () => {
+    const { user } = setup()
+    const input = await openSearch(user)
+    await user.type(input, 'new')
+    await waitFor(() => expect(actionLabels()).toEqual(['New note', 'New task']))
+    await user.clear(input)
+    await user.type(input, 'note')
+    await waitFor(() => expect(actionLabels()).toEqual(['New note', "Today's note", 'Open all notes']))
+    await user.clear(input)
+    await user.type(input, 'task')
+    await waitFor(() => expect(actionLabels()).toEqual(['New task']))
+    await user.clear(input)
+    await user.type(input, 'today')
+    await waitFor(() => expect(actionLabels()).toEqual(['Open today', "Today's note"]))
+  })
+
+  test('test New note makes a Note as the new-note key does: a popped-out note steps aside and the new one opens (W17)', async () => {
+    const { user } = setup()
+    // A type's page in view and a note popped out over it: the command still makes a Note.
+    act(() => {
+      useTabs.getState().open({ kind: 'type', typeId: 'person' })
+      usePeek.getState().show('Pages/Alpha.md')
+    })
+    await user.click(await findAction(user, 'new', 'newNote'))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('page', {}))
+    expect(mocked.createObject).toHaveBeenCalledTimes(1)
+    expect(usePalette.getState().open).toBe(false)
+    expect(usePeek.getState().path).toBeNull()
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toMatchObject({ kind: 'object' }))
+  })
+
+  test('test New task makes a task as Ctrl+Shift+T does (W17)', async () => {
+    const { user } = setup()
+    await user.click(await findAction(user, 'new task', 'newTask'))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', {}))
+    expect(mocked.createObject).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toMatchObject({ kind: 'object' }))
   })
 
   test('open graph view only offered with an object open', async () => {

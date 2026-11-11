@@ -228,6 +228,45 @@ describe('TrashView type names (M32)', () => {
     expect(trashTypeLabel('Page', renamed)).toBe('Page')
   })
 
+  // M32 fix pass (W16): the server names a deleted note's type by its id ("recipe"), and the row
+  // showed that id. It shows the type's name.
+  test('test a deleted note is named by its type\'s name, not the type\'s id (W16)', async () => {
+    useLinkIndex.setState({
+      types: [
+        typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true }),
+        typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true }),
+        typeDef({ id: 'recipe', name: 'Recipe', pluralName: 'Recipes' }),
+        typeDef({ id: 'journalEntry', name: 'Journal entry', pluralName: 'Journal entries' }),
+      ],
+    })
+    entries = [
+      { ...NOTE, id: 'r1', originalPath: 'Recipes/Lentil soup.md', title: 'Lentil soup', type: 'recipe' },
+      { ...NOTE, id: 'j1', originalPath: 'Journal entries/Monday.md', title: 'Monday', type: 'journalEntry' },
+      { ...NOTE, id: 'p1', originalPath: 'Pages/Plan.md', title: 'Plan', type: 'page' },
+      { ...DAILY, type: 'dailynote' },
+    ]
+    render(<TrashView />)
+    const soup = await screen.findByRole('listitem', { name: 'Lentil soup' })
+    expect(soup).toHaveTextContent('Recipe · Recipes/Lentil soup.md · ')
+    expect(soup).not.toHaveTextContent('recipe ·')
+    expect(screen.getByRole('listitem', { name: 'Monday' })).toHaveTextContent('Journal entry · Journal entries/Monday.md · ')
+    expect(screen.getByRole('listitem', { name: 'Plan' })).toHaveTextContent('Note · Notes/Plan.md · ')
+    expect(screen.getByRole('listitem', { name: '2026-11-10' })).toHaveTextContent('Daily note · Daily notes/2026-11-10.md · ')
+  })
+
+  test('test a type id reads as the type\'s name; a type that is gone keeps what it showed (W16)', () => {
+    const types = [typeDef({ id: 'recipe', name: 'Recipe', pluralName: 'Recipes' }), typeDef({ id: 'page', name: 'Doc', pluralName: 'Docs', basic: true })]
+    expect(trashTypeLabel('recipe', types)).toBe('Recipe')
+    // The built-in Page under the user's own name: theirs.
+    expect(trashTypeLabel('page', types)).toBe('Doc')
+    // The built-in types by id when the type itself is gone, as by name.
+    expect(trashTypeLabel('page', [])).toBe('Note')
+    expect(trashTypeLabel('dailynote', [])).toBe('Daily note')
+    // Any other type that no longer exists: what the entry holds, as before.
+    expect(trashTypeLabel('recipe', [])).toBe('recipe')
+    expect(trashTypeLabel('', types)).toBe('')
+  })
+
   test('test a trashed built-in type is listed by the name the screen gives it', async () => {
     entries = [
       { id: 't9', kind: 'type', originalPath: '.object/types/page.json', title: 'Page', type: 'page', deletedAt: NOTE.deletedAt, objectCount: 2 },

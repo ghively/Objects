@@ -131,7 +131,7 @@ describe('Explore side panel (M31)', () => {
     s().newSidepanelEntry('area1')
     render(<SidePanel space={null} renderTarget={renderTarget} />)
     await user.click(within(area(1)).getByRole('tab', { name: 'Relevant Content' }))
-    expect(within(area(1)).getByText('Open a page to see content related to it.')).toBeInTheDocument()
+    expect(within(area(1)).getByText('Open a note to see content related to it.')).toBeInTheDocument()
     await waitFor(() => expect(mocked.references).not.toHaveBeenCalled())
   })
 

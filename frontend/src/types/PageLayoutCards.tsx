@@ -1,6 +1,6 @@
 /**
- * "Page layout": four cards, each a small SVG sketch of the layout (our own drawings), for the
- * type's `viewDesign`. Standard is `null`.
+ * "Layout" (M32 fix pass: was "Page layout"; it lays out a type's notes): four cards, each a small
+ * SVG sketch of the layout (our own drawings), for the type's `viewDesign`. Standard is `null`.
  */
 import type { ReactNode } from 'react'
 import type { ViewDesign } from '@/api/types'
@@ -11,6 +11,9 @@ export interface PageLayoutCardsProps {
   onChange(next: ViewDesign | null): void
   disabled?: boolean
 }
+
+/** What the group of cards is called (its accessible name). */
+export const PAGE_LAYOUTS_LABEL = 'Layout'
 
 export const PAGE_LAYOUTS: readonly { value: ViewDesign | null; name: string; description: string }[] = [
   { value: null, name: 'Standard', description: 'A plain, all-purpose layout.' },
@@ -81,7 +84,7 @@ function Sketch({ value }: { value: ViewDesign | null }): ReactNode {
 
 export function PageLayoutCards({ value, onChange, disabled }: PageLayoutCardsProps) {
   return (
-    <div role="radiogroup" aria-label="Page layout" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <div role="radiogroup" aria-label={PAGE_LAYOUTS_LABEL} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {PAGE_LAYOUTS.map((l) => {
         const selected = (value ?? null) === l.value
         return (

@@ -76,16 +76,16 @@ describe('ReferencesSection (M8 settings)', () => {
     setSettings({ backlinkSectionsDefault: { backlinks: 'open', relatedContent: 'closed', unlinkedMentions: 'hidden' } })
     await renderSection()
     // Hidden: no tab, no part of All.
-    expect(tabLabels()).toEqual(['All', 'Backlinks', 'Related Content'])
+    expect(tabLabels()).toEqual(['All', 'Backlinks', 'Related'])
     expect(part('mentions')).toBeNull()
     // Open shows its content; Closed starts collapsed under its heading.
     expect(part('backlinks')).toHaveAttribute('data-part-open', 'true')
     expect(within(part('backlinks')).getByText('Alpha')).toBeInTheDocument()
     expect(part('related')).toHaveAttribute('data-part-open', 'false')
     expect(within(part('related')).queryByText('Delta')).toBeNull()
-    expect(within(part('related')).getByRole('button', { name: 'Related Content' })).toHaveAttribute('aria-expanded', 'false')
+    expect(within(part('related')).getByRole('button', { name: 'Related' })).toHaveAttribute('aria-expanded', 'false')
     // The tab still shows the section's content when picked.
-    await userEvent.setup().click(screen.getByRole('tab', { name: /^Related Content/ }))
+    await userEvent.setup().click(screen.getByRole('tab', { name: /^Related(?! tags)/ }))
     expect(within(screen.getByRole('tabpanel')).getByText('Delta')).toBeInTheDocument()
   })
 
@@ -103,7 +103,7 @@ describe('ReferencesSection (M8 settings)', () => {
     await renderSection()
     // Both read as Closed (so the section starts closed, as when every shown section is closed);
     // Unlinked mentions keep Hidden: no tab.
-    expect(tabLabels()).toEqual(['All', 'Backlinks', 'Related Content'])
+    expect(tabLabels()).toEqual(['All', 'Backlinks', 'Related'])
     expect(screen.queryByRole('tabpanel')).toBeNull()
     expect(screen.getByRole('tab', { name: /^All/ })).toHaveAttribute('aria-expanded', 'false')
   })
@@ -172,7 +172,7 @@ describe('ReferencesSection (M8 settings)', () => {
     expect(part('related')).toBeNull()
     first.unmount()
     await renderSection(SELF)
-    expect(tabLabels()).toEqual(['All', 'Backlinks', 'Related Content', 'Mentions'])
+    expect(tabLabels()).toEqual(['All', 'Backlinks', 'Related', 'Mentions'])
   })
 
   test('settings read tolerantly: bad values fall back to the defaults', () => {

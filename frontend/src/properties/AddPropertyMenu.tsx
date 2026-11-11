@@ -1,5 +1,5 @@
 import { typeLabel } from '@/lib/typeLabel'
-import { useMemo, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Icon as IconValue, PropertyDef, PropertyOptions, PropertyType, TypeDef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
@@ -38,13 +38,64 @@ export function addableItems(type: TypeDef): AddPropertyItem[] {
   return ADD_PROPERTY_ITEMS.filter((i) => !(isSystemKind(i.type) && has.has(i.type)))
 }
 
-/** "Add Property": pick a kind (or "Link to a type" › a type), then name it and "Create". */
+/**
+ * The keys of a search field over a list (fix pass W8): ArrowDown and ArrowUp move a highlight
+ * through the list (stopping at its ends), Enter picks the highlighted row, or the first one when
+ * none is highlighted. The focus stays in the field, so typing goes on filtering.
+ */
+function listKey(e: KeyboardEvent, count: number, active: number | null, setActive: (i: number | null) => void, pick: (i: number) => void) {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    if (count === 0) return
+    const next = active === null ? 0 : e.key === 'ArrowDown' ? active + 1 : active - 1
+    setActive(Math.max(0, Math.min(count - 1, next)))
+  } else if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+    e.preventDefault()
+    const i = active ?? 0
+    if (i < count) pick(i)
+  }
+}
+
+/**
+ * "Add Property": pick a kind (or "Link to a type" › a type), then name it and "Create". By mouse
+ * or by key: the arrows and Enter in either search field (`listKey`), then the default name is
+ * selected in the Name field so typing replaces it (fix pass W8).
+ */
 export function AddPropertyMenu({ type, types, onSave, onClose }: AddPropertyMenuProps) {
-  const [step, setStep] = useState<Step>({ kind: 'list' })
-  const [query, setQuery] = useState('')
-  const [typeQuery, setTypeQuery] = useState('')
+  const [step, setStepState] = useState<Step>({ kind: 'list' })
+  const [query, setQueryState] = useState('')
+  const [typeQuery, setTypeQueryState] = useState('')
   const [iconOpen, setIconOpen] = useState(false)
+  // The row the arrow keys highlighted in the list on screen (kinds or types); none after a new
+  // search or a change of step.
+  const [active, setActive] = useState<number | null>(null)
+  const rowId = useId()
+  const listRef = useRef<HTMLDivElement | HTMLUListElement | null>(null)
+  const nameRef = useRef<HTMLInputElement | null>(null)
   const basic = type.basic
+  const setStep = (next: Step) => {
+    setActive(null)
+    setStepState(next)
+  }
+  const setQuery = (q: string) => {
+    setActive(null)
+    setQueryState(q)
+  }
+  const setTypeQuery = (q: string) => {
+    setActive(null)
+    setTypeQueryState(q)
+  }
+  const inForm = step.kind === 'form'
+  // The Name field opens with its default name selected: the first key replaces it.
+  useEffect(() => {
+    if (inForm) nameRef.current?.select()
+  }, [inForm])
+  // Keep the highlighted row in view.
+  useEffect(() => {
+    if (active === null) return
+    const row = listRef.current?.querySelector<HTMLElement>('[data-active="true"]')
+    row?.scrollIntoView?.({ block: 'nearest' })
+  }, [active])
 
   const items = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -146,6 +197,7 @@ export function AddPropertyMenu({ type, types, onSave, onClose }: AddPropertyMen
           </Popover>
           <input
             autoFocus
+            ref={nameRef}
             aria-label="Name"
             placeholder="Name"
             value={d.name}
@@ -182,6 +234,7 @@ export function AddPropertyMenu({ type, types, onSave, onClose }: AddPropertyMen
   }
 
   if (step.kind === 'objectSelect') {
+    const pickType = (t: TypeDef) => form('entity', typeLabel(t), { isArray: true, allowedTypes: [t.id], hasFixedSet: false, fixedSet: [] })
     return (
       <div className="w-64 text-fg">
         <div className="mb-1 flex items-center gap-1.5">
@@ -197,19 +250,23 @@ export function AddPropertyMenu({ type, types, onSave, onClose }: AddPropertyMen
             autoFocus
             value={typeQuery}
             onChange={(e) => setTypeQuery(e.target.value)}
+            onKeyDown={(e) => listKey(e, targets.length, active, setActive, (i) => pickType(targets[i]))}
             placeholder="Search types"
             aria-label="Search types"
+            aria-activedescendant={active !== null && active < targets.length ? `${rowId}-${active}` : undefined}
             className="min-w-0 flex-1 rounded border border-line bg-transparent px-2 py-1 text-[14px] outline-none"
           />
         </div>
-        <ul aria-label="Types" className="max-h-80 overflow-auto">
-          {targets.map((t) => (
+        <ul aria-label="Types" ref={(el) => void (listRef.current = el)} className="max-h-80 overflow-auto">
+          {targets.map((t, i) => (
             <li key={t.id}>
               <button
                 type="button"
+                id={`${rowId}-${i}`}
                 aria-label={typeLabel(t)}
-                onClick={() => form('entity', typeLabel(t), { isArray: true, allowedTypes: [t.id], hasFixedSet: false, fixedSet: [] })}
-                className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[14px] hover:bg-hover"
+                data-active={active === i ? 'true' : undefined}
+                onClick={() => pickType(t)}
+                className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[14px] hover:bg-hover data-[active=true]:bg-hover"
               >
                 <IconOrEmoji icon={t.icon} size={14} fallback="ph-cube" />
                 <span className="truncate">{typeLabel(t)}</span>
@@ -231,20 +288,24 @@ export function AddPropertyMenu({ type, types, onSave, onClose }: AddPropertyMen
         disabled={basic}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => listKey(e, items.length, active, setActive, (n) => pick(items[n]))}
         placeholder="Search Properties"
         aria-label="Search Properties"
+        aria-activedescendant={active !== null && active < items.length ? `${rowId}-${active}` : undefined}
         className="mb-1 w-full rounded border border-line bg-transparent px-2 py-1 text-[14px] outline-none"
       />
-      <div role="menu" aria-label="Add Property" className="max-h-96 overflow-auto">
-        {items.map((i) => (
+      <div role="menu" aria-label="Add Property" ref={(el) => void (listRef.current = el)} className="max-h-96 overflow-auto">
+        {items.map((i, n) => (
           <button
             key={i.key}
             type="button"
             role="menuitem"
+            id={`${rowId}-${n}`}
             aria-label={i.name}
+            data-active={active === n ? 'true' : undefined}
             disabled={basic}
             onClick={() => pick(i)}
-            className="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left hover:bg-hover disabled:opacity-50"
+            className="flex w-full items-start gap-2 rounded px-2 py-1.5 text-left hover:bg-hover disabled:opacity-50 data-[active=true]:bg-hover"
           >
             <Icon name={i.icon} size={15} className="mt-0.5" />
             <span className="min-w-0 flex-1">

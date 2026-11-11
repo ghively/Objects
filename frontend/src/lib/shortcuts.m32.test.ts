@@ -35,7 +35,7 @@ describe('the new-note keys (M32)', () => {
   test('test the sheet says what the keys do in everyday words', () => {
     const name = (id: string) => allShortcuts().find((d) => d.id === id)?.name
     expect(name('createNewEntityOfType')).toBe('New note, or one more of the type in view')
-    expect(name('openAddEntityMenu')).toBe('Add new content')
+    expect(name('openAddEntityMenu')).toBe('New')
     expect(name('openTodaysNote')).toBe("Pop out today's daily note")
   })
 

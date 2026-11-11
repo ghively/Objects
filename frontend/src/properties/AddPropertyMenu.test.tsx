@@ -69,6 +69,94 @@ describe('AddPropertyMenu', () => {
     expect(added).toMatchObject({ type: 'number', key: 'budget', name: 'Budget', description: 'In euros' })
   })
 
+  // Fix pass W8: the menu works from the keyboard, and the default name gives way to what is typed.
+  const highlighted = () => screen.getAllByRole('menuitem').filter((b) => b.getAttribute('data-active') === 'true').map((b) => b.getAttribute('aria-label'))
+
+  test('test Enter in the search picks the first match, and typing replaces the selected default name (W8)', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    render(<AddPropertyMenu type={PROJECT} types={TYPES} onSave={onSave} />)
+    // The search field has the focus when the menu opens.
+    expect(screen.getByPlaceholderText('Search Properties')).toHaveFocus()
+    await user.keyboard('Number')
+    expect(items()).toEqual(['Number'])
+    // Nothing is highlighted yet: Enter takes the first match.
+    expect(highlighted()).toEqual([])
+    await user.keyboard('{Enter}')
+    const name = screen.getByRole('textbox', { name: 'Name' }) as HTMLInputElement
+    expect(name).toHaveFocus()
+    expect(name).toHaveValue('Number')
+    // The whole default name is selected, so the next key replaces it.
+    expect([name.selectionStart, name.selectionEnd]).toEqual([0, 'Number'.length])
+    await user.keyboard('Rating')
+    expect(name).toHaveValue('Rating')
+    await user.keyboard('{Enter}')
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect((onSave.mock.calls[0][0] as TypeDef).propertyDefinitions.at(-1)).toMatchObject({ type: 'number', key: 'rating', name: 'Rating' })
+  })
+
+  test('test ArrowDown and ArrowUp move through the kinds and Enter picks the highlighted one (W8)', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    render(<AddPropertyMenu type={PROJECT} types={TYPES} onSave={onSave} />)
+    const all = items()
+    await user.keyboard('{ArrowDown}')
+    expect(highlighted()).toEqual([all[0]])
+    await user.keyboard('{ArrowDown}{ArrowDown}')
+    expect(highlighted()).toEqual([all[2]])
+    await user.keyboard('{ArrowUp}')
+    expect(highlighted()).toEqual([all[1]])
+    // The focus never left the search field, so typing still filters.
+    expect(screen.getByPlaceholderText('Search Properties')).toHaveFocus()
+    // ArrowUp from the first stays on the first; ArrowDown from the last stays on the last.
+    await user.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}')
+    expect(highlighted()).toEqual([all[0]])
+    await user.keyboard('{ArrowDown>40/}')
+    expect(highlighted()).toEqual([all.at(-1)])
+    // A new search starts from no highlight again.
+    await user.keyboard('te')
+    expect(highlighted()).toEqual([])
+    expect(items().slice(0, 2)).toEqual(['Text', 'Content'])
+    await user.keyboard('{ArrowDown}{ArrowDown}')
+    expect(highlighted()).toEqual(['Content'])
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Content')
+  })
+
+  test('test Enter with no match does nothing, and the keys work in the "Link to a type" list too (W8)', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    render(<AddPropertyMenu type={PROJECT} types={TYPES} onSave={onSave} />)
+    await user.keyboard('zzzz{Enter}')
+    expect(screen.getByPlaceholderText('Search Properties')).toBeInTheDocument()
+    expect(onSave).not.toHaveBeenCalled()
+    await user.clear(screen.getByPlaceholderText('Search Properties'))
+    await user.keyboard('Link to a type{Enter}')
+    const search = screen.getByPlaceholderText('Search types')
+    expect(search).toHaveFocus()
+    // Note, Tag, Person and Project are offered (Task is not): the third, by the keys.
+    await user.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}{Enter}')
+    const name = screen.getByRole('textbox', { name: 'Name' }) as HTMLInputElement
+    expect(name).toHaveValue('Person')
+    expect([name.selectionStart, name.selectionEnd]).toEqual([0, 'Person'.length])
+    await user.keyboard('Owner{Enter}')
+    expect((onSave.mock.calls[0][0] as TypeDef).propertyDefinitions.at(-1)).toMatchObject({ type: 'entity', name: 'Owner', options: { allowedTypes: ['person'] } })
+  })
+
+  test('test a system kind is added at once by Enter, and a basic type picks nothing (W8)', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const { unmount } = render(<AddPropertyMenu type={PROJECT} types={TYPES} onSave={onSave} />)
+    await user.keyboard('Created at{Enter}')
+    expect((onSave.mock.calls[0][0] as TypeDef).propertyDefinitions.at(-1)).toMatchObject({ type: 'entity_createdAt' })
+    unmount()
+    onSave.mockClear()
+    render(<AddPropertyMenu type={PAGE} types={TYPES} onSave={onSave} />)
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(onSave).not.toHaveBeenCalled()
+    expect(highlighted()).toEqual([])
+  })
+
   test('adding a second Content asks "Add a second content property?"', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()

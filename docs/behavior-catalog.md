@@ -69,6 +69,10 @@ Object has no accounts.
   its picker "Select a note")); Highlight Style (Default with a
   rail and notes section | Minimal); Backlink sections start as (Backlinks Open | Closed; Unlinked
   Mentions Open | Closed | Hidden); Backlink content view (Embed default).
+  (M32 fix pass) On screen: "Keep type settings inside Settings only" explains "Removes the controls for editing
+  properties and type settings from notes. …"; the second "Backlink sections start as" row reads "Related" (was
+  "Related Content"), as the note page's tab does ("All", "Backlinks", "Related", "Mentions", "Related tags"), and
+  "Types without related content" explains "Notes of the types picked here leave out the Related section.".
   (M31) "Hide App Menu" (a switch after "Hide outliner lines"; device setting `hideAppMenu`, off by default): Object's
   window has no menu bar, so its app menu is the top bar's space menu (spaces, Space settings, Space history, Create
   space, Open folder…). On, that button is hidden (the sidebar toggle stays); a lone Alt tap shows it, focused, and
@@ -86,7 +90,9 @@ Object has no accounts.
   Local rows (M31): "Local Storage" lists the space folder, its cache (`.object-cache`) and Object's data for the
   space in the state folder (saved versions and the per-space files), and the total (`GET /api/storage`, read
   only). "Media loading" (device setting `mediaLoading`): "Required only" shows images, video, audio and PDF
-  as a placeholder with "Load" until clicked, wherever they show: blocks in pages, cover images (and the
+  as a placeholder with "Load" until clicked, wherever they show ((M32 fix pass) the setting's text says "in notes,
+  cover images, …", "Media loads as soon as a note opens." and, for the cache, "Media loads again from your
+  files."): blocks in pages, cover images (and the
   profile picture and a presentation's title slide), card and gallery pictures (the Page link view card
   too), image property cells and whiteboard media; small pictures get a compact "Load" in the picture's box
   (our call); the image picker shows its thumbnails, as opening it asks for them (our call). "Everything" loads
@@ -131,6 +137,10 @@ Object has no accounts.
     said "objects". The built-in Page type shows "Note" / "Notes" and the built-in DailyNote "Daily note" / "Daily
     notes" in the breadcrumb and in their (fixed) Name and Plural fields; the type file keeps `Page` / `DailyNote`.
     The "Work" section ("Add work fields"; Object's own, M22) shows only while the Work page is on for the space.
+    (M32 fix pass) Configuration's first group is headed "Layout" (was "Page", over a row "Page layout"): the four
+    layout cards under "How notes of this type are laid out.", then Font ("The typeface that notes of this type
+    use."), Wide layout, the cover image rows and Default list view. The "Default link view" option "Page" keeps
+    its name: it shows the linked note as a whole page.
   - Add Property › **Table** (M31, after Files; ours: "A small table: a header row of column names, then rows of
     text."): stored as a Markdown table in a `|-` block (header row first; a hand-written YAML list of rows reads the
     same; only line 2 is the separator, and a cell of dashes is written `\-`, `|` as `\|` and `\` as `\\`, read back
@@ -150,7 +160,7 @@ Object has no accounts.
   not changed." Tasks already made are kept. (M32) While it is on: the sidebar has no Tasks entry and no Work entry
   under it; a Tasks or Work tab (a restored one, a pinned link) shows one quiet line, "Tasks are hidden in this
   space.", with "Open Task management settings"; Home leaves its Tasks block out; the work toasts and overlays do
-  not show; the palette offers no "Create Task"; Ctrl+Shift+T makes no task (outside a note and in one); the
+  not show; the palette offers no "New task"; Ctrl+Shift+T makes no task (outside a note and in one); the
   Shortcuts sheet leaves the task keys and the Work group out; the Calendar's day header has no task link. The Task
   type, the tasks and the Calendar's own Tasks section stay; the switch off brings everything back at once.
 - Work (Object's own; M32): the first row is the switch "Use the Work page in this space" (`workEnabled` in
@@ -225,6 +235,10 @@ Tick or untick the to-do in this block Ctrl+Enter | Open or close all toggles on
 Code block: leave downwards or upwards (Ctrl+Shift+Down/Up) | Math block likewise | Merge text blocks
 Ctrl+Shift+G.
 
+(M32 fix pass) On screen this group is headed **Note** and its rows name the note: "Pin or unpin this note",
+"Export this note", "Delete this note"; and General's "Add new content" (Ctrl+U or Alt+Shift+N, the New menu)
+reads "New". The catalogued names below are the ones they had.
+
 **Page**: Pin or unpin this page Ctrl+Shift+* (M32: was "Favorite or unfavorite this page") | Import, Export this page (Ctrl+E), Share menu Ctrl+S (not in Object) |
 Start presentation mode Ctrl+Alt+P; back one slide / next presentation slide; exit presentation mode Esc | Find in page Ctrl+F | Select all top-level blocks |
 Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down) | Scroll to top Home, bottom End,
@@ -279,10 +293,15 @@ shows under its key as words. "IT operations" is always the last group and start
 disclosure that shows its entries when opened, and the fold is not remembered (a reopened gallery has it collapsed
 again). (M32) "Starter sets" is the last group, under IT operations: "Everyday set" ("Comes with types for people,
 meetings, projects and books.") and "IT operations set" ("Includes hosts, software, applications, runbooks and
-incidents."). One click adds the set (`POST /api/space/setup` with `basic` or `itops`; it writes only the types the
-space lacks), a toast says what was added ("Added: Person, Meeting, Book.", or "This space already has every type
-in that set."; the IT set adds "The Work page is now on for this space." when it turned Work on), the gallery and
-the types are read again and the gallery stays open, the set's types now marked "Added".
+incidents."). (M32 fix pass) A click on a set asks first: "Add the Everyday set?" / "Add the IT operations set?",
+naming the types the space does not have yet ("This adds 3 types (Person, Meeting, Book) to this space. Types you
+already have are left as they are."; the IT set names every type it adds the same way and reads "…, their
+templates and tags to this space. …", then "The Work page is turned on for this space." when its switch was never
+set and Work is off), with "Cancel" and "Add". "Add" adds the set (`POST /api/space/setup` with `basic` or `itops`; it writes only
+the types the space lacks), a toast says what was added ("Added: Person, Meeting, Book."; the IT set adds "The Work
+page is now on for this space." when it turned Work on), the gallery and the types are read again and the gallery
+stays open, the set's types now marked "Added". A set whose types are all in the space reads "Added" itself and
+cannot be clicked.
 - Meetings (who attended, and when), People, Projects (status, collaborators, meetings).
 - Research: Atomic notes, Definitions.
 - Media: Books (authors, rating, genre), Films, TV series, Podcasts.
@@ -308,7 +327,7 @@ Each starter template pre-fills the new type's properties.
 ## 4. Sidebar details
 
 - **Today's note** (ours, 2026-11-09, Gene): the top bar's notebook button "Today's note", Home's button (M32), the
-  palette's "Pop out today's daily note" and Ctrl+Shift+D open today's daily note in the peek, the floating panel
+  palette's "Today's note" ((M32 fix pass) was "Pop out today's daily note") and Ctrl+Shift+D open today's daily note in the peek, the floating panel
   over the page, creating the note first when today has none (the same call as "+ Daily Note"). The page underneath
   stays as it was; Escape closes the peek. (M32) It opens with the caret at the end of its text, so the next key
   typed lands in the note, and the key works with the caret in a note's text or title. It stays a peek while
@@ -339,7 +358,11 @@ Each starter template pre-fills the new type's properties.
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
 - **A new space just starts (M32)**: "Create new space" asks for a name and a folder only (plus "Import from…" and
-  "Do I need a new space?"); it makes the space with the plain start (`setup: blank`) and offers to switch. A
+  "Do I need a new space?"); it makes the space with the plain start (`setup: blank`) and offers to switch.
+  (M32 fix pass) Under Location: "The space is made as a new folder with its name inside this folder." (the
+  space is `<Location>/<its name>`, and Location itself must be there); a Location that is no folder reads 'The
+  folder "…" does not exist.'. After creating, the dialog is headed "Space created" with "Switch to it now?", the
+  new folder's path (it wraps inside the box) and "Later" / "Switch space". A
   space opened as a new or empty folder asks nothing: the "Pick a starting point" dialog is gone, and nothing is
   written by opening. The starter sets ("Start with basic setup", "IT operations"; `POST /api/space/setup`) are
   offered from the type gallery instead. What the IT operations set writes is unchanged: the 17 IT ops types (Host,
@@ -511,6 +534,9 @@ Each starter template pre-fills the new type's properties.
     a type" (was "Object Select"; its list is "Search types"); the system type property is named "Type"; property
     settings say "note" where they said "object" ("Linked type", "Allow one linked note, or several.", "Number
     existing notes"). A relation's picker reads "Search for notes".
+  - Add Property by key (M32 fix pass): in "Search Properties" (and in "Search types") ArrowDown and ArrowUp move
+    a highlight through the list, and Enter picks the highlighted row, or the first match when none is
+    highlighted. The Name field then opens with the default name selected, so typing replaces it.
 - **Property name** (a property label's menu, and "Name" in Property settings): Enter or leaving the field commits
   the new name; Escape goes back only to the last committed name, so Enter then Escape keeps the new one (Escape
   in Property settings closes the dialog).
@@ -632,7 +658,8 @@ Each starter template pre-fills the new type's properties.
   completely. Types and collections cannot be restored completely. …"; a row's second line names the kind "Type",
   "Collection", "Saved search" or "Automation" with "N notes" where it takes notes with it, and for a deleted note
   its type and where it was, both as the screen names the type ("Daily note · Daily notes/2026-11-11.md", "Note ·
-  Notes/Plan.md"; the path as it is on disk is the line's tooltip). "Delete permanently?" asks about "1 note",
+  Notes/Plan.md", "Recipe · Recipes/Lentil soup.md": (M32 fix pass) the type's name, not its id; a type that no
+  longer exists shows as the entry holds it; the path as it is on disk is the line's tooltip). "Delete permanently?" asks about "1 note",
   "this type and its 3 notes" or "this saved search".
 - **Explore** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
   (objects related to the page you are on) with "Find More". Toggled with Ctrl+Shift+Right; the tooltip reads
@@ -641,8 +668,12 @@ Each starter template pre-fills the new type's properties.
   Tab") shows the tabs "Explore" (first) and "Relevant Content". Explore: the cards "AI Chat" (hidden with "Hide AI
   features") and "Search" (the Search page, in the entry), then Graph View and Backlinks as small buttons (Object's
   own: kept so neither is lost). Relevant Content: up to 20 objects related to the main view's object (the same
-  list as the AI chat's), and "Find More" (the search palette); "Open a page to see content related to it." when the
-  main view shows no object.
+  list as the AI chat's), and "Find More" (the search palette); "Open a note to see content related to it." when the
+  main view shows no object. (M32 fix pass, wording only; nothing in the AI area moved) The AI Chat panel says
+  "notes" where it said "pages": "Ask about your notes…", "Ask a question about the notes in the context, or about
+  anything in your space.", "Add a note to the context", "Find a note", "Append to note", and its first-use notice
+  "AI Chat sends the notes in its context, … Notes tagged "Exclude from AI" are never sent." (a remote agent's
+  notice likewise).
 - **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback. Object's own
   section is local only: Keyboard shortcuts, Getting started, Markdown reference and **How-to guides** (Gene's
   decision D1). How-to guides opens a read-only list (People, Meetings, Projects, Books — one per basic-setup type —
@@ -667,7 +698,11 @@ Each starter template pre-fills the new type's properties.
   note" and "Make a new note from the clipboard". "Create new {type} with title "{q}"" makes a Note unless a type
   filter is set, the page in view has a type (a type's page, a collection, a saved search) or a name pattern
   matches: never one more of the type made last. The palette forgets what was typed (and its filters) the moment
-  it closes: reopened at once, within its closing animation, it starts empty.
+  it closes: reopened at once, within its closing animation, it starts empty. (M32 fix pass) Its commands open
+  with "New note" and "New task" (they were "Create Note" and "Create Task"; every other type keeps "Create
+  <Type>"), and today's note reads "Today's note": "new", "note", "task" and "today" find them, as do the names
+  they had. Each runs what its key runs: "New note" makes a Note in the tab (a popped-out note steps aside),
+  "New task" what Ctrl+Shift+T makes, "Today's note" what Ctrl+Shift+D opens.
 - **New** (M32, "New means a note"): the sidebar's "New" button makes a Note at once and opens it with the title
   focused (Ctrl/Cmd+click a new tab, Shift+click the side panel, as every create); a small arrow beside it,
   "Choose a type", opens the New menu. Home's "New note" does the same.

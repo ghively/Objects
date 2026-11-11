@@ -80,15 +80,16 @@ export const TYPE_SETTINGS_TEXT = {
   addProperty: 'Add Property',
   templates: 'Templates',
   configuration: 'Configuration',
-  configurationExplanation: "Settings for how this type's notes appear and act on pages, on cards and in the calendar.",
-  page: 'Page',
-  pageLayout: 'Page layout',
-  pageLayoutExplanation: 'How pages of this type are laid out.',
+  configurationExplanation: "Settings for how this type's notes are laid out and how they appear on cards and in the calendar.",
+  // M32 fix pass (W16): the group was headed "Page" over a first row "Page layout". One heading
+  // now, "Layout", and its first row is the explanation alone (the cards are named `PAGE_LAYOUTS_LABEL`).
+  page: 'Layout',
+  pageLayoutExplanation: 'How notes of this type are laid out.',
   font: 'Font',
-  fontExplanation: 'The typeface that pages of this type use.',
+  fontExplanation: 'The typeface that notes of this type use.',
   wideLayout: 'Wide layout',
   wideLayoutExplanation:
-    'Set the default layout mode for this type. This will only affect the default page layout and will not make any difference for encyclopedia, profile, or index card designs.',
+    'Set the default layout mode for this type. This will only affect the Standard layout and will not make any difference for encyclopedia, profile, or index card designs.',
   coverImageMode: 'Cover image mode',
   coverImageModeExplanation:
     'Choose whether cover images of notes of this type should be displayed as wide or small cover images by default. This setting only applies when the type has a cover image property.',
@@ -206,12 +207,13 @@ function Section({ title, explanation, children }: { title: string; explanation?
   )
 }
 
-function Field({ label, explanation, children }: { label: string; explanation?: string; children: ReactNode }) {
+/** A setting's row: its label and explanation, then the control. No label: the group's heading names it. */
+function Field({ label, explanation, children }: { label?: string; explanation?: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5 py-2 sm:flex-row sm:items-start sm:gap-6">
       <div className="sm:w-[240px] sm:shrink-0">
-        <div className="text-[15px] font-medium">{label}</div>
-        {explanation && <p className="mt-0.5 text-[13px] text-fg-muted">{explanation}</p>}
+        {label && <div className="text-[15px] font-medium">{label}</div>}
+        {explanation && <p className={label ? 'mt-0.5 text-[13px] text-fg-muted' : 'text-[13px] text-fg-muted'}>{explanation}</p>}
       </div>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
@@ -544,7 +546,8 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
           <Section title={TYPE_SETTINGS_TEXT.configuration} explanation={TYPE_SETTINGS_TEXT.configurationExplanation}>
             <section aria-label={TYPE_SETTINGS_TEXT.page}>
               <h3 className="mb-2 text-[15px] font-semibold text-fg-muted">{TYPE_SETTINGS_TEXT.page}</h3>
-              <Field label={TYPE_SETTINGS_TEXT.pageLayout} explanation={TYPE_SETTINGS_TEXT.pageLayoutExplanation}>
+              {/* The heading above already says "Layout": the row is the explanation and the cards. */}
+              <Field explanation={TYPE_SETTINGS_TEXT.pageLayoutExplanation}>
                 <PageLayoutCards
                   value={type.viewDesign}
                   disabled={readOnly}

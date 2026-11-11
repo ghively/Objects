@@ -44,7 +44,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   global: 'General',
   markdown: 'Markdown',
   navigation: 'Navigation',
-  page: 'Page',
+  page: 'Note',
   pdf: 'PDF viewer',
   table: 'Table',
   text: 'Text editing',
@@ -412,9 +412,9 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   // (`NEW_KEYS_IN_NOTE` below says how each key was checked against the editor's own keys), and
   // each has a second key that a browser tab lets through. Delete stays out of editable targets
   // (there Ctrl+Backspace deletes a word).
-  def('openAddEntityMenu', 'global', 'Add new content', ['Mod-u', 'AltCtrl-Shift-n'], 'global', false, false),
+  def('openAddEntityMenu', 'global', 'New', ['Mod-u', 'AltCtrl-Shift-n'], 'global', false, false),
   def('createNewEntityOfType', 'global', 'New note, or one more of the type in view', ['Mod-n', 'AltCtrl-n'], 'global', false, false),
-  def('deleteCurrentPage', 'page', 'Delete current page', ['Mod-Backspace'], 'global', false, false),
+  def('deleteCurrentPage', 'page', 'Delete this note', ['Mod-Backspace'], 'global', false, false),
   // M4, calendar/CalendarChrome.tsx
   def('goToToday', 'calendar', 'Jump to today', ['t'], 'calendar', false, false),
   def('setViewToMonth', 'calendar', 'Go to monthly view', ['m'], 'calendar', false, false),
@@ -610,10 +610,10 @@ export const POLISH_SHORTCUTS: ShortcutDef[] = [
  * Mod-e and Mod-i (in the editor they stay code and italic).
  */
 export const OBJECT_MENU_SHORTCUTS: ShortcutDef[] = [
-  def('openExportMenu', 'page', 'Export this page', ['Mod-e'], 'global', V, false),
+  def('openExportMenu', 'page', 'Export this note', ['Mod-e'], 'global', V, false),
   // "Import": on a type page Ctrl+I opens the type's CSV import, not a page's.
   def('openImportMenu', 'page', 'Import', ['Mod-i'], 'global', V, false),
-  def('toggleFavorite', 'page', 'Pin or unpin this page', ['Mod-Shift-*'], 'global', V, false),
+  def('toggleFavorite', 'page', 'Pin or unpin this note', ['Mod-Shift-*'], 'global', V, false),
 ]
 
 /**

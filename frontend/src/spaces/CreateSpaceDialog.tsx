@@ -32,8 +32,15 @@ export const CREATE_SPACE_TEXT = {
   explainText: 'Use one only for work that must stay separate: notes in different spaces cannot link to each other.',
   cancel: 'Cancel',
   create: 'Create space',
+  // Fix pass W9 (our string): the space is `<Location>/<its name>`; Location itself must be there.
+  locationHint: 'The space is made as a new folder with its name inside this folder.',
   exists: 'A folder with that name already exists here.', // our string
-  created: 'Space created. Switch to it now?', // our string
+  // Fix pass W9 (our string): the server's 404 `"<location>" is not a folder.`, in plain words.
+  noLocation: (location: string) => `The folder "${location}" does not exist.`,
+  // Fix pass W9: after creating, the dialog's heading and its one line (they were one paragraph
+  // under the form's heading "Create new space" / "Name your space").
+  createdTitle: 'Space created', // our string
+  created: 'Switch to it now?', // our string
   switchNow: 'Switch space', // our string
   later: 'Later', // our string
   howToStart: 'Pick a starting point',
@@ -126,6 +133,8 @@ export function CreateSpaceDialog() {
       setCreated(res.path)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) setError(T.exists)
+      // The Location is no folder (it is missing, or it is a file): the server's `"…" is not a folder.`
+      else if (err instanceof ApiError && err.status === 404 && /is not a folder\.$/.test(err.message)) setError(T.noLocation(location.trim()))
       else setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
@@ -143,13 +152,14 @@ export function CreateSpaceDialog() {
     <Dialog open={isOpen} onOpenChange={(o) => (o ? useCreateSpaceDialog.getState().open() : close())}>
       <DialogContent className="border-line bg-raised-2 text-fg sm:max-w-[460px]">
         <DialogHeader>
-          <DialogTitle className="text-[18px]">{T.title}</DialogTitle>
-          <DialogDescription className="text-[14px] text-fg-muted">{T.intro}</DialogDescription>
+          <DialogTitle className="text-[18px]">{created ? T.createdTitle : T.title}</DialogTitle>
+          <DialogDescription className="text-[14px] text-fg-muted">{created ? T.created : T.intro}</DialogDescription>
         </DialogHeader>
         {created ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-[14px]">{T.created}</p>
-            <p className="truncate text-[13px] text-fg-muted" title={created}>
+          // `min-w-0`: a grid item is as wide as its longest line unless told otherwise, and a long
+          // path pushed the buttons out of the box. The path wraps instead (W9).
+          <div className="flex min-w-0 flex-col gap-3">
+            <p className="font-mono text-[13px] break-all text-fg-muted" title={created}>
               {created}
             </p>
             <div className="flex justify-end gap-2">
@@ -162,7 +172,7 @@ export function CreateSpaceDialog() {
             </div>
           </div>
         ) : (
-          <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3">
+          <form onSubmit={(e) => void submit(e)} className="flex min-w-0 flex-col gap-3">
             <input
               autoFocus
               aria-label={T.namePlaceholder}
@@ -172,15 +182,21 @@ export function CreateSpaceDialog() {
               onChange={(e) => setName(e.target.value)}
               className="h-9 rounded-md border border-line bg-transparent px-2 text-[15px] outline-none focus:border-fg-muted"
             />
-            <label className="flex flex-col gap-1 text-[13px] font-semibold">
-              {T.location}
-              <input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                spellCheck={false}
-                className="h-9 rounded-md border border-line bg-transparent px-2 font-mono text-[13px] font-normal outline-none focus:border-fg-muted"
-              />
-            </label>
+            <div className="flex flex-col gap-1">
+              <label className="flex flex-col gap-1 text-[13px] font-semibold">
+                {T.location}
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  spellCheck={false}
+                  aria-describedby="space-location-hint"
+                  className="h-9 rounded-md border border-line bg-transparent px-2 font-mono text-[13px] font-normal outline-none focus:border-fg-muted"
+                />
+              </label>
+              <p id="space-location-hint" className="text-[12px] text-fg-muted">
+                {T.locationHint}
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -207,7 +223,7 @@ export function CreateSpaceDialog() {
               </div>
             </aside>
             {error && (
-              <p role="alert" className="text-[13px] text-danger">
+              <p role="alert" className="text-[13px] [overflow-wrap:anywhere] text-danger">
                 {error}
               </p>
             )}

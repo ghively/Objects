@@ -13,7 +13,7 @@ describe('RemoteContextNotice', () => {
     render(<RemoteContextNotice open agentName="Fake Planner" host="agents.example.com" onSend={onSend} onCancel={onCancel} />)
     const dialog = screen.getByRole('dialog', { name: 'This leaves your computer' })
     expect(dialog).toHaveTextContent(
-      'Fake Planner is a remote agent. The context pages you send go to agents.example.com, outside this computer. Pages excluded from AI are never sent.',
+      'Fake Planner is a remote agent. The context notes you send go to agents.example.com, outside this computer. Notes excluded from AI are never sent.',
     )
     await user.click(screen.getByRole('button', { name: R.noticeSend }))
     expect(onSend).toHaveBeenCalledTimes(1)

@@ -80,15 +80,24 @@ const BUILT_IN: readonly (TypeNames & { id: string })[] = [
   { id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes' },
 ]
 
-/** The built-in type stored under `value` (its name or plural), when the space no longer has that type. */
+/**
+ * The built-in type stored under `value` (its name or plural; for the name, its id too), when the
+ * space no longer has that type.
+ */
 function goneBuiltIn(value: string, key: 'name' | 'pluralName', types: readonly TypeDef[]): TypeNames | undefined {
-  const builtIn = BUILT_IN.find((b) => b[key] === value)
+  const builtIn = BUILT_IN.find((b) => b[key] === value || (key === 'name' && b.id === value))
   return builtIn && !types.some((t) => t.id === builtIn.id) ? builtIn : undefined
 }
 
-/** A deleted note's type as the screen names it ("Page" reads "Note", "DailyNote" reads "Daily note"). */
-export function trashTypeLabel(typeName: string, types: readonly TypeDef[]): string {
-  return typeLabel(types.find((t) => t.name === typeName) ?? goneBuiltIn(typeName, 'name', types), typeName)
+/**
+ * A deleted note's type as the screen names it. `type` is what the Trash entry holds: the type's
+ * id ("recipe" reads "Recipe", "page" reads "Note"; M32 fix pass: the row showed the id), or, in
+ * an older entry, its name ("Page" reads "Note", "DailyNote" reads "Daily note"). A type that no
+ * longer exists and is not a built-in one is shown as the entry holds it.
+ */
+export function trashTypeLabel(type: string, types: readonly TypeDef[]): string {
+  const found = types.find((t) => t.id === type) ?? types.find((t) => t.name === type)
+  return typeLabel(found ?? goneBuiltIn(type, 'name', types), type)
 }
 
 /**
