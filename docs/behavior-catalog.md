@@ -477,7 +477,8 @@ Each starter template pre-fills the new type's properties.
   Note", "Only search for type "Note"", and typing "note" finds the type); the clipboard offers read "Create
   note" and "Make a new note from the clipboard". "Create new {type} with title "{q}"" makes a Note unless a type
   filter is set, the page in view has a type (a type's page, a collection, a saved search) or a name pattern
-  matches: never one more of the type made last.
+  matches: never one more of the type made last. The palette forgets what was typed (and its filters) the moment
+  it closes: reopened at once, within its closing animation, it starts empty.
 - **New** (M32, "New means a note"): the sidebar's "New" button makes a Note at once and opens it with the title
   focused (Ctrl/Cmd+click a new tab, Shift+click the side panel, as every create); a small arrow beside it,
   "Choose a type", opens the New menu. Home's "New note" does the same.

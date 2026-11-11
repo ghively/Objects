@@ -169,6 +169,40 @@ describe('shortcuts', () => {
     expect(usePalette.getState().open).toBe(false)
   })
 
+  // M32 (small faults): the palette forgets its last query the moment it closes.
+  test('test the palette forgets its query at once: reopened before the dialog has gone, it starts empty', async () => {
+    const { user } = setup()
+    const input = await openSearch(user)
+    await user.type(input, 'alpha peo')
+    await user.click(await screen.findByText('Only search for type "Person"'))
+    expect(document.querySelectorAll('[data-filter-chip]')).toHaveLength(1)
+    await user.type(input, 'bea')
+    expect(input).toHaveValue('alphabea')
+    // Closed and opened again in one go: the dialog never unmounts (as within its 0.2 s close animation).
+    act(() => {
+      usePalette.getState().hide()
+      usePalette.getState().show('search')
+    })
+    const again = screen.getByPlaceholderText(PALETTE_TEXT.placeholder)
+    expect(again).toHaveValue('')
+    expect(document.querySelectorAll('[data-filter-chip]')).toHaveLength(0)
+    expect(screen.queryByText('Create new Person with title "alphabea"')).toBeNull()
+  })
+
+  test('test each opening is a new session; switching mode while open is not', () => {
+    const s = usePalette.getState
+    const start = s().session
+    s().show('search')
+    expect(s().session).toBe(start + 1)
+    s().show('actions')
+    expect(s().session).toBe(start + 1)
+    s().toggle('actions')
+    expect(s().open).toBe(false)
+    s().toggle('search')
+    expect(s().session).toBe(start + 2)
+    s().hide()
+  })
+
   test('one list: no mode switch; the placeholder names content and actions; opening "actions" shows the same list', async () => {
     const { user } = setup()
     const input = await openSearch(user)

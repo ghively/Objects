@@ -80,6 +80,8 @@ export function paletteShortcut(e: KeyboardEvent): PaletteMode | null {
 
 export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPanel, onShowRightPanel }: CommandPaletteProps) {
   const open = usePalette((s) => s.open)
+  // M32: one search view per opening, so nothing typed before is left when it opens again.
+  const session = usePalette((s) => s.session)
   const types = useLinkIndex((s) => s.types)
   const hasObjectOpen = useTabs((s) => currentTarget(s)?.kind === 'object')
   const [spaces, setSpaces] = useState<SpaceEntry[]>([])
@@ -171,7 +173,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
       >
         <DialogTitle className="sr-only">{PALETTE_TEXT.searchTitle}</DialogTitle>
         <DialogDescription className="sr-only">{PALETTE_TEXT.placeholder}</DialogDescription>
-        <SearchView onDone={hide} footer={footer} onOpenExtendedSearch={toExtendedSearch} actions={context} />
+        <SearchView key={session} onDone={hide} footer={footer} onOpenExtendedSearch={toExtendedSearch} actions={context} />
       </DialogContent>
     </Dialog>
   )
