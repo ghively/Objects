@@ -377,10 +377,14 @@ Each starter template pre-fills the new type's properties.
 - **Tasks** (M32): the sidebar's Tasks entry opens the plain Tasks page (the `tasks` target; the `work` target
   too while Work is off for the space). Header: icon, "Tasks", "Search tasks" (filters the shown list by title as
   you type; Esc clears it) and "New task" (creates a task and opens it). Under it "Add a task": Enter (or "Add
-  task") adds without opening and keeps focus. Date words anywhere in the text — today, tomorrow, a weekday
-  ("friday", "next friday"), "next week", "in 3 days", "nov 20", `2026-11-20` — set the task's date and show as a
-  chip beside the field while typing; the words (and an "on", "by" or "due" just before them) are left out of the
-  title, and a month and day already past this year means next year's. Backspace at the start of the field, or
+  task") adds without opening and keeps focus. Date words anywhere in the text — today, tomorrow, a weekday's
+  full name ("friday", "next friday"), "next week", "in 3 days", `2026-11-20` — set the task's date and show as a
+  chip beside the field while typing; the words (and an "on", "by", "due" or "for" just before them) are left out
+  of the title, and a month and day already past this year means next year's. Words that are everyday words too
+  — a shortened weekday ("sat", "sun", "wed") and a month with a day ("nov 20", "3 may") — are a date only as the
+  last words of the text or right after "on", "by", "due" or "next" ("Pay rent fri", "Dentist on 3 may"; "Buy sun
+  cream" and "Chapter 3 may need a rewrite" keep their words). While the chip shows, a line under the field reads
+  the task as it will be saved (`Adds "Call the bank" on Nov 13, 2026`). Backspace at the start of the field, or
   the chip's ×, removes the chip, and the words then stay in the title as typed. The new task's file has an empty
   body: the title is not repeated in it (a default template's body is kept). Tabs: **Today** (two groups,
   "Overdue (n)" — open tasks whose date ended before today — then "Today (n)" — the date covers today or the

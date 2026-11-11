@@ -4,9 +4,11 @@
 // M32: date words anywhere in the text ("Call Pat friday", "nov 20", "next week", "in 3 days";
 // `findDate.ts`) set the task's date. While typing they show as a chip beside the field; Backspace
 // at the start of the field, or the chip's ×, removes the chip, and the words then stay in the
-// title as typed. The new file's body is sent empty, so its text does not repeat the title (the
+// title as typed. While the chip shows, a line under the field reads the task as it will be saved
+// ("Adds "Call Pat" on Nov 13, 2026"), so words taken for the date are seen before Enter (the M32
+// review, F3). The new file's body is sent empty, so its text does not repeat the title (the
 // server would write `# <title>` there); a type with a default template keeps the template's body.
-import { useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
 import { useZonedToday } from '@/lib/zonedShell'
@@ -20,6 +22,8 @@ export const QUICK_ADD_TEXT = {
   created: (taskName: string) => `Created task "${taskName}"`,
   /** The date chip's × (our string). */
   removeDate: 'Remove date',
+  /** The task as Enter would save it, while date words are read from the text (our string). */
+  preview: (taskName: string, date: string) => `Adds "${taskName}" on ${date}`,
 }
 
 export interface QuickAddTaskProps {
@@ -41,6 +45,7 @@ export function QuickAddTask({ taskTypeId, values, onAdded }: QuickAddTaskProps)
   const today = useZonedToday()
   const found = useMemo(() => findDatePhrase(title, today), [title, today])
   const dated = found && found.phrase.toLowerCase() !== ignored ? found : null
+  const previewId = useId()
 
   const removeDate = () => {
     if (found) setIgnored(found.phrase.toLowerCase())
@@ -78,6 +83,7 @@ export function QuickAddTask({ taskTypeId, values, onAdded }: QuickAddTaskProps)
         <input
           ref={input}
           aria-label={QUICK_ADD_TEXT.placeholder}
+          aria-describedby={dated ? previewId : undefined}
           placeholder={QUICK_ADD_TEXT.placeholder}
           value={title}
           onChange={(e) => {
@@ -124,7 +130,12 @@ export function QuickAddTask({ taskTypeId, values, onAdded }: QuickAddTaskProps)
           {QUICK_ADD_TEXT.button}
         </button>
       </div>
-      {message && (
+      {dated && (
+        <p id={previewId} data-testid="quick-add-preview" className="px-1 text-[13px] text-fg-muted">
+          {QUICK_ADD_TEXT.preview(dated.title, formatDate({ start: dated.day, resolution: 'day' }))}
+        </p>
+      )}
+      {message && !dated && (
         <p role="status" className="px-1 text-[13px] text-fg-muted">
           {message}
         </p>
