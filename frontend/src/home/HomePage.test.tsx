@@ -12,6 +12,7 @@ import { addDays, todayYmd } from '@/calendar/dates'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { takeBodyFocus } from '@/nav/focusRequest'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { TASK_TYPE, taskRow } from '@/tasks/taskFixtures'
 import { objectSummary, typeDef } from '@/test/mockApi'
 import { HOME_TEXT, HomePage, noteTypeId } from './HomePage'
@@ -153,6 +154,19 @@ describe('HomePage (M32)', () => {
     render(<HomePage types={[PAGE]} />)
     expect(screen.getByText(HOME_TEXT.noTasks)).toBeInTheDocument()
     expect(mocked.rows).not.toHaveBeenCalled()
+  })
+
+  test('test Tasks is left out while the space hides task management', async () => {
+    index([objectSummary({ path: 'Pages/A.md', title: 'Alpha', lastUpdated: hoursAgo(1) })])
+    useSpaceInfo.setState({ space: { name: 's', root: '/s', types: TYPES, hideTaskManagement: true }, loaded: true })
+    try {
+      render(<HomePage types={TYPES} />)
+      expect(screen.getByRole('region', { name: 'Recent' })).toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'Tasks' })).toBeNull()
+      expect(mocked.rows).not.toHaveBeenCalled()
+    } finally {
+      resetSpaceInfo()
+    }
   })
 
   test('test an empty space shows one friendly line and the two buttons', async () => {

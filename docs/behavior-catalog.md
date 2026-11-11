@@ -271,7 +271,7 @@ Each starter template pre-fills the new type's properties.
   sidebar to see its objects.", which is gone. Top to bottom: "New note" and "Today's note"; "Recent", the last 12
   notes edited, newest first (title, type, when edited; daily notes included; tasks, tags and templates left
   out; a click opens the note); "Tasks", the open overdue tasks and today's, each with the task checkbox, or
-  the line "Nothing due today."; an empty space shows "Nothing here yet. Start a note, or open today." and the
+  the line "Nothing due today." (left out while the space hides task management); an empty space shows "Nothing here yet. Start a note, or open today." and the
   two buttons only. Opening Home writes no file. Its tab reads "Home". "When this space opens" › "Home" shows it
   in the active tab (our call: that tab starts over; a persistent or pinned tab keeps its page and an empty tab
   is used, a new one only when there is none); "Where I left off" with nothing to restore is Home. The tab strip's `+`

@@ -3,8 +3,9 @@
 // already holds and opening it writes no file. Top to bottom: the two ways to start writing ("New
 // note", "Today's note"), "Recent" (the last 12 notes edited, newest first, daily notes included,
 // tasks and tags left out; from the link index, no request of its own) and "Tasks" (overdue and
-// today, each with the task checkbox; the Task rows are read, never written, until a tick). An
-// empty space shows one friendly line and the two buttons.
+// today, each with the task checkbox; the Task rows are read, never written, until a tick; left out
+// while the space hides task management). An empty space shows one friendly line and the two
+// buttons.
 import { useCallback, useMemo, type MouseEvent } from 'react'
 import type { ObjectSummary, Row, TypeDef } from '@/api/types'
 import { isListedNote, recentNotes, editedAt, editedLabel } from '@/allnotes/notes'
@@ -18,6 +19,7 @@ import { HOME, NEW_NOTE, TASKS, TODAYS_NOTE } from '@/lib/words'
 import { useZonedToday } from '@/lib/zonedShell'
 import { useLinkIndex } from '@/links/linkIndex'
 import { ObjectIcon } from '@/object/ObjectHeader'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { TypeChip } from '@/shell/Sidebar'
 import { isOpen } from '@/tasks/statusCategory'
 import { completionToast, type TaskOutcome } from '@/tasks/taskActions'
@@ -133,6 +135,8 @@ export function HomePage({ types }: { types: readonly TypeDef[] }) {
   const typesById = useMemo(() => new Map(types.map((t) => [t.id, t])), [types])
   const recent = useMemo(() => recentNotes(objects, [...types]), [objects, types])
   const taskType = useMemo(() => findTaskType([...types]), [types])
+  // "Hide Task Management" (the space's setting) leaves the task lists out everywhere, here too.
+  const hideTasks = useSpaceInfo((s) => s.space?.hideTaskManagement ?? false)
   // An empty space: no note and no task yet (templates and tags don't count).
   const empty = loaded && !objects.some((o) => o.template == null && (isListedNote(o, typesById) || o.type === taskType?.id))
 
@@ -170,10 +174,12 @@ export function HomePage({ types }: { types: readonly TypeDef[] }) {
                 </ul>
               </section>
             )}
-            <section aria-label={HOME_TEXT.tasks}>
-              <h2 className={SECTION_HEADING}>{HOME_TEXT.tasks}</h2>
-              {taskType ? <TaskList taskType={taskType} today={today} /> : <p className="px-2 text-[14px] text-fg-muted">{HOME_TEXT.noTasks}</p>}
-            </section>
+            {!hideTasks && (
+              <section aria-label={HOME_TEXT.tasks}>
+                <h2 className={SECTION_HEADING}>{HOME_TEXT.tasks}</h2>
+                {taskType ? <TaskList taskType={taskType} today={today} /> : <p className="px-2 text-[14px] text-fg-muted">{HOME_TEXT.noTasks}</p>}
+              </section>
+            )}
           </>
         )}
       </div>
