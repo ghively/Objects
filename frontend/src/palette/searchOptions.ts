@@ -3,14 +3,15 @@
  * filters). Pure: no React, no stores.
  */
 import type { TypeDef } from '@/api/types'
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 
 /** The palette's strings. */
 export const PALETTE_TEXT = {
   /** The palette's one input (content and actions). */
-  placeholder: 'Find objects and commands, or paste',
+  placeholder: 'Find notes and commands, or paste',
   /** The extended search page's input. */
   placeholderSearch: 'Search content',
-  /** The recent objects' groups. */
+  /** The recent notes' groups. */
   today: 'Today',
   earlier: 'Earlier',
   /** Shown at the right of an action row, where content shows its type. */
@@ -18,7 +19,7 @@ export const PALETTE_TEXT = {
   /** Our string: the info icon's tooltip beside the input. */
   info: 'Type to search your content and actions. Type a type or tag name to filter; Ctrl+Shift+Enter opens extended search.',
   emptyRecentsTitle: 'Nothing here yet',
-  emptyRecentsDescription: 'Recently opened objects appear here.',
+  emptyRecentsDescription: 'Recently opened notes appear here.',
   emptyTitle: (query: string) => `No results for "${query}"`,
   emptyDescription: 'Try other words, or clear a filter to see more.',
   onlyPartialResults: 'Indexing is still running, so some matches may be missing.',
@@ -88,7 +89,8 @@ function phrases(query: string): { phrase: string; rest: string }[] {
 
 function typeMatch(query: string, t: TypeDef): string | null {
   for (const { phrase, rest } of phrases(query)) {
-    if (nameMatches(phrase, t.name) || nameMatches(phrase, t.pluralName)) return rest
+    // By the name the screen shows ("note") and by the stored one ("page").
+    if ([typeLabel(t), typePlural(t), t.name, t.pluralName].some((n) => nameMatches(phrase, n))) return rest
   }
   return null
 }
@@ -120,7 +122,7 @@ export function suggestableTypes(types: readonly TypeDef[]): TypeDef[] {
 /**
  * The option rows below the results, in order: create, then the type include/exclude pairs, then
  * the tag filters. Nothing for an empty query. The create row's type is the type filter's, else
- * `suggested` (M29: the suggested type of the query), else Page.
+ * `suggested` (M29: the suggested type of the query), else Page (shown as "Note", M32).
  */
 export function buildSearchOptions(
   query: string,
@@ -137,16 +139,16 @@ export function buildSearchOptions(
     (suggested ? types.find((t) => t.id === suggested) : undefined) ??
     pageType(types)
   if (createType) {
-    out.push({ kind: 'create', typeId: createType.id, title, label: PALETTE_TEXT.createNewWithTitle(createType.name, title) })
+    out.push({ kind: 'create', typeId: createType.id, title, label: PALETTE_TEXT.createNewWithTitle(typeLabel(createType), title) })
   }
   const taken = new Set([...filters.types, ...filters.excludeTypes])
-  const sorted = [...types].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  const sorted = [...types].sort((a, b) => typeLabel(a).localeCompare(typeLabel(b), undefined, { sensitivity: 'base' }))
   for (const t of sorted) {
     if (taken.has(t.id)) continue
     const rest = typeMatch(title, t)
     if (rest === null) continue
-    out.push({ kind: 'includeType', typeId: t.id, rest, label: PALETTE_TEXT.typeFilter(t.name) })
-    out.push({ kind: 'excludeType', typeId: t.id, rest, label: PALETTE_TEXT.typeFilterExclude(t.name) })
+    out.push({ kind: 'includeType', typeId: t.id, rest, label: PALETTE_TEXT.typeFilter(typeLabel(t)) })
+    out.push({ kind: 'excludeType', typeId: t.id, rest, label: PALETTE_TEXT.typeFilterExclude(typeLabel(t)) })
   }
   if (filters.tag === null) {
     const seen = new Set<string>()

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { useCollections } from '@/collections/useCollections'
 import { Icon, IconOrEmoji, iconName } from '@/components/Icon'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -17,6 +17,9 @@ import { MainNavButton } from './MainNavButton'
 import { SectionHeader } from './SectionHeader'
 import { chipStyle } from './typeColor'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
+import { typePlural } from '@/lib/typeLabel'
+import { NEW_TYPE, NOTES, SAVED_SEARCHES, TYPES, WORK } from '@/lib/words'
+import { useWorkOn } from '@/work/useWorkOn'
 import { usePalette } from '@/palette/usePalette'
 import { useSettings } from '@/settings/useSettings'
 import { toggleDarkMode } from '@/theme/shortcuts'
@@ -50,29 +53,33 @@ export interface SidebarProps {
   onOpenType?: (type: TypeDef) => void
   /** Optional object counts per type id, shown muted at the row's end. */
   counts?: Record<string, number>
-  /** "+ New": create an object. */
-  onNew?: () => void
-  /** The `+` beside "Object Types": create a type. */
+  /** M32: "+ New" makes a Note at once (the click's modifier keys say where it opens). */
+  onNew?: (e: MouseEvent) => void
+  /** M32: the arrow beside "New" opens the type list (the New menu; also Ctrl+U). */
+  onNewMenu?: () => void
+  /** The `+` beside "Types": create a type. */
   onCreateType?: () => void
-  /** A type row's context menu › "Object type settings". */
+  /** A type row's context menu › "Type settings". */
   onOpenTypeSettings?: (type: TypeDef) => void
-  /** A type row's context menu › "Delete object type" (non-basic types only). */
+  /** A type row's context menu › "Delete type" (non-basic types only). */
   onDeleteType?: (type: TypeDef) => void
   /** "Trash": the app's own trash. */
   onOpenTrash?: () => void
   /** Highlights the Trash item. */
   trashActive?: boolean
-  /** Opens any navigation target (the "Queries" entry; pins reuse it). */
+  /** Opens any navigation target (the "Saved searches" entry; pins reuse it). */
   onOpenTarget?: (target: Target, opts: { newTab?: boolean }) => void
-  /** Highlights the "Queries" entry. */
+  /** Highlights the "Saved searches" entry. */
   queriesActive?: boolean
+  /** M32: highlights the "Notes" entry (the all-notes view). */
+  notesActive?: boolean
   /** Highlights the "Calendar" entry. */
   calendarActive?: boolean
   /** Highlights the "Tasks" entry. */
   tasksActive?: boolean
   /** Highlights the "Graph" entry. */
   graphActive?: boolean
-  /** M23: highlights the "Work" entry. */
+  /** Highlights the "Work" entry (M32: shown under Tasks only while Work is on for the space). */
   workActive?: boolean
   /** Highlights the collection row of the open collection's page. */
   activeCollectionId?: string | null
@@ -134,20 +141,31 @@ export const SETTINGS_TOOLTIP = 'Settings'
 /** The footer's Shortcuts icon: opens the shortcuts sheet (catalog §4: settings gear, theme toggle, Shortcuts icon). */
 export const SHORTCUTS_TOOLTIP = 'Shortcuts'
 
+/** M32: the arrow beside "New": the list of types to make something else (our string). */
+export const NEW_MENU_LABEL = 'Choose a type'
+
 /** The square search button's tooltip. */
 export const SEARCH_THIS_SPACE = 'Search this space'
 
-/** M23: the sidebar entry for the Work section. */
-export const WORK_LABEL = 'Work'
+/** The sidebar entry for the Work page (M32: only while Work is on for the space). */
+export const WORK_LABEL = WORK
 
-/** The sidebar entry for the query list. */
-export const QUERIES_LABEL = 'Queries'
+/** M32: the sidebar's first entry, every note by last edited (the all-notes view). */
+export const NOTES_LABEL = NOTES
 
+/** The sidebar entry for the saved-search list (M32: was "Queries"). */
+export const QUERIES_LABEL = SAVED_SEARCHES
+
+/** M32: the type list's heading (was "Object Types") and its `+` (was "Create object type"). */
+export const TYPES_HEADING = TYPES
+export const NEW_TYPE_LABEL = NEW_TYPE
+
+/** By the plural the screen shows (M32: the built-in Page sorts as "Notes", DailyNote as "Daily notes"). */
 export function byPluralName(a: TypeDef, b: TypeDef): number {
-  return a.pluralName.localeCompare(b.pluralName, undefined, { sensitivity: 'base' })
+  return typePlural(a).localeCompare(typePlural(b), undefined, { sensitivity: 'base' })
 }
 
-/** The sidebar "Queries" entry's tile: the query icon in a type-chip tile (green). */
+/** The sidebar "Saved searches" entry's tile: the query icon in a type-chip tile (green). */
 const QUERIES_CHIP: Pick<TypeDef, 'icon' | 'color'> = { icon: { type: 'iconify', val: QUERY_ICON }, color: 'green' }
 
 export function TypeChip({ type, size = 22 }: { type: Pick<TypeDef, 'icon' | 'color'>; size?: number }) {
@@ -164,7 +182,7 @@ export function TypeChip({ type, size = 22 }: { type: Pick<TypeDef, 'icon' | 'co
   )
 }
 
-/** The Queries entry's id in the manual Object Types order. */
+/** The Saved searches entry's id in the manual type order. */
 const QUERIES_ENTRY = 'queries'
 
 type DragProps = Record<string, unknown>
@@ -189,7 +207,7 @@ function SortableTypeEntry({ id, children }: { id: string; children: (drag: Drag
   )
 }
 
-/** The Object Types header `...`: Sort manually | Sort alphabetically, the current one checked. */
+/** The Types header `...`: Sort manually | Sort alphabetically, the current one checked. */
 function ObjectTypesMenu({ sort, onManual, onAlphabetical }: { sort: TypeSort; onManual(): void; onAlphabetical(): void }) {
   return (
     <DropdownMenu>
@@ -221,6 +239,7 @@ export function Sidebar({
   onOpenType,
   counts,
   onNew,
+  onNewMenu,
   onCreateType,
   onOpenTypeSettings,
   onDeleteType,
@@ -228,6 +247,7 @@ export function Sidebar({
   trashActive,
   onOpenTarget,
   queriesActive,
+  notesActive,
   calendarActive,
   tasksActive,
   graphActive,
@@ -238,6 +258,8 @@ export function Sidebar({
   useEffect(() => {
     void useSpaceInfo.getState().ensure()
   }, [])
+  // M32: the Work entry exists only while the Work page is on for this space.
+  const workOn = useWorkOn()
   // A type's collections sit under its row in the object types block.
   const { collections } = useCollections()
   const [collapsed, toggleCollapsed] = useCollapsedTypes()
@@ -254,12 +276,12 @@ export function Sidebar({
     }
     return map
   }, [collections])
-  // The order: by name ("Queries" among the types where a type of that name would be), or the
+  // The order: by name ("Saved searches" among the types where a type of that name would be), or the
   // manual order (`ui.objectsSectionSortOption`, `ui.workspace.objects.ids`).
   const ui = useUiStore((st) => st.ui)
   const sort = typeSortOf(ui)
   const names: Record<string, string> = { [QUERIES_ENTRY]: QUERIES_LABEL }
-  for (const t of types) names[t.id] = t.pluralName
+  for (const t of types) names[t.id] = typePlural(t)
   const order = orderTypeEntries(Object.keys(names), names, sort, ui.workspace?.objects?.ids)
   const manual = sort === 'manual'
   const typeSensors = useSensors(
@@ -301,6 +323,7 @@ export function Sidebar({
         if (!t) return null
         const own = byType.get(t.id) ?? []
         const folded = collapsed.has(t.id)
+        const plural = typePlural(t)
         return (
           <TypeEntryItem key={t.id} id={t.id} sortable={manual}>
             {(drag) => (
@@ -320,7 +343,7 @@ export function Sidebar({
                     )}
                   >
                     <TypeChip type={t} />
-                    <span className="min-w-0 flex-1 truncate">{t.pluralName}</span>
+                    <span className="min-w-0 flex-1 truncate">{plural}</span>
                     {counts && counts[t.id] !== undefined && (
                       <span className="text-[13px] text-fg-muted tabular-nums">{counts[t.id]}</span>
                     )}
@@ -328,7 +351,7 @@ export function Sidebar({
                   {own.length > 0 && (
                     <button
                       type="button"
-                      aria-label={folded ? `Show ${t.pluralName} collections` : `Hide ${t.pluralName} collections`}
+                      aria-label={folded ? `Show ${plural} collections` : `Hide ${plural} collections`}
                       aria-expanded={!folded}
                       title={folded ? `Show ${own.length} collections` : 'Hide collections'}
                       onClick={() => toggleCollapsed(t.id)}
@@ -352,7 +375,7 @@ export function Sidebar({
               />
             </ContextMenu>
             {own.length > 0 && !folded && (
-              <ul aria-label={`${t.pluralName} collections`} className="mt-0.5 mb-1 flex flex-col gap-px">
+              <ul aria-label={`${plural} collections`} className="mt-0.5 mb-1 flex flex-col gap-px">
                 {own.map((c) => (
                   <li key={c.id}>
                     <button
@@ -379,7 +402,7 @@ export function Sidebar({
       })}
     </ul>
   )
-  // The object types and the Queries entry: the `objects` block of `workspaceOrder`.
+  // The types and the Saved searches entry: the `objects` block of `workspaceOrder`.
   const objectTypes = (
     <section aria-labelledby="sb-types">
       <SectionHeader
@@ -389,8 +412,8 @@ export function Sidebar({
             <ObjectTypesMenu sort={sort} onManual={() => void sortTypesManually(order)} onAlphabetical={() => void sortTypesAlphabetically()} />
             <button
               type="button"
-              aria-label="Create object type"
-              title="Create object type"
+              aria-label={NEW_TYPE_LABEL}
+              title={NEW_TYPE_LABEL}
               onClick={() => onCreateType?.()}
               className="flex size-6 items-center justify-center rounded-md text-fg-muted hover:bg-hover hover:text-fg"
             >
@@ -399,7 +422,7 @@ export function Sidebar({
           </div>
         }
       >
-        Object Types
+        {TYPES_HEADING}
       </SectionHeader>
       {manual ? (
         <DndContext id="object-types-order" sensors={typeSensors} collisionDetection={closestCenter} onDragEnd={onTypeDragEnd}>
@@ -415,15 +438,28 @@ export function Sidebar({
   return (
     <aside className="flex h-full w-[358px] shrink-0 flex-col bg-app pr-3.5 pl-2.5 text-fg" aria-label="Sidebar">
       <div className="flex items-center gap-2 pt-3 pb-3">
-        <button
-          type="button"
-          onClick={() => onNew?.()}
+        {/* M32: "New" makes a Note at once; the arrow beside it opens the type list. The two read
+            as one control (`data-new-button` anchors the menu under it). */}
+        <div
           data-new-button=""
-          className="flex h-[42px] flex-1 items-center gap-2 rounded-xl border border-[var(--chrome-btn-border)] bg-raised px-3 text-[15px] font-medium hover:bg-hover"
+          className="flex h-[42px] min-w-0 flex-1 overflow-hidden rounded-xl border border-[var(--chrome-btn-border)] bg-raised text-[15px] font-medium"
         >
-          <Icon name="ph-plus" size={16} />
-          New
-        </button>
+          <button type="button" onClick={(e) => onNew?.(e)} data-new-note="" className="flex min-w-0 flex-1 items-center gap-2 px-3 hover:bg-hover">
+            <Icon name="ph-plus" size={16} />
+            New
+          </button>
+          <button
+            type="button"
+            aria-label={NEW_MENU_LABEL}
+            title={NEW_MENU_LABEL}
+            aria-haspopup="dialog"
+            data-new-menu=""
+            onClick={() => onNewMenu?.()}
+            className="flex w-9 shrink-0 items-center justify-center border-l border-[var(--chrome-btn-border)] text-fg-muted hover:bg-hover hover:text-fg"
+          >
+            <Icon name="ph-caret-down" size={13} />
+          </button>
+        </div>
         <button
           type="button"
           aria-label={SEARCH_THIS_SPACE}
@@ -435,23 +471,37 @@ export function Sidebar({
         </button>
       </div>
 
-      {/* The main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant. M32:
-          Tasks opens the plain Tasks page (target `tasks`); the dashboard is the Work page. */}
+      {/* The main navigation, always visible at the top. M32: Notes first (every note by last
+          edited), then Calendar, Tasks (the plain Tasks page, target `tasks`), Work directly under
+          it while the Work page is on for the space, Graph, Assistant. */}
       <nav aria-label="Main" className="flex flex-col gap-0.5">
+        <MainNavButton
+          icon="ph-note"
+          label={NOTES_LABEL}
+          active={notesActive}
+          onClick={(e) => onOpenTarget?.({ kind: 'allNotes' }, { newTab: e.ctrlKey || e.metaKey })}
+        />
         <MainNavButton
           icon="ph-calendar-blank"
           label="Calendar"
           active={calendarActive}
           onClick={(e) => onOpenTarget?.({ kind: 'calendar' }, { newTab: e.ctrlKey || e.metaKey })}
         />
-        {/* Always shown. Active on the `work` target too until the sidebar has its own Work entry
-            (M32 lane B). */}
+        {/* Always shown; active for the `tasks` target only. */}
         <MainNavButton
           icon="ph-check-circle"
           label="Tasks"
-          active={tasksActive || workActive}
+          active={tasksActive}
           onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
         />
+        {workOn && (
+          <MainNavButton
+            icon="ph-briefcase"
+            label={WORK_LABEL}
+            active={workActive}
+            onClick={(e) => onOpenTarget?.({ kind: 'work' }, { newTab: e.ctrlKey || e.metaKey })}
+          />
+        )}
         <MainNavButton
           icon="ph-graph"
           label="Graph"
@@ -466,7 +516,7 @@ export function Sidebar({
       <AgentsSection onOpenTarget={onOpenTarget} />
 
       <ScrollArea className="min-h-0 flex-1">
-        {/* The custom sections, Pinned and the object types, in `ui.workspaceOrder` (M9). */}
+        {/* The custom sections, Pinned and the types, in `ui.workspaceOrder` (M9). */}
         <WorkspaceSections onOpenTarget={onOpenTarget} objects={objectTypes} />
 
         <HelpSection />

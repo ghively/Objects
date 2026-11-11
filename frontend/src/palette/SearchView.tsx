@@ -33,6 +33,7 @@ import { Icon, IconOrEmoji } from '@/components/Icon'
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command'
 import { createAndOpen, openObject, type OpenMods } from '@/create/createAndOpen'
 import { suggestFor } from '@/create/suggestContext'
+import { typeLabel } from '@/lib/typeLabel'
 import { ensureLinkIndex, typeOf, typesByIdOf, useLinkIndex } from '@/links/linkIndex'
 import { useRecent } from '@/nav/recent'
 import { isTagType } from '@/object/ObjectHeader'
@@ -53,7 +54,7 @@ import {
 } from './searchOptions'
 
 export const SEARCH_DEBOUNCE_MS = 100
-/** Recently opened objects shown on an empty query. */
+/** Recently opened notes shown on an empty query. */
 export const RECENT_SHOWN = 10
 /** Snippets shown per result. */
 const SNIPPETS_SHOWN = 2
@@ -214,8 +215,9 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
     return [...names.values()]
   }, [objects, types])
 
-  // M29: with no type filter, the create row is of the query's suggested type (else Page).
-  const suggested = useMemo(() => (q.trim() ? (suggestFor(q, suggestableTypes(types))[0] ?? null) : null), [q, types])
+  // M29: with no type filter, the create row is of the query's suggested type (the active page's
+  // type, or a name pattern's). M32: never the last type made: with nothing to go on it is a Note.
+  const suggested = useMemo(() => (q.trim() ? (suggestFor(q, suggestableTypes(types), { last: false })[0] ?? null) : null), [q, types])
   const options = useMemo(
     () => buildSearchOptions(q, types, tagNames, filters, suggested),
     [q, types, tagNames, filters, suggested],
@@ -352,7 +354,7 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
     const t = typeOf(id)
     chips.push({
       key: `t:${id}`,
-      label: t?.name ?? id,
+      label: typeLabel(t, id),
       icon: t ? <TypeChip type={t} size={16} /> : null,
       clear: () => setFilters((f) => ({ ...f, types: f.types.filter((x) => x !== id) })),
     })
@@ -361,7 +363,7 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
     const t = typeOf(id)
     chips.push({
       key: `x:${id}`,
-      label: t?.name ?? id,
+      label: typeLabel(t, id),
       icon: <Icon name="ph-minus-circle" size={14} />,
       clear: () => setFilters((f) => ({ ...f, excludeTypes: f.excludeTypes.filter((x) => x !== id) })),
     })
@@ -388,7 +390,7 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
       >
         {o.icon ? <IconOrEmoji icon={o.icon} size={18} /> : t && <TypeChip type={t} size={20} />}
         <span className="min-w-0 flex-1 truncate">{o.title}</span>
-        {t && <span className={rightLabelClass}>{t.name}</span>}
+        {t && <span className={rightLabelClass}>{typeLabel(t)}</span>}
       </CommandItem>
     )
   }
@@ -523,7 +525,7 @@ export function SearchView({ onDone, footer, onOpenExtendedSearch, actions: acti
                       <span className="min-w-0 flex-1 truncate" data-result-title="">
                         <MatchedTitle title={r.title} matches={r.titleMatches} />
                       </span>
-                      <span className={rightLabelClass}>{t?.name ?? r.type}</span>
+                      <span className={rightLabelClass}>{typeLabel(t, r.type)}</span>
                     </span>
                     {snippets.map((s, i) => (
                       <Highlight key={i} text={s} className="truncate text-[13px] text-fg-muted" />

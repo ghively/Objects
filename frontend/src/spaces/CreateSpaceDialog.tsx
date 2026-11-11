@@ -2,12 +2,15 @@
  * "Create new space": a name and a location (the current space's parent folder by default), then
  * "Create space" makes `<location>/<safe name>/.object/space.json` through `POST /api/spaces`
  * and offers to switch to it. An existing folder is never touched (the server answers 409, shown
- * as "A folder with that name already exists here."). M8: "Pick a starting point" picks
- * "Start with basic setup" (the server also writes the Person, Meeting, Project and Book types)
- * or "Empty space" (nothing else is created; the default, our choice). M28: "IT operations", between
- * them, writes the IT ops types, their templates and the seed tags.
- * M15: "Import from…" below the choices closes this dialog and opens the import dialog with the
- * name and location typed here (the import makes the new space itself).
+ * as "A folder with that name already exists here.").
+ *
+ * M32, "a new space just starts": the dialog asks for a name and a folder only. The space is made
+ * with the plain start (`setup: 'blank'`, recorded in `space.json`; the server gives every new
+ * space the Note, Tag, Daily note and Task types). The starter sets M8 and M28 offered here
+ * ("Start with basic setup", "IT operations"; `SETUPS`, `api.spaceSetup`) are offered from the
+ * type gallery instead.
+ * M15: "Import from…" closes this dialog and opens the import dialog with the name and location
+ * typed here (the import makes the new space itself).
  */
 import { useEffect, useState, type FormEvent } from 'react'
 import { create } from 'zustand'
@@ -46,12 +49,18 @@ export const CREATE_SPACE_TEXT = {
 
 const T = CREATE_SPACE_TEXT
 
-/** M8's starting points (M28 adds IT operations between them); also offered when a new or empty folder is opened (`StartingPointDialog`). */
+/**
+ * M8's starting points (M28 added IT operations between them). M32: this dialog no longer asks and
+ * an empty folder asks nothing; the list stays for the type gallery's "Starter sets".
+ */
 export const SETUPS: { value: SpaceSetup; icon: string; label: string; description: string }[] = [
   { value: 'basic', icon: 'ph-shapes', label: T.basicLabel, description: T.basicDescription },
   { value: 'itops', icon: 'ph-hard-drives', label: T.itopsLabel, description: T.itopsDescription },
   { value: 'blank', icon: 'ph-file-dashed', label: T.blankLabel, description: T.blankDescription },
 ]
+
+/** M32: what "Create space" makes: the plain start (no starter set). */
+export const NEW_SPACE_SETUP: SpaceSetup = 'blank'
 
 /** The longest name `space.json` accepts (the server's rule). */
 const MAX_NAME = 120
@@ -86,7 +95,6 @@ export function CreateSpaceDialog() {
   const root = useSpaceInfo((s) => s.space?.root ?? null)
   const [name, setName] = useState('')
   const [location, setLocation] = useState('')
-  const [setup, setSetup] = useState<SpaceSetup>('blank')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [created, setCreated] = useState<string | null>(null)
@@ -95,7 +103,6 @@ export function CreateSpaceDialog() {
     if (!isOpen) return
     void useSpaceInfo.getState().ensure()
     setName('')
-    setSetup('blank')
     setError(null)
     setCreated(null)
     setBusy(false)
@@ -115,7 +122,7 @@ export function CreateSpaceDialog() {
     setBusy(true)
     setError(null)
     try {
-      const res = await api.createSpace(trimmed, location.trim(), setup)
+      const res = await api.createSpace(trimmed, location.trim(), NEW_SPACE_SETUP)
       setCreated(res.path)
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) setError(T.exists)
@@ -174,34 +181,6 @@ export function CreateSpaceDialog() {
                 className="h-9 rounded-md border border-line bg-transparent px-2 font-mono text-[13px] font-normal outline-none focus:border-fg-muted"
               />
             </label>
-            <fieldset className="flex flex-col gap-1.5">
-              <legend className="mb-1.5 text-[13px] font-semibold">{T.howToStart}</legend>
-              {SETUPS.map((o) => (
-                <label
-                  key={o.value}
-                  data-selected={setup === o.value || undefined}
-                  className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-2.5 hover:bg-hover data-[selected]:border-fg-muted data-[selected]:bg-hover/60"
-                >
-                  <input
-                    type="radio"
-                    name="space-setup"
-                    value={o.value}
-                    checked={setup === o.value}
-                    onChange={() => setSetup(o.value)}
-                    className="sr-only"
-                    aria-label={o.label}
-                    aria-describedby={`space-setup-${o.value}`}
-                  />
-                  <Icon name={o.icon} size={18} className="mt-0.5 shrink-0 text-fg-muted" />
-                  <span className="min-w-0">
-                    <span className="block text-[14px] font-semibold">{o.label}</span>
-                    <span id={`space-setup-${o.value}`} className="block text-[13px] text-fg-muted">
-                      {o.description}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
             <button
               type="button"
               onClick={() => {

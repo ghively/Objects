@@ -24,16 +24,21 @@ export function scopeTypesOfActiveTab(): string[] {
   return []
 }
 
-/** The suggested type ids for `name` among `types`, best first (empty: no suggestion). */
+/**
+ * The suggested type ids for `name` among `types`, best first (empty: no suggestion). M32: with
+ * `last: false` the space's last type is left out, so a row with nothing else to go on (no context,
+ * no name pattern) makes a Note, not one more of whatever was made last (the palette's "Create new
+ * … with title"; the New menu's "Suggested" row keeps the last type).
+ */
 export function suggestFor(
   name: string,
   types: readonly TypeDef[],
-  extra?: { allowed?: readonly string[]; scope?: readonly string[] },
+  extra?: { allowed?: readonly string[]; scope?: readonly string[]; last?: boolean },
 ): string[] {
   return suggestType(name, {
     types,
     allowed: extra?.allowed,
     scope: extra?.scope ?? scopeTypesOfActiveTab(),
-    last: useLastType.getState().typeId,
+    last: extra?.last === false ? null : useLastType.getState().typeId,
   })
 }

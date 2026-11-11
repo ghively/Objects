@@ -165,7 +165,9 @@ Markdown, Block editing, Page, Navigation, Calendar, AI Assistant, Table, Date p
 Ctrl means Cmd on Mac. "Shift" is written as Shift here. "(not in Object)" marks a catalogued key that Object leaves
 unbound on purpose; "(not bound)" one whose key is taken by another action (decision D3).
 
-**General**: Open settings Ctrl+, | Create new task Ctrl+Shift+T | Add new content Ctrl+U | Search
+**General**: Open settings Ctrl+, | Create new task Ctrl+Shift+T | Add new content Ctrl+U or Alt+Shift+N (M32) |
+New note, or one more of the type in view Ctrl+N or Alt+N (M32: Alt+N is the key a browser tab lets through, where
+Ctrl+N opens a browser window) | Search
 this space Ctrl+P or Ctrl+K | Open extended search Ctrl+Shift+P (not in Object) | Toggle dark mode Ctrl+Shift+L |
 Toggle focus mode Ctrl+Shift+M | Toggle left sidebar Ctrl+Shift+Left | Toggle right side panel
 Ctrl+Shift+Right (in Object both panel keys stay out of text fields, where Ctrl+Shift+Left/Right select by word; our call) | Toggle side panel entry list Ctrl+Shift+Down (not in Object) | Toggle media sidebar Ctrl+Alt+Right (not in Object) | Close
@@ -196,7 +198,7 @@ Tick or untick the to-do in this block Ctrl+Enter | Open or close all toggles on
 Code block: leave downwards or upwards (Ctrl+Shift+Down/Up) | Math block likewise | Merge text blocks
 Ctrl+Shift+G.
 
-**Page**: Favorite or unfavorite this page Ctrl+Shift+* | Import, Export this page (Ctrl+E), Share menu Ctrl+S (not in Object) |
+**Page**: Pin or unpin this page Ctrl+Shift+* (M32: was "Favorite or unfavorite this page") | Import, Export this page (Ctrl+E), Share menu Ctrl+S (not in Object) |
 Start presentation mode Ctrl+Alt+P; back one slide / next presentation slide; exit presentation mode Esc | Find in page Ctrl+F | Select all top-level blocks |
 Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down) | Scroll to top Home, bottom End,
 page up/down.
@@ -211,6 +213,14 @@ side panel (Shift+Click; inline `[[links]]` too) | Open in preview Alt+Shift+Cli
 
 **Calendar**: Go to monthly view M | Go to weekly view W | Show the day before and after R (decision C9) | Go to daily view D | Jump to today T | Back / forward one day, week or month
 Left/Right | Toggle calendar sidebar Ctrl+Alt+S | Pop out today's daily note Ctrl+Shift+D (ours, 2026-11-09).
+
+**Keys that work while you type (M32)**: with the caret in a note's text or title, the new-note keys (Ctrl+N,
+Alt+N), the New menu's (Ctrl+U, Alt+Shift+N) and today's note (Ctrl+Shift+D) all work; a note popped out in the
+peek closes first, so what is made is seen. Each key was checked against the editors' own: none is bound in the
+rich editor or the title; in raw mode Ctrl+U stays the editor's "undo selection" (our call: the menu has
+Alt+Shift+N there); on macOS the second keys are Ctrl+N and Ctrl+Shift+N, which stay "next line" inside a text
+field (⌘N works there). In other fields (a dialog's input, a quick-add box) the two "new" keys stay off.
+Ctrl+Backspace stays "delete a word" in every field.
 
 **AI Assistant**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; send a message to the daily
 note; retry Ctrl+Alt+R; close chat Ctrl+Alt+X; rephrase Ctrl+Alt+U.
@@ -250,29 +260,58 @@ Each starter template pre-fills the new type's properties.
 
 ## 4. Sidebar details
 
-- **Today's note** (ours, 2026-11-09, Gene): the top bar's notebook button "Today's note", the palette's "Pop out
-  today's daily note" and Ctrl+Shift+D open today's daily note in the peek, the floating panel over the page (as an
-  object clicked on the Calendar's timeline opens), creating the note first when today has none (the same call as
-  "+ Daily Note"). The page underneath stays as it was; Escape closes the peek.
+- **Today's note** (ours, 2026-11-09, Gene): the top bar's notebook button "Today's note", Home's button (M32), the
+  palette's "Pop out today's daily note" and Ctrl+Shift+D open today's daily note in the peek, the floating panel
+  over the page, creating the note first when today has none (the same call as "+ Daily Note"). The page underneath
+  stays as it was; Escape closes the peek. (M32) It opens with the caret at the end of its text, so the next key
+  typed lands in the note, and the key works with the caret in a note's text or title. It stays a peek while
+  "Open notes as a full page" is on (an explicit pop-out).
+
+- **Home (M32)**: a tab with no page (a new empty tab, the first open of a space with nothing to restore, the
+  start choice "Home") shows Home; it replaces the old start text "Pick an object type / Choose a type in the
+  sidebar to see its objects.", which is gone. Top to bottom: "New note" and "Today's note"; "Recent", the last 12
+  notes edited, newest first (title, type, when edited; daily notes included; tasks, tags and templates left
+  out; a click opens the note); "Tasks", the open overdue tasks and today's, each with the task checkbox, or
+  the line "Nothing due today." (left out while the space hides task management); an empty space shows "Nothing here yet. Start a note, or open today." and the
+  two buttons only. Opening Home writes no file. Its tab reads "Home". "When this space opens" › "Home" shows it
+  in the active tab (our call: that tab starts over; a persistent or pinned tab keeps its page and an empty tab
+  is used, a new one only when there is none); "Where I left off" with nothing to restore is Home. The tab strip's `+`
+  ("Create new tab") and Ctrl+T open a new, empty tab, so they land on Home (our call, M32: they used to copy the
+  page in view; Ctrl/Cmd+click still opens anything in a new tab).
+
+- **A click opens a full page (M32)**: while "Open notes as a full page" is on (it starts on), a plain click on a
+  note anywhere (a list, card or table row, a `[[link]]`, a tag or backlink chip, a graph node, the Calendar's
+  timeline, a new card or daily note made from a view) opens it in the current tab, with the page it came from on
+  the breadcrumb trail, and an open peek closes. The peek is still there when asked for: Alt+Shift+click, a menu's
+  "Open in peek" or "Expand", today's note pop-out, the collection peek and its stepper; Ctrl/Cmd+click is still a
+  new tab and Shift+click the side panel. With the setting off a plain click peeks, as before M32.
 
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
-- A space opened as a new or empty folder (`objectapp --space <folder>`: no `setup` in `space.json`, no basic
-  types, no files) asks "Pick a starting point" once — the same three choices as "Create new space"
-  (`POST /api/space/setup`): "Start with basic setup", "IT operations" ("Includes hosts, software, applications,
-  runbooks and incidents."; Object's own, M28) and "Empty space". IT operations writes the 17 IT ops types (Host,
+- **A new space just starts (M32)**: "Create new space" asks for a name and a folder only (plus "Import from…" and
+  "Do I need a new space?"); it makes the space with the plain start (`setup: blank`) and offers to switch. A
+  space opened as a new or empty folder asks nothing: the "Pick a starting point" dialog is gone, and nothing is
+  written by opening. The starter sets ("Start with basic setup", "IT operations"; `POST /api/space/setup`) are
+  offered from the type gallery instead. What the IT operations set writes is unchanged: the 17 IT ops types (Host,
   Software, Application, Container, Configuration, Location, Network, Person, Vendor, Script, Command, Runbook,
   Prompt, Source, Project, Incident, Meeting; an Incident has one Resolved, its own date and time, which Desk sync
   fills, M31), a default template for each but Source, and 30 seed Tags; a type,
-  template or Tag already there is kept as it is. Nothing is written before a pick; closing asks again next
-  time. The pick is recorded as `space.json` `setup` (`basic`, `itops` or `blank`; Create space records it too).
-- Main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant (Gene's 2026-11-08 redesign;
-  Calendar is the space's opening view). The Assistant is the built-in, always-on helper — a program
+  template or Tag already there is kept as it is. A pick is recorded as `space.json` `setup` (`basic`, `itops` or
+  `blank`; Create space records `blank`).
+- Main navigation, always visible at the top (M32): Notes, Calendar, Tasks, Work (only while the Work page is on
+  for the space; directly under Tasks; it opens the `work` target), Graph, Assistant. Tasks is the active entry for
+  the `tasks` target only, Work for `work` (a `work` target shown while Work is off reads as Tasks). The Assistant
+  and the Agents section stay exactly where they were (M32 decision 1). The Assistant is the built-in, always-on helper — a program
   feature, not an "agent" — shown with its own icon; a click opens its chat. Like an agent row it carries a
   hover `…` menu (Open chat, Settings, Memory & skills — no Duplicate/Delete: it is built in), the way into
-  its own page (Profile, Instructions, Memory, Skills, Learning, Chats…). "All notes" is gone from the
-  sidebar — with many note types it was a dumping ground; the view stays reachable through queries and the
-  palette.
+  its own page (Profile, Instructions, Memory, Skills, Learning, Chats…).
+- **Notes** (M32; was "All notes", off the sidebar since 2026-11-08): the first main entry opens the all-notes
+  view, heading "Notes", "Every note, by when it was last edited.": every note by last edit (`lastUpdated`, else
+  the creation time), newest first, grouped Today / Yesterday / This week / Earlier (our call: "This week" is
+  the five days before yesterday, so the list never empties on a Monday); daily notes are in, tasks, tags and
+  templates are left out; a list row ends with when it was edited. A sort or grouping picked in the toolbar
+  takes over while it is set; the layout is still saved to `ui.allNotesLayout`. The palette's "Open all notes"
+  opens the same view.
 - Agents (M17), a section of its own with the standard section header, directly below the main navigation;
   it lists only the user's own agents (the built-in Assistant is not in it), and the header's `+` menu —
   not a "+ New agent" row — is the way to add one.
@@ -326,8 +365,11 @@ Each starter template pre-fills the new type's properties.
   one line under the track (the next row down when two would meet; the tooltip stays). The Task rows load
   once for the page. (M32) The plain Tasks page is its own page again (above); the task lists stay views of the
   Work page too. Controls use the app's pill style (14px, `bg-hover-2` when on).
-- Object Types header: fold chevron, count, a `...` menu (Sort manually with a check, Sort alphabetically) and
-  a `+` (the gallery above) on hover.
+- Types header (M32; was "Object Types"): fold chevron, count, a `...` menu "Types options" (Sort manually with a
+  check, Sort alphabetically) and a `+` "New type" (the gallery above; was "Create object type") on hover. The
+  list's rows read the type's plural as the screen shows it: the built-in Page is "Notes", the built-in
+  DailyNote "Daily notes" (a renamed type keeps the user's name), and sort by that name; the "Queries" row reads
+  "Saved searches". A type row's menu: "Create <Type>" ("Create Note"), "Type settings", "Delete type".
 - "Add section" opens a small form (a one-line explanation that a section is a named heading for pages
   and collections in the sidebar) with an Icon picker, Section Name and Create.
 - Trash, on its own at the very bottom of the sidebar.
@@ -457,8 +499,20 @@ Each starter template pre-fills the new type's properties.
 
 ## 8. Search, New menu, view toolbar
 
-- **Search palette**: see audit backlog item 2 (placeholder text, Today/Earlier groups, type at the right).
-- **New menu**: popover with Search; types in recent-use order; footer hints.
+- **Search palette**: see audit backlog item 2 (placeholder text, Today/Earlier groups, type at the right). (M32)
+  The placeholder reads "Find notes and commands, or paste"; the empty state "Recently opened notes appear
+  here."; types read as the screen names them ("Note" for the built-in Page: the type at a row's right, "Create
+  Note", "Only search for type "Note"", and typing "note" finds the type); the clipboard offers read "Create
+  note" and "Make a new note from the clipboard". "Create new {type} with title "{q}"" makes a Note unless a type
+  filter is set, the page in view has a type (a type's page, a collection, a saved search) or a name pattern
+  matches: never one more of the type made last. The palette forgets what was typed (and its filters) the moment
+  it closes: reopened at once, within its closing animation, it starts empty.
+- **New** (M32, "New means a note"): the sidebar's "New" button makes a Note at once and opens it with the title
+  focused (Ctrl/Cmd+click a new tab, Shift+click the side panel, as every create); a small arrow beside it,
+  "Choose a type", opens the New menu. Home's "New note" does the same.
+- **New menu** (the arrow beside "New", Ctrl+U): popover with Search ("Search types"; was "Search Object
+  Types"); types by the name the screen shows, the suggested type first, marked "Suggested" (the page in view's
+  type, else the type made last); footer hints.
 - **View toolbar** (type pages, `All` tab): count pill, Filter, Sort, Group by, a layout dropdown, Customize.
   - Layouts (`views/model.ts`): List, Wall, Kanban, Gallery, Table, Embed, Calendar, Timeline, Chart, Gallery strip.
     Chart export (the Customize page): **Export PNG** renders the frame at 2x; **Export SVG** saves the chart's own
@@ -603,8 +657,11 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
 - **Month view**: header "Nov 2026" at the left, the view switcher (Month, Week, Three days, Day) centered,
   "< Today >" at the right; below, a strip Jan to Dec with the current month highlighted; then one card per
   existing daily note of that month (type label, title, Reviewed checkbox, Tags row, then the note's content:
-  to-dos, bullets, code/time rows), and a "+ New object" row. An empty month shows a short
-  empty-state line saying the month has no daily notes yet. Clicking a month in the strip jumps there; the tab
+  to-dos, bullets, code/time rows), and a "+ New daily note" row (M32: was "+ New object"; it makes the month's
+  daily note). An empty month shows a short empty-state line saying the month has no daily notes yet, with
+  "Create a note to see it here." (M32). The Day view's dated section reads "Notes with this date" and the
+  quick-create row's tooltips "Makes a note dated this day…" / "Show buttons that create notes on this day."
+  (M32; chips name types as the screen does). Clicking a month in the strip jumps there; the tab
   title becomes the month's first day.
 - **Week view**: a single column of days. Each day: the weekday name colored by weekday (Sunday red, Monday amber
   with a red "Today" pill, Tuesday pink, Wednesday green, Thursday orange, Friday blue), the date as a large

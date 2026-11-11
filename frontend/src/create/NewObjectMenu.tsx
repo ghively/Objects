@@ -1,6 +1,7 @@
 /**
- * "+ New" (and Ctrl+U): a popover under the New button (seen in the live app, v1.72.7) with a "Search"
- * field and the object types in the sidebar's order; picking a type creates an untitled object of it and
+ * The arrow beside "New" (and Ctrl+U; M32: the "New" button itself makes a Note at once): a popover
+ * under the New button with a "Search" field and the types in the sidebar's order (by the name the
+ * screen shows: the built-in Page is "Note"); picking a type creates an untitled one of it and
  * opens it at once. Modifier keys pick where it opens (see `createAndOpen`). Given a `typeId`, it starts
  * at the second step instead ("Search or Create"): "New '<q>'" (or "New Untitled") creates one, an
  * existing object of the type opens.
@@ -18,7 +19,9 @@ import { whiteboardApi } from '@/api/whiteboardClient'
 import { Icon } from '@/components/Icon'
 import { KeyHints } from '@/components/KeyHints'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 import { cn } from '@/lib/utils'
+import { TYPES } from '@/lib/words'
 import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { ObjectIcon } from '@/object/ObjectHeader'
 import { byPluralName, TypeChip } from '@/shell/Sidebar'
@@ -29,7 +32,8 @@ import { suggestFor } from './suggestContext'
 import { SUGGEST_TEXT } from './typeSuggest'
 
 export const NEW_OBJECT_TEXT = {
-  searchTypes: 'Search Object Types',
+  /** M32: was "Search Object Types". */
+  searchTypes: 'Search types',
   searchPlaceholder: 'Search', // the live popover's field
   searchOrCreate: 'Search or Create',
   newUntitled: 'New Untitled',
@@ -134,7 +138,8 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
     if (!typeId) {
       const listed = [...types]
         .sort(byPluralName)
-        .filter((t) => !needle || t.name.toLowerCase().includes(needle) || t.pluralName.toLowerCase().includes(needle))
+        // By the name the screen shows ("note") and by the stored one ("page").
+        .filter((t) => !needle || [typeLabel(t), typePlural(t), t.name, t.pluralName].some((n) => n.toLowerCase().includes(needle)))
         .map((t) => ({ kind: 'type' as const, type: t }))
       const top = !needle && suggestedId ? listed.find((i) => i.type.id === suggestedId) : undefined
       return top ? [{ ...top, suggested: true }, ...listed.filter((i) => i !== top)] : listed
@@ -208,7 +213,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
         align="start"
         sideOffset={6}
         role="dialog"
-        aria-label="New object"
+        aria-label="New"
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           inputRef.current?.focus()
@@ -236,7 +241,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
             {error}
           </p>
         )}
-        <ul role="listbox" aria-label={type ? type.pluralName : 'Object Types'} className="max-h-[360px] overflow-auto p-1">
+        <ul role="listbox" aria-label={type ? typePlural(type) : TYPES} className="max-h-[360px] overflow-auto p-1">
           {items.map((item, i) => (
             <li
               key={item.kind === 'type' ? item.type.id : item.kind === 'object' ? item.object.path : 'new'}
@@ -253,7 +258,7 @@ export function NewObjectMenu({ open, onOpenChange, typeId: initialTypeId }: New
               {item.kind === 'type' && (
                 <>
                   <TypeChip type={item.type} size={20} />
-                  <span className="min-w-0 flex-1 truncate">{item.type.name}</span>
+                  <span className="min-w-0 flex-1 truncate">{typeLabel(item.type)}</span>
                   {item.suggested && (
                     <span className="shrink-0 rounded bg-hover px-1.5 text-[12px] text-fg-muted">{SUGGEST_TEXT.suggested}</span>
                   )}

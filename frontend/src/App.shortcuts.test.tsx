@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { configure, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { SpaceInfo } from '@/api/types'
@@ -12,11 +12,16 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import { todayYmd } from '@/calendar/dates'
 import { useCalendar } from '@/calendar/useCalendar'
-import { resetLinkIndex } from '@/links/linkIndex'
+import { setLastTypeSpace, useLastType } from '@/create/lastType'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { takeBodyFocus } from '@/nav/focusRequest'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import App from './App'
 
 const mocked = vi.mocked(api)
+
+// The page's editor loads lazily: on a busy machine the first render can take longer than a second.
+configure({ asyncUtilTimeout: 10_000 })
 
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true, revision: 'r1' })
 const PROJECT = typeDef({ id: 'project', name: 'Project', pluralName: 'Projects', revision: 'r1' })
@@ -24,8 +29,9 @@ const TASK = typeDef({ id: 'task', name: 'Task', pluralName: 'Tasks', basic: tru
 const PATH = 'Projects/Notes.md'
 const NOTES = objectSummary({ path: PATH, type: 'project', title: 'Notes' })
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear()
+  await setLastTypeSpace(null)
   useTabs.getState().reset()
   usePeek.getState().close()
   resetLinkIndex()
@@ -71,7 +77,41 @@ describe('app shortcuts', () => {
     render(<App />)
     await waitFor(() => expect(mocked.space).toHaveBeenCalled())
     ctrl(document.body, 'u')
-    expect(await screen.findByRole('textbox', { name: 'Search Object Types' })).toBeInTheDocument()
+    expect(await screen.findByRole('textbox', { name: 'Search types' })).toBeInTheDocument()
+  })
+
+  // M32, "New means a note".
+  test('test the New button makes a Note at once and opens it; the arrow opens the type list', async () => {
+    const user = userEvent.setup()
+    // The last thing made was a task: New still makes a Note.
+    useLastType.getState().set('task')
+    useTabs.getState().open({ kind: 'trash' })
+    render(<App />)
+    await waitFor(() => expect(mocked.space).toHaveBeenCalled())
+    await user.click(await screen.findByRole('button', { name: 'New' }))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('page', {}))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'page/Untitled.md' }))
+    expect(screen.queryByRole('textbox', { name: 'Search types' })).toBeNull()
+    // The arrow: the type list, as before.
+    await user.click(screen.getByRole('button', { name: 'Choose a type' }))
+    expect(await screen.findByRole('textbox', { name: 'Search types' })).toBeInTheDocument()
+    expect(mocked.createObject).toHaveBeenCalledTimes(1)
+  })
+
+  test('test Ctrl+N with a daily note open makes a Note, not a daily note', async () => {
+    const DAILY = typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true, revision: 'r1' })
+    const day = objectSummary({ path: 'DailyNotes/2026-11-11.md', type: 'dailynote', title: '2026-11-11' })
+    mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE, PROJECT, TASK, DAILY] } satisfies SpaceInfo)
+    mocked.objects.mockResolvedValue([NOTES, day])
+    mocked.object.mockImplementation(async () =>
+      objectDetail({ summary: day, frontmatter: { type: 'DailyNote', title: '2026-11-11' }, body: '', version: 'v1' }),
+    )
+    useTabs.getState().open({ kind: 'object', path: day.path })
+    render(<App />)
+    await screen.findByRole('textbox', { name: 'Title' })
+    await waitFor(() => expect(useLinkIndex.getState().objects.length).toBe(2))
+    ctrl(document.body, 'n')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('page', {}))
   })
 
   test('test Ctrl+Backspace in the title input and in the editor does not open the delete dialog', async () => {
@@ -89,7 +129,7 @@ describe('app shortcuts', () => {
     await openObjectPage()
     expect(ctrl(document.body, 'Backspace')).toBe(false)
     const dialog = await screen.findByRole('alertdialog')
-    expect(dialog).toHaveTextContent('Delete this object?')
+    expect(dialog).toHaveTextContent(/Delete this (object|note)\?/)
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(mocked.deleteObject).not.toHaveBeenCalled()
@@ -137,5 +177,64 @@ describe('app shortcuts', () => {
     fireEvent.keyDown(editor, { key: 'T', ctrlKey: true, shiftKey: true })
     await new Promise((r) => setTimeout(r, 50))
     expect(mocked.createObject).not.toHaveBeenCalled()
+  })
+
+  // M32, "keys work while you type": with the caret in a note's text or title.
+  test('test Ctrl+N with the caret in the note text makes a new one (of the type in view)', async () => {
+    const { container } = await openObjectPage()
+    const editor = container.querySelector('.ProseMirror')!
+    expect(ctrl(editor, 'n')).toBe(false)
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('project', {}))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'project/Untitled.md' }))
+  })
+
+  test('test Ctrl+N and Alt+N in the title make a new note', async () => {
+    await openObjectPage()
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    expect(ctrl(title, 'n')).toBe(false)
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledTimes(1))
+    // The key a browser tab lets through.
+    expect(fireEvent.keyDown(document.body, { key: 'n', code: 'KeyN', altKey: true })).toBe(false)
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledTimes(2))
+  })
+
+  test('test Ctrl+U and Alt+Shift+N open the New menu from the note text', async () => {
+    const user = userEvent.setup()
+    const { container } = await openObjectPage()
+    const editor = container.querySelector('.ProseMirror')!
+    expect(ctrl(editor, 'u')).toBe(false)
+    expect(await screen.findByRole('textbox', { name: 'Search types' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Search types' })).toBeNull())
+    expect(fireEvent.keyDown(editor, { key: 'N', code: 'KeyN', altKey: true, shiftKey: true })).toBe(false)
+    expect(await screen.findByRole('textbox', { name: 'Search types' })).toBeInTheDocument()
+    expect(mocked.createObject).not.toHaveBeenCalled()
+  })
+
+  test('test the new keys stay off in a field outside a note', async () => {
+    render(<App />)
+    await waitFor(() => expect(mocked.space).toHaveBeenCalled())
+    ctrl(document.body, 'u')
+    const search = await screen.findByRole('textbox', { name: 'Search types' })
+    expect(ctrl(search, 'n')).toBe(true) // not prevented, nothing made
+    await new Promise((r) => setTimeout(r, 30))
+    expect(mocked.createObject).not.toHaveBeenCalled()
+  })
+
+  test("test Ctrl+Shift+D with the caret in the note text opens today's note and asks for the caret at its end", async () => {
+    mocked.createDailyNote.mockResolvedValue({ path: 'DailyNotes/2026-11-11.md', version: 'v1', typeIds: [] })
+    const { container } = await openObjectPage()
+    const editor = container.querySelector('.ProseMirror')!
+    expect(fireEvent.keyDown(editor, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true })).toBe(false)
+    await waitFor(() => expect(usePeek.getState().path).toBe('DailyNotes/2026-11-11.md'))
+    expect(takeBodyFocus('DailyNotes/2026-11-11.md')).toBe('end')
+  })
+
+  test('test a new note made by key steps out from under a popped-out note', async () => {
+    await openObjectPage()
+    usePeek.getState().show('Projects/Other.md')
+    ctrl(document.body, 'n')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledTimes(1))
+    expect(usePeek.getState().path).toBeNull()
   })
 })

@@ -126,7 +126,7 @@ describe('M5 mounts in the app', () => {
     await screen.findByText('calendar page')
     const panel2 = screen.getByRole('complementary', { name: 'Side panel' })
     expect(within(panel2).queryByTestId('local-graph')).toBeNull()
-    expect(within(panel2).getByText('Open an object to see its graph.')).toBeInTheDocument()
+    expect(within(panel2).getByText('Open a note to see its graph.')).toBeInTheDocument()
     expect(screen.queryByTestId('calendar-side-panel')).toBeNull()
   })
 

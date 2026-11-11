@@ -26,7 +26,7 @@ describe('buildSearchOptions', () => {
 
   test('create uses Page by default and the filter type when set', () => {
     const [first] = buildSearchOptions('Hello', TYPES, [], NO_FILTERS)
-    expect(first).toMatchObject({ kind: 'create', typeId: 'page', title: 'Hello', label: 'Create new Page with title "Hello"' })
+    expect(first).toMatchObject({ kind: 'create', typeId: 'page', title: 'Hello', label: 'Create new Note with title "Hello"' })
     const [withFilter] = buildSearchOptions('Hello', TYPES, [], { ...NO_FILTERS, types: ['person'] })
     expect(withFilter).toMatchObject({ kind: 'create', typeId: 'person', label: 'Create new Person with title "Hello"' })
   })
@@ -34,7 +34,7 @@ describe('buildSearchOptions', () => {
   test('type include and exclude for name or plural matches, by whole query or last word', () => {
     const opts = buildSearchOptions('peo', TYPES, [], NO_FILTERS)
     expect(opts.map((o) => o.label)).toEqual([
-      'Create new Page with title "peo"',
+      'Create new Note with title "peo"',
       'Only search for type "Person"',
       'Exclude type "Person"',
     ])

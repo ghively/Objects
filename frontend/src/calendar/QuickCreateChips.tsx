@@ -6,17 +6,18 @@ import { useEffect, useState, type MouseEvent } from 'react'
 import type { CalendarDay, ObjectSummary, PropertyDef, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { createAndOpen } from '@/create/createAndOpen'
+import { typeLabel } from '@/lib/typeLabel'
 import { ensureLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { TypeChip } from '@/shell/Sidebar'
 import { saveCalendarDaily, useCalendarDaily } from './calendarUi'
 import type { Day } from './dates'
 
 export const CHIPS_TEXT = {
-  create: (object: string) => `Create ${object} linked to this day.`,
+  create: (typeName: string) => `Create ${typeName} linked to this day.`,
   createObjects:
-    "Makes an object dated this day. To take a type off this list, change that type's settings.",
+    "Makes a note dated this day. To take a type off this list, change that type's settings.",
   hide: 'Hide the quick-create buttons.',
-  show: 'Show buttons that create objects on this day.',
+  show: 'Show buttons that create notes on this day.',
 }
 
 const DATE_KINDS = new Set(['datetime', 'datetimeSimple'])
@@ -113,12 +114,12 @@ export function QuickCreateChips({
               key={type.id}
               type="button"
               data-type-id={type.id}
-              title={CHIPS_TEXT.create(type.name)}
+              title={CHIPS_TEXT.create(typeLabel(type))}
               onClick={(e) => void create(type, key, e)}
               className="flex h-8 items-center gap-1.5 rounded-lg border border-line px-2.5 text-[14px] text-fg hover:bg-hover"
             >
               <TypeChip type={type} size={18} />
-              {type.name}
+              {typeLabel(type)}
             </button>
           ))}
         {toggle}

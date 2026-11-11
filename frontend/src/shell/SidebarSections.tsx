@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { TYPES } from '@/lib/words'
 import { PinList, PinnedSection, type OpenTarget } from './PinnedSection'
 import { PINNED_TEXT } from './pinText'
 import { showToast } from '@/editor/media/upload'
@@ -281,7 +282,7 @@ export function WorkspaceSections({ onOpenTarget, objects }: { onOpenTarget?: Op
     return section ? <Section section={section} onOpenTarget={onOpenTarget} /> : null
   }
   const label = (id: string) =>
-    id === WORKSPACE_OBJECTS ? 'Object Types' : id === WORKSPACE_PINNED ? PINNED_TEXT.heading : (sections.find((x) => x.id === id)?.name ?? id)
+    id === WORKSPACE_OBJECTS ? TYPES : id === WORKSPACE_PINNED ? PINNED_TEXT.heading : (sections.find((x) => x.id === id)?.name ?? id)
   return (
     <DndContext id="workspace-order" sensors={sensors} collisionDetection={workspaceCollision} onDragEnd={onDragEnd}>
       <SortableContext items={blocks} strategy={verticalListSortingStrategy}>

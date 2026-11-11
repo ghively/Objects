@@ -20,9 +20,9 @@ import { useCalendarRange } from './useCalendarRange'
 export const MONTH_TEXT = {
   empty: 'This month has no daily notes yet.',
   /** Shown under the month's empty line. */
-  emptyHint: 'Create an object to see it here.',
-  /** Sentence case like every other button (Gene, 2026-11-08). */
-  newObject: 'New object',
+  emptyHint: 'Create a note to see it here.',
+  /** Sentence case like every other button (Gene, 2026-11-08). M32: was "New object"; it makes a daily note. */
+  newObject: 'New daily note',
   /** Our string: the month strip's accessible name. */
   months: 'Months',
 }

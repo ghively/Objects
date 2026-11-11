@@ -81,7 +81,7 @@ describe('QuickCreateChips', () => {
     const user = userEvent.setup()
     render(<QuickCreateChips day={TODAY} calendarDay={calendarDay()} summaries={{}} />)
     expect(screen.getByRole('group').getAttribute('title')).toBe(
-      "Makes an object dated this day. To take a type off this list, change that type's settings.",
+      "Makes a note dated this day. To take a type off this list, change that type's settings.",
     )
     const hide = screen.getByRole('button', { name: 'Hide the quick-create buttons.' })
     expect(hide).toHaveAttribute('title', 'Hide the quick-create buttons.')
@@ -93,8 +93,8 @@ describe('QuickCreateChips', () => {
       ),
     )
     expect(chipNames()).toEqual([])
-    const show = screen.getByRole('button', { name: 'Show buttons that create objects on this day.' })
-    expect(show).toHaveAttribute('title', 'Show buttons that create objects on this day.')
+    const show = screen.getByRole('button', { name: 'Show buttons that create notes on this day.' })
+    expect(show).toHaveAttribute('title', 'Show buttons that create notes on this day.')
     expect(useUiStore.getState().ui.calendar?.daily.hideCreateObjects).toBe(true)
     await user.click(show)
     expect(chipNames()).toEqual(['task', 'meeting', 'journal'])

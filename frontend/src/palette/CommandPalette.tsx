@@ -19,7 +19,7 @@ import type { SpaceEntry } from '@/api/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { KeyHints } from '@/components/KeyHints'
 import { useCalendar } from '@/calendar/useCalendar'
-import { createAndOpen } from '@/create/createAndOpen'
+import { newNote } from '@/create/newNote'
 import { useLinkIndex } from '@/links/linkIndex'
 import { keysFor, matches } from '@/lib/shortcuts'
 import { currentTarget, usePeek, useTabs, type OpenOptions, type Target } from '@/nav/tabs'
@@ -80,6 +80,8 @@ export function paletteShortcut(e: KeyboardEvent): PaletteMode | null {
 
 export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPanel, onShowRightPanel }: CommandPaletteProps) {
   const open = usePalette((s) => s.open)
+  // M32: one search view per opening, so nothing typed before is left when it opens again.
+  const session = usePalette((s) => s.session)
   const types = useLinkIndex((s) => s.types)
   const hasObjectOpen = useTabs((s) => currentTarget(s)?.kind === 'object')
   const [spaces, setSpaces] = useState<SpaceEntry[]>([])
@@ -121,7 +123,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
       types,
       hasObjectOpen,
       createObject: (typeId) => {
-        void createAndOpen(typeId).catch((err: unknown) => console.warn('Could not create an object:', err))
+        void newNote({}, typeId)
       },
       openCalendar: () => onOpenTarget({ kind: 'calendar' }),
       openToday: () => {
@@ -171,7 +173,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
       >
         <DialogTitle className="sr-only">{PALETTE_TEXT.searchTitle}</DialogTitle>
         <DialogDescription className="sr-only">{PALETTE_TEXT.placeholder}</DialogDescription>
-        <SearchView onDone={hide} footer={footer} onOpenExtendedSearch={toExtendedSearch} actions={context} />
+        <SearchView key={session} onDone={hide} footer={footer} onOpenExtendedSearch={toExtendedSearch} actions={context} />
       </DialogContent>
     </Dialog>
   )

@@ -15,7 +15,7 @@ import {
 // id → [category, scope, name, keys]
 const TABLE: Record<string, [string, string, string, string[]]> = {
   copyBlockReference: ['block', 'editor', 'Copy block reference', ['Mod-AltCtrl-l']],
-  turnIntoObject: ['block', 'editor', 'Turn into object', ['i']],
+  turnIntoObject: ['block', 'editor', 'Turn into a note', ['i']],
   turnIntoTask: ['block', 'editor', 'Turn into task', []],
   turnBlockIntoTaskObject: ['block', 'editor', 'Make this block a task', ['Mod-Shift-t']],
   highlightText: ['text', 'editor', 'Highlight the selected text', ['Mod-Shift-h']],

@@ -18,6 +18,8 @@ import { PIN_MENU_TEXT } from './PinToMenu'
 import { usePinned } from './usePinned'
 import { useTabs, type Target } from '@/nav/tabs'
 import { isDailyNoteType } from '@/object/ObjectHeader'
+import { typeLabel } from '@/lib/typeLabel'
+import { TYPE_SETTINGS } from '@/lib/words'
 import { IMPORT_CSV_TEXT } from '@/types/ImportCsvDialog'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 
@@ -29,8 +31,8 @@ export const TYPE_MENU_TEXT = {
   fromTemplate: 'New from template',
   noTemplates: 'No templates',
   newCollection: 'New collection',
-  settings: 'Object type settings',
-  deleteType: 'Delete object type',
+  settings: TYPE_SETTINGS,
+  deleteType: 'Delete type',
 }
 
 /** Daily notes and whiteboards are made by their own flows, not from the type's menu. */
@@ -112,9 +114,9 @@ export function TypeContextMenu({ type, onOpenTarget, onOpenTypeSettings, onDele
       </ContextMenuSub>
       {creatable && (
         <>
-          <ContextMenuItem onSelect={() => void createAndOpen(type.id).catch((e: unknown) => console.warn('Could not create the object:', e))}>
+          <ContextMenuItem onSelect={() => void createAndOpen(type.id).catch((e: unknown) => console.warn('Could not create it:', e))}>
             <Icon name="ph-plus" size={14} />
-            {TYPE_MENU_TEXT.create(type.name)}
+            {TYPE_MENU_TEXT.create(typeLabel(type))}
           </ContextMenuItem>
           <ContextMenuSub>
             <ContextMenuSubTrigger>

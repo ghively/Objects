@@ -3,8 +3,8 @@
  *
  * What the clipboard holds decides the offers:
  * - text: "Paste into today's daily note" (preview "1 block | {count} blocks"; appends to today's
- *   note, creating it; "Sent to the daily note") and "Make a new page from the clipboard";
- * - Markdown with a heading: also "Create page", titled with the first heading (which then leaves
+ *   note, creating it; "Sent to the daily note") and "Make a new note from the clipboard";
+ * - Markdown with a heading: also "Create note", titled with the first heading (which then leaves
  *   the body; our choice);
  * - a URL: also "Create {typeName}" for Page: a page titled with the URL's host and path
  *   holding one bookmark block. The URL is **never fetched** (our choice: no network at runtime);
@@ -16,6 +16,7 @@
  * picked. A refused read the user asked for shows "Clipboard access was denied." (our string)
  * and offers nothing.
  */
+import { typeLabel } from '@/lib/typeLabel'
 import { api, DailyNoteExistsError } from '@/api/client'
 import type { TypeDef } from '@/api/types'
 import { todayYmd } from '@/calendar/dates'
@@ -32,8 +33,8 @@ export const PASTE_TEXT = {
   addedToDailyNote: 'Sent to the daily note',
   upload: 'Upload',
   createHttpLinkEntity: (typeName: string) => `Create ${typeName}`,
-  createPageFromMd: 'Create page',
-  createPageWithBlocks: 'Make a new page from the clipboard',
+  createPageFromMd: 'Create note',
+  createPageWithBlocks: 'Make a new note from the clipboard',
   denied: 'Clipboard access was denied.', // our string
   /** The row that reads the clipboard when picked. */
   readClipboard: 'Clipboard',
@@ -242,7 +243,7 @@ export function pasteActions(content: ClipboardContent, types: readonly TypeDef[
   if (url && page) {
     out.push({
       id: 'paste:url',
-      label: PASTE_TEXT.createHttpLinkEntity(page.name),
+      label: PASTE_TEXT.createHttpLinkEntity(typeLabel(page)),
       icon: 'ph-link',
       run: () => createPageFromUrl(page.id, url),
     })

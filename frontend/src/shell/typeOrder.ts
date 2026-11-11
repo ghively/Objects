@@ -7,7 +7,7 @@ import { saveSidebarUi } from './SidebarSections'
 export const SORT_MANUALLY = 'Sort manually'
 export const SORT_ALPHABETICALLY = 'Sort alphabetically'
 /** Our string: the header `...` button's name. */
-export const TYPES_MENU_LABEL = 'Object Types options'
+export const TYPES_MENU_LABEL = 'Types options'
 
 export type TypeSort = 'alphabetical' | 'manual'
 

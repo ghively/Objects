@@ -45,7 +45,7 @@ describe('DayView', () => {
     const user = userEvent.setup()
     fullDay(TODAY)
     const { rerender } = render(<DayView day={TODAY} />)
-    await screen.findByText('Objects with this date')
+    await screen.findByText('Notes with this date')
     expect(tabLabels()).toEqual(['All', 'Daily note', 'Tasks', 'Dates', 'Created Today', 'Updated Today'])
     expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
     // M8: Backlinks, Date references and Timeline follow M4's sections (under All only).
@@ -90,7 +90,7 @@ describe('DayView', () => {
   test('test one rows call per day', async () => {
     fullDay(TODAY)
     render(<DayView day={TODAY} />)
-    await screen.findByText('Objects with this date')
+    await screen.findByText('Notes with this date')
     await screen.findByText('New')
     expect(mocked.calendar).toHaveBeenCalledTimes(1)
     expect(mocked.calendar).toHaveBeenCalledWith(TODAY, TODAY)

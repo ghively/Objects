@@ -100,5 +100,6 @@ export function usePanelShortcuts({ toggleLeftSidebar }: { toggleLeftSidebar: ()
   useGlobalShortcut('toggleSidepanel', () => useTabs.getState().toggleSidepanel())
   useGlobalShortcut('toggleLeftSidebar', toggleLeftSidebar)
   useGlobalShortcut('toggleCalendarSidebar', () => void toggleCalendarSidebar())
-  useGlobalShortcut('openTodaysNote', () => void openTodaysNote())
+  // M32: also with the caret in a note's text or title (no editor binds Ctrl+Shift+D).
+  useGlobalShortcut('openTodaysNote', () => void openTodaysNote(), { allowInEditable: true })
 }

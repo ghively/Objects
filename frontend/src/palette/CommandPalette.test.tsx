@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useFocusMode } from '@/focus/useFocusMode'
 import { todayYmd } from '@/calendar/dates'
+import { useLastType } from '@/create/lastType'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useRecent } from '@/nav/recent'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
@@ -76,6 +77,7 @@ beforeEach(() => {
   usePeek.getState().close()
   useTabs.getState().reset()
   useRecent.setState({ paths: [], openedAt: {} })
+  useLastType.setState({ typeId: null })
   useLinkIndex.setState({ types: [PAGE, PERSON, TASK, TAG], objects: [ALPHA, BEA, WORK, TODO], loaded: true })
 })
 
@@ -167,10 +169,44 @@ describe('shortcuts', () => {
     expect(usePalette.getState().open).toBe(false)
   })
 
+  // M32 (small faults): the palette forgets its last query the moment it closes.
+  test('test the palette forgets its query at once: reopened before the dialog has gone, it starts empty', async () => {
+    const { user } = setup()
+    const input = await openSearch(user)
+    await user.type(input, 'alpha peo')
+    await user.click(await screen.findByText('Only search for type "Person"'))
+    expect(document.querySelectorAll('[data-filter-chip]')).toHaveLength(1)
+    await user.type(input, 'bea')
+    expect(input).toHaveValue('alphabea')
+    // Closed and opened again in one go: the dialog never unmounts (as within its 0.2 s close animation).
+    act(() => {
+      usePalette.getState().hide()
+      usePalette.getState().show('search')
+    })
+    const again = screen.getByPlaceholderText(PALETTE_TEXT.placeholder)
+    expect(again).toHaveValue('')
+    expect(document.querySelectorAll('[data-filter-chip]')).toHaveLength(0)
+    expect(screen.queryByText('Create new Person with title "alphabea"')).toBeNull()
+  })
+
+  test('test each opening is a new session; switching mode while open is not', () => {
+    const s = usePalette.getState
+    const start = s().session
+    s().show('search')
+    expect(s().session).toBe(start + 1)
+    s().show('actions')
+    expect(s().session).toBe(start + 1)
+    s().toggle('actions')
+    expect(s().open).toBe(false)
+    s().toggle('search')
+    expect(s().session).toBe(start + 2)
+    s().hide()
+  })
+
   test('one list: no mode switch; the placeholder names content and actions; opening "actions" shows the same list', async () => {
     const { user } = setup()
     const input = await openSearch(user)
-    expect(input).toHaveAttribute('placeholder', 'Find objects and commands, or paste')
+    expect(input).toHaveAttribute('placeholder', 'Find notes and commands, or paste')
     expect(screen.queryByRole('button', { name: /Switch to/ })).toBeNull()
     expect(document.querySelector('[data-palette-info]')).not.toBeNull()
     await user.keyboard('{Escape}')
@@ -193,7 +229,7 @@ describe('search mode', () => {
     const today = screen.getByText('Today').closest('[cmdk-group]') as HTMLElement
     expect(within(today).getAllByRole('option').map((i) => i.textContent)).toEqual(['BeaPerson'])
     const earlier = screen.getByText('Earlier').closest('[cmdk-group]') as HTMLElement
-    expect(within(earlier).getAllByRole('option').map((i) => i.textContent)).toEqual(['TodoTask', 'AlphaPage'])
+    expect(within(earlier).getAllByRole('option').map((i) => i.textContent)).toEqual(['TodoTask', 'AlphaNote'])
     // The type name is the row's last, right-hand element.
     const bea = within(today).getByRole('option')
     expect(bea.lastElementChild?.textContent).toBe('Person')
@@ -208,7 +244,7 @@ describe('search mode', () => {
     useRecent.setState({ paths: [], openedAt: {} })
     await openSearch(user)
     expect(screen.getByText('Nothing here yet')).toBeInTheDocument()
-    expect(screen.getByText('Recently opened objects appear here.')).toBeInTheDocument()
+    expect(screen.getByText('Recently opened notes appear here.')).toBeInTheDocument()
   })
 
   test('typing debounces one request and drops stale responses', async () => {
@@ -272,7 +308,7 @@ describe('search mode', () => {
     expect(snippets).toHaveLength(2)
     expect(snippets[0].textContent).toBe('one <img src=x> alpine')
     expect(snippets[0].querySelector('b')?.textContent).toBe('alp')
-    expect(row.textContent).toContain('Page')
+    expect(row.textContent).toContain('Note')
     expect(row.textContent).not.toContain('three')
   })
 
@@ -412,12 +448,24 @@ describe('search mode', () => {
     const { user } = setup()
     const input = await openSearch(user)
     await user.type(input, 'Fresh idea')
-    const option = await screen.findByText('Create new Page with title "Fresh idea"')
+    const option = await screen.findByText('Create new Note with title "Fresh idea"')
     await user.click(option)
     await waitFor(() => expect(usePalette.getState().open).toBe(false))
     expect(mocked.createObject).toHaveBeenCalledTimes(1)
     expect(mocked.createObject).toHaveBeenCalledWith('page', { title: 'Fresh idea' })
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'page/Fresh idea.md' })
+  })
+
+  // M32: the create row is a Note, not one more of the type made last.
+  test('create new with title makes a Note whatever type was made last', async () => {
+    useLastType.getState().set('task')
+    mocked.search.mockResolvedValue({ results: [], partial: false })
+    const { user } = setup()
+    const input = await openSearch(user)
+    await user.type(input, 'Fresh idea')
+    await user.click(await screen.findByText('Create new Note with title "Fresh idea"'))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('page', { title: 'Fresh idea' }))
+    expect(screen.queryByText('Create new Task with title "Fresh idea"')).toBeNull()
   })
 
   test('create new with title uses the type filter', async () => {
@@ -465,7 +513,7 @@ describe('actions in the list', () => {
     const { user } = setup()
     const input = await openSearch(user)
     await user.type(input, 'create')
-    await waitFor(() => expect(actionLabels()).toEqual(['Create Page', 'Create Person', 'Create Tag', 'Create Task']))
+    await waitFor(() => expect(actionLabels()).toEqual(['Create Note', 'Create Person', 'Create Tag', 'Create Task']))
     for (const row of document.querySelectorAll('[data-action]')) expect(row.lastElementChild?.textContent).toBe('Action')
     await user.clear(input)
     await user.type(input, 'toggle')
@@ -564,7 +612,7 @@ describe('actions in the list', () => {
 })
 
 test('palette string templates', () => {
-  expect(PALETTE_TEXT.placeholder).toBe('Find objects and commands, or paste')
+  expect(PALETTE_TEXT.placeholder).toBe('Find notes and commands, or paste')
   expect(PALETTE_TEXT.emptyTitle('q')).toBe('No results for "q"')
   expect(PALETTE_TEXT.createNewWithTitle('Page', 't')).toBe('Create new Page with title "t"')
   expect(PALETTE_TEXT.typeFilter('X')).toBe('Only search for type "X"')

@@ -4,7 +4,7 @@ import { AiHost } from '@/ai/AiHost'
 import type { ChangeKind, ObjectSummary, SpaceInfo, TypeDef } from '@/api/types'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { createAndOpen } from '@/create/createAndOpen'
+import { newNote, noteTypeId } from '@/create/newNote'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
 import { AllNotesView } from '@/allnotes/AllNotesView'
 import { AgentPage } from '@/agents/AgentPage'
@@ -30,6 +30,7 @@ import {
   type Target,
 } from '@/nav/tabs'
 import { useDeleteRequest } from '@/object/DeleteObjectDialog'
+import { isDailyNoteType } from '@/object/ObjectHeader'
 import { ObjectPage } from '@/object/ObjectPage'
 import { ObjectPeek } from '@/object/ObjectPeek'
 import { BacklinksPanel } from '@/references/BacklinksPanel'
@@ -41,7 +42,7 @@ import { SidePanel } from '@/shell/SidePanel'
 import { Sidebar } from '@/shell/Sidebar'
 import { TabStrip, useSpaceTypes } from '@/shell/TabStrip'
 import { usePanelShortcuts, useTabShortcuts } from '@/shell/shortcuts'
-import { isEditableTarget } from '@/lib/shortcuts'
+import { isEditableTarget, keysFor, matches, newKeyAllowed } from '@/lib/shortcuts'
 import { lazyWithReload } from '@/lib/lazyReload'
 import { applyOpenOnStart } from '@/nav/startup'
 import { prefetchOnIdle } from '@/nav/prefetch'
@@ -98,15 +99,17 @@ function countsByType(s: { objects: ObjectSummary[]; loaded: boolean }): Record<
 /** Inputs, text areas, selects, contenteditable (the body editor) and CodeMirror (raw mode). */
 export { isEditableTarget }
 
-/** The type Ctrl+N creates: the open type, else the open object's type, else Page. */
+/**
+ * The type the new-note key makes: the open type, else the open note's type, else a Note (M32:
+ * never the last type made). A daily note is made by its date, so from one the key makes a Note.
+ */
 function currentTypeId(types: TypeDef[]): string {
   const target = currentTarget(useTabs.getState())
-  if (target?.kind === 'type' || target?.kind === 'typeSettings') return target.typeId
-  if (target?.kind === 'object') {
-    const t = useLinkIndex.getState().objects.find((o) => o.path === target.path)?.type
-    if (t && types.some((x) => x.id === t)) return t
-  }
-  return types.find((t) => t.name.toLowerCase() === 'page')?.id ?? 'page'
+  let id: string | undefined
+  if (target?.kind === 'type' || target?.kind === 'typeSettings') id = target.typeId
+  else if (target?.kind === 'object') id = useLinkIndex.getState().objects.find((o) => o.path === target.path)?.type
+  const type = id ? types.find((x) => x.id === id) : undefined
+  return type && !isDailyNoteType(type) ? type.id : noteTypeId(types)
 }
 
 interface PageCtx {
@@ -126,7 +129,7 @@ function pageFor(target: Target, { types, space, open, workOn }: PageCtx): React
     case 'type': {
       const type = types.find((t) => t.id === target.typeId)
       if (type) return <TypePage key={type.id} type={type} />
-      return space ? <Centered title="Unknown object type" subtitle={target.typeId} /> : null
+      return space ? <Centered title="Unknown type" subtitle={target.typeId} /> : null
     }
     case 'typeSettings':
       return (
@@ -274,26 +277,31 @@ export default function App() {
   // M32: the Work page, its toasts and its overlays exist only while Work is on for this space.
   const workOn = useWorkOn()
 
-  // Shortcuts, only when focus is not in an editable element (there Ctrl+Backspace deletes a word):
-  // Ctrl+U "+ New" menu, Ctrl+N a new object of the current type, Ctrl+Backspace "Delete this object?".
+  // Shortcuts (their keys are in `lib/shortcuts.ts`): the New menu (Ctrl+U, Alt+Shift+N), a new
+  // note, or one more of the type in view (Ctrl+N, Alt+N), and Ctrl+Backspace "Delete this …?".
+  // M32: the two "new" keys also work with the caret in a note's text or title (`newKeyAllowed`
+  // keeps each key's own editing meaning); Delete stays out of editable elements, where
+  // Ctrl+Backspace deletes a word.
   const typesRef = useRef(types)
   useLayoutEffect(() => {
     typesRef.current = types
   }, [types])
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
-      if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return
-      const key = e.key.toLowerCase()
-      if (key === 'u') {
+      if (e.defaultPrevented) return
+      if (matches(e, keysFor('openAddEntityMenu'))) {
+        if (!newKeyAllowed('openAddEntityMenu', e)) return
         e.preventDefault()
+        // What gets made opens in the tab: a note popped out over it steps aside.
+        usePeek.getState().close()
         setNewMenuOpen(true)
-      } else if (key === 'n') {
+      } else if (matches(e, keysFor('createNewEntityOfType'))) {
+        if (!newKeyAllowed('createNewEntityOfType', e)) return
         e.preventDefault()
-        void createAndOpen(currentTypeId(typesRef.current)).catch((err: unknown) =>
-          console.warn('Could not create an object:', err),
-        )
-      } else if (key === 'backspace') {
+        usePeek.getState().close()
+        void newNote({}, currentTypeId(typesRef.current))
+      } else if (matches(e, keysFor('deleteCurrentPage'))) {
+        if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return
         const peekPath = usePeek.getState().path
         const target = currentTarget(useTabs.getState())
         const path = peekPath ?? (target?.kind === 'object' ? target.path : null)
@@ -336,7 +344,7 @@ export default function App() {
           <LocalGraphPanel path={target.path} />
         </Suspense>
       ) : (
-        <Centered title="Graph View" subtitle="Open an object to see its graph." />
+        <Centered title="Graph View" subtitle="Open a note to see its graph." />
       )
     }
     // M8: the backlinks entry follows the tab's current object.
@@ -369,7 +377,10 @@ export default function App() {
                 activeTypeId={activeType?.id}
                 onOpenType={(t) => open({ kind: 'type', typeId: t.id })}
                 counts={counts}
-                onNew={() => setNewMenuOpen(true)}
+                onNew={(e) =>
+                  void newNote({ ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey }, noteTypeId(types))
+                }
+                onNewMenu={() => setNewMenuOpen(true)}
                 onCreateType={() => setCreateTypeOpen(true)}
                 onOpenTypeSettings={(t) => open({ kind: 'typeSettings', typeId: t.id })}
                 onDeleteType={setDeleting}
@@ -377,10 +388,12 @@ export default function App() {
                 trashActive={target?.kind === 'trash'}
                 onOpenTarget={(t, o) => open(t, o)}
                 queriesActive={target?.kind === 'queries'}
+                notesActive={target?.kind === 'allNotes'}
                 calendarActive={target?.kind === 'calendar'}
-                tasksActive={target?.kind === 'tasks'}
+                // A `work` target shows the Tasks page while Work is off (M32).
+                tasksActive={target?.kind === 'tasks' || (target?.kind === 'work' && !workOn)}
                 graphActive={target?.kind === 'graph'}
-                workActive={target?.kind === 'work'}
+                workActive={target?.kind === 'work' && workOn}
                 activeCollectionId={target?.kind === 'collection' ? target.id : null}
               />
             </ErrorBoundary>

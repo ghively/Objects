@@ -47,27 +47,27 @@ describe('NewObjectMenu suggested type (M29)', () => {
   test('on a collection of Hosts, Host is first and marked Suggested', () => {
     useTabs.getState().open({ kind: 'collection', id: 'c-hosts' })
     render(<NewObjectMenu open onOpenChange={() => undefined} />)
-    expect(names()).toEqual(['HostSuggested', 'Page', 'Task', 'Whiteboard'])
+    expect(names()).toEqual(['HostSuggested', 'Note', 'Task', 'Whiteboard'])
   })
 
   test('elsewhere the last type is first', () => {
     useTabs.getState().open({ kind: 'object', path: 'Pages/A.md' })
     useLastType.getState().set('task')
     render(<NewObjectMenu open onOpenChange={() => undefined} />)
-    expect(names()).toEqual(['TaskSuggested', 'Host', 'Page', 'Whiteboard'])
+    expect(names()).toEqual(['TaskSuggested', 'Host', 'Note', 'Whiteboard'])
   })
 
   test('no last type keeps the order as before', () => {
     render(<NewObjectMenu open onOpenChange={() => undefined} />)
-    expect(names()).toEqual(['Host', 'Page', 'Task', 'Whiteboard'])
+    expect(names()).toEqual(['Host', 'Note', 'Task', 'Whiteboard'])
   })
 
   test('typing keeps the filtered order without a suggestion', async () => {
     const user = userEvent.setup()
     useLastType.getState().set('task')
     render(<NewObjectMenu open onOpenChange={() => undefined} />)
-    await user.type(screen.getByRole('textbox', { name: 'Search Object Types' }), 'a')
-    expect(names()).toEqual(['Page', 'Task', 'Whiteboard'])
+    await user.type(screen.getByRole('textbox', { name: 'Search types' }), 'a')
+    expect(names()).toEqual(['Note', 'Task', 'Whiteboard'])
   })
 
   test('picking the suggested type creates with no templateId', async () => {

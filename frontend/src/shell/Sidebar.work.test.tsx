@@ -1,6 +1,6 @@
-// Gene's redesign: M23's Work entry is gone from the sidebar. M32 contract: the Tasks entry opens
-// the plain Tasks page (target `tasks`) and, until the sidebar has its own Work entry (lane B),
-// is active on the `work` target too. It stays while the space hides task management.
+// M32: the Tasks entry opens the plain Tasks page (target `tasks`) and is active for it only. The
+// Work page (the dashboard) has its own entry directly under Tasks, shown only while Work is on for
+// the space (`useWorkOn`). Tasks stays while the space hides task management.
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -15,23 +15,59 @@ import { resetAgents } from '@/agents/useAgents'
 import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { agent } from '@/test/mockApi'
+import { setWorkOn } from '@/test/workOn'
 import { Sidebar } from './Sidebar'
 
 const mocked = vi.mocked(api)
-const tasksButton = () => within(screen.getByRole('navigation', { name: 'Main' })).getByRole('button', { name: 'Tasks' })
+const main = () => screen.getByRole('navigation', { name: 'Main' })
+const tasksButton = () => within(main()).getByRole('button', { name: 'Tasks' })
+const workButton = () => within(main()).queryByRole('button', { name: 'Work' })
+const mainNames = () =>
+  within(main())
+    .getAllByRole('button')
+    .map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim())
 
-describe('Sidebar Tasks entry (the Tasks dashboard)', () => {
+describe('Sidebar Tasks and Work entries (M32)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetAgents()
+    resetSpaceInfo()
     useSettings.setState({ settings: { ...settingsDefaults } })
     mocked.agents.mockResolvedValue([agent({ id: 'assistant', exists: false })])
+    // Work off unless a test turns it on.
+    mocked.space.mockResolvedValue({ name: 'space', root: '/space', types: [], workEnabled: null, workOn: false })
   })
 
-  test('test there is no separate Work entry', () => {
+  test('test there is no Work entry while Work is off', async () => {
     render(<Sidebar types={[]} />)
-    expect(screen.queryByRole('navigation', { name: 'Work' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Work' })).toBeNull()
+    await waitFor(() => expect(useSpaceInfo.getState().space).not.toBeNull())
+    expect(workButton()).toBeNull()
+    expect(mainNames().slice(0, 4)).toEqual(['Notes', 'Calendar', 'Tasks', 'Graph'])
+  })
+
+  test('test Work shows directly under Tasks while Work is on, and opens the work target', async () => {
+    mocked.space.mockResolvedValue({ name: 'space', root: '/space', types: [], workEnabled: true, workOn: true })
+    const onOpenTarget = vi.fn()
+    const user = userEvent.setup()
+    render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
+    await waitFor(() => expect(workButton()).not.toBeNull())
+    expect(mainNames().slice(0, 5)).toEqual(['Notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
+    await user.click(workButton()!)
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'work' }, { newTab: false })
+    await user.keyboard('{Control>}')
+    await user.click(workButton()!)
+    await user.keyboard('{/Control}')
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'work' }, { newTab: true })
+  })
+
+  test('test the Work entry follows the switch without a reload', async () => {
+    render(<Sidebar types={[]} />)
+    await waitFor(() => expect(useSpaceInfo.getState().space).not.toBeNull())
+    expect(workButton()).toBeNull()
+    setWorkOn(true)
+    await waitFor(() => expect(workButton()).not.toBeNull())
+    setWorkOn(false)
+    await waitFor(() => expect(workButton()).toBeNull())
   })
 
   test('test Tasks opens the Tasks page, Ctrl+click in a new tab', async () => {
@@ -46,18 +82,22 @@ describe('Sidebar Tasks entry (the Tasks dashboard)', () => {
     expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'tasks' }, { newTab: true })
   })
 
-  test('test aria-current marks Tasks on the dashboard and on the old tasks target', () => {
+  test('test aria-current marks Tasks for the tasks target only, Work for the work target', async () => {
+    mocked.space.mockResolvedValue({ name: 'space', root: '/space', types: [], workEnabled: true, workOn: true })
     const { rerender } = render(<Sidebar types={[]} />)
+    await waitFor(() => expect(workButton()).not.toBeNull())
     expect(tasksButton()).not.toHaveAttribute('aria-current')
+    expect(workButton()).not.toHaveAttribute('aria-current')
     rerender(<Sidebar types={[]} workActive />)
-    expect(tasksButton()).toHaveAttribute('aria-current', 'page')
+    expect(tasksButton()).not.toHaveAttribute('aria-current')
+    expect(workButton()).toHaveAttribute('aria-current', 'page')
     rerender(<Sidebar types={[]} tasksActive />)
     expect(tasksButton()).toHaveAttribute('aria-current', 'page')
+    expect(workButton()).not.toHaveAttribute('aria-current')
   })
 
   test('test Tasks stays, and opens the Tasks page, while the space hides task management', async () => {
-    resetSpaceInfo()
-    mocked.space.mockResolvedValueOnce({
+    mocked.space.mockResolvedValue({
       name: 'space',
       root: '/space',
       types: [],
@@ -68,15 +108,11 @@ describe('Sidebar Tasks entry (the Tasks dashboard)', () => {
     })
     const onOpenTarget = vi.fn()
     const user = userEvent.setup()
-    try {
-      render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
-      await waitFor(() => expect(useSpaceInfo.getState().space?.hideTaskManagement).toBe(true))
-      await user.click(tasksButton())
-      expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'tasks' }, { newTab: false })
-      expect(screen.queryByRole('button', { name: 'Work' })).toBeNull()
-    } finally {
-      resetSpaceInfo()
-    }
+    render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
+    await waitFor(() => expect(useSpaceInfo.getState().space?.hideTaskManagement).toBe(true))
+    await user.click(tasksButton())
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'tasks' }, { newTab: false })
+    expect(workButton()).toBeNull()
   })
 
   test('test Tasks shows while AI features are hidden', () => {

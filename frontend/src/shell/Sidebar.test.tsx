@@ -53,9 +53,9 @@ describe('Sidebar', () => {
     expect(btn).toBeEnabled()
     await user.click(btn)
     expect(onNew).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('button', { name: /search/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Search this space' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Create object type' }))
+    await user.click(screen.getByRole('button', { name: 'New type' }))
     expect(onCreateType).toHaveBeenCalledTimes(1)
 
     await user.click(screen.getByRole('button', { name: 'Trash' }))
@@ -70,18 +70,18 @@ describe('Sidebar', () => {
       'New from template',
       'New collection',
       'Pin to sidebar',
-      'Object type settings',
+      'Type settings',
       'Import CSV',
-      'Delete object type',
+      'Delete type',
     ])
-    await user.click(within(menu).getByRole('menuitem', { name: 'Delete object type' }))
+    await user.click(within(menu).getByRole('menuitem', { name: 'Delete type' }))
     expect(onDeleteType).toHaveBeenCalledWith(expect.objectContaining({ id: 'server' }))
 
     // A basic type: no delete.
-    fireEvent.contextMenu(screen.getByRole('button', { name: 'Pages' }))
+    fireEvent.contextMenu(within(screen.getByRole('region', { name: 'Types' })).getByRole('button', { name: 'Notes' }))
     menu = await screen.findByRole('menu')
-    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).not.toContain('Delete object type')
-    await user.click(within(menu).getByRole('menuitem', { name: 'Object type settings' }))
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).not.toContain('Delete type')
+    await user.click(within(menu).getByRole('menuitem', { name: 'Type settings' }))
     expect(onOpenTypeSettings).toHaveBeenCalledWith(expect.objectContaining({ id: 'page' }))
   })
 
@@ -125,13 +125,13 @@ describe('Sidebar', () => {
     // Regression guard (green from the start).
     render(<Sidebar types={TYPES} />)
     const nav = screen.getByRole('navigation', { name: /main/i })
-    for (const name of ['Calendar', 'Tasks', 'Graph']) {
+    for (const name of ['Notes', 'Calendar', 'Tasks', 'Graph']) {
       expect(within(nav).getByRole('button', { name })).toBeEnabled()
     }
-    // All notes is gone from the sidebar: with many note types it was a dumping ground
-    // (the view itself stays reachable through queries and the palette).
+    // M32: "Notes" (the all-notes view) is back, first; "Queries" reads "Saved searches".
     expect(screen.queryByRole('button', { name: 'All notes' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Queries' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Queries' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Saved searches' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Pinned' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Trash' })).toBeInTheDocument()
@@ -169,7 +169,7 @@ describe('Sidebar', () => {
     const nav = screen.getByRole('navigation', { name: /main/i })
     expect(within(nav).getByRole('button', { name: 'Calendar' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'All notes' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Queries' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Saved searches' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Pinned' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Trash' })).toBeInTheDocument()
@@ -184,15 +184,16 @@ describe('Sidebar', () => {
 
   it('lists object types alphabetically with coloured icon chips', () => {
     render(<Sidebar types={TYPES} />)
-    const section = screen.getByRole('region', { name: 'Object Types' })
+    const section = screen.getByRole('region', { name: 'Types' })
     const items = within(section)
       .getAllByRole('button')
-      .filter((b) => !['Create object type', 'Object Types options'].includes(b.getAttribute('aria-label') ?? ''))
+      .filter((b) => !['New type', 'Types options'].includes(b.getAttribute('aria-label') ?? ''))
+    // M32: the built-in Page and DailyNote read "Notes" and "Daily notes" and sort by that name.
     expect(items.map((b) => b.textContent?.trim())).toEqual([
-      'DailyNotes',
-      'Pages',
+      'Daily notes',
+      'Notes',
       'People',
-      'Queries',
+      'Saved searches',
       'Servers',
       'Tasks',
     ])
@@ -303,5 +304,61 @@ describe('Sidebar theme button (M7)', () => {
     expect(useSettingsModal.getState().shortcutsOpen).toBe(true)
     expect(useSettingsModal.getState().isOpen).toBe(false)
     resetSettingsModal()
+  })
+})
+
+// M32: "Notes" leads the main navigation, and the sidebar speaks the glossary's words.
+describe('Sidebar (M32: notes first)', () => {
+  it('test Notes is the first main entry, above Calendar, and opens the all-notes view', async () => {
+    const user = userEvent.setup()
+    const onOpenTarget = vi.fn()
+    const { rerender } = render(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} />)
+    const nav = screen.getByRole('navigation', { name: 'Main' })
+    const names = within(nav)
+      .getAllByRole('button')
+      .map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim())
+    expect(names.slice(0, 3)).toEqual(['Notes', 'Calendar', 'Tasks'])
+    const notes = within(nav).getByRole('button', { name: 'Notes' })
+    expect(notes).not.toHaveAttribute('aria-current')
+    await user.click(notes)
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'allNotes' }, { newTab: false })
+    fireEvent.click(notes, { ctrlKey: true })
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'allNotes' }, { newTab: true })
+    rerender(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} notesActive />)
+    expect(within(nav).getByRole('button', { name: 'Notes' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('test the type list is headed Types, its plus is New type, and no default text says object', () => {
+    render(<Sidebar types={TYPES} />)
+    expect(screen.getByRole('region', { name: 'Types' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New type' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Types options' })).toBeInTheDocument()
+    expect(screen.queryByText('Object Types')).toBeNull()
+    expect(screen.queryByRole('button', { name: /object type/i })).toBeNull()
+  })
+
+  it('test a renamed built-in type keeps the name the user gave it', () => {
+    const journal = { ...typeDef('Page', 'Pages', 'ph-file-text', 'pink'), basic: true, name: 'Journal', pluralName: 'Journals' }
+    render(<Sidebar types={[journal]} />)
+    const section = screen.getByRole('region', { name: 'Types' })
+    expect(within(section).getByRole('button', { name: 'Journals' })).toBeInTheDocument()
+    expect(within(section).queryByRole('button', { name: 'Notes' })).toBeNull()
+  })
+
+  it('test New makes a note at once and the arrow beside it opens the type list', async () => {
+    const user = userEvent.setup()
+    const onNew = vi.fn()
+    const onNewMenu = vi.fn()
+    render(<Sidebar types={TYPES} onNew={onNew} onNewMenu={onNewMenu} />)
+    await user.click(screen.getByRole('button', { name: 'New' }))
+    expect(onNew).toHaveBeenCalledTimes(1)
+    expect(onNewMenu).not.toHaveBeenCalled()
+    const arrow = screen.getByRole('button', { name: 'Choose a type' })
+    expect(arrow).toHaveAttribute('title', 'Choose a type')
+    await user.click(arrow)
+    expect(onNewMenu).toHaveBeenCalledTimes(1)
+    expect(onNew).toHaveBeenCalledTimes(1)
+    // The two sit in the one control the New menu opens under.
+    expect(arrow.closest('[data-new-button]')).toBe(screen.getByRole('button', { name: 'New' }).closest('[data-new-button]'))
   })
 })

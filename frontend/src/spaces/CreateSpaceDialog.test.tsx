@@ -14,7 +14,7 @@ vi.mock('./switchSpace', async (orig) => ({
 import { api, ApiError } from '@/api/client'
 import { resetImportDialog, useImportDialog } from '@/import/useImportDialog'
 import { resetSpaceInfo } from '@/settings/useSpaceInfo'
-import { CREATE_SPACE_TEXT, CreateSpaceDialog, parentFolder, useCreateSpaceDialog } from './CreateSpaceDialog'
+import { CREATE_SPACE_TEXT, CreateSpaceDialog, NEW_SPACE_SETUP, parentFolder, SETUPS, useCreateSpaceDialog } from './CreateSpaceDialog'
 import { switchSpace } from './switchSpace'
 
 const mocked = vi.mocked(api)
@@ -99,45 +99,22 @@ describe('CreateSpaceDialog', () => {
     expect(useCreateSpaceDialog.getState().isOpen).toBe(false)
   })
 
-  test('test create dialog offers basic setup', async () => {
+  // M32: a new space just starts. The dialog asks for a name and a folder, nothing else.
+  test('test create dialog asks for a name and a folder only and makes the plain start', async () => {
     const user = await openDialog()
-    expect(screen.getByText('Pick a starting point')).toBeInTheDocument()
-    expect(screen.getByText('Comes with types for people, meetings, projects and books.')).toBeInTheDocument()
-    expect(screen.getByText('Starts with no extra types; create them as you go.')).toBeInTheDocument()
-    const basic = screen.getByRole('radio', { name: 'Start with basic setup' })
-    const blank = screen.getByRole('radio', { name: 'Empty space' })
-    expect(blank).toBeChecked()
-    expect(basic).not.toBeChecked()
+    expect(screen.queryByText('Pick a starting point')).toBeNull()
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    for (const gone of ['Start with basic setup', 'IT operations', 'Empty space']) expect(screen.queryByText(gone)).toBeNull()
+    expect(screen.getAllByRole('textbox').map((t) => t.getAttribute('aria-label') ?? t.closest('label')?.textContent)).toEqual(['Name', 'Location'])
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Location' })).toHaveValue('/home/gene/Spaces'))
-    await user.type(screen.getByPlaceholderText('Name'), 'Starter')
-    await user.click(screen.getByText('Start with basic setup'))
-    expect(basic).toBeChecked()
+    await user.type(screen.getByPlaceholderText('Name'), 'Journal')
     await user.click(screen.getByRole('button', { name: 'Create space' }))
-    await waitFor(() => expect(mocked.createSpace).toHaveBeenCalledWith('Starter', '/home/gene/Spaces', 'basic'))
+    await waitFor(() => expect(mocked.createSpace).toHaveBeenCalledWith('Journal', '/home/gene/Spaces', 'blank'))
+    expect(NEW_SPACE_SETUP).toBe('blank')
     expect(await screen.findByText(CREATE_SPACE_TEXT.created)).toBeInTheDocument()
-
-    // Reopening starts from a blank space again.
-    act(() => useCreateSpaceDialog.getState().close())
-    act(() => useCreateSpaceDialog.getState().open())
-    expect(await screen.findByRole('radio', { name: 'Empty space' })).toBeChecked()
-  })
-
-  test('test create dialog offers IT operations between basic setup and empty space (M28)', async () => {
-    const user = await openDialog()
-    const radios = screen.getAllByRole('radio')
-    expect(radios.map((r) => r.getAttribute('aria-label'))).toEqual([
-      'Start with basic setup',
-      'IT operations',
-      'Empty space',
-    ])
-    expect(screen.getByText('Includes hosts, software, applications, runbooks and incidents.')).toBeInTheDocument()
-    expect(CREATE_SPACE_TEXT.itopsLabel).toBe('IT operations')
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Location' })).toHaveValue('/home/gene/Spaces'))
-    await user.type(screen.getByPlaceholderText('Name'), 'Ops')
-    await user.click(screen.getByText('IT operations'))
-    expect(screen.getByRole('radio', { name: 'IT operations' })).toBeChecked()
-    await user.click(screen.getByRole('button', { name: 'Create space' }))
-    await waitFor(() => expect(mocked.createSpace).toHaveBeenCalledWith('Ops', '/home/gene/Spaces', 'itops'))
+    // The starter sets stay in the client for the type gallery.
+    expect(SETUPS.map((o) => o.value)).toEqual(['basic', 'itops', 'blank'])
+    expect(typeof api.spaceSetup).toBe('function')
   })
 
   test('test import from closes the dialog and opens the import dialog with the name and location (M15)', async () => {

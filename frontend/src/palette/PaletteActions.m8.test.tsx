@@ -149,7 +149,7 @@ describe('action palette, clipboard group', () => {
     vi.stubGlobal('fetch', fetchSpy)
     const user = setup({ readText: async () => 'https://example.com/docs' })
     await openActions(user)
-    await waitFor(() => expect(document.querySelector('[data-action="paste:url"]')?.textContent).toBe('Create Page'))
+    await waitFor(() => expect(document.querySelector('[data-action="paste:url"]')?.textContent).toBe('Create Note'))
     await user.click(document.querySelector<HTMLElement>('[data-action="paste:url"]')!)
     await waitFor(() => expect(mocked.createObject).toHaveBeenCalled())
     expect(mocked.createObject).toHaveBeenCalledWith('page', {
