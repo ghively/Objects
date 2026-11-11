@@ -19,11 +19,12 @@ const mocked = vi.mocked(api)
 
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true })
 const TASK = typeDef({ id: 'task', name: 'Task', pluralName: 'Tasks', basic: true })
+const TAG = typeDef({ id: 'tag', name: 'Tag', pluralName: 'Tags', basic: true })
 const DAILY = typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true })
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
-const make = (path: string, type: string, createdAt: string): Row =>
-  row({ summary: objectSummary({ path, type, createdAt }) })
+const make = (path: string, type: string, lastUpdated: string | null, createdAt: string | null = null): Row =>
+  row({ summary: objectSummary({ path, type, lastUpdated, createdAt }) })
 
 beforeEach(() => {
   resetLinkIndex()
@@ -36,31 +37,54 @@ beforeEach(() => {
     ui: { pinned: [], sections: [], allNotesLayout: 'list', ...patch },
     revision: 'u2',
   }))
-  useLinkIndex.setState({ types: [PAGE, TASK, DAILY], objects: [], loaded: true })
+  useLinkIndex.setState({ types: [PAGE, TASK, TAG, DAILY], objects: [], loaded: true })
 })
 
-describe('AllNotesView', () => {
-  test('test All notes excludes daily notes and tasks and groups by created', async () => {
+describe('AllNotesView (M32: Notes)', () => {
+  test('test Notes lists every note by last edited, daily notes in, tasks and tags out', async () => {
     mocked.rows.mockResolvedValue([
       make('Pages/Old.md', 'page', daysAgo(60)),
       make('Pages/New.md', 'page', daysAgo(0)),
       make('Tasks/Do.md', 'task', daysAgo(0)),
+      make('Tags/home.md', 'tag', daysAgo(0)),
       make('Daily/2026-10-26.md', 'dailynote', daysAgo(0)),
     ])
     render(<AllNotesView />)
-    expect(screen.getByRole('heading', { name: 'All notes' })).toBeInTheDocument()
-    expect(screen.getByText('Every note in the space, sorted into groups by creation date.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Notes' })).toBeInTheDocument()
+    expect(screen.getByText('Every note, by when it was last edited.')).toBeInTheDocument()
     await screen.findByText('New')
+    expect(screen.getByText('2026-10-26')).toBeInTheDocument()
     expect(screen.queryByText('Do')).not.toBeInTheDocument()
-    expect(screen.queryByText('2026-10-26')).not.toBeInTheDocument()
-    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['page'], preview: false })
-    const headers = screen.getAllByTestId('group-header').map((h) => h.textContent)
-    // Newest first.
-    expect(headers[0]).toMatch(/^Today/)
-    expect(headers[1]).toMatch(/^Earlier/)
+    expect(screen.queryByText('home')).not.toBeInTheDocument()
+    expect(mocked.rows).toHaveBeenCalledWith({ typeIds: ['page', 'dailynote'], preview: false })
   })
 
-  test('test All notes layout saved to ui', async () => {
+  test('test Notes groups Today, Yesterday, This week, Earlier, newest first inside each', async () => {
+    mocked.rows.mockResolvedValue([
+      make('Pages/LastMonth.md', 'page', daysAgo(40)),
+      make('Pages/FourDays.md', 'page', daysAgo(4)),
+      make('Pages/Yesterday.md', 'page', daysAgo(1)),
+      // No last update yet: the creation time counts.
+      make('Pages/Fresh.md', 'page', null, new Date(Date.now() - 60_000).toISOString()),
+      make('Pages/Now.md', 'page', new Date().toISOString()),
+      make('Pages/NoStamp.md', 'page', null),
+    ])
+    render(<AllNotesView />)
+    await screen.findByText('Now')
+    const headers = screen.getAllByTestId('group-header').map((h) => h.textContent)
+    expect(headers.map((h) => h?.replace(/\d+$/, ''))).toEqual(['Today', 'Yesterday', 'This week', 'Earlier'])
+    const titles = [...document.querySelectorAll('li[data-path]')].map((li) => li.getAttribute('data-path'))
+    expect(titles).toEqual([
+      'Pages/Now.md',
+      'Pages/Fresh.md',
+      'Pages/Yesterday.md',
+      'Pages/FourDays.md',
+      'Pages/LastMonth.md',
+      'Pages/NoStamp.md',
+    ])
+  })
+
+  test('test Notes layout saved to ui', async () => {
     const user = userEvent.setup()
     mocked.rows.mockResolvedValue([make('Pages/New.md', 'page', daysAgo(0))])
     render(<AllNotesView />)

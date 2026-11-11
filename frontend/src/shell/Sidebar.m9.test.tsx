@@ -73,7 +73,7 @@ describe('Sidebar workspaceOrder', () => {
     // The type list really sits first: "Object Types" comes before the sections' headings (M17's
     // Agents section sits above the main navigation, outside the workspace blocks).
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent).filter((h) => h !== 'Agents')
-    expect(headings.slice(0, 4)).toEqual(['Object Types', 'Later', 'Pinned', 'In Progress'])
+    expect(headings.slice(0, 4)).toEqual(['Types', 'Later', 'Pinned', 'In Progress'])
   })
 
   test('without workspaceOrder the default order is kept', async () => {
@@ -106,7 +106,7 @@ describe('Sidebar workspaceOrder', () => {
     render(<Sidebar types={[SERVER]} />)
     await waitFor(() => expect(blocks()).toEqual(['S1', 'S2', 'pinned', 'objects']))
     // Every block has a drag handle.
-    expect(screen.getByRole('button', { name: 'Reorder Object Types' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reorder Types' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reorder Pinned' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reorder In Progress' })).toBeInTheDocument()
     // Drop "Object Types" on Pinned.
@@ -118,7 +118,7 @@ describe('Sidebar workspaceOrder', () => {
 
   test('the drag handle sits inside the block, not in the clipped gutter', async () => {
     render(<Sidebar types={[SERVER]} />)
-    const handle = await screen.findByRole('button', { name: 'Reorder Object Types' })
+    const handle = await screen.findByRole('button', { name: 'Reorder Types' })
     expect(handle.className).not.toMatch(/(^|\s)-left-/)
     expect(handle.className).toMatch(/(^|\s)left-0(\s|$)/)
   })

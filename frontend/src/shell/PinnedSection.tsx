@@ -17,6 +17,8 @@ import { useDefinitions } from '@/types/useDefinitions'
 import { cn } from '@/lib/utils'
 import { TypeChip } from './Sidebar'
 import { PINNED_TEXT } from './pinText'
+import { typePlural } from '@/lib/typeLabel'
+import { SAVED_SEARCH } from '@/lib/words'
 import { usePinned } from './usePinned'
 import { dropObjectAt, setObjectDragData } from './objectDrag'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
@@ -61,7 +63,7 @@ function useResolver(): (ref: PinRef) => Resolved | 'missing' | null {
         case 'type': {
           const t = types.find((x) => x.id === ref.id)
           if (!t) return indexLoaded || types.length > 0 ? 'missing' : null
-          return { target: { kind: 'type', typeId: t.id }, label: t.pluralName, leading: <TypeChip type={t} size={22} /> }
+          return { target: { kind: 'type', typeId: t.id }, label: typePlural(t), leading: <TypeChip type={t} size={22} /> }
         }
         case 'collection': {
           const c = collections.find((x) => x.id === ref.id)
@@ -77,7 +79,7 @@ function useResolver(): (ref: PinRef) => Resolved | 'missing' | null {
           if (!q) return defsLoaded ? 'missing' : null
           return {
             target: { kind: 'query', id: q.id },
-            label: queryTitle(q, titleCtx) || 'Query',
+            label: queryTitle(q, titleCtx) || SAVED_SEARCH,
             leading: <IconOrEmoji icon={q.icon} fallback={QUERY_ICON} size={16} />,
           }
         }

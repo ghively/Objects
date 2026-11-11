@@ -126,7 +126,7 @@ function pageFor(target: Target, { types, space, open, workOn }: PageCtx): React
     case 'type': {
       const type = types.find((t) => t.id === target.typeId)
       if (type) return <TypePage key={type.id} type={type} />
-      return space ? <Centered title="Unknown object type" subtitle={target.typeId} /> : null
+      return space ? <Centered title="Unknown type" subtitle={target.typeId} /> : null
     }
     case 'typeSettings':
       return (
@@ -336,7 +336,7 @@ export default function App() {
           <LocalGraphPanel path={target.path} />
         </Suspense>
       ) : (
-        <Centered title="Graph View" subtitle="Open an object to see its graph." />
+        <Centered title="Graph View" subtitle="Open a note to see its graph." />
       )
     }
     // M8: the backlinks entry follows the tab's current object.
@@ -377,10 +377,12 @@ export default function App() {
                 trashActive={target?.kind === 'trash'}
                 onOpenTarget={(t, o) => open(t, o)}
                 queriesActive={target?.kind === 'queries'}
+                notesActive={target?.kind === 'allNotes'}
                 calendarActive={target?.kind === 'calendar'}
-                tasksActive={target?.kind === 'tasks'}
+                // A `work` target shows the Tasks page while Work is off (M32).
+                tasksActive={target?.kind === 'tasks' || (target?.kind === 'work' && !workOn)}
                 graphActive={target?.kind === 'graph'}
-                workActive={target?.kind === 'work'}
+                workActive={target?.kind === 'work' && workOn}
                 activeCollectionId={target?.kind === 'collection' ? target.id : null}
               />
             </ErrorBoundary>

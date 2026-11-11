@@ -42,7 +42,7 @@ let rev = 0
 
 /** The type list's rows (types and Queries) as rendered. */
 const rows = () => {
-  const list = screen.getByRole('region', { name: 'Object Types' })
+  const list = screen.getByRole('region', { name: 'Types' })
   return [...list.querySelectorAll('[data-type-entry]')].map((el) => el.getAttribute('data-type-entry'))
 }
 
@@ -67,7 +67,7 @@ beforeEach(() => {
 })
 
 describe('orderTypeEntries', () => {
-  const names = { a: 'Apples', b: 'Bananas', z: 'Zebras', queries: 'Queries' }
+  const names = { a: 'Apples', b: 'Bananas', z: 'Zebras', queries: 'Saved searches' }
   test('alphabetical ignores the saved ids', () => {
     expect(orderTypeEntries(['z', 'a', 'queries', 'b'], names, 'alphabetical', ['z', 'a'])).toEqual(['a', 'b', 'queries', 'z'])
   })
@@ -79,7 +79,7 @@ describe('orderTypeEntries', () => {
   })
 })
 
-describe('Object Types sort', () => {
+describe('Types sort', () => {
   test('the header menu offers both sorts and checks the current one', async () => {
     const user = userEvent.setup()
     render(<Sidebar types={[Z, A, B]} />)

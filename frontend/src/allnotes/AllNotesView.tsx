@@ -1,31 +1,58 @@
-// "All notes": every object except daily notes and tasks, grouped by when it was created
-// (newest first). The layout is saved to `ui.allNotesLayout`.
-import { useMemo, useState } from 'react'
-import type { Layout, ViewState } from '@/api/types'
+// "Notes" (M32; was "All notes"): every note by when it was last edited, newest first, grouped
+// Today / Yesterday / This week / Earlier. Daily notes are in; tasks, tags and templates are left
+// out (`notes.ts`). A sort or a grouping picked in the toolbar takes over for as long as it is set.
+// The layout is saved to `ui.allNotesLayout`.
+import { useCallback, useMemo, useState } from 'react'
+import type { Layout, Row, ViewState } from '@/api/types'
 import { Icon } from '@/components/Icon'
+import { NOTES } from '@/lib/words'
+import { useZonedToday } from '@/lib/zonedShell'
 import { useLinkIndex } from '@/links/linkIndex'
 import { usePinned, saveAllNotesLayout, useUiStore } from '@/shell/usePinned'
 import { useDefinitions } from '@/types/useDefinitions'
-import { DataView } from '@/views/DataView'
+import { DataView, type Pipeline } from '@/views/DataView'
+import { applyFilters } from '@/views/filter'
+import { groupRows } from '@/views/group'
 import { ALL_NOTES_LAYOUTS } from '@/views/model'
+import { applySorts } from '@/views/sort'
 import { useRows } from '@/views/useRows'
+import { byEditedDesc, editedAt, editedDay, editedGroup, editedLabel, isListedNote, isListedType, NOTES_GROUPS } from './notes'
 
 export const ALL_NOTES_TEXT = {
-  heading: 'All notes',
-  description: 'Every note in the space, sorted into groups by creation date.',
+  heading: NOTES,
+  description: 'Every note, by when it was last edited.', // our string
   emptyTitle: 'No notes yet',
   emptyBody: 'New notes show up here.',
 }
-
-/** The types All notes leaves out. */
-const EXCLUDED = new Set(['dailynote', 'task'])
 
 const initial = (layout: Layout): ViewState => ({
   viewDefinition: { dataViewLayout: layout },
   filterGroup: { type: 'filterGroup', operator: 'and', elements: [] },
   sorts: [],
-  groupBy: { groups: [{ propertyId: 'createdAt', option: 'relative' }], sortOption: 'defaultDescending' },
+  groupBy: null,
 })
+
+/**
+ * The view's filters, then the notes by last edit under Today / Yesterday / This week / Earlier
+ * (empty groups left out). With a sort or a grouping of the user's own, the standard pipeline.
+ */
+export function notesPipeline(today: string): Pipeline {
+  return (rows, state, ctx) => {
+    const filtered = applyFilters(rows, state.filterGroup, ctx)
+    if (state.groupBy || state.sorts.length > 0) {
+      const sorted = applySorts(filtered, state.sorts, ctx)
+      const g = groupRows(sorted, state.groupBy, state.viewDefinition.groupByConfig, ctx)
+      return { rows: sorted, groups: g.groups, hidden: g.hidden }
+    }
+    const sorted = [...filtered].sort((a, b) => byEditedDesc(a.summary, b.summary))
+    const groups = NOTES_GROUPS.map((g) => ({
+      id: g.id,
+      label: g.label,
+      rows: sorted.filter((r) => editedGroup(editedDay(editedAt(r.summary)), today) === g.id),
+    })).filter((g) => g.rows.length > 0)
+    return { rows: groups.flatMap((g) => g.rows), groups }
+  }
+}
 
 export function AllNotesView() {
   usePinned() // loads `ui.json`
@@ -33,10 +60,24 @@ export function AllNotesView() {
   const types = useLinkIndex((s) => s.types)
   const { collections } = useDefinitions()
   const [local, setLocal] = useState<ViewState>(() => initial(layout))
+  const today = useZonedToday()
 
-  const typeIds = useMemo(() => types.filter((t) => !EXCLUDED.has(t.id)).map((t) => t.id), [types])
+  const typesById = useMemo(() => new Map(types.map((t) => [t.id, t])), [types])
+  const typeIds = useMemo(() => types.filter((t) => isListedType(t, t.id)).map((t) => t.id), [types])
   const { rows, loading, patchRow } = useRows(typeIds.length > 0 ? { typeIds } : {})
-  const shown = useMemo(() => (rows ?? []).filter((r) => !EXCLUDED.has(r.summary.type)), [rows])
+  const shown = useMemo(() => (rows ?? []).filter((r) => isListedNote(r.summary, typesById)), [rows, typesById])
+  const pipeline = useMemo(() => notesPipeline(today), [today])
+  // A list row ends with when the note was edited.
+  const rowExtras = useCallback(
+    (r: Row) => ({
+      trailing: (
+        <time dateTime={editedAt(r.summary)} className="text-[13px] text-fg-muted tabular-nums">
+          {editedLabel(editedAt(r.summary), today)}
+        </time>
+      ),
+    }),
+    [today],
+  )
 
   const state: ViewState = { ...local, viewDefinition: { ...local.viewDefinition, dataViewLayout: layout } }
   const onState = (next: ViewState) => {
@@ -66,6 +107,8 @@ export function AllNotesView() {
         onState={onState}
         layouts={ALL_NOTES_LAYOUTS}
         patchRow={patchRow}
+        pipeline={pipeline}
+        rowExtras={rowExtras}
         emptyState={
           <div className="flex flex-col items-center gap-1 py-10 text-center">
             <p className="text-[15px] text-fg">{ALL_NOTES_TEXT.emptyTitle}</p>

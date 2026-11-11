@@ -34,7 +34,7 @@ describe('Sidebar type context menu', () => {
     render(<Sidebar types={[MEETING]} />)
     await openMenu(user, /Meetings/)
     const items = (await screen.findAllByRole('menuitem')).map((i) => i.textContent)
-    expect(items).toEqual(['Open', 'Create Meeting', 'New from template', 'New collection', 'Pin to sidebar', 'Object type settings', 'Import CSV', 'Delete object type'])
+    expect(items).toEqual(['Open', 'Create Meeting', 'New from template', 'New collection', 'Pin to sidebar', 'Type settings', 'Import CSV', 'Delete type'])
   })
 
   it('Pin to sidebar pins the type', async () => {
@@ -97,8 +97,8 @@ describe('Sidebar type context menu', () => {
   it('a daily note type has no Create, template or Import entries (its own flow)', async () => {
     const user = userEvent.setup()
     render(<Sidebar types={[DAILY]} />)
-    await openMenu(user, /DailyNotes/)
+    await openMenu(user, /Daily notes/)
     const items = (await screen.findAllByRole('menuitem')).map((i) => i.textContent)
-    expect(items).toEqual(['Open', 'New collection', 'Pin to sidebar', 'Object type settings'])
+    expect(items).toEqual(['Open', 'New collection', 'Pin to sidebar', 'Type settings'])
   })
 })

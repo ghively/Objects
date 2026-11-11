@@ -22,7 +22,9 @@ import { queryTitle } from '@/queries/autoTitle'
 import { useTitleCtx } from '@/queries/QueryPage'
 import { TypeChip } from '@/shell/Sidebar'
 import { TabMenu } from '@/shell/TabMenu'
-import { HOME } from '@/lib/words'
+import { typeLabel, typePlural } from '@/lib/typeLabel'
+import { HOME, NOTES, SAVED_SEARCH, SAVED_SEARCHES, TASKS, WORK } from '@/lib/words'
+import { useWorkOn } from '@/work/useWorkOn'
 import { useAgents } from '@/agents/useAgents'
 import { useDefinitions } from '@/types/useDefinitions'
 
@@ -45,6 +47,8 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null,
   const { collections, queries } = useDefinitions()
   const titleCtx = useTitleCtx(types)
   const agents = useAgents((s) => s.agents)
+  // M32: a `work` target is the Work page while Work is on for the space, else the Tasks page.
+  const workOn = useWorkOn()
   return useCallback(
     (target: Target | null, empty: string = HOME): string => {
       if (!target) return empty
@@ -53,16 +57,16 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null,
           return collections.find((x) => x.id === target.id)?.name ?? target.id
         case 'query': {
           const q = queries.find((x) => x.id === target.id)
-          return (q && queryTitle(q, titleCtx)) || 'Query'
+          return (q && queryTitle(q, titleCtx)) || SAVED_SEARCH
         }
         case 'queries':
-          return 'Queries'
+          return SAVED_SEARCHES
         case 'allNotes':
-          return 'All notes'
+          return NOTES
         case 'calendar':
           return 'Calendar'
         case 'tasks':
-          return 'Tasks'
+          return TASKS
         case 'graph':
           return 'Graph'
         case 'search':
@@ -73,19 +77,19 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null,
         case 'typeSettings': {
           const type = types.find((t) => t.id === target.typeId)
           if (!type) return target.typeId
-          return target.kind === 'type' ? type.pluralName : `${type.name} settings`
+          return target.kind === 'type' ? typePlural(type) : `${typeLabel(type)} settings`
         }
         case 'object':
           return byPath.get(target.path)?.title ?? stemOf(target.path)
         case 'agent':
           return agents.find((a) => a.id === target.id)?.name ?? 'Agent'
         case 'work':
-          return 'Tasks'
+          return workOn ? WORK : TASKS
         case 'spaceHistory':
           return 'Space history'
       }
     },
-    [byPath, types, collections, queries, titleCtx, agents],
+    [byPath, types, collections, queries, titleCtx, agents, workOn],
   )
 }
 
@@ -95,6 +99,7 @@ export function TargetLabel({ target, space, emptyTitle }: { target: Target | nu
   const types = useSpaceTypes(space)
   const { collections, queries } = useDefinitions()
   const title = useTargetTitle(space)(target, emptyTitle)
+  const workOn = useWorkOn()
   let icon = null
   if (target?.kind === 'collection') {
     icon = <IconOrEmoji icon={collections.find((x) => x.id === target.id)?.icon} size={15} fallback={COLLECTION_ICON} />
@@ -115,7 +120,7 @@ export function TargetLabel({ target, space, emptyTitle }: { target: Target | nu
   } else if (target?.kind === 'trash') {
     icon = <Icon name="ph-trash" size={15} />
   } else if (target?.kind === 'work') {
-    icon = <Icon name="ph-check-circle" size={15} />
+    icon = <Icon name={workOn ? 'ph-briefcase' : 'ph-check-circle'} size={15} />
   } else if (target?.kind === 'spaceHistory') {
     icon = <Icon name="ph-clock-counter-clockwise" size={15} />
   } else if (target?.kind === 'type' || target?.kind === 'typeSettings') {

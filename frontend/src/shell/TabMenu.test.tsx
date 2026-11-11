@@ -31,7 +31,7 @@ describe('TabMenu', () => {
     const search = await screen.findByRole('textbox', { name: 'Search tabs' })
     expect(search).toHaveAttribute('placeholder', 'Search tabs')
     const list = screen.getByRole('listbox', { name: 'Tabs' })
-    expect(within(list).getAllByRole('option').map((o) => o.textContent)).toEqual(['Calendar', 'Trash', 'All notes'])
+    expect(within(list).getAllByRole('option').map((o) => o.textContent)).toEqual(['Calendar', 'Trash', 'Notes'])
 
     await userEvent.type(search, 'tr')
     expect(within(list).getAllByRole('option').map((o) => o.textContent)).toEqual(['Trash'])

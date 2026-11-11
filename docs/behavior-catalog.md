@@ -275,13 +275,20 @@ Each starter template pre-fills the new type's properties.
   fills, M31), a default template for each but Source, and 30 seed Tags; a type,
   template or Tag already there is kept as it is. Nothing is written before a pick; closing asks again next
   time. The pick is recorded as `space.json` `setup` (`basic`, `itops` or `blank`; Create space records it too).
-- Main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant (Gene's 2026-11-08 redesign;
-  Calendar is the space's opening view). The Assistant is the built-in, always-on helper — a program
+- Main navigation, always visible at the top (M32): Notes, Calendar, Tasks, Work (only while the Work page is on
+  for the space; directly under Tasks; it opens the `work` target), Graph, Assistant. Tasks is the active entry for
+  the `tasks` target only, Work for `work` (a `work` target shown while Work is off reads as Tasks). The Assistant
+  and the Agents section stay exactly where they were (M32 decision 1). The Assistant is the built-in, always-on helper — a program
   feature, not an "agent" — shown with its own icon; a click opens its chat. Like an agent row it carries a
   hover `…` menu (Open chat, Settings, Memory & skills — no Duplicate/Delete: it is built in), the way into
-  its own page (Profile, Instructions, Memory, Skills, Learning, Chats…). "All notes" is gone from the
-  sidebar — with many note types it was a dumping ground; the view stays reachable through queries and the
-  palette.
+  its own page (Profile, Instructions, Memory, Skills, Learning, Chats…).
+- **Notes** (M32; was "All notes", off the sidebar since 2026-11-08): the first main entry opens the all-notes
+  view, heading "Notes", "Every note, by when it was last edited.": every note by last edit (`lastUpdated`, else
+  the creation time), newest first, grouped Today / Yesterday / This week / Earlier (our call: "This week" is
+  the five days before yesterday, so the list never empties on a Monday); daily notes are in, tasks, tags and
+  templates are left out; a list row ends with when it was edited. A sort or grouping picked in the toolbar
+  takes over while it is set; the layout is still saved to `ui.allNotesLayout`. The palette's "Open all notes"
+  opens the same view.
 - Agents (M17), a section of its own with the standard section header, directly below the main navigation;
   it lists only the user's own agents (the built-in Assistant is not in it), and the header's `+` menu —
   not a "+ New agent" row — is the way to add one.
@@ -310,8 +317,11 @@ Each starter template pre-fills the new type's properties.
   one line under the track (the next row down when two would meet; the tooltip stays). The Task rows load
   once for the page. The old Tasks page (header and section tabs) is retired. Controls use the app's pill style
   (14px, `bg-hover-2` when on).
-- Object Types header: fold chevron, count, a `...` menu (Sort manually with a check, Sort alphabetically) and
-  a `+` (the gallery above) on hover.
+- Types header (M32; was "Object Types"): fold chevron, count, a `...` menu "Types options" (Sort manually with a
+  check, Sort alphabetically) and a `+` "New type" (the gallery above; was "Create object type") on hover. The
+  list's rows read the type's plural as the screen shows it: the built-in Page is "Notes", the built-in
+  DailyNote "Daily notes" (a renamed type keeps the user's name), and sort by that name; the "Queries" row reads
+  "Saved searches". A type row's menu: "Create <Type>" ("Create Note"), "Type settings", "Delete type".
 - "Add section" opens a small form (a one-line explanation that a section is a named heading for pages
   and collections in the sidebar) with an Icon picker, Section Name and Create.
 - Trash, on its own at the very bottom of the sidebar.
