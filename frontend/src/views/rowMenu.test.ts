@@ -1,5 +1,6 @@
 // M9 Task 17: the common row menu (a data view's context menu).
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { objectSummary, row, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -8,7 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
-import { usePeek, useTabs } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { commonRowMenu, ROW_MENU_TEXT, type RowMenuCtx } from './rowMenu'
 
 const mocked = vi.mocked(api)
@@ -28,6 +29,7 @@ function ctx(over: Partial<RowMenuCtx> = {}): RowMenuCtx {
 beforeEach(() => {
   useTabs.getState().reset()
   usePeek.getState().close()
+  resetOpenAsFullPage()
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
 })
 
@@ -82,10 +84,20 @@ describe('commonRowMenu', () => {
     expect(c.requestDelete).toHaveBeenCalledWith(r)
   })
 
-  test('test duplicate posts and peeks the copy', async () => {
+  test('test duplicate posts and opens the copy as a full page (M32)', async () => {
+    mocked.duplicateObject.mockResolvedValue({ path: 'Pages/Alpha (Copy).md', version: 'v2', summary: objectSummary({ path: 'Pages/Alpha (Copy).md' }) })
+    commonRowMenu(mk(), ctx()).find((i) => i.key === 'duplicate')!.onSelect()
+    await vi.waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Pages/Alpha (Copy).md' }))
+    expect(usePeek.getState().path).toBeNull()
+    expect(mocked.duplicateObject).toHaveBeenCalledWith('Pages/Alpha.md')
+  })
+
+  test('test with full pages off, duplicate peeks the copy and the view stays', async () => {
+    setOpenAsFullPage(false)
     mocked.duplicateObject.mockResolvedValue({ path: 'Pages/Alpha (Copy).md', version: 'v2', summary: objectSummary({ path: 'Pages/Alpha (Copy).md' }) })
     commonRowMenu(mk(), ctx()).find((i) => i.key === 'duplicate')!.onSelect()
     await vi.waitFor(() => expect(usePeek.getState().path).toBe('Pages/Alpha (Copy).md'))
+    expect(currentTarget(useTabs.getState())).toBeNull()
     expect(mocked.duplicateObject).toHaveBeenCalledWith('Pages/Alpha.md')
   })
 
