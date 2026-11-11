@@ -42,17 +42,17 @@ export interface MergeStrings {
 export const MERGE_OBJECT: MergeStrings = {
   submenuTitle: 'Merge into',
   preparing: 'Loading…',
-  nothingFound: 'No other objects found',
+  nothingFound: 'No other notes found',
   confirmTitle: (s, t) => `Merge “${s}” into “${t}”?`,
   confirmDescription: (s, t) =>
     `“${t}” keeps the single values it already has, picks up the list items from “${s}”, which also fills any properties that are blank. Its content goes at the end.`,
   confirmText: 'Merge',
-  loading: 'Merging objects…',
-  success: 'Objects merged',
-  error: 'Could not merge objects',
-  errorTooLarge: 'Too many references to merge this object',
+  loading: 'Merging notes…',
+  success: 'Notes merged',
+  error: 'Could not merge notes',
+  errorTooLarge: 'Too many references to merge this note',
   errorTooLargeDescription: (limit) =>
-    `A merge can move at most ${limit} references. Pick a smaller object to merge here, or drop some of its links before trying again.`,
+    `A merge can move at most ${limit} references. Pick a smaller note to merge here, or drop some of its links before trying again.`,
 }
 
 export const MERGE_TAG: MergeStrings = {
@@ -67,7 +67,7 @@ export const MERGE_TAG: MergeStrings = {
   error: 'Could not merge tags',
   errorTooLarge: 'Too many references to merge this tag',
   errorTooLargeDescription: (limit) =>
-    `A merge can move at most ${limit} references. Pick a smaller tag to merge here, or untag some objects before trying again.`,
+    `A merge can move at most ${limit} references. Pick a smaller tag to merge here, or untag some notes before trying again.`,
 }
 
 /** Our string (the cancel button). */

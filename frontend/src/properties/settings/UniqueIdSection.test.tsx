@@ -92,7 +92,7 @@ describe('UniqueIdSection', () => {
     expect(prefixBox().value).toBe('A-')
   })
 
-  test('"Number existing objects" numbers them and reports how many', async () => {
+  test('"Number existing notes" numbers them and reports how many', async () => {
     const user = userEvent.setup()
     const answered = taskType({ prefix: 'TASK-', nextNumber: 15 })
     vi.mocked(api.numberExistingObjects).mockResolvedValue({
@@ -103,7 +103,7 @@ describe('UniqueIdSection', () => {
     })
     open({ prefix: 'TASK-', nextNumber: 12 })
     await user.click(screen.getByRole('button', { name: UNIQUE_ID_TEXT.numberExisting }))
-    expect(await screen.findByText('Numbered 3 objects')).toBeInTheDocument()
+    expect(await screen.findByText('Numbered 3 notes')).toBeInTheDocument()
     expect(api.numberExistingObjects).toHaveBeenCalledWith('task', 'p-id', 'r1')
     // The answered type is adopted: the next ID moves on.
     expect(useLinkIndex.getState().types.find((t) => t.id === 'task')?.revision).toBe('r2')
@@ -120,7 +120,7 @@ describe('UniqueIdSection', () => {
     })
     open({ prefix: '', nextNumber: 1 })
     await user.click(screen.getByRole('button', { name: UNIQUE_ID_TEXT.numberExisting }))
-    expect(await screen.findByText('Numbered 1 object (1 file could not be changed)')).toBeInTheDocument()
+    expect(await screen.findByText('Numbered 1 note (1 file could not be changed)')).toBeInTheDocument()
   })
 
   test('a revision conflict reloads the index and says so', async () => {
@@ -154,7 +154,7 @@ describe('Email, Phone and Files', () => {
     expect(screen.getByRole('textbox', { name: 'Description' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Visibility' })).toBeInTheDocument()
     expect(screen.getByText('This property type cannot be changed.')).toBeInTheDocument()
-    for (const heading of ['Format', 'Formula', 'Rollup', 'ID', 'Linked object type', 'Label set']) {
+    for (const heading of ['Format', 'Formula', 'Rollup', 'ID', 'Linked type', 'Label set']) {
       expect(screen.queryByRole('region', { name: heading })).toBeNull()
     }
   })

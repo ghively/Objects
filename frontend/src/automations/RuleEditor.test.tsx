@@ -69,7 +69,7 @@ describe('RuleEditorDialog', () => {
     })
     const dialog = screen.getByRole('dialog', { name: 'New automation' })
     expect(within(dialog).getByRole('button', { name: 'Trigger' })).toHaveTextContent('A button is pressed')
-    expect(within(dialog).getByRole('button', { name: 'Objects' })).toHaveTextContent('Task')
+    expect(within(dialog).getByRole('button', { name: 'Notes' })).toHaveTextContent('Task')
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
     await waitFor(() =>
       expect(mocked.createAutomation).toHaveBeenCalledWith({
@@ -118,7 +118,7 @@ describe('RuleEditorDialog', () => {
     })
     await user.click(screen.getByRole('button', { name: 'Trigger' }))
     await user.click(await screen.findByRole('menuitemradio', { name: 'On a schedule' }))
-    expect(screen.getByText('Scheduled automations run without an object, so they have no conditions.')).toBeInTheDocument()
+    expect(screen.getByText('Scheduled automations run without a note, so they have no conditions.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(mocked.createAutomation).toHaveBeenCalledTimes(1))
     const sent = mocked.createAutomation.mock.calls[0][0]

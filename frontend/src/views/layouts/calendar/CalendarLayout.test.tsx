@@ -310,7 +310,7 @@ describe('CalendarLayout create', () => {
   test('the day\'s "+" button creates too', () => {
     const onCreate = vi.fn()
     render(<Harness rows={UNDATED} onCreate={onCreate} />)
-    fireEvent.click(screen.getByRole('button', { name: 'New object on November 9, 2026' }))
+    fireEvent.click(screen.getByRole('button', { name: 'New note on November 9, 2026' }))
     expect(onCreate).toHaveBeenCalledWith({ due: { start: '2026-11-09', resolution: 'day' } }, 'task')
   })
 
@@ -332,12 +332,12 @@ describe('CalendarLayout create', () => {
     expect(screen.getByTestId('calendar-layout').getAttribute('data-property')).toBe('lastBoot')
     fireEvent.click(cellOf('2026-11-18'))
     expect(onCreate).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: /New object on/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /New note on/ })).toBeNull()
   })
 
   test('without onCreate a day click does nothing', () => {
     render(<Harness rows={UNDATED} />)
-    expect(screen.queryByRole('button', { name: /New object on/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /New note on/ })).toBeNull()
   })
 })
 

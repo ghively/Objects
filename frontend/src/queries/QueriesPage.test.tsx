@@ -38,7 +38,7 @@ beforeEach(() => {
 describe('QueriesPage', () => {
   test('lists every query by title with its types and the automatic title of a custom one', async () => {
     render(<QueriesPage />)
-    const list = await screen.findByRole('list', { name: 'Queries' })
+    const list = await screen.findByRole('list', { name: 'Saved searches' })
     const rows = within(list).getAllByRole('listitem')
     expect(rows.map((r) => r.getAttribute('data-query-row'))).toEqual(['abc', 'zed'])
     expect(within(rows[1]).getByText('Zed list')).toBeInTheDocument()
@@ -49,8 +49,8 @@ describe('QueriesPage', () => {
   test('shows the empty state', async () => {
     mocked.queries.mockResolvedValue([])
     render(<QueriesPage />)
-    expect(await screen.findByText('No queries')).toBeInTheDocument()
-    expect(screen.getByText('Queries you save show up here.')).toBeInTheDocument()
+    expect(await screen.findByText('No saved searches')).toBeInTheDocument()
+    expect(screen.getByText('Searches you save show up here.')).toBeInTheDocument()
   })
 
   test('test Queries sidebar item opens QueriesPage listing every query; New creates and opens one', async () => {
@@ -64,9 +64,10 @@ describe('QueriesPage', () => {
         </main>
       </>,
     )
-    // "Queries" sits between the types by name, with no count.
-    const items = within(screen.getByRole('region', { name: 'Object Types' })).getAllByRole('listitem')
-    expect(items.map((i) => i.textContent)).toEqual(['Queries', 'Servers'])
+    // The sidebar row sits between the types by name, with no count. The sidebar is lane B's (M32):
+    // its section and row read "Types" and "Saved searches" once that lane is merged.
+    const items = within(screen.getByRole('region', { name: /^(Object Types|Types)$/ })).getAllByRole('listitem')
+    expect(items.map((i) => i.textContent)).toEqual([expect.stringMatching(/^(Queries|Saved searches)$/), 'Servers'])
     await user.click(within(items[0]).getByRole('button'))
     expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'queries' }, { newTab: false })
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'queries' })

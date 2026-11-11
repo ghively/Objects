@@ -3,10 +3,13 @@
  * types (a type shows its object count), "Restore", "Delete permanently", and "Empty Trash", which
  * asks the user to type "Delete". Entries are removed after 30 days.
  * M14: deleted automations are listed too ("Automation"), restored under their id.
+ * M32: the words are the glossary's ("note", "type", "saved search"), and a type's name and folder
+ * read as the screen names the type ("Daily note · Daily notes/2026-11-11.md"); the row's tooltip
+ * keeps the path as it is on disk.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/api/client'
-import type { TrashItem } from '@/api/types'
+import type { TrashItem, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import {
   AlertDialog,
@@ -19,12 +22,14 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
+import { typeLabel, typePlural, type TypeNames } from '@/lib/typeLabel'
+import { SAVED_SEARCH, SAVED_SEARCH_LOWER } from '@/lib/words'
 import { formatInZone } from '@/lib/zonedTime'
-import { invalidateLinkIndex } from '@/links/linkIndex'
+import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 
 export const TRASH_TEXT = {
   heading: 'Trash',
-  info: 'Objects and object types are kept in the Trash for 30 days and are then removed completely. Object types and collections cannot be restored completely. This is Object\'s own Trash, separate from your computer\'s.',
+  info: 'Notes and types are kept in the Trash for 30 days and are then removed completely. Types and collections cannot be restored completely. This is Object\'s own Trash, separate from your computer\'s.',
   empty: 'Trash is empty',
   restore: 'Restore',
   deletePermanently: 'Delete permanently',
@@ -32,7 +37,7 @@ export const TRASH_TEXT = {
   emptyConfirmDescription: (count: number) =>
     `${count === 1 ? 'Delete the one entry' : `Delete all ${count} entries`} in the Trash for good? You won't be able to get ${count === 1 ? 'it' : 'them'} back.`,
   purgeConfirmTitle: 'Delete permanently?',
-  /** Names what goes: an object, an object type or collection with its objects, a query or an automation. */
+  /** Names what goes: a note, a type or collection with its notes, a saved search or an automation. */
   purgeConfirmDescription: (item: Pick<TrashItem, 'kind' | 'objectCount'> | null) => {
     const what = item ? purgeSubject(item) : TRASH_TEXT.objects(1)
     const many = item !== null && item.kind !== 'object' && (item.objectCount ?? 0) > 0
@@ -41,12 +46,12 @@ export const TRASH_TEXT = {
   cancel: 'Cancel',
   typeToConfirm: 'Enter "Delete" to go ahead',
   confirmWord: 'Delete',
-  objectType: 'Object type',
+  objectType: 'Type',
   collection: 'Collection',
-  query: 'Query',
+  query: SAVED_SEARCH,
   /** M14 (our string). */
   automation: 'Automation',
-  objects: (n: number) => `${n} object${n === 1 ? '' : 's'}`,
+  objects: (n: number) => `${n} note${n === 1 ? '' : 's'}`,
 }
 
 const ENTRY_ICON: Partial<Record<TrashItem['kind'], string>> = {
@@ -61,12 +66,46 @@ function entryCount(i: TrashItem): number {
   return i.kind === 'type' || i.kind === 'collection' ? 1 + (i.objectCount ?? 0) : 1
 }
 
-/** The thing a "Delete permanently" asks about: "1 object", "this object type and its 3 objects", "this query". */
+/** The thing a "Delete permanently" asks about: "1 note", "this type and its 3 notes", "this saved search". */
 function purgeSubject(i: Pick<TrashItem, 'kind' | 'objectCount'>): string {
   if (i.kind === 'object') return TRASH_TEXT.objects(1)
-  const noun = i.kind === 'type' ? 'object type' : i.kind
+  const noun = i.kind === 'query' ? SAVED_SEARCH_LOWER : i.kind
   const n = i.objectCount ?? 0
   return n > 0 ? `this ${noun} and its ${TRASH_TEXT.objects(n)}` : `this ${noun}`
+}
+
+/** The built-in types as they are stored, for an entry whose type is itself gone (in the Trash). */
+const BUILT_IN: readonly (TypeNames & { id: string })[] = [
+  { id: 'page', name: 'Page', pluralName: 'Pages' },
+  { id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes' },
+]
+
+/** The built-in type stored under `value` (its name or plural), when the space no longer has that type. */
+function goneBuiltIn(value: string, key: 'name' | 'pluralName', types: readonly TypeDef[]): TypeNames | undefined {
+  const builtIn = BUILT_IN.find((b) => b[key] === value)
+  return builtIn && !types.some((t) => t.id === builtIn.id) ? builtIn : undefined
+}
+
+/** A deleted note's type as the screen names it ("Page" reads "Note", "DailyNote" reads "Daily note"). */
+export function trashTypeLabel(typeName: string, types: readonly TypeDef[]): string {
+  return typeLabel(types.find((t) => t.name === typeName) ?? goneBuiltIn(typeName, 'name', types), typeName)
+}
+
+/**
+ * Where a deleted note was, with its type's folder named as the screen names the type
+ * ("DailyNotes/2026-11-11.md" reads "Daily notes/2026-11-11.md"). Any other folder is shown as it is.
+ */
+export function trashPathLabel(path: string, types: readonly TypeDef[]): string {
+  const cut = path.indexOf('/')
+  if (cut < 0) return path
+  const folder = path.slice(0, cut)
+  const t = types.find((x) => (x.folder || x.pluralName) === folder) ?? goneBuiltIn(folder, 'pluralName', types)
+  return t ? `${typePlural(t) || folder}${path.slice(cut)}` : path
+}
+
+/** A trashed type's name as the screen names it (the built-in Page reads "Note"). */
+function trashedTypeTitle(item: TrashItem): string {
+  return typeLabel({ id: item.type, name: item.title, pluralName: '' })
 }
 
 function formatDeletedAt(iso: string): string {
@@ -81,6 +120,9 @@ export function TrashView() {
   const [confirmEmpty, setConfirmEmpty] = useState(false)
   const [typed, setTyped] = useState('')
   const [purging, setPurging] = useState<TrashItem | null>(null)
+  const types = useLinkIndex((s) => s.types)
+  /** What a row is called: a trashed type by the name the screen gives it, anything else by its title. */
+  const nameOf = (item: TrashItem) => (item.kind === 'type' && item.title ? trashedTypeTitle(item) : item.title || item.name)
 
   const load = useCallback(() => {
     return api
@@ -145,13 +187,13 @@ export function TrashView() {
             {visible.map((item) => (
               <li
                 key={item.id}
-                aria-label={item.title || item.name}
+                aria-label={nameOf(item)}
                 className="flex min-h-12 items-center gap-2.5 border-b border-line/60 px-2 py-1.5 last:border-b-0"
               >
                 <Icon name={ENTRY_ICON[item.kind] ?? 'ph-file-text'} size={18} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-medium">{item.title || item.name}</p>
-                  <p className="truncate text-[13px] text-fg-muted">
+                  <p className="truncate text-[15px] font-medium">{nameOf(item)}</p>
+                  <p className="truncate text-[13px] text-fg-muted" title={item.kind === 'object' ? item.originalPath : undefined}>
                     {item.kind === 'type'
                       ? `${TRASH_TEXT.objectType} · ${TRASH_TEXT.objects(item.objectCount ?? 0)}`
                       : item.kind === 'collection'
@@ -160,7 +202,7 @@ export function TrashView() {
                           ? TRASH_TEXT.query
                           : item.kind === 'automation'
                             ? TRASH_TEXT.automation
-                            : `${item.type} · ${item.originalPath}`}
+                            : `${trashTypeLabel(item.type, types)} · ${trashPathLabel(item.originalPath, types)}`}
                     {' · '}
                     {formatDeletedAt(item.deletedAt)}
                   </p>

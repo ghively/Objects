@@ -346,6 +346,10 @@ Each starter template pre-fills the new type's properties.
   - Text, number, checkbox, label: not specified yet.
   - Label, a new status (M32): "Create" in an empty status section makes "New status" and opens "Edit label"
     with that name selected, so typing replaces it.
+  - Property wording (M32): Add Property lists "Link" (was "Object": "Points to one or more notes") and "Link to
+    a type" (was "Object Select"; its list is "Search types"); the system type property is named "Type"; property
+    settings say "note" where they said "object" ("Linked type", "Allow one linked note, or several.", "Number
+    existing notes"). A relation's picker reads "Search for notes".
 - **Property name** (a property label's menu, and "Name" in Property settings): Enter or leaving the field commits
   the new name; Escape goes back only to the last committed name, so Enter then Escape keeps the new one (Escape
   in Property settings closes the dialog).
@@ -411,12 +415,22 @@ Each starter template pre-fills the new type's properties.
   it); zoom in and out go to the next step and the menu shows the zoom now, wheel zooms included. Download is "Export
   view as PNG"; the settings dropdown is Customize. The search field ("Find a note in this graph", Object's own)
   stays in the header. The local graph panel keeps its compact toolbar.
+- **Graph wording** (M32): the count reads "N notes shown" ("1 note shown"), the list is headed "Notes in this
+  graph", the settings dropdown's rows read "Filter types", "Exclude types" and "Hide heavily linked notes", the
+  first loading step is "Reading notes", and the type lists name a type as the rest of the screen does ("Notes",
+  "Daily notes").
 - **Edge labels** (Object's own, M28): a link made by a relation property is labelled with the relation's name
   ("Runs on"; a pair linked by relations both ways joins the names with " · "); a link from body text only has no
   label. Labels show only on the hovered node's edges, or on the local graph centre's while nothing is hovered,
   and "Show simplified graph" hides them with the node labels.
 - **Trash**: a list of deleted objects, "Empty Trash", 30-day retention, and "object types and collections cannot
   be restored completely".
+- **Trash wording** (M32): the note reads "Notes and types are kept in the Trash for 30 days and are then removed
+  completely. Types and collections cannot be restored completely. …"; a row's second line names the kind "Type",
+  "Collection", "Saved search" or "Automation" with "N notes" where it takes notes with it, and for a deleted note
+  its type and where it was, both as the screen names the type ("Daily note · Daily notes/2026-11-11.md", "Note ·
+  Notes/Plan.md"; the path as it is on disk is the line's tooltip). "Delete permanently?" asks about "1 note",
+  "this type and its 3 notes" or "this saved search".
 - **Explore** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
   (objects related to the page you are on) with "Find More". Toggled with Ctrl+Shift+Right; the tooltip reads
   "Hide sidepanel".
@@ -448,6 +462,12 @@ Each starter template pre-fills the new type's properties.
   - Type page header: type icon + plural name; search icon; `...` (New collection, Pin to sidebar, Pin to…,
     Object type settings, Import CSV, Save as query, Delete object type; "New from template" is in the sidebar's
     type menu); a split "New" button.
+- **View wording** (M32): a row's menu reads Select multiple, Open in side panel, Open in new tab, Change type,
+  "Copy reference" (toast "Link copied"), Duplicate, "Delete"; the selection bar's bin is "Delete". An empty view
+  says "Create a note to see it here." with a "Create Note" button (the view's one type) or "Create note". A filter's
+  picked values read "1 selected" / "N selected"; a chart's Y axis offers "Count"; the calendar's day button is "New
+  note on <day>"; "A table can show only one type at a time.". A type's name in chips, cards, the Type column,
+  filters and "Change type" reads as the screen names the type ("Note", "Daily note").
 - **Filter editor** (decision C1; `views/FilterEditor.tsx`, `views/filter.ts`):
   - Popover body: rows that start "where", then the group operator (a menu "and | or" on the second row, plain
     text on the rest), Property, Operator, value editor and a `…` menu (Turn into group, Remove; Remove only, one
@@ -478,6 +498,8 @@ Each starter template pre-fills the new type's properties.
     grouping.
   - Options: status label default | By category; long text By Text | By Linked Objects; number By Exact Value |
     By Range (Min, Max, Group every); date By Hour | By Day | By Week | By Month | By Year | Relative | Scheduled.
+  - Wording (M32): the long-text option reads "By Linked Notes"; a group by type is headed as the screen names the
+    type ("Note", "Daily note").
   - Group order: label Order | Order inverse, others default; then ascending, descending, (relations: Created
     oldest first, Created newest first), smallest first, largest first, Manual.
   - Long text with paragraphs, files, steps, text lists and floor items can't be grouped.
@@ -516,6 +538,13 @@ Each starter template pre-fills the new type's properties.
     query's page lists, in its order (`backend/objectapp/queryeval.py`, the server's port of `runQuery.ts`): every
     part above applies, a search pauses filters and sorts (`paused`), and a query that isn't ready lists nothing.
     Objects excluded from AI stay out. The ad-hoc `POST /api/v1/query` (MCP `query`) takes the same parts.
+  - **Saved searches** (M32, the screen's name for queries; the files, the API route and the MCP tool keep theirs):
+    the list is headed "Saved searches" (empty: "No saved searches" / "Searches you save show up here."). A saved
+    search's page has "Edit saved search" / "Close editor", `…` with "Pin to type" / "Unpin from type", and the
+    draft note "Saved search isn’t ready" / "… until it has a search term, a tag or a type."; the builder's rows
+    read "Add type" and "Exclude types". An automatic title names the built-in types as the screen does ("Tasks,
+    Notes tagged work …", "Daily notes"). The Search page's button is "Save search"; Version History says "Change
+    this saved search and its versions start to show up here."
 - **Query builder search mode**: Auto | Title. Auto looks for the words in titles, aliases, descriptions and text (a
   case-folded substring); Title looks in titles only. Exact and Semantic are hidden until real full-text search exists
   (Gene's decision Q-1: they matched exactly like Auto). A saved query that uses one still runs as Auto (the
@@ -541,6 +570,10 @@ Each starter template pre-fills the new type's properties.
   name, view toolbar, "Search title...", `...` (the page's menu, plus "Add existing"), New (split when the type has
   templates) and "Open as page" (expand: the tab page); the type chip opens the type's page. "+ New object" opens the
   new object in the object peek over the collection's. The peek closes when the main view goes elsewhere.
+- **Collection wording** (M32): the row reads "+ New note"; an empty collection says "Nothing in this collection
+  yet. Add a new note or an existing one."; "Add existing" searches "Search notes" ("No notes to add."); the type
+  chip and the "New" menu name a type as the screen does ("Notes", "New Note"); deleting says "1 note is affected."
+  / "N notes are affected.".
 - **Outline popover** (hover the dash column at the right edge, in a peek or full page): tabs "Outline" and
   "Stats" and a pin button. Outline lists headings indented by level with an active marker on the left; click
   scrolls. Stats: Words, Sentences, Paragraphs, Characters, Created At, Last Updated.
@@ -827,6 +860,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   doesn't block Apply; a relation property is kept when it points at an existing type or one proposed in the same
   proposal, else it is left out ("It points at Vault, which is neither a type in this space nor one proposed here; it
   stays a plain link.") (M31 fix pass).
+- **Import wording** (M32): the import dialog, the batch panel and the AI filing steps say "note" where they said
+  "object" ("12 notes, 2 types, 4 attachments", "Writing notes", **Keep originals as** Attachments | File notes,
+  "Trial on the first 50 notes", "Not made into notes"), and "Make types from" offers "Nothing (everything is a
+  Note)". The Import report file keeps its own words.
 - **Trial on the first 50 objects**: **Start trial**; each result shows a confidence (High, Medium, Low), the value
   and its **Quote**, the **Tags** and **Collections** it adds (each with its quote), and **Right** / **Wrong** marks with an accuracy line ("N of M marked right (P%)"); a value that
   failed the app's check says **Did not pass the check**. **Continue with the rest** starts the bulk pass (40 objects

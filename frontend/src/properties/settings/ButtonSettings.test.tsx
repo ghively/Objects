@@ -65,7 +65,7 @@ describe('ButtonSettingsSection', () => {
     const dialog = await screen.findByRole('dialog', { name: 'New automation' })
     expect(dialog).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Start review')
-    expect(screen.getByRole('button', { name: 'Objects' })).toHaveTextContent('Task')
+    expect(screen.getByRole('button', { name: 'Notes' })).toHaveTextContent('Task')
     await user.click(screen.getByRole('button', { name: '+ Add action' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Send a notification' }))
     await user.click(screen.getByRole('button', { name: 'Save' }))

@@ -41,8 +41,8 @@ describe('Toolbox', () => {
       'Move',
       TOOLBOX_TEXT.choosePointer,
       'Text',
-      'Existing object',
-      'New object',
+      'Existing note',
+      'New note',
       'Media',
       TOOLBOX_TEXT.chooseMedia,
       'Shapes',
@@ -63,8 +63,8 @@ describe('Toolbox', () => {
     const user = userEvent.setup()
     const p = setup({ tool: 'text' })
     expect(screen.getByRole('button', { name: 'Text' })).toHaveAttribute('aria-pressed', 'true')
-    await user.click(screen.getByRole('button', { name: 'Existing object' }))
-    await user.click(screen.getByRole('button', { name: 'New object' }))
+    await user.click(screen.getByRole('button', { name: 'Existing note' }))
+    await user.click(screen.getByRole('button', { name: 'New note' }))
     await user.click(screen.getByRole('button', { name: 'Frame' }))
     expect(p.onTool).toHaveBeenNthCalledWith(1, 'link')
     expect(p.onTool).toHaveBeenNthCalledWith(2, 'create')
@@ -160,7 +160,7 @@ describe('Toolbox', () => {
     const unlock = screen.getByRole('button', { name: 'Unlock whiteboard' })
     await user.click(unlock)
     expect(p.onLock).toHaveBeenCalledWith(false)
-    for (const name of ['Text', 'Existing object', 'New object', 'Shapes', 'Frame']) {
+    for (const name of ['Text', 'Existing note', 'New note', 'Shapes', 'Frame']) {
       expect(screen.getByRole('button', { name })).toBeDisabled()
     }
     expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled()
@@ -185,7 +185,7 @@ describe('Toolbox', () => {
     const user = userEvent.setup()
     const seen: WhiteboardTool[] = []
     setup({ settings: engineering, onTool: (t) => seen.push(t) })
-    for (const b of screen.getAllByRole('button', { name: /Text|Existing object|New object|Frame/ })) await user.click(b)
+    for (const b of screen.getAllByRole('button', { name: /Text|Existing note|New note|Frame/ })) await user.click(b)
     expect(seen).toEqual(['text', 'link', 'create', 'frame'])
   })
 })

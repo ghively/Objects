@@ -115,11 +115,11 @@ describe('quick-create on a connector drop', () => {
     dropConnector('a', 700, 300)
     const menu = await screen.findByRole('menu', { name: WB.quickCreateObjects.text })
     const m = within(menu)
-    // Objects: Create Object, Link Object, Link {name} per type; Shapes; Nothing; Remove.
-    expect(m.getByText('Objects')).toBeTruthy()
-    expect(m.getByRole('menuitem', { name: 'Create Object' })).toBeTruthy()
-    expect(m.getByRole('menuitem', { name: 'Link Object' })).toBeTruthy()
-    expect(m.getByRole('menuitem', { name: 'Link Page' })).toBeTruthy()
+    // Notes: Create note, Link any note, Link {name} per type; Shapes; Nothing; Remove.
+    expect(m.getByText('Notes')).toBeTruthy()
+    expect(m.getByRole('menuitem', { name: 'Create note' })).toBeTruthy()
+    expect(m.getByRole('menuitem', { name: 'Link any note' })).toBeTruthy()
+    expect(m.getByRole('menuitem', { name: 'Link Note' })).toBeTruthy()
     expect(m.getByRole('menuitem', { name: 'Link Person' })).toBeTruthy()
     expect(m.getByText('Shapes')).toBeTruthy()
     for (const shape of ['Rectangle', 'Ellipse', 'Diamond', 'Parallelogram', 'Triangle', 'Star', 'Bubble', 'Arrow right', 'Heart']) {
@@ -137,7 +137,7 @@ describe('quick-create on a connector drop', () => {
     const { store } = renderCanvas(sourceBoard(), h)
     await act(async () => {})
     dropConnector('a', 700, 300)
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Object' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create note' }))
     // The type picker; picking a type creates the object through the host.
     const picker = await screen.findByRole('dialog', { name: WB.toolCreate.text })
     fireEvent.click(await within(picker).findByText('Person'))

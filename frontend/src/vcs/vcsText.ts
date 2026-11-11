@@ -83,7 +83,7 @@ export const VCS_TEXT = {
   gitVersions: 'In version control',
   gitVersion: (short: string) => `Commit ${short}`,
   gitRestoreDescription: (short: string) =>
-    `Bring back the object as it was in ${short}? The current state is committed first, and the restore is a new version.`,
+    `Bring back the note as it was in ${short}? The current state is committed first, and the restore is a new version.`,
 } as const
 
 export function formatWhen(at: string | null | undefined): string {

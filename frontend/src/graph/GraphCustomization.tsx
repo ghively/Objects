@@ -1,4 +1,5 @@
 // The graph's "Customize" popover: the graph filters and their labels. Shared by the global graph and the local graph panel.
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 import type { GraphCustomization as Custom, TypeDef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -8,16 +9,16 @@ import { LARGE_NODE_LIMIT } from './filterGraph'
 
 export const CUSTOMIZATION_TEXT = {
   customize: 'Customize',
-  filterObjectTypes: 'Filter object types',
-  excludeObjectTypes: 'Exclude object types',
+  filterObjectTypes: 'Filter types',
+  excludeObjectTypes: 'Exclude types',
   deselectAll: 'Deselect all',
   showCompletedTasks: 'Show completed tasks',
   alwaysMinimalNodes: 'Show simplified graph',
-  hideLargeNodes: 'Hide heavily linked objects',
+  hideLargeNodes: 'Hide heavily linked notes',
   hideLargeNodesTooltip: (limit: number) => `Nodes with more than ${limit} links are hidden`,
   hideDates: 'Hide dates',
   hideIndirectLinks: 'Hide indirect links',
-  hideIndirectLinksTooltip: 'A link that runs only through hidden objects is hidden too.',
+  hideIndirectLinksTooltip: 'A link that runs only through hidden notes is hidden too.',
   showTagsNetwork: 'Show tags network',
 }
 
@@ -78,7 +79,7 @@ function TypeList({
                   {on && <Icon name="ph-check-bold" size={10} />}
                 </span>
                 <IconOrEmoji icon={t.icon} size={14} fallback="ph-cube" />
-                <span className="truncate">{t.pluralName || t.name}</span>
+                <span className="truncate">{typePlural(t) || typeLabel(t)}</span>
               </button>
             </li>
           )

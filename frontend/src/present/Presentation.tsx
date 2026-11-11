@@ -34,7 +34,7 @@ export const PRESENTATION_TEXT = {
   /** Our string: the dialog's accessible name. */
   label: 'Presentation',
   /** Our string: the object could not be read. */
-  loadFailed: 'This object could not be opened.',
+  loadFailed: 'This note could not be opened.',
 } as const
 
 const noop = () => undefined

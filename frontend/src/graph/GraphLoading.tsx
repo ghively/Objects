@@ -1,7 +1,7 @@
 // The step lines shown while the graph loads and lays out.
 
 export const LOADING_STEPS = [
-  'Reading objects',
+  'Reading notes',
   'Calculating connections',
   'Applying filters',
   'Arranging the layout',

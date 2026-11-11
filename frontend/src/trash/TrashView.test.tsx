@@ -11,7 +11,8 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { useSettings } from '@/settings/useSettings'
-import { TrashView } from './TrashView'
+import { typeDef } from '@/test/mockApi'
+import { TrashView, trashPathLabel, trashTypeLabel } from './TrashView'
 
 const mocked = vi.mocked(api)
 
@@ -73,28 +74,30 @@ describe('TrashView', () => {
     const list = await screen.findByRole('list', { name: 'Trash' })
     expect(within(list).getAllByRole('listitem').map((li) => li.getAttribute('aria-label'))).toEqual(['Tooling', 'Open'])
     const coll = within(list).getByRole('listitem', { name: 'Tooling' })
-    expect(coll).toHaveTextContent('Collection · 2 objects')
+    expect(coll).toHaveTextContent('Collection · 2 notes')
     expect(coll).not.toHaveTextContent('.object')
     // Icons render once their bundled set has loaded.
     await waitFor(() => expect(coll.querySelector('[data-icon="ph-cards-three"]')).not.toBeNull())
     await waitFor(() =>
       expect(within(list).getByRole('listitem', { name: 'Open' }).querySelector('[data-icon="ph-list-magnifying-glass"]')).not.toBeNull(),
     )
-    expect(within(list).getByRole('listitem', { name: 'Open' })).toHaveTextContent(/^OpenQuery · /)
+    expect(within(list).getByRole('listitem', { name: 'Open' })).toHaveTextContent(/^OpenSaved search · /)
     await user.click(screen.getByRole('button', { name: 'Empty Trash' }))
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toHaveTextContent('Delete all 4 entries in the Trash for good?')
     expect(dialog).not.toHaveTextContent('(s)')
   })
 
-  test('lists objects and types (a type with its object count), with the 30-day info', async () => {
+  test('lists notes and types (a type with its note count), with the 30-day info', async () => {
     render(<TrashView />)
     const list = await screen.findByRole('list', { name: 'Trash' })
     expect(within(list).getAllByRole('listitem').map((li) => li.getAttribute('aria-label'))).toEqual(['Note', 'Book'])
-    expect(within(list).getByRole('listitem', { name: 'Book' })).toHaveTextContent('3 objects')
+    expect(within(list).getByRole('listitem', { name: 'Book' })).toHaveTextContent('Type · 3 notes')
     const info = screen.getByText(/30 days/)
     expect(info).not.toHaveTextContent(/Windows/)
-    expect(info).toHaveTextContent('Object types and collections cannot be restored completely.')
+    expect(info).toHaveTextContent('Notes and types are kept in the Trash for 30 days')
+    expect(info).toHaveTextContent('Types and collections cannot be restored completely.')
+    expect(info).not.toHaveTextContent(/object type|Objects/)
   })
 
   test('test Empty Trash requires typing "Delete"', async () => {
@@ -142,7 +145,7 @@ describe('TrashView', () => {
     const row = await screen.findByRole('listitem', { name: 'Note' })
     await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
     const dialog = await screen.findByRole('alertdialog', { name: 'Delete permanently?' })
-    expect(dialog).toHaveTextContent("Delete 1 object for good? You won't be able to get it back.")
+    expect(dialog).toHaveTextContent("Delete 1 note for good? You won't be able to get it back.")
     expect(dialog).not.toHaveTextContent('(s)')
     expect(mocked.purge).not.toHaveBeenCalled()
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
@@ -154,16 +157,16 @@ describe('TrashView', () => {
     await waitFor(() => expect(mocked.purge).toHaveBeenCalledWith('o1'))
   })
 
-  test('a type row counts the type and its objects', async () => {
+  test('a type row counts the type and its notes', async () => {
     const user = userEvent.setup()
     render(<TrashView />)
     const row = await screen.findByRole('listitem', { name: 'Book' })
     await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
     const dialog = await screen.findByRole('alertdialog', { name: 'Delete permanently?' })
-    expect(dialog).toHaveTextContent('Delete this object type and its 3 objects for good?')
+    expect(dialog).toHaveTextContent('Delete this type and its 3 notes for good?')
   })
 
-  test('purging a query names the query, not "object(s)"', async () => {
+  test('purging a saved search names it, not "note(s)"', async () => {
     entries = [
       { id: 'q1', kind: 'query', originalPath: '.object/queries/open.json', title: 'Open', type: '', deletedAt: NOTE.deletedAt, queryId: 'open', name: 'Open' },
     ]
@@ -172,8 +175,66 @@ describe('TrashView', () => {
     const row = await screen.findByRole('listitem', { name: 'Open' })
     await user.click(within(row).getByRole('button', { name: 'Delete permanently' }))
     const dialog = await screen.findByRole('alertdialog', { name: 'Delete permanently?' })
-    expect(dialog).toHaveTextContent('Delete this query for good?')
+    expect(dialog).toHaveTextContent('Delete this saved search for good?')
     expect(dialog).not.toHaveTextContent('(s)')
+  })
+})
+
+// M32 (notes first): the Trash names a type as the rest of the screen does.
+describe('TrashView type names (M32)', () => {
+  const DAILY: TrashItem = {
+    id: 'o9',
+    kind: 'object',
+    originalPath: 'DailyNotes/2026-11-10.md',
+    title: '2026-11-10',
+    type: 'DailyNote',
+    deletedAt: '2026-11-11T10:00:00.000Z',
+  }
+
+  test('test a deleted daily note reads Daily note and Daily notes, not DailyNotes', async () => {
+    useLinkIndex.setState({
+      types: [
+        typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true }),
+        typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true }),
+      ],
+    })
+    entries = [DAILY, NOTE]
+    render(<TrashView />)
+    const row = await screen.findByRole('listitem', { name: '2026-11-10' })
+    expect(row).toHaveTextContent('Daily note · Daily notes/2026-11-10.md · ')
+    expect(row).not.toHaveTextContent(/DailyNotes?/)
+    // The path as it is on disk stays one hover away.
+    expect(within(row).getByTitle('DailyNotes/2026-11-10.md')).toBeInTheDocument()
+    expect(screen.getByRole('listitem', { name: 'Note' })).toHaveTextContent('Note · Notes/Note.md · ')
+  })
+
+  test('test the built-in names read the same when the type itself is gone', () => {
+    expect(trashTypeLabel('DailyNote', [])).toBe('Daily note')
+    expect(trashPathLabel('DailyNotes/2026-11-10.md', [])).toBe('Daily notes/2026-11-10.md')
+    expect(trashTypeLabel('Page', [])).toBe('Note')
+    expect(trashPathLabel('Pages/Sub/Plan.md', [])).toBe('Notes/Sub/Plan.md')
+    // Any other type and folder is shown as it is stored.
+    expect(trashTypeLabel('Book', [])).toBe('Book')
+    expect(trashPathLabel('Books/Dune.md', [])).toBe('Books/Dune.md')
+    expect(trashPathLabel('loose.md', [])).toBe('loose.md')
+  })
+
+  test('test a type the user renamed keeps their name and folder', () => {
+    const renamed = [typeDef({ id: 'page', name: 'Doc', pluralName: 'Docs', basic: true })]
+    expect(trashTypeLabel('Doc', renamed)).toBe('Doc')
+    expect(trashPathLabel('Docs/Plan.md', renamed)).toBe('Docs/Plan.md')
+    // A leftover "Pages" folder is not the renamed type's: shown as it is.
+    expect(trashPathLabel('Pages/Old.md', renamed)).toBe('Pages/Old.md')
+    expect(trashTypeLabel('Page', renamed)).toBe('Page')
+  })
+
+  test('test a trashed built-in type is listed by the name the screen gives it', async () => {
+    entries = [
+      { id: 't9', kind: 'type', originalPath: '.object/types/page.json', title: 'Page', type: 'page', deletedAt: NOTE.deletedAt, objectCount: 2 },
+    ]
+    render(<TrashView />)
+    const row = await screen.findByRole('listitem', { name: 'Note' })
+    expect(row).toHaveTextContent('Type · 2 notes')
   })
 })
 

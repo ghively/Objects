@@ -28,14 +28,14 @@ export const LIST_LIMIT = 500
 export const RECENT_LIMIT = 10
 
 export const GRAPH_CONTROLS_TEXT = {
-  count: (n: number) => (n === 1 ? '1 object shown' : `${n.toLocaleString()} objects shown`),
+  count: (n: number) => (n === 1 ? '1 note shown' : `${n.toLocaleString()} notes shown`),
   openAsList: 'Open as list',
-  listHeading: 'Objects in this graph',
+  listHeading: 'Notes in this graph',
   listMore: (shown: number, total: number) => `${shown.toLocaleString()} of ${total.toLocaleString()} listed. Find the rest with the search field.`,
   recent: 'Recently opened',
   recentHeading: 'Recently opened',
   noRecent: 'Nothing you opened lately is in this graph.',
-  graphControls: 'Graph objects',
+  graphControls: 'Graph notes',
   viewControls: 'Graph view',
   zoomOut: 'Zoom out',
   zoomIn: 'Zoom in',

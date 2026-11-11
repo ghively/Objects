@@ -306,7 +306,7 @@ export function WhiteboardPage({
     } catch (err) {
       if (err instanceof ConflictError) {
         await loadDetail()
-        throw new Error('The object changed on disk. It has been reloaded; try again.', { cause: err })
+        throw new Error('This whiteboard changed on disk. It has been reloaded; try again.', { cause: err })
       }
       throw err
     }

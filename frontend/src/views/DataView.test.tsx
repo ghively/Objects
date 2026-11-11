@@ -197,8 +197,8 @@ describe('DataView', () => {
     const onCreate = vi.fn()
     render(<Harness rows={[]} onCreate={onCreate} />)
     expect(screen.getByText("Nothing to show yet.")).toBeInTheDocument()
-    expect(screen.getByText('Create an object to see it here.')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Create Page' }))
+    expect(screen.getByText('Create a note to see it here.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Create Note' }))
     expect(onCreate).toHaveBeenCalledWith({}, 'page')
   })
 

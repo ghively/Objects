@@ -1,6 +1,7 @@
 // The bar a data view shows while rows are selected ("Select multiple"): the count and the bulk
 // actions (change type, open in side panel, delete), plus the
 // bulk delete's confirmation. Change type runs the one-object dialog once per row (in the view).
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 import { useState } from 'react'
 import type { Row, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
@@ -28,7 +29,7 @@ export const SELECTION_TEXT = {
   selected: 'selected',
   changeType: 'Change the type of the selection',
   openInSidepanel: 'Open the selection in the side panel',
-  delete: 'Delete objects',
+  delete: 'Delete',
   deleteHeading: 'Delete?',
   deleteDescription: 'Check the list below before you confirm.',
   /** Our string. */
@@ -54,7 +55,7 @@ export function SelectionBar({ rows, types, onChangeType, onOpenInSidepanel, onD
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const editable = rows.filter((r) => !r.summary.readOnly && r.summary.template == null)
-  const targets = [...types].sort((a, b) => a.pluralName.localeCompare(b.pluralName))
+  const targets = [...types].sort((a, b) => typePlural(a).localeCompare(typePlural(b)))
 
   const confirm = async () => {
     setBusy(true)
@@ -89,7 +90,7 @@ export function SelectionBar({ rows, types, onChangeType, onOpenInSidepanel, onD
           {targets.map((t) => (
             <DropdownMenuItem key={t.id} onSelect={() => onChangeType(t)}>
               <TypeChip type={t} size={18} />
-              {t.name}
+              {typeLabel(t)}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

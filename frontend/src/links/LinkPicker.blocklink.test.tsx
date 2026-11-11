@@ -49,7 +49,7 @@ describe('@ at the start of an empty block', () => {
     await new Promise((r) => setTimeout(r, 20))
     expect(useLinkPicker.getState().range).toEqual({ from: end, to: end + 1 })
     render(<LinkPicker />)
-    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    const input = await screen.findByRole('textbox', { name: 'Search notes' })
     await screen.findByText('Ada Lovelace')
     fireEvent.change(input, { target: { value: 'ada' } })
     fireEvent.keyDown(input, { key: 'Enter' })

@@ -64,7 +64,7 @@ describe('GraphPage', () => {
     expect(screen.getByRole('heading', { name: 'Graph' })).toBeInTheDocument()
     const loading = screen.getByTestId('graph-loading')
     for (const step of LOADING_STEPS) expect(loading).toHaveTextContent(step)
-    expect(screen.getByText('Reading objects')).toHaveAttribute('data-state', 'active')
+    expect(screen.getByText('Reading notes')).toHaveAttribute('data-state', 'active')
     expect(screen.queryByTestId('graph-canvas')).toBeNull()
 
     await act(async () => resolve(DATA))

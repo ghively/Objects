@@ -166,7 +166,7 @@ describe('VersionHistoryDialog', () => {
     mocked.history.mockResolvedValue([])
     openDialog()
     expect(await screen.findByText('No earlier versions')).toBeTruthy()
-    expect(screen.getByText('Edit this object and its versions start to show up here.')).toBeTruthy()
+    expect(screen.getByText('Edit this note and its versions start to show up here.')).toBeTruthy()
     act(() => useVersionHistory.getState().close())
 
     mocked.history.mockRejectedValue(new ApiError(500, 'boom'))

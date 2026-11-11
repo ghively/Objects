@@ -5,6 +5,7 @@
 // values won't fit, "Don't import"). Every change goes to `onChange`; the dialog re-previews.
 // Each row is a labelled group inside a list item, so the lists keep their semantics (review O3);
 // "Add to" offers only the types imported notes can go into (`canReceiveImport`, finding 5).
+import { typeLabel } from '@/lib/typeLabel'
 import { useId, useState } from 'react'
 import { IMPORT_KINDS, type ImportMapping, type ImportPlannedType, type ImportPreview, type ImportSystemKey, type TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
@@ -207,7 +208,7 @@ function TypeRow({
                 <option value={NEW_TYPE}>{T.newType}</option>
                 {addTo.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name}
+                    {typeLabel(s)}
                   </option>
                 ))}
               </select>

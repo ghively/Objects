@@ -67,17 +67,17 @@ describe('type-constrained query tabs', () => {
     const user = userEvent.setup()
     mocked.queries.mockResolvedValue([Q(['book'])])
     render(<TypePage type={BOOK} />)
-    await user.click(await screen.findByRole('button', { name: 'Edit query' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit saved search' }))
     const lock = await screen.findByTestId('query-type-lock')
     expect(within(lock).getByText('Book')).toBeInTheDocument()
-    // No way to change the type: no "All", no remove, no "Add object type".
+    // No way to change the type: no "All", no remove, no "Add type".
     const builder = screen.getByTestId('query-builder')
-    expect(within(builder).queryByRole('button', { name: 'Add object type' })).toBeNull()
+    expect(within(builder).queryByRole('button', { name: 'Add type' })).toBeNull()
     expect(within(builder).queryByRole('button', { name: 'All' })).toBeNull()
     expect(within(builder).queryByRole('button', { name: 'Remove Book' })).toBeNull()
     expect(within(lock).getByRole('button', { name: BUILDER_TEXT.releaseConstraint })).toHaveAttribute(
       'title',
-      'Makes this a regular query that can cover any type. It opens as its own page and leaves the dashboard of this type.',
+      'Makes this a regular saved search that can cover any type. It opens as its own page and leaves the dashboard of this type.',
     )
   })
 
@@ -85,7 +85,7 @@ describe('type-constrained query tabs', () => {
     const user = userEvent.setup()
     mocked.queries.mockResolvedValue([Q(['book'])])
     render(<TypePage type={BOOK} />)
-    await user.click(await screen.findByRole('button', { name: 'Edit query' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit saved search' }))
     await user.click(await screen.findByRole('button', { name: BUILDER_TEXT.releaseConstraint }))
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'query', id: 'q1' })
     expect(screen.queryByRole('tab', { name: 'Unread' })).toBeNull()
@@ -101,18 +101,18 @@ describe('type-constrained query tabs', () => {
     const user = userEvent.setup()
     mocked.queries.mockResolvedValue([Q(['book', 'page'])])
     render(<TypePage type={BOOK} />)
-    await user.click(await screen.findByRole('button', { name: 'Edit query' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit saved search' }))
     expect(await screen.findByTestId('query-builder')).toBeInTheDocument()
     expect(screen.queryByTestId('query-type-lock')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Add object type' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add type' })).toBeInTheDocument()
   })
 
   test('the builder edits the query from the tab', async () => {
     const user = userEvent.setup()
     mocked.queries.mockResolvedValue([Q(['book', 'page'])])
     render(<TypePage type={BOOK} />)
-    await user.click(await screen.findByRole('button', { name: 'Edit query' }))
-    await user.click(await screen.findByRole('button', { name: 'Remove Page' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit saved search' }))
+    await user.click(await screen.findByRole('button', { name: 'Remove Note' }))
     await waitFor(() => expect(useDefs.getState().queries[0].definition.types).toEqual([{ id: 'book' }]))
     // Now single-type: locked.
     expect(await screen.findByTestId('query-type-lock')).toBeInTheDocument()

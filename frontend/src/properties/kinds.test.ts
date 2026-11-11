@@ -17,20 +17,20 @@ describe('KIND_META', () => {
     expect(KIND_META.datetimeSimple.name).toBe('Date time')
     expect(KIND_META.boolean).toEqual({ name: 'Checkbox', description: 'A yes-or-no tick box', icon: 'ph-check-square' })
     expect(KIND_META.blocks.name).toBe('Content')
-    expect(KIND_META.entity_type.name).toBe('Object type')
+    expect(KIND_META.entity_type.name).toBe('Type')
     expect(KIND_META.label.icon).toBe('ph-caret-circle-down')
     expect(KIND_META.entity_collections.icon).toBe('ph-cards-three')
   })
 })
 
 describe('ADD_PROPERTY_ITEMS', () => {
-  it('test ADD_PROPERTY_ITEMS order has 15 catalogued entries then the six M12 kinds, the M14 Button and the M22 List, and Object Select lists Page, Tag and custom types but not Task', () => {
+  it('test ADD_PROPERTY_ITEMS order has 15 catalogued entries then the six M12 kinds, the M14 Button and the M22 List, and Link to a type lists Page, Tag and custom types but not Task', () => {
     expect(ADD_PROPERTY_ITEMS.map((i) => i.name)).toEqual([
       'Text',
       'Content',
       'Tags',
       'Label',
-      'Object Select',
+      'Link to a type',
       'Checkbox',
       'Date time',
       'Number',
@@ -86,9 +86,9 @@ describe('ADD_PROPERTY_ITEMS', () => {
       icon: 'ph-table',
     })
     const objectSelect = ADD_PROPERTY_ITEMS.find((i) => i.action === 'objectSelect')
-    expect(objectSelect?.description).toBe('Points to objects of one chosen type.')
+    expect(objectSelect?.description).toBe('Points to notes of one chosen type.')
     const cover = ADD_PROPERTY_ITEMS.find((i) => i.action === 'coverImage')
-    expect(cover?.description).toBe('One picture shown at the top of the object.')
+    expect(cover?.description).toBe('One picture shown at the top of the note.')
     // Kinds never offered here.
     for (const t of ['text', 'url', 'datetimeSimple', 'steps', 'floorItems'] as const) {
       expect(ADD_PROPERTY_ITEMS.some((i) => i.type === t)).toBe(false)

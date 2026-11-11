@@ -1,6 +1,7 @@
 // The right-click menu of a row in a data view (type page, its sections, a query, a collection):
 // the data view's context menu. The actions that need a dialog
 // (change type, delete) or the view's selection are handed in by the view (`RowMenuCtx`).
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 import { api } from '@/api/client'
 import type { Row, TypeDef } from '@/api/types'
 import { showToast } from '@/editor/media/upload'
@@ -26,10 +27,10 @@ export const ROW_MENU_TEXT = {
   openInSidepanel: 'Open in side panel',
   openInTab: 'Open in new tab',
   changeType: 'Change type',
-  copyReference: 'Copy object reference',
-  copied: 'Link to object copied',
+  copyReference: 'Copy reference',
+  copied: 'Link copied',
   duplicate: 'Duplicate',
-  delete: 'Delete object',
+  delete: 'Delete',
 }
 
 /** What a row's menu needs from its view. */
@@ -62,7 +63,8 @@ export async function copyReference(row: Row): Promise<void> {
   showToast(ROW_MENU_TEXT.copied)
 }
 
-const byPluralName = (a: TypeDef, b: TypeDef) => a.pluralName.localeCompare(b.pluralName)
+// By the plural the screen shows (M32: the built-in Page sorts as "Notes").
+const byPluralName = (a: TypeDef, b: TypeDef) => typePlural(a).localeCompare(typePlural(b))
 
 /** The common items, in menu order. A view appends its own (a collection's) after these. */
 export function commonRowMenu(row: Row, ctx: RowMenuCtx): RowMenuItem[] {
@@ -92,7 +94,7 @@ export function commonRowMenu(row: Row, ctx: RowMenuCtx): RowMenuItem[] {
       label: ROW_MENU_TEXT.changeType,
       icon: 'ph-swap',
       onSelect: () => undefined,
-      children: others.map((t) => ({ key: `type:${t.id}`, label: t.name, icon: 'ph-cube', chip: t, onSelect: () => ctx.changeType(row, t) })),
+      children: others.map((t) => ({ key: `type:${t.id}`, label: typeLabel(t), icon: 'ph-cube', chip: t, onSelect: () => ctx.changeType(row, t) })),
     })
   }
   items.push({

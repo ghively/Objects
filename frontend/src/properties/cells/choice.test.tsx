@@ -160,6 +160,28 @@ describe('other system cells', () => {
     expect(onChangeType).toHaveBeenCalled()
   })
 
+  it('test TypeChipCell names the built-in Page "Note" and DailyNote "Daily note"; a renamed type keeps its name (M32)', () => {
+    useLinkIndex.setState({
+      types: [
+        typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true }),
+        typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true }),
+      ],
+    })
+    const chip = (value: string) => (
+      <TypeChipCell def={propertyDef({ id: 'type', type: 'entity_type', name: 'Type' })} value={value} onChange={vi.fn()} />
+    )
+    const { rerender } = render(chip('page'))
+    expect(screen.getByText('Note')).toBeInTheDocument()
+    rerender(chip('dailynote'))
+    expect(screen.getByText('Daily note')).toBeInTheDocument()
+    useLinkIndex.setState({ types: [typeDef({ id: 'page', name: 'Doc', pluralName: 'Docs', basic: true })] })
+    rerender(chip('page'))
+    expect(screen.getByText('Doc')).toBeInTheDocument()
+    // A type the space doesn't have shows its id, as before.
+    rerender(chip('gone'))
+    expect(screen.getByText('gone')).toBeInTheDocument()
+  })
+
   it('collections, backlinks and media fields are read-only', () => {
     render(
       <>

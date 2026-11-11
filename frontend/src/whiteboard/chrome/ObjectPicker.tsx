@@ -5,6 +5,7 @@
  * object of that type through `host.createObject` and picks it. Escape closes. With `typeId`
  * (M8, the quick-create menu's "Link {name}") only objects of that type are listed.
  */
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 import { useEffect, useMemo, useState } from 'react'
 import type { ObjectSummary, TypeDef } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
@@ -19,7 +20,7 @@ export const PICKER_LIMIT = 50
 /** Our string. */
 export const NOTHING_FOUND = 'Nothing found'
 
-const byPluralName = (a: TypeDef, b: TypeDef) => a.pluralName.localeCompare(b.pluralName, undefined, { sensitivity: 'base' })
+const byPluralName = (a: TypeDef, b: TypeDef) => typePlural(a).localeCompare(typePlural(b), undefined, { sensitivity: 'base' })
 
 export function ObjectPicker({ mode, typeId, host, onPick, onClose }: ObjectPickerProps) {
   const types = useLinkIndex((s) => s.types)
@@ -53,7 +54,7 @@ export function ObjectPicker({ mode, typeId, host, onPick, onClose }: ObjectPick
     () =>
       [...types]
         .sort(byPluralName)
-        .filter((t) => !needle || t.name.toLowerCase().includes(needle) || t.pluralName.toLowerCase().includes(needle)),
+        .filter((t) => !needle || [t.name, t.pluralName, typeLabel(t), typePlural(t)].some((n) => n.toLowerCase().includes(needle))),
     [types, needle],
   )
 
@@ -105,7 +106,7 @@ export function ObjectPicker({ mode, typeId, host, onPick, onClose }: ObjectPick
                     <CommandItem key={o.path} value={o.path} onSelect={() => onPick({ path: o.path })}>
                       <IconOrEmoji icon={o.icon ?? type?.icon} fallback="ph-file" size={16} />
                       <span className="flex-1 truncate">{o.title}</span>
-                      {type && <span className="text-[12px] text-fg-muted">{type.name}</span>}
+                      {type && <span className="text-[12px] text-fg-muted">{typeLabel(type)}</span>}
                     </CommandItem>
                   )
                 })}
@@ -117,7 +118,7 @@ export function ObjectPicker({ mode, typeId, host, onPick, onClose }: ObjectPick
               {foundTypes.map((t) => (
                 <CommandItem key={t.id} value={t.id} disabled={busy} onSelect={() => void create(t.id)}>
                   <IconOrEmoji icon={t.icon} fallback="ph-cube" size={16} />
-                  <span className="flex-1 truncate">{t.name}</span>
+                  <span className="flex-1 truncate">{typeLabel(t)}</span>
                 </CommandItem>
               ))}
             </CommandGroup>

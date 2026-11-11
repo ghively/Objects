@@ -92,7 +92,7 @@ export function presentWikilink(dom: HTMLElement, attrs: WikilinkAttrs): () => v
       dom.setAttribute('data-unresolved', '')
       dom.removeAttribute('data-resolved-path')
       dom.classList.add('wikilink-unresolved')
-      dom.title = `No object named “${attrs.target}”`
+      dom.title = `No note named “${attrs.target}”`
       clearStyle(dom)
       typeIcon = null
       showIcon()

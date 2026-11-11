@@ -41,7 +41,7 @@ describe('triggerSummary', () => {
     expect(triggerSummary({ kind: 'objectCreated', scope: { kind: 'type', id: 'task' } }, ctx)).toBe('When a Task is created')
     expect(triggerSummary({ kind: 'objectCreated', scope: { kind: 'type', id: 'idea' } }, ctx)).toBe('When an Idea is created')
     expect(triggerSummary({ kind: 'objectCreated', scope: { kind: 'collection', id: 'reading' } }, ctx)).toBe(
-      'When an object is added to Reading list',
+      'When a note is added to Reading list',
     )
     expect(
       triggerSummary(
@@ -64,6 +64,16 @@ describe('triggerSummary', () => {
       triggerSummary({ kind: 'schedule', repeat: 'every day', time: '21:30', start: '2026-11-05' }, { ...ctx, twentyFourHour: false }),
     ).toBe('Every day at 9:30 PM')
     expect(triggerSummary({ kind: 'button', scope: null }, ctx)).toBe('When pressed')
+  })
+
+  test('test a built-in type is named as the screen names it (M32)', () => {
+    const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true })
+    const DAILY = typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true })
+    const named = { ...ctx, types: [PAGE, DAILY] }
+    expect(triggerSummary({ kind: 'objectCreated', scope: { kind: 'type', id: 'page' } }, named)).toBe('When a Note is created')
+    expect(triggerSummary({ kind: 'objectCreated', scope: { kind: 'type', id: 'dailynote' } }, named)).toBe('When a Daily note is created')
+    expect(RULE_TEXT.triggers.objectCreated).toBe('A note is created')
+    expect(RULE_TEXT.actions.createFromTemplate).toBe('Create a note')
   })
 
   test('a missing scope shows its id', () => {

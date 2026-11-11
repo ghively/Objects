@@ -1,4 +1,5 @@
 // The filter popover's body: nested AND/OR rows, each a property, an operator and a value editor.
+import { typeLabel } from '@/lib/typeLabel'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import { COMPUTED_KINDS } from '@/api/types'
@@ -29,8 +30,8 @@ export interface FilterEditorProps {
 /** The filter editor's strings; "Select…" is ours (for an empty picker). */
 export const FILTER_TEXT = {
   selectDate: 'Select date',
-  oneSelected: '1 element selected',
-  elementsSelected: (count: number) => `${count} objects`,
+  oneSelected: '1 selected',
+  elementsSelected: (count: number) => `${count} selected`,
   select: 'Select…',
 }
 
@@ -513,7 +514,7 @@ function ValueEditor({
   }
   if (kind === 'entity_type') {
     return (
-      <MultiPick label="Value" value={ids} onChange={set} items={types.map((t) => ({ id: t.id, text: t.name, label: t.name }))} />
+      <MultiPick label="Value" value={ids} onChange={set} items={types.map((t) => ({ id: t.id, text: typeLabel(t), label: typeLabel(t) }))} />
     )
   }
   if (kind === 'entity_collections') {

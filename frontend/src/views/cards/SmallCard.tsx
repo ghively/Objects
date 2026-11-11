@@ -1,6 +1,7 @@
 // The small card (`.preview-card-base` + `.preview-card-core`): type label, cover, title and the
 // configured properties as compact read-only cells. The wall variant shows the type label, the icon
 // and title, the description, then one labelled row per card-view property ("Empty" when unset).
+import { typeLabel } from '@/lib/typeLabel'
 import type { MouseEvent, ReactNode } from 'react'
 import type { PropertyDef, Row, TypeDef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
@@ -43,7 +44,7 @@ function TypeLabel({ type }: { type?: TypeDef }) {
       style={chipStyle(type.color)}
     >
       <IconOrEmoji icon={type.icon} fallback="ph-file-text" size={12} />
-      <span className="truncate">{type.name}</span>
+      <span className="truncate">{typeLabel(type)}</span>
     </span>
   )
 }

@@ -5,6 +5,7 @@
  * M30 (in every space since M31): an item the rules refuse as a look-alike offers "Use <type>, with a category",
  * which saves it as an edit onto that existing type.
  */
+import { typeLabel } from '@/lib/typeLabel'
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import type { ProposalGroup, ProposalReviewItem, ProposalStatus, SchemaProposal } from '@/api/types'
@@ -150,7 +151,7 @@ function GroupCard({
   const offerTaken = !!offer && status === 'edited' && decision?.edited?.useType === offer.typeId
   const types = useLinkIndex((s) => s.types)
   // The offer taken makes the item a use of that type: its own create, skip and properties no longer apply.
-  const offerType = offerTaken ? (types.find((t) => t.id === offer.typeId)?.name ?? offer.typeId) : null
+  const offerType = offerTaken ? typeLabel(types.find((t) => t.id === offer.typeId), offer.typeId) : null
   return (
     <li role="group" aria-label={T.itemLabel(g.name)} className="flex flex-col gap-2 rounded-md border border-line p-3 text-[13px]">
       <div className="flex flex-wrap items-baseline gap-2">

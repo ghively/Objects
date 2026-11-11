@@ -5,6 +5,7 @@
  * connector keeps a point end there) and "Remove" (the connector is dropped). Escape or a click
  * outside counts as "Remove" (our choice). The canvas places the choice and connects it.
  */
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 import { useEffect, useMemo, useRef } from 'react'
 import type { TypeDef } from '@/api/types'
 import type { WhiteboardPickerShape } from '@/api/whiteboardTypes'
@@ -27,7 +28,7 @@ export interface QuickCreateMenuProps {
   onClose(): void
 }
 
-const byPluralName = (a: TypeDef, b: TypeDef) => a.pluralName.localeCompare(b.pluralName, undefined, { sensitivity: 'base' })
+const byPluralName = (a: TypeDef, b: TypeDef) => typePlural(a).localeCompare(typePlural(b), undefined, { sensitivity: 'base' })
 
 export function QuickCreateMenu({ onPick, onClose }: QuickCreateMenuProps) {
   const types = useLinkIndex((s) => s.types)
@@ -64,7 +65,7 @@ export function QuickCreateMenu({ onPick, onClose }: QuickCreateMenuProps) {
       {sorted.map((t) => (
         <MenuRow
           key={t.id}
-          label={quickCreateLinkTyped(t.name)}
+          label={quickCreateLinkTyped(typeLabel(t))}
           icon={<IconOrEmoji icon={t.icon} fallback="ph-cube" size={14} />}
           onSelect={() => onPick({ kind: 'linkObject', typeId: t.id })}
         />

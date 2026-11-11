@@ -1,5 +1,6 @@
 // Group-by: the group options per property kind, the groups a set of rows falls into,
 // and the update that moves a row into a group (kanban drag). Pure functions over rows.
+import { typeLabel } from '@/lib/typeLabel'
 import type {
   DataViewDefinition,
   DateValue,
@@ -53,7 +54,7 @@ const isStatusLabel = (def?: Pick<PropertyDef, 'type' | 'options'>) => def?.type
  */
 export function GROUP_OPTIONS(kind: PropertyType, def?: Partial<Pick<PropertyDef, 'key'>> & Pick<PropertyDef, 'options'>): GroupOption[] {
   if (kind === 'label' && def?.options?.isStatus) return [o('default', 'default'), o(STATUS_CATEGORY_OPTION, 'By category')]
-  if (kind === 'textBlock') return [o('default', 'By Text'), o('entity', 'By Linked Objects')]
+  if (kind === 'textBlock') return [o('default', 'By Text'), o('entity', 'By Linked Notes')]
   if (kind === 'number') return [o('default', 'By Exact Value'), o('range', 'By Range')]
   if (DATE_KINDS.has(kind)) {
     return [
@@ -351,7 +352,7 @@ function rowBuckets(row: Row, entry: GroupByEntry, def: Pick<PropertyDef, 'type'
     }
     case 'entity_type': {
       const t = ctx.types.find((x) => x.id === row.summary.type)
-      return t ? [{ id: t.id, label: t.name, sort: t.name }] : []
+      return t ? [{ id: t.id, label: typeLabel(t), sort: typeLabel(t) }] : []
     }
     case 'entity_aliases':
       return (row.summary.aliases ?? []).map((a) => ({ id: ALIAS_ID + a, label: a, sort: a }))

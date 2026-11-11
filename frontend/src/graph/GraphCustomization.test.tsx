@@ -20,27 +20,27 @@ describe('GraphCustomization', () => {
     render(<GraphCustomization custom={{}} onPatch={vi.fn()} types={TYPES} tagsNetworkKey="showSpaceTagsNetwork" />)
     await user.click(screen.getByRole('button', { name: 'Customize' }))
     const pop = await screen.findByRole('dialog')
-    for (const label of ['Filter object types', 'Exclude object types']) expect(within(pop).getByRole('region', { name: label })).toBeInTheDocument()
+    for (const label of ['Filter types', 'Exclude types']) expect(within(pop).getByRole('region', { name: label })).toBeInTheDocument()
     expect(within(pop).getAllByRole('button', { name: 'Deselect all' })).toHaveLength(2)
     // Catalog order: Show tags network first, then the type lists and the switches; "Show simplified graph" is ours, last.
     const order = Array.from(pop.querySelectorAll('[role="switch"], section[aria-label]')).map((el) => el.getAttribute('aria-label'))
     expect(order).toEqual([
       'Show tags network',
-      'Filter object types',
-      'Exclude object types',
+      'Filter types',
+      'Exclude types',
       'Show completed tasks',
-      'Hide heavily linked objects',
+      'Hide heavily linked notes',
       'Hide dates',
       'Hide indirect links',
       'Show simplified graph',
     ])
-    expect(within(pop).getByRole('switch', { name: 'Hide heavily linked objects' }).closest('label')).toHaveAttribute(
+    expect(within(pop).getByRole('switch', { name: 'Hide heavily linked notes' }).closest('label')).toHaveAttribute(
       'title',
       'Nodes with more than 20 links are hidden',
     )
     expect(within(pop).getByRole('switch', { name: 'Hide indirect links' }).closest('label')).toHaveAttribute(
       'title',
-      'A link that runs only through hidden objects is hidden too.',
+      'A link that runs only through hidden notes is hidden too.',
     )
   })
 
@@ -52,10 +52,10 @@ describe('GraphCustomization', () => {
     )
     await user.click(screen.getByRole('button', { name: 'Customize' }))
     const pop = await screen.findByRole('dialog')
-    const filter = within(pop).getByRole('region', { name: 'Filter object types' })
+    const filter = within(pop).getByRole('region', { name: 'Filter types' })
     await user.click(within(filter).getByRole('menuitemcheckbox', { name: /People/ }))
     expect(onPatch).toHaveBeenLastCalledWith({ filterTypeIds: ['person'] })
-    const exclude = within(pop).getByRole('region', { name: 'Exclude object types' })
+    const exclude = within(pop).getByRole('region', { name: 'Exclude types' })
     expect(within(exclude).getByRole('menuitemcheckbox', { name: /People/ })).toHaveAttribute('aria-checked', 'true')
     await user.click(within(exclude).getByRole('button', { name: 'Deselect all' }))
     expect(onPatch).toHaveBeenLastCalledWith({ excludeTypeIds: [] })

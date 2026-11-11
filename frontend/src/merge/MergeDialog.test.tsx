@@ -97,7 +97,7 @@ describe('MergeDialog', () => {
     ).toBeTruthy()
     expect(mocked.mergeObject).not.toHaveBeenCalled()
     fireEvent.click(screen.getByText('Merge'))
-    expect(await screen.findByText('Merging objects…')).toBeTruthy()
+    expect(await screen.findByText('Merging notes…')).toBeTruthy()
     await waitFor(() =>
       expect(mocked.mergeObject).toHaveBeenCalledWith('Pages/Source.md', 'Pages/Target.md', {
         sourceVersion: 'v-Pages/Source.md',
@@ -107,7 +107,7 @@ describe('MergeDialog', () => {
     await act(async () => finish())
     await waitFor(() => expect(useMerge.getState().source).toBeNull())
     expect(open).toHaveBeenCalledWith({ kind: 'object', path: 'Pages/Target.md' })
-    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Objects merged')
+    expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Notes merged')
   })
 
   test('tag confirm uses the tag strings', async () => {
@@ -129,17 +129,17 @@ describe('MergeDialog', () => {
 
     mocked.mergeObject.mockRejectedValueOnce(new ApiError(413, 'too large'))
     fireEvent.click(screen.getByText('Merge'))
-    expect(await screen.findByText('Too many references to merge this object')).toBeTruthy()
+    expect(await screen.findByText('Too many references to merge this note')).toBeTruthy()
     expect(
       screen.getByText(
-        `A merge can move at most ${MERGE_LIMIT} references. Pick a smaller object to merge here, or drop some of its links before trying again.`,
+        `A merge can move at most ${MERGE_LIMIT} references. Pick a smaller note to merge here, or drop some of its links before trying again.`,
       ),
     ).toBeTruthy()
     expect(MERGE_LIMIT).toBe(5000)
 
     mocked.mergeObject.mockRejectedValueOnce(new ConflictError('v9'))
     fireEvent.click(screen.getByText('Merge'))
-    expect(await screen.findByText('Could not merge objects')).toBeTruthy()
+    expect(await screen.findByText('Could not merge notes')).toBeTruthy()
     expect(useMerge.getState().source).toBe('Pages/Source.md')
 
     act(() => useMerge.getState().close())
@@ -150,7 +150,7 @@ describe('MergeDialog', () => {
     expect(await screen.findByText('Too many references to merge this tag')).toBeTruthy()
     expect(
       screen.getByText(
-        'A merge can move at most 5000 references. Pick a smaller tag to merge here, or untag some objects before trying again.',
+        'A merge can move at most 5000 references. Pick a smaller tag to merge here, or untag some notes before trying again.',
       ),
     ).toBeTruthy()
     mocked.mergeObject.mockRejectedValueOnce(new Error('boom'))

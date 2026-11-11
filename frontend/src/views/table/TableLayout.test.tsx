@@ -91,7 +91,7 @@ describe('TableLayout', () => {
 
   test('multiple types shows refusal text', () => {
     render(<Harness types={[PAGE, TASK]} />)
-    expect(screen.getByText('A table can show only one object type at a time.')).toBeInTheDocument()
+    expect(screen.getByText('A table can show only one type at a time.')).toBeInTheDocument()
   })
 
   test('drag resize saves colWidth in rem on release', () => {

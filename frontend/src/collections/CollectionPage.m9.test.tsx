@@ -51,9 +51,9 @@ describe('CollectionPage row menu (Task 17)', () => {
       'Open in side panel',
       'Open in new tab',
       'Change type',
-      'Copy object reference',
+      'Copy reference',
       'Duplicate',
-      'Delete object',
+      'Delete',
       'Pin to collection',
       'Remove from collection',
     ])

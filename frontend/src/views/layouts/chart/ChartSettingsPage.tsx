@@ -92,7 +92,7 @@ export function ChartSettingsPage({ types, state, onState, exportDeps }: ChartSe
   const splits = config.kind !== 'donut' && !isNumber
 
   const kindOptions: MenuOption[] = CHART_KINDS.map((k) => ({ value: k.value, label: k.label, icon: k.icon }))
-  const yOptions: MenuOption[] = [{ value: COUNT, label: 'Count of objects', icon: 'ph-hash' }, ...propertyOptions(values)]
+  const yOptions: MenuOption[] = [{ value: COUNT, label: 'Count', icon: 'ph-hash' }, ...propertyOptions(values)]
   const calcOptions: MenuOption[] = y ? yCalcKinds(y.kind).map((k) => ({ value: k, label: CALC_LABELS.full[k] ?? k })) : []
   const splitOptions: MenuOption[] = [{ value: NONE, label: 'None' }, ...propertyOptions(axes.filter((c) => c.key !== x.key))]
 

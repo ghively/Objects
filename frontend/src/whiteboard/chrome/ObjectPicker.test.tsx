@@ -58,7 +58,7 @@ test('test object picker filters titles and picks; new object creates then picks
   const onPick = vi.fn()
   const h = host()
   const { unmount } = render(<ObjectPicker mode="link" host={h} onPick={onPick} onClose={vi.fn()} />)
-  const input = screen.getByPlaceholderText('Search objects')
+  const input = screen.getByPlaceholderText('Search notes')
   await waitFor(() => expect(screen.getByText('Switch B')).toBeInTheDocument())
   await user.type(input, 'router')
   expect(screen.queryByText('Switch B')).toBeNull()
@@ -86,7 +86,7 @@ test('escape closes the picker', async () => {
   const user = userEvent.setup()
   const onClose = vi.fn()
   render(<ObjectPicker mode="link" host={host()} onPick={vi.fn()} onClose={onClose} />)
-  await user.type(screen.getByPlaceholderText('Search objects'), '{Escape}')
+  await user.type(screen.getByPlaceholderText('Search notes'), '{Escape}')
   expect(onClose).toHaveBeenCalledTimes(1)
 })
 

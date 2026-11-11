@@ -53,7 +53,7 @@ describe('RelationPicker create rows (M29)', () => {
   it("a relation to Software offers Create 'SQL Server 2019' as Software only", async () => {
     const user = userEvent.setup()
     render(<RelationPicker def={relDef({ isArray: true, allowedTypes: ['software'] })} value={[]} onChange={vi.fn()} />)
-    await user.type(screen.getByRole('textbox', { name: 'Search for objects' }), 'SQL Server 2019')
+    await user.type(screen.getByRole('textbox', { name: 'Search for notes' }), 'SQL Server 2019')
     expect(createButtons()).toEqual([{ type: 'software', text: "Create 'SQL Server 2019'SoftwareSuggested" }])
   })
 
@@ -62,7 +62,7 @@ describe('RelationPicker create rows (M29)', () => {
     render(
       <RelationPicker def={relDef({ isArray: true, allowedTypes: ['application', 'host'] })} value={[]} onChange={vi.fn()} />,
     )
-    await user.type(screen.getByRole('textbox', { name: 'Search for objects' }), '10.20.0.5')
+    await user.type(screen.getByRole('textbox', { name: 'Search for notes' }), '10.20.0.5')
     expect(createButtons().map((b) => b.type)).toEqual(['host', 'application'])
     expect(createButtons()[0].text).toContain('Suggested')
     expect(createButtons()[1].text).not.toContain('Suggested')
@@ -78,7 +78,7 @@ describe('RelationPicker create rows (M29)', () => {
         onChange={onChange}
       />,
     )
-    await user.type(screen.getByRole('textbox', { name: 'Search for objects' }), 'Payroll')
+    await user.type(screen.getByRole('textbox', { name: 'Search for notes' }), 'Payroll')
     await user.click(screen.getByRole('button', { name: /Create 'Payroll'.*Application/ }))
     await waitFor(() =>
       expect(onChange).toHaveBeenCalledWith([
@@ -95,7 +95,7 @@ describe('RelationPicker create rows (M29)', () => {
     const onChange = vi.fn()
     const onClose = vi.fn()
     render(<RelationPicker def={relDef({ isArray: false })} value={[]} onChange={onChange} onClose={onClose} />)
-    await user.type(screen.getByRole('textbox', { name: 'Search for objects' }), 'SRV-09')
+    await user.type(screen.getByRole('textbox', { name: 'Search for notes' }), 'SRV-09')
     expect(createButtons().map((b) => b.type)).toEqual(['host', 'application', 'page', 'software', 'tag'])
     await user.keyboard('{Enter}')
     await waitFor(() => expect(onChange).toHaveBeenCalledWith([{ target: 'SRV-09', path: 'host/SRV-09.md' }]))
@@ -109,7 +109,7 @@ describe('RelationPicker create rows (M29)', () => {
     useTabs.getState().open({ kind: 'collection', id: 'c-hosts' })
     try {
       render(<RelationPicker def={relDef({ isArray: false })} value={[]} onChange={vi.fn()} />)
-      await user.type(screen.getByRole('textbox', { name: 'Search for objects' }), 'Payroll')
+      await user.type(screen.getByRole('textbox', { name: 'Search for notes' }), 'Payroll')
       expect(createButtons().length).toBeGreaterThan(1)
       expect(createButtons().filter((b) => b.text?.includes('Suggested'))).toEqual([])
     } finally {
@@ -123,7 +123,7 @@ describe('RelationPicker create rows (M29)', () => {
       <RelationPicker def={relDef({ isArray: true, allowedTypes: ['software'] })} value={[]} onChange={vi.fn()} />,
     )
     expect(createButtons()).toEqual([])
-    await user.type(screen.getByRole('textbox', { name: 'Search for objects' }), 'python 3.11')
+    await user.type(screen.getByRole('textbox', { name: 'Search for notes' }), 'python 3.11')
     expect(createButtons()).toEqual([])
     unmount()
     render(
@@ -133,7 +133,7 @@ describe('RelationPicker create rows (M29)', () => {
         onChange={vi.fn()}
       />,
     )
-    await user.type(screen.getByRole('textbox', { name: 'Search for objects' }), 'Java 21')
+    await user.type(screen.getByRole('textbox', { name: 'Search for notes' }), 'Java 21')
     expect(createButtons()).toEqual([])
   })
 

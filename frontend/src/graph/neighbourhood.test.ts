@@ -49,7 +49,7 @@ describe('neighbourhood', () => {
     expect(neighbourhood(withDone, 0, 3, false, { showCompletedTasks: true }).size).toBe(4)
   })
 
-  test('with "Hide heavily linked objects" the walk does not go on from a large node', () => {
+  test('with "Hide heavily linked notes" the walk does not go on from a large node', () => {
     // 0 — hub(1) — 21 leaves; the hub links each leaf.
     const leaves = LARGE_NODE_LIMIT + 1
     const data: GraphData = {

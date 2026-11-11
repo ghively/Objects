@@ -31,7 +31,7 @@ export const IMPORT_TEXT = {
   summaryHeading: 'What will be imported',
   /** The preview's summary line. */
   summary: (objects: number, types: number, attachments: number) =>
-    `${plural(objects, 'object', 'objects')}, ${plural(types, 'type', 'types')}, ${plural(attachments, 'attachment', 'attachments')}`,
+    `${plural(objects, 'note', 'notes')}, ${plural(types, 'type', 'types')}, ${plural(attachments, 'attachment', 'attachments')}`,
   sourceLine: (app: string, container: 'zip' | 'folder', detected: boolean) =>
     `${app} export, ${container === 'zip' ? 'a .zip file' : 'a folder'}${detected ? ' (detected)' : ''}`,
   properties: (n: number) => plural(n, 'property', 'properties'),
@@ -66,16 +66,16 @@ export const IMPORT_TEXT = {
   typesFrom: 'Make types from',
   typesFromFolder: 'Top-level folders',
   typesFromKey: 'A frontmatter key',
-  typesFromNone: 'Nothing (everything is a Page)',
+  typesFromNone: 'Nothing (everything is a Note)',
   typeKey: 'Frontmatter key',
   typeKeyOption: (key: string, files: number) => `${key} (${plural(files, 'file', 'files')})`,
   types: 'Types',
   typeName: 'Name',
   pluralName: 'Plural name',
-  objectCount: (n: number) => plural(n, 'object', 'objects'),
+  objectCount: (n: number) => plural(n, 'note', 'notes'),
   skip: "Don't import",
   // The preview's Image row (AC-2): the import makes these Image objects; the row can't be mapped.
-  imageRow: 'Images always become Image objects.',
+  imageRow: 'Images always become Image notes.',
   existingType: 'Add to',
   newType: 'A new type',
   showProperties: (n: number) => `Properties (${n})`,
@@ -93,7 +93,7 @@ export const IMPORT_TEXT = {
   newSpace: 'A new space',
   thisSpace: 'This space',
   thisSpaceNamed: (name: string) => `This space (${name})`,
-  thisSpaceNote: 'The objects are added to the space that is open now. Nothing in it is changed or overwritten.',
+  thisSpaceNote: 'The notes are added to the space that is open now. Nothing in it is changed or overwritten.',
   name: 'Name',
   location: 'Location',
   import: 'Import',
@@ -108,7 +108,7 @@ export const IMPORT_TEXT = {
     preparing: 'Preparing',
     types: 'Making types',
     attachments: 'Copying attachments',
-    objects: 'Writing objects',
+    objects: 'Writing notes',
     report: 'Writing the Import report',
     done: 'Done',
     failed: 'Failed',
@@ -127,16 +127,16 @@ export const IMPORT_TEXT = {
   stopped: 'The import stopped. What was written so far is kept.',
   failed: 'The import failed. What was written so far is kept.',
   result: (r: Pick<ImportResult, 'objects' | 'types' | 'attachments' | 'tags'>) =>
-    `${plural(r.objects, 'object', 'objects')}, ${plural(r.types, 'type', 'types')}, ` +
+    `${plural(r.objects, 'note', 'notes')}, ${plural(r.types, 'type', 'types')}, ` +
     `${plural(r.attachments, 'attachment', 'attachments')}, ${plural(r.tags, 'tag', 'tags')}`,
   resultSkipped: (n: number) => `${plural(n, 'item was', 'items were')} skipped; the Import report lists them.`,
 
   // M25: originals, scratch copy, batches, re-runs (our strings).
   keepOriginals: 'Keep originals as',
   keepAttachments: 'Attachments',
-  keepFileObjects: 'File objects',
+  keepFileObjects: 'File notes',
   keepOriginalsNote:
-    'Each file that is not Markdown is kept untouched in Attachments/Originals; an image becomes an Image object. File objects also make a File, PDF, Audio or Video object for each other file.',
+    'Each file that is not Markdown is kept untouched in Attachments/Originals; an image becomes an Image note. File notes also make a File, PDF, Audio or Video note for each other file.',
   tryCopy: 'Try on a copy of this space',
   tryCopyNote: 'Imports into a copy of this space, made next to it under the name below, for you to look at before the real run.',
   copyName: 'Name of the copy',
@@ -144,7 +144,7 @@ export const IMPORT_TEXT = {
   // M30 (the label is the design's; the help is our string).
   keepAsSources: 'Keep pages as Sources',
   keepAsSourcesHelp:
-    'Every page is kept as a read-only Source, exactly as imported. With the AI filing pass, the things they talk about become their own objects, built from all the pages that mention them.',
+    'Every page is kept as a read-only Source, exactly as imported. With the AI filing pass, the things they talk about become their own notes, built from all the pages that mention them.',
   accountedFor: (
     r: Pick<ImportResult, 'sourceItems' | 'objects' | 'updated' | 'unchanged' | 'changedInBoth' | 'leftOut' | 'failed' | 'notWritten'>,
   ) =>
@@ -152,11 +152,11 @@ export const IMPORT_TEXT = {
     `${r.unchanged ?? 0} unchanged, ${r.changedInBoth ?? 0} changed in both, ${r.leftOut ?? 0} left out, ${r.failed ?? 0} failed` +
     // the Import report's wording: "Failed includes N not written because the import stopped"
     (r.notWritten ? ` (${r.notWritten} not written because the import stopped)` : ''),
-  removedAtSource: (n: number) => `${plural(n, 'object is', 'objects are')} no longer in the source. They stay in the space; the Import report lists them.`,
+  removedAtSource: (n: number) => `${plural(n, 'note is', 'notes are')} no longer in the source. They stay in the space; the Import report lists them.`,
   moveBatch: 'Move batch to Trash',
-  moveBatchConfirm: (n: number) => `Move the ${plural(n, 'object', 'objects')} this import created to the Trash?`,
+  moveBatchConfirm: (n: number) => `Move the ${plural(n, 'note', 'notes')} this import created to the Trash?`,
   moveBatchDo: 'Move to Trash',
-  moveBatchDone: (n: number) => `${plural(n, 'object was', 'objects were')} moved to the Trash.`,
+  moveBatchDone: (n: number) => `${plural(n, 'note was', 'notes were')} moved to the Trash.`,
   moveBatchOther: 'To move this batch to the Trash, open the space it went into.',
   changedInBothHeading: 'Changed in both',
   changedInBothNote: 'These changed at the source and were edited in Object, so they were not overwritten.',

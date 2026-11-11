@@ -22,7 +22,7 @@ function items() {
 }
 
 describe('AddPropertyMenu', () => {
-  test('test AddPropertyMenu lists 24 items in order, hides existing Title, and Object Select › Person creates an entity bound to person', async () => {
+  test('test AddPropertyMenu lists 24 items in order, hides existing Title, and Link to a type › Person creates an entity bound to person', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<AddPropertyMenu type={typeDef({ id: 'empty' })} types={TYPES} onSave={vi.fn()} />)
     expect(screen.getByText('Add Property')).toBeInTheDocument()
@@ -36,11 +36,11 @@ describe('AddPropertyMenu', () => {
     expect(items()).toHaveLength(23)
     expect(items()).not.toContain('Title')
 
-    await user.click(screen.getByRole('menuitem', { name: 'Object Select' }))
-    expect(screen.getByPlaceholderText('Search Object Types')).toBeInTheDocument()
-    const list = screen.getByRole('list', { name: 'Object types' })
+    await user.click(screen.getByRole('menuitem', { name: 'Link to a type' }))
+    expect(screen.getByPlaceholderText('Search types')).toBeInTheDocument()
+    const list = screen.getByRole('list', { name: 'Types' })
     expect(within(list).getByText('Person')).toBeInTheDocument()
-    expect(within(list).getByText('Page')).toBeInTheDocument()
+    expect(within(list).getByText('Note')).toBeInTheDocument()
     expect(within(list).queryByText('Task')).not.toBeInTheDocument()
     await user.click(within(list).getByRole('button', { name: 'Person' }))
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Person')

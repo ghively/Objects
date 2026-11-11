@@ -1,5 +1,6 @@
 // The data view: toolbar, filter -> sort -> group pipeline and a layout, reused by type pages,
 // collections, queries and All notes. The caller owns the state (see `useViewState`).
+import { typeLabel } from '@/lib/typeLabel'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Collection, Layout, Row, RowsScope, TypeDef, UpdateResult, ViewState } from '@/api/types'
@@ -172,7 +173,7 @@ function overlayOpen(target: EventTarget | null): boolean {
 
 /** Our string: a bulk delete where some rows failed (they stay selected). */
 export function bulkDeleteFailed(failed: number, total: number, reason: string): string {
-  const head = `${failed} of ${total} ${total === 1 ? 'object' : 'objects'} could not be deleted.`
+  const head = `${failed} of ${total} ${total === 1 ? 'note' : 'notes'} could not be deleted.`
   return reason ? `${head} ${reason}` : head
 }
 
@@ -644,7 +645,7 @@ export function DataView(props: DataViewProps) {
   // M13: the calendar and timeline still draw their grid with no rows (a day click creates the first object).
   const empty = !props.loading && total === 0 && layout !== 'calendar' && layout !== 'timeline'
   const createType = viewTypes[0]
-  const createName = viewTypes.length === 1 ? viewTypes[0].name : 'object'
+  const createName = viewTypes.length === 1 ? typeLabel(viewTypes[0]) : 'note'
 
   const toolbarSlot = useContext(ToolbarSlot)
   const toolbar = (
@@ -755,7 +756,7 @@ export function DataView(props: DataViewProps) {
       ) : empty ? (
         <div className="flex flex-col items-center gap-1 py-10 text-center">
           <p className="text-[15px] text-fg">Nothing to show yet.</p>
-          <p className="text-[14px] text-fg-muted">Create an object to see it here.</p>
+          <p className="text-[14px] text-fg-muted">Create a note to see it here.</p>
           {props.allowCreate && props.onCreate && createType && (
             <button
               type="button"

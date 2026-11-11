@@ -123,7 +123,7 @@ describe('CollectionPage', () => {
     const [saved, opts] = mocked.saveCollection.mock.calls[0]
     expect(saved.name).toBe('Gear')
     expect(opts).toEqual({ baseRevision: 'c1' })
-    expect(await screen.findByTestId('collection-notice')).toHaveTextContent("1 object couldn't be updated and still list this collection.")
+    expect(await screen.findByTestId('collection-notice')).toHaveTextContent("1 note couldn't be updated and still list this collection.")
   })
 
   test('test collection Overview defaults to pinned and Add a section adds a query section', async () => {
@@ -175,9 +175,9 @@ describe('CollectionPage', () => {
   test('shows the empty state for an empty collection', async () => {
     setup(TOOLING(), [])
     render(<CollectionPage id="tooling" />)
-    expect(await screen.findByText('Nothing in this collection yet. Add a new object or an existing one.')).toBeInTheDocument()
+    expect(await screen.findByText('Nothing in this collection yet. Add a new note or an existing one.')).toBeInTheDocument()
     // Catalog: a "+ New object" row (sentence case, Gene 2026-11-08); "object" is the one word for what a collection holds.
-    expect(screen.getByRole('button', { name: 'New object' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New note' })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Add existing' }).length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: 'Create entry' })).toBeNull()
   })

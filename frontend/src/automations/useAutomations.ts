@@ -117,7 +117,7 @@ export const BUTTON_TEXT = {
   noRuleBlock: 'Choose an automation', // our string
   notFound: 'Automation not found', // our string
   off: 'This automation is turned off.', // our string
-  inTemplate: 'Buttons run in objects made from this template.', // our string
+  inTemplate: 'Buttons run in notes made from this template.', // our string
   done: 'Done', // our string
   failed: 'The automation failed.', // our string
 } as const
@@ -128,6 +128,6 @@ export function runMessage(run: { status: string; error: string | null; actions:
   if (run.error) return run.error
   const failed = run.actions.find((a) => a.status !== 'ok' && a.detail)
   if (failed?.detail) return failed.detail
-  if (run.status === 'skipped') return "This object doesn't meet the automation's conditions." // our string
+  if (run.status === 'skipped') return "This note doesn't meet the automation's conditions." // our string
   return BUTTON_TEXT.failed
 }

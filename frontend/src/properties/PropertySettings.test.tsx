@@ -94,13 +94,13 @@ describe('PropertySettings', () => {
       .mockRejectedValueOnce(new ConfirmRequiredError('Links that break the rules will be removed.', 3))
       .mockImplementation(async (t) => ({ type: { ...t, revision: 'r2' }, rewritten: [], skipped: [] }))
     open('p-owner')
-    expect(screen.getByText('Linked object type')).toBeInTheDocument()
+    expect(screen.getByText('Linked type')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Single' }))
     // Relation rule changes wait for "Apply changes".
     expect(api.saveType).not.toHaveBeenCalled()
     expect(screen.getByText(/Links that no longer fit the rules above/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Apply changes' }))
-    expect(await screen.findByText('3 objects will change.')).toBeInTheDocument()
+    expect(await screen.findByText(/^3 (objects|notes) will change\.$/)).toBeInTheDocument()
     expect(screen.getByText('Links that break the rules will be removed.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(api.saveType).toHaveBeenCalledTimes(2))
@@ -211,7 +211,7 @@ describe('PropertySettings', () => {
       ],
     })
     open('p-b')
-    expect(screen.getByRole('note')).toHaveTextContent('A content property usually holds the body of an object;')
+    expect(screen.getByRole('note')).toHaveTextContent('A content property usually holds the body of a note;')
   })
 
   test('test date Default Custom writes startTimeDefault', async () => {

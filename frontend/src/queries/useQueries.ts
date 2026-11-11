@@ -43,7 +43,7 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
 export function saveQueryEdit(id: string, edit: (q: Query) => Query): Promise<Query> {
   return enqueue(async () => {
     const cur = latest(id)
-    if (!cur) throw new Error('Unknown query')
+    if (!cur) throw new Error('Unknown saved search')
     let res: { query: Query }
     try {
       res = await api.saveQuery(edit(cur), { baseRevision: cur.revision })
@@ -59,7 +59,7 @@ export function saveQueryEdit(id: string, edit: (q: Query) => Query): Promise<Qu
 }
 
 /** The toast after a query's save failed ("Could not save …" form, as the graph's and the sidebar's). */
-export const QUERY_SAVE_FAILED = 'Could not save the query'
+export const QUERY_SAVE_FAILED = 'Could not save this search'
 
 type QueryEdit = (q: Query) => Query
 const pending = new Map<string, QueryEdit[]>()

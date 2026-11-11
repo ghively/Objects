@@ -63,7 +63,7 @@ describe('SearchPage', () => {
     expect(screen.getByRole('heading', { name: 'Search' })).toBeTruthy()
     expect(screen.getByText('Type a word to find content in this space.')).toBeTruthy()
     expect(mocked.search).not.toHaveBeenCalled()
-    expect((screen.getByRole('button', { name: /Save as Query/ }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: /Save search/ }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   test('search page runs the query and shows results', async () => {
@@ -107,7 +107,7 @@ describe('SearchPage', () => {
     mocked.createQuery.mockReturnValue(new Promise<Query>((r) => (resolve = r)))
     render(<SearchPage q="alpha" textOnly />)
     await screen.findByText('Alpha')
-    await user.click(screen.getByRole('button', { name: /Save as Query/ }))
+    await user.click(screen.getByRole('button', { name: /Save search/ }))
     expect(screen.getByRole('button', { name: /Saving\.\.\./ })).toBeTruthy()
     expect(mocked.createQuery).toHaveBeenCalledTimes(1)
     const init = mocked.createQuery.mock.calls[0][0]!
@@ -128,7 +128,7 @@ describe('SearchPage', () => {
     await user.click(await screen.findByRole('button', { name: 'Only search for type "Page"' }))
     await waitFor(() => expect(lastSearch()?.[1]).toMatchObject({ types: ['page'] }))
     expect(lastSearch()?.[0]).toBe('alpha')
-    await user.click(screen.getByRole('button', { name: /Save as Query/ }))
+    await user.click(screen.getByRole('button', { name: /Save search/ }))
     await waitFor(() => expect(mocked.createQuery).toHaveBeenCalled())
     expect(mocked.createQuery.mock.calls[0][0]!.definition).toMatchObject({
       types: [{ id: 'page' }],

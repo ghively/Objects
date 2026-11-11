@@ -8,6 +8,7 @@
  * keep the server's rank order; their rows come from `api.rows({paths})`. Each list row shows its
  * first full-text snippet.
  */
+import { typeLabel } from '@/lib/typeLabel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import type { Layout, QueryDefinition, Row, SearchResponse, SearchResult, ViewState } from '@/api/types'
@@ -38,7 +39,7 @@ export const SEARCH_PAGE_TEXT = {
   emptyState: 'Type a word to find content in this space.',
   fullTextSearchOnly: 'Text matches only',
   openSearch: 'Open extended search',
-  saveAsQuery: 'Save as Query',
+  saveAsQuery: 'Save search',
   saving: 'Saving...',
 } as const
 
@@ -213,7 +214,7 @@ export function SearchPage({ q: initialQ = '', textOnly: initialTextOnly = false
     const t = typeOf(id)
     chips.push({
       key: `t:${id}`,
-      label: t?.name ?? id,
+      label: typeLabel(t, id),
       icon: t ? <TypeChip type={t} size={16} /> : null,
       clear: () => setFilters((f) => ({ ...f, types: f.types.filter((x) => x !== id) })),
     })
@@ -222,7 +223,7 @@ export function SearchPage({ q: initialQ = '', textOnly: initialTextOnly = false
     const t = typeOf(id)
     chips.push({
       key: `x:${id}`,
-      label: t?.name ?? id,
+      label: typeLabel(t, id),
       icon: <Icon name="ph-minus-circle" size={14} />,
       strike: true,
       clear: () => setFilters((f) => ({ ...f, excludeTypes: f.excludeTypes.filter((x) => x !== id) })),
