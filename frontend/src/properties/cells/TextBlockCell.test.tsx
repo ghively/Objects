@@ -93,13 +93,13 @@ describe('TextBlockCell (M9)', () => {
       view.someProp('handleTextInput', (f) => f(view, at, at, '[', () => view.state.tr))
       editor.commands.insertContentAt(at, '[')
     })
-    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    const input = await screen.findByRole('textbox', { name: 'Search notes' })
     // The picker taking focus does not end the edit.
     act(() => {
       fireEvent.blur(dom, { relatedTarget: input })
     })
     expect(document.querySelector('.ProseMirror')).toBeTruthy()
-    await screen.findByRole('listbox', { name: 'Objects' })
+    await screen.findByRole('listbox', { name: 'Notes' })
     fireEvent.change(input, { target: { value: 'ada' } })
     await screen.findByText('Ada Lovelace')
     fireEvent.keyDown(input, { key: 'Enter' })
@@ -121,7 +121,7 @@ describe('TextBlockCell (M9)', () => {
       // A fast typist: "Ada" lands in the cell before the trigger hands over to the picker.
       editor.commands.insertContent('Ada')
     })
-    const input = (await screen.findByRole('textbox', { name: 'Search objects' })) as HTMLInputElement
+    const input = (await screen.findByRole('textbox', { name: 'Search notes' })) as HTMLInputElement
     await waitFor(() => expect(input.value).toBe('Ada'))
     act(() => {
       fireEvent.blur(dom, { relatedTarget: input })

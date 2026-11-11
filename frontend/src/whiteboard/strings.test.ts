@@ -13,7 +13,7 @@ describe('whiteboard strings', () => {
   test('test every tool has a label', () => {
     for (const tool of TOOLS) expect(TOOL_LABEL[tool].text.length).toBeGreaterThan(0)
     expect(TOOL_LABEL.select.text).toBe('Move')
-    expect(TOOL_LABEL.link.text).toBe('Existing object')
+    expect(TOOL_LABEL.link.text).toBe('Existing note')
     expect(TOOL_LABEL.blockArrow.text).toBe('Arrow right')
   })
 })

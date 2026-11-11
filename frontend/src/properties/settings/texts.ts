@@ -4,7 +4,7 @@
 /** Our strings: the formula settings. */
 export const FORMULA_TEXT = {
   heading: 'Formula',
-  description: 'Calculate a value from this object’s properties.',
+  description: 'Calculate a value from this note’s properties.',
   editorLabel: 'Formula expression',
   placeholder: 'For example: prop("Price") * prop("Quantity")',
   save: 'Save formula',
@@ -15,7 +15,7 @@ export const FORMULA_TEXT = {
   noFunctions: 'No matching functions',
   preview: 'Preview',
   calculating: 'Calculating…',
-  openObject: 'Open an object to preview its value',
+  openObject: 'Open a note to preview its value',
   parsed: 'The formula is valid.',
   empty: 'Empty',
   numberFormat: 'Number format',
@@ -25,10 +25,10 @@ export const FORMULA_TEXT = {
 /** Our strings: the rollup settings. */
 export const ROLLUP_TEXT = {
   heading: 'Rollup',
-  description: 'Show or calculate a property of the objects this property’s relation links to.',
+  description: 'Show or calculate a property of the notes this property’s relation links to.',
   relation: 'Relation',
   chooseRelation: 'Choose a relation',
-  noRelations: 'This type has no relation property yet. Add one to roll up the objects it links to.',
+  noRelations: 'This type has no relation property yet. Add one to roll up the notes it links to.',
   property: 'Property',
   chooseProperty: 'Choose a property',
   calculate: 'Calculate',
@@ -38,15 +38,15 @@ export const ROLLUP_TEXT = {
 /** Our strings: the ID settings. */
 export const UNIQUE_ID_TEXT = {
   heading: 'ID',
-  description: 'Each new object of this type gets the next number, after the prefix.',
+  description: 'Each new note of this type gets the next number, after the prefix.',
   prefix: 'Prefix',
   prefixPlaceholder: 'For example: TASK-',
   prefixInvalid: 'Use at most 20 letters, digits, - or _.',
   nextId: 'Next ID',
-  numberExisting: 'Number existing objects',
-  numberExistingDescription: 'Give every object of this type that has no ID the next number, oldest first.',
+  numberExisting: 'Number existing notes',
+  numberExistingDescription: 'Give every note of this type that has no ID the next number, oldest first.',
   numbering: 'Numbering…',
-  numbered: (n: number) => `Numbered ${n} ${n === 1 ? 'object' : 'objects'}`,
+  numbered: (n: number) => `Numbered ${n} ${n === 1 ? 'note' : 'notes'}`,
   skipped: (n: number) => `${n} ${n === 1 ? 'file' : 'files'} could not be changed`,
   conflict: 'The type was changed elsewhere. It has been reloaded; try again.',
 }

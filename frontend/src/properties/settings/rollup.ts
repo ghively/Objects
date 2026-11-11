@@ -1,5 +1,6 @@
 // M12: what a rollup's pickers offer: the relations of the type, the properties of the related
 // objects, and the calculations that fit the chosen property's kind.
+import { typeLabel } from '@/lib/typeLabel'
 import { ROLLUP_CALCS, type PropertyDef, type PropertyType, type RollupCalc, type TypeDef } from '@/api/types'
 import { CALC_LABELS } from '@/views/calc'
 
@@ -59,7 +60,7 @@ export function rollupTargets(relation: PropertyDef | undefined, types: readonly
     for (const d of t.propertyDefinitions) {
       if (seen.has(d.id) || d.type === 'rollup' || d.type === 'blocks') continue
       seen.add(d.id)
-      out.push({ id: d.id, name: d.name, kind: d.type, typeName: t.name })
+      out.push({ id: d.id, name: d.name, kind: d.type, typeName: typeLabel(t) })
     }
   }
   const count = new Map<string, number>()

@@ -1,4 +1,5 @@
 // The filter popover's body: nested AND/OR rows, each a property, an operator and a value editor.
+import { typeLabel } from '@/lib/typeLabel'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import { COMPUTED_KINDS } from '@/api/types'
@@ -29,8 +30,8 @@ export interface FilterEditorProps {
 /** The filter editor's strings; "Select…" is ours (for an empty picker). */
 export const FILTER_TEXT = {
   selectDate: 'Select date',
-  oneSelected: '1 element selected',
-  elementsSelected: (count: number) => `${count} objects`,
+  oneSelected: '1 selected',
+  elementsSelected: (count: number) => `${count} selected`,
   select: 'Select…',
 }
 
@@ -432,6 +433,28 @@ const TEXT_KINDS = new Set([
 const COMPUTED_EDITOR = { text: 'text', number: 'number', date: 'datetimeSimple', none: 'text' } as const
 const DATE_KINDS = new Set(['datetime', 'datetimeSimple', 'entity_createdAt', 'entity_lastUpdated'])
 
+/** A filter's exact day: its button opens the date picker; Enter in the picker's field closes it (M32). */
+function ExactDate({ day, onChange }: { day: string; onChange(day: string): void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" aria-label={FILTER_TEXT.selectDate} className={SELECT}>
+          {day}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto border-line bg-raised p-0">
+        <DatePicker
+          value={{ start: day, resolution: 'day' }}
+          constraints={{ resolutionConstraint: 'day', endTimeSettings: 'notAllowed' }}
+          onChange={(v) => v && onChange(v.start.slice(0, 10))}
+          onClose={() => setOpen(false)}
+        />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function ValueEditor({
   filter,
   choice,
@@ -491,7 +514,7 @@ function ValueEditor({
   }
   if (kind === 'entity_type') {
     return (
-      <MultiPick label="Value" value={ids} onChange={set} items={types.map((t) => ({ id: t.id, text: t.name, label: t.name }))} />
+      <MultiPick label="Value" value={ids} onChange={set} items={types.map((t) => ({ id: t.id, text: typeLabel(t), label: typeLabel(t) }))} />
     )
   }
   if (kind === 'entity_collections') {
@@ -570,22 +593,7 @@ function ValueEditor({
           options={DATE_RELATIVE_OPTIONS.map((o) => ({ value: o.key, label: o.label }))}
           placeholder={FILTER_TEXT.selectDate}
         />
-        {mode === 'exactDate' && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button type="button" aria-label={FILTER_TEXT.selectDate} className={SELECT}>
-                {r.exactDate}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-auto border-line bg-raised p-0">
-              <DatePicker
-                value={{ start: r.exactDate ?? '', resolution: 'day' }}
-                constraints={{ resolutionConstraint: 'day', endTimeSettings: 'notAllowed' }}
-                onChange={(v) => v && set({ exactDate: v.start.slice(0, 10) })}
-              />
-            </PopoverContent>
-          </Popover>
-        )}
+        {mode === 'exactDate' && <ExactDate day={r.exactDate ?? ''} onChange={(day) => set({ exactDate: day })} />}
       </span>
     )
   }

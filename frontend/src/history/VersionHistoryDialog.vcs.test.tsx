@@ -47,7 +47,7 @@ describe('VersionHistoryDialog: versions in version control', () => {
     expect(await screen.findByText('The first words.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Restore' }))
     const dialog = await screen.findByRole('alertdialog')
-    expect(dialog).toHaveTextContent('Bring back the object as it was in ddddddd?')
+    expect(dialog).toHaveTextContent('Bring back the note as it was in ddddddd?')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Restore' }))
     await waitFor(() => expect(vcs.fileRestore).toHaveBeenCalledWith(PATH, 'd'.repeat(40), 'v-current', 'Pages/Old name.md'))
     await waitFor(() => expect(useVersionHistory.getState().path).toBeNull())

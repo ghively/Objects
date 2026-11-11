@@ -63,12 +63,12 @@ beforeEach(() => {
 })
 
 describe('QueryPage', () => {
-  test('test isQueryReady false for empty definition shows Query isn’t ready', async () => {
+  test('test isQueryReady false for empty definition shows Saved search isn’t ready', async () => {
     setup(Q({ definition: emptyDef() }))
     render(<QueryPage id="q1" />)
-    expect(await screen.findByText('Query isn’t ready')).toBeInTheDocument()
+    expect(await screen.findByText('Saved search isn’t ready')).toBeInTheDocument()
     expect(
-      screen.getByText('The draft is kept, but it lists nothing until it has a search term, a tag or an object type.'),
+      screen.getByText('The draft is kept, but it lists nothing until it has a search term, a tag or a type.'),
     ).toBeInTheDocument()
   })
 
@@ -111,36 +111,36 @@ describe('QueryPage', () => {
     const user = userEvent.setup()
     setup(Q({ definition: emptyDef() }))
     render(<QueryPage id="q1" />)
-    await user.click(await screen.findByRole('button', { name: 'Edit query' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit saved search' }))
     expect(screen.getByText('To exclude tags, first add a search term or include a tag.')).toBeInTheDocument()
     expect(screen.getByText('Excluding types needs a search term or a tag first.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Leave out tags or backlinks' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /Exclude object types/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Exclude types/ })).toBeDisabled()
   })
 
   test('with a type selected the exclude control says it has no effect', async () => {
     const user = userEvent.setup()
     setup(Q({ definition: emptyDef({ types: [{ id: 'server' }], search: { searchTerms: [{ text: 'alp' }], searchMode: 'auto' } }) }))
     render(<QueryPage id="q1" />)
-    await user.click(await screen.findByRole('button', { name: 'Edit query' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit saved search' }))
     expect(screen.getByText('Ignored while particular types are picked.')).toBeInTheDocument()
     // While searching, the toolbar and the builder say filters and sorts pause.
     expect(screen.getAllByText('Sorting and property filters are off during a search.').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'Filter' })).toHaveAttribute('title', 'Sorting and property filters are off during a search.')
   })
 
-  test('test builder All clears types; Exclude object types writes excludeTypeIds', async () => {
+  test('test builder All clears types; Exclude types writes excludeTypeIds', async () => {
     const user = userEvent.setup()
     setup(Q({ definition: emptyDef({ types: [{ id: 'server' }], search: { searchTerms: [{ text: 'alp' }], searchMode: 'auto' } }) }))
     render(<QueryPage id="q1" />)
-    await user.click(await screen.findByRole('button', { name: 'Edit query' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit saved search' }))
     await user.click(screen.getByRole('button', { name: 'All' }))
     await waitFor(() => expect(mocked.saveQuery).toHaveBeenCalled(), { timeout: 2000 })
     expect(lastSaved()![0].definition.types).toEqual([])
 
     mocked.saveQuery.mockClear()
-    await user.click(screen.getByRole('button', { name: /Exclude object types/ }))
-    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Page' }))
+    await user.click(screen.getByRole('button', { name: /Exclude types/ }))
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Note' }))
     await waitFor(() => expect(mocked.saveQuery).toHaveBeenCalled(), { timeout: 2000 })
     expect(lastSaved()![0].definition.excludeTypeIds).toEqual(['page'])
   })
@@ -149,7 +149,7 @@ describe('QueryPage', () => {
     const user = userEvent.setup()
     setup()
     render(<QueryPage id="q1" />)
-    await user.click(await screen.findByRole('button', { name: 'Edit query' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit saved search' }))
     await user.type(screen.getByRole('textbox', { name: 'Search' }), 'x{Enter}')
     expect(mocked.saveQuery).not.toHaveBeenCalled()
     expect(screen.getByText('Type 2 or more characters')).toBeInTheDocument()
@@ -182,7 +182,7 @@ describe('QueryPage', () => {
     const user = userEvent.setup()
     setup(Q({ definition: emptyDef({ search: { searchTerms: [{ text: 'alp' }], searchMode: 'semantic' } }) }))
     render(<QueryPage id="q1" />)
-    await user.click(await screen.findByRole('button', { name: 'Edit query' }))
+    await user.click(await screen.findByRole('button', { name: 'Edit saved search' }))
     expect(screen.queryByRole('radio', { name: 'Semantic' })).toBeNull()
     expect(screen.queryByRole('radio', { name: 'Exact' })).toBeNull()
     expect(screen.getByRole('radio', { name: 'Auto' })).toHaveAttribute('aria-checked', 'true')
@@ -192,12 +192,12 @@ describe('QueryPage', () => {
     expect(lastSaved()![0].definition.search).toEqual({ searchTerms: [{ text: 'alp' }, { text: 'beta' }], searchMode: 'auto' })
   })
 
-  test('test Pin to object type adds query section to type views', async () => {
+  test('test Pin to type adds query section to type views', async () => {
     const user = userEvent.setup()
     setup()
     render(<QueryPage id="q1" />)
     await user.click(await screen.findByRole('button', { name: 'More' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Pin to object type' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Pin to type' }))
     await waitFor(() => expect(mocked.saveViews).toHaveBeenCalled())
     const [typeId, views, base] = mocked.saveViews.mock.calls[0]
     expect(typeId).toBe('server')
@@ -205,7 +205,7 @@ describe('QueryPage', () => {
     expect(views.dashboard.sections.map((s) => s.key)).toContain('query:q1')
   })
 
-  test('Unpin from object type drops the section when the type already shows the query', async () => {
+  test('Unpin from type drops the section when the type already shows the query', async () => {
     const user = userEvent.setup()
     setup()
     const v = defaultViews()
@@ -213,7 +213,7 @@ describe('QueryPage', () => {
     mocked.views.mockResolvedValue({ views: v, revision: 'v0' })
     render(<QueryPage id="q1" />)
     await user.click(await screen.findByRole('button', { name: 'More' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Unpin from object type' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Unpin from type' }))
     await waitFor(() => expect(mocked.saveViews).toHaveBeenCalled())
     expect(mocked.saveViews.mock.calls[0][1].dashboard.sections).toEqual([])
   })
@@ -244,7 +244,7 @@ describe('QueryPage', () => {
     const user = userEvent.setup()
     setup(Q({ name: '', titleIsCustom: false }))
     render(<QueryPage id="q1" />)
-    const name = await screen.findByRole('textbox', { name: 'Query name' })
+    const name = await screen.findByRole('textbox', { name: 'Saved search name' })
     expect(name).toHaveValue('Servers')
     await user.clear(name)
     await user.type(name, 'My servers{Enter}')
@@ -261,6 +261,6 @@ describe('QueryPage', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     await waitFor(() => expect(mocked.deleteQuery).toHaveBeenCalledWith('q1'))
     await waitFor(() => expect(useTabs.getState().tabs.at(-1)?.history.at(-1)).toEqual({ kind: 'queries' }))
-    expect(within(document.body).queryByText('Unknown query')).toBeNull()
+    expect(within(document.body).queryByText('Unknown saved search')).toBeNull()
   })
 })

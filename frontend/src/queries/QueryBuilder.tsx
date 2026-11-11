@@ -1,5 +1,6 @@
 // The query editor: Types, Tags or backlinks, Search and Limit. Every change is an edit of the
 // query's `definition`; nothing here touches the view (layout, table, cards).
+import { typeLabel } from '@/lib/typeLabel'
 import { useMemo, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { Collection, EntityRef, PropertyDef, Query, QueryDefinition, TypeDef } from '@/api/types'
@@ -15,9 +16,9 @@ export const BUILDER_TEXT = {
   types: 'Types',
   allTypes: 'All',
   allTypesTooltip: 'Include every type',
-  addType: 'Add object type',
+  addType: 'Add type',
   moreTypes: (n: number) => `+${n} more`,
-  excludeTypes: 'Exclude object types',
+  excludeTypes: 'Exclude types',
   excludeTypesHint: 'Excluding types needs a search term or a tag first.',
   excludeTypesInactive: 'Ignored while particular types are picked.',
   clear: 'Clear',
@@ -28,7 +29,7 @@ export const BUILDER_TEXT = {
   tags: 'Tags or backlinks',
   anyOf: 'Any of',
   allOf: 'All of',
-  allOfHint: 'Each object has just one type, so All of does not apply here.',
+  allOfHint: 'Each note has just one type, so All of does not apply here.',
   addTag: 'Add tag or backlink',
   excludeTags: 'Leave out tags or backlinks',
   excludeTagsDisabled: 'To exclude tags, first add a search term or include a tag.',
@@ -42,7 +43,7 @@ export const BUILDER_TEXT = {
   noLimit: 'No limit',
   paused: PAUSED_HINT,
   releaseConstraintTooltip:
-    'Makes this a regular query that can cover any type. It opens as its own page and leaves the dashboard of this type.',
+    'Makes this a regular saved search that can cover any type. It opens as its own page and leaves the dashboard of this type.',
   /** Our string: the release button's accessible name (the tooltip is the visible hint). */
   releaseConstraint: 'Release type constraint',
 }
@@ -140,7 +141,7 @@ function CollectionFilter({ s, type, collections, edit }: { s: TypeEntry; type: 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button type="button" aria-label={`${type.name} collections`} className="text-[12px] text-fg-muted hover:text-fg">
+        <button type="button" aria-label={`${typeLabel(type)} collections`} className="text-[12px] text-fg-muted hover:text-fg">
           {collectionFilterLabel(s)}
         </button>
       </PopoverTrigger>
@@ -182,7 +183,7 @@ function ConstrainedTypes({ def, constraint, collections, onChange }: { def: Que
         <Chip>
           <Icon name="ph-lock-simple" size={12} />
           <TypeChip type={constraint.type} size={18} />
-          <span>{constraint.type.name}</span>
+          <span>{typeLabel(constraint.type)}</span>
           <CollectionFilter
             s={s}
             type={constraint.type}
@@ -230,11 +231,11 @@ function TypesSection({ def, types, collections, onChange }: { def: QueryDefinit
           return (
             <Chip
               key={s.id}
-              label={t?.name ?? s.id}
+              label={typeLabel(t, s.id)}
               onRemove={() => onChange((d) => ({ ...d, types: d.types.filter((x) => x.id !== s.id) }))}
             >
               {t ? <TypeChip type={t} size={18} /> : <Icon name="ph-warning" size={14} />}
-              <span>{t?.name ?? 'Invalid'}</span>
+              <span>{typeLabel(t, 'Invalid')}</span>
               {t && (
                 <CollectionFilter
                   s={s}
@@ -264,7 +265,7 @@ function TypesSection({ def, types, collections, onChange }: { def: QueryDefinit
               .map((t) => (
                 <Check key={t.id} checked={false} onClick={() => onChange((d) => ({ ...d, types: [...d.types, { id: t.id }] }))}>
                   <TypeChip type={t} size={18} />
-                  {t.name}
+                  {typeLabel(t)}
                 </Check>
               ))}
           </PopoverContent>
@@ -289,7 +290,7 @@ function TypesSection({ def, types, collections, onChange }: { def: QueryDefinit
               const on = excluded.includes(t.id)
               return (
                 <Check key={t.id} checked={on} onClick={() => setExcluded(on ? excluded.filter((i) => i !== t.id) : [...excluded, t.id])}>
-                  {t.name}
+                  {typeLabel(t)}
                 </Check>
               )
             })}

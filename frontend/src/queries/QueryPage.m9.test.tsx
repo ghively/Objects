@@ -61,9 +61,9 @@ describe('QueryPage row menu (Task 17)', () => {
       'Open in side panel',
       'Open in new tab',
       'Change type',
-      'Copy object reference',
+      'Copy reference',
       'Duplicate',
-      'Delete object',
+      'Delete',
     ])
     await user.click(within(menu).getByRole('menuitem', { name: 'Open in new tab' }))
     expect(useTabs.getState().tabs.length).toBeGreaterThan(0)

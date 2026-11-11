@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
-import { DatePicker, parseDateInput } from './DatePicker'
+import { DATE_TEXT, DatePicker, parseDateInput } from './DatePicker'
 import { formatDate } from './format'
 
 // Wednesday 21 Oct 2026, 10:30 local time.
@@ -353,5 +353,91 @@ describe('DatePicker: the Task date', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(onTaskChange).toHaveBeenLastCalledWith({ date: { start: '2026-10-30', resolution: 'day' }, repeat: 'every 3 days', remind: null })
     expect(screen.queryByRole('dialog', { name: 'Custom repeat' })).toBeNull()
+  })
+})
+
+// M32 (notes first), item 13: the date field reads everyday words, says so when it can't, and
+// Enter is "done".
+describe('DatePicker: typed dates (M32)', () => {
+  const VALUE = { start: '2026-10-30', resolution: 'day' as const }
+
+  it('test parseDateInput reads weekdays, next week and a month day', () => {
+    // NOW is Wednesday 21 Oct 2026.
+    expect(parseDateInput('friday', NOW)).toEqual({ start: '2026-10-23', resolution: 'day' })
+    expect(parseDateInput('Fri', NOW)).toEqual({ start: '2026-10-23', resolution: 'day' })
+    expect(parseDateInput('wednesday', NOW)).toEqual({ start: '2026-10-21', resolution: 'day' })
+    expect(parseDateInput('next wednesday', NOW)).toEqual({ start: '2026-10-28', resolution: 'day' })
+    expect(parseDateInput('next week', NOW)).toEqual({ start: '2026-10-28', resolution: 'day' })
+    expect(parseDateInput('nov 20', NOW)).toEqual({ start: '2026-11-20', resolution: 'day' })
+    expect(parseDateInput('20 nov', NOW)).toEqual({ start: '2026-11-20', resolution: 'day' })
+    expect(parseDateInput('friday at 3 pm', NOW)).toEqual({
+      start: new Date(2026, 9, 23, 15, 0).toISOString(),
+      resolution: 'time',
+    })
+    expect(parseDateInput('someday', NOW)).toBeNull()
+  })
+
+  it('test typing friday, next week or nov 20 and Enter sets that date', async () => {
+    for (const [typed, day] of [
+      ['friday', '2026-10-23'],
+      ['next week', '2026-10-28'],
+      ['nov 20', '2026-11-20'],
+    ]) {
+      const onChange = vi.fn()
+      const { unmount } = render(<DatePicker value={VALUE} onChange={onChange} now={NOW} />)
+      const input = screen.getByRole('textbox', { name: 'Starts' })
+      await userEvent.clear(input)
+      await userEvent.type(input, `${typed}{Enter}`)
+      expect(onChange).toHaveBeenLastCalledWith({ start: day, resolution: 'day' })
+      expect(screen.queryByRole('alert')).toBeNull()
+      unmount()
+    }
+  })
+
+  it('test an unreadable date shows a short message and sets nothing', async () => {
+    const onChange = vi.fn()
+    const onClose = vi.fn()
+    render(<DatePicker value={VALUE} onChange={onChange} onClose={onClose} now={NOW} />)
+    const input = screen.getByRole('textbox', { name: 'Starts' })
+    await userEvent.clear(input)
+    await userEvent.type(input, 'someday soon{Enter}')
+    expect(onChange).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(DATE_TEXT.unreadable)
+    // What was typed stays, to be fixed; typing again takes the message away.
+    expect(input).toHaveValue('someday soon')
+    await userEvent.type(input, '{Backspace}')
+    expect(screen.queryByRole('alert')).toBeNull()
+    await userEvent.clear(input)
+    await userEvent.type(input, 'tomorrow{Enter}')
+    expect(onChange).toHaveBeenLastCalledWith({ start: '2026-10-22', resolution: 'day' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('test Enter closes the picker after setting', async () => {
+    const onChange = vi.fn()
+    const onClose = vi.fn()
+    render(<DatePicker value={VALUE} onChange={onChange} onClose={onClose} now={NOW} />)
+    const input = screen.getByRole('textbox', { name: 'Starts' })
+    // Leaving the field sets the date and keeps the picker open.
+    await userEvent.clear(input)
+    await userEvent.type(input, 'tomorrow')
+    await userEvent.tab()
+    expect(onChange).toHaveBeenLastCalledWith({ start: '2026-10-22', resolution: 'day' })
+    expect(onClose).not.toHaveBeenCalled()
+    // Enter sets it and closes.
+    await userEvent.clear(input)
+    await userEvent.type(input, 'friday{Enter}')
+    expect(onChange).toHaveBeenLastCalledWith({ start: '2026-10-23', resolution: 'day' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('test Enter on the date as shown closes without writing', async () => {
+    const onChange = vi.fn()
+    const onClose = vi.fn()
+    render(<DatePicker value={VALUE} onChange={onChange} onClose={onClose} now={NOW} />)
+    await userEvent.type(screen.getByRole('textbox', { name: 'Starts' }), '{Enter}')
+    expect(onChange).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

@@ -142,6 +142,24 @@ describe('FilterEditor', () => {
     }
   })
 
+  test('test a typed day and Enter set the filter date and close the picker (M32)', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const T = typeDef({ id: 'task', propertyDefinitions: [propertyDef({ id: 'due', type: 'datetime', name: 'Due' })] })
+    const init: FilterGroup = {
+      type: 'filterGroup',
+      operator: 'and',
+      elements: [{ type: 'filter', propertyId: 'due', option: 'is', referenceValue: { exactDate: '2026-10-30' } }],
+    }
+    render(<FilterEditor group={init} onChange={onChange} choices={propertyChoices([T])} types={[T]} collections={[]} />)
+    await user.click(screen.getByRole('button', { name: 'Select date' }))
+    const input = screen.getByRole('textbox', { name: 'Starts' })
+    await user.clear(input)
+    await user.type(input, 'nov 20 2026{Enter}')
+    expect((onChange.mock.calls.at(-1)![0] as FilterGroup).elements[0]).toMatchObject({ referenceValue: { exactDate: '2026-11-20' } })
+    expect(screen.queryByTestId('date-picker')).toBeNull()
+  })
+
   test('a percentage filter value is typed in percent and stored as the fraction', () => {
     const T = typeDef({
       id: 'deal',

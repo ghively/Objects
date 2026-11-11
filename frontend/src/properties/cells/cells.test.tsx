@@ -268,7 +268,7 @@ describe('placeholders', () => {
   })
 
   it('test empty table cells show no placeholder, wrapped or not', () => {
-    const d = def('text', { description: 'A short summary of what the object is about' })
+    const d = def('text', { description: 'A short summary of what the note is about' })
     const { unmount } = render(<TextCell def={d} value={null} density="table" inTable onChange={() => {}} />)
     expect(screen.getByRole('textbox')).toHaveAttribute('placeholder', '')
     unmount()
@@ -310,10 +310,19 @@ describe('DateCell: the Task date', () => {
     }
   })
 
+  /** Type a date and Enter: sets it and (M32) closes the picker. */
   async function setStart(text: string) {
     const input = screen.getByRole('textbox', { name: 'Starts' })
     await userEvent.clear(input)
     await userEvent.type(input, `${text}{Enter}`)
+  }
+
+  /** Type a date and leave the field: sets it and keeps the picker open. */
+  async function setStartAndStay(text: string) {
+    const input = screen.getByRole('textbox', { name: 'Starts' })
+    await userEvent.clear(input)
+    await userEvent.type(input, text)
+    await userEvent.tab()
   }
 
   async function choose(row: 'Repeat' | 'Reminder', item: string) {
@@ -326,7 +335,7 @@ describe('DateCell: the Task date', () => {
     const onChange = vi.fn()
     render(<DateCell def={TASK_DATE} value={null} typeId="task" frontmatter={{}} onChange={onChange} onChangeMany={onChangeMany} />)
     await userEvent.click(screen.getByRole('button', { name: 'Edit Date' }))
-    await setStart('2026-10-30')
+    await setStartAndStay('2026-10-30')
     await choose('Repeat', 'Weekly on Friday')
     await choose('Reminder', '1 day before')
     expect(onChangeMany).not.toHaveBeenCalled()

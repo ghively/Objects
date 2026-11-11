@@ -82,9 +82,9 @@ describe('definition summary', () => {
     const col = summarizeDefinition('collections', OLD, NOW, (id) => id.toUpperCase())
     expect(col.rows).toEqual([
       { label: 'Name', value: 'Reading list' },
-      { label: 'Object types', value: 'PAGE' },
+      { label: 'Types', value: 'PAGE' },
     ])
-    expect(col.changes).toEqual(['Renamed from “Reading list” to “Shelf”', 'Object types added since: BOOK'])
+    expect(col.changes).toEqual(['Renamed from “Reading list” to “Shelf”', 'Types added since: BOOK'])
 
     const filterGroup = { type: 'filterGroup', operator: 'and', elements: [{ key: 'x' }, { type: 'filterGroup', elements: [{ key: 'y' }] }] }
     const q = summarizeDefinition(
@@ -94,7 +94,7 @@ describe('definition summary', () => {
     )
     expect(q.rows).toEqual([
       { label: 'Name', value: 'Open' },
-      { label: 'Object types', value: 'task' },
+      { label: 'Types', value: 'task' },
       { label: 'Search', value: 'urgent' },
       { label: 'Filters', value: '2' },
       { label: 'Sorts', value: '0' },
@@ -122,7 +122,7 @@ describe('DefinitionHistoryDialog', () => {
     expect(hist.version).toHaveBeenCalledWith(PATH, 'a')
     const changes = screen.getByRole('list', { name: S.changedSince })
     expect(within(changes).getByText('Renamed from “Reading list” to “Shelf”')).toBeInTheDocument()
-    expect(within(changes).getByText('Object types added since: Book')).toBeInTheDocument()
+    expect(within(changes).getByText('Types added since: Book')).toBeInTheDocument()
     expect(screen.getByText(S.file)).toBeInTheDocument()
     expect(screen.getByTestId('definition-json').textContent).toBe(prettyDefinition(TEXTS.a))
   })
@@ -164,7 +164,7 @@ describe('DefinitionHistoryDialog', () => {
     const ask = await screen.findByText('Apply changes?')
     const dialog = ask.closest('[role="alertdialog"]') as HTMLElement
     expect(within(dialog).getByText('This removes the values of Email.')).toBeInTheDocument()
-    expect(within(dialog).getByText('3 objects will change.')).toBeInTheDocument()
+    expect(within(dialog).getByText(/^3 (objects|notes) will change\.$/)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(hist.restore).toHaveBeenLastCalledWith(PATH, 'a', 'rev-now', true))
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))

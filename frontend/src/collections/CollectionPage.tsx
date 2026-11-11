@@ -1,6 +1,8 @@
 // A collection: header (icon, name, menu, New), the Overview / All / query tabs, and "Add existing".
 // The collection's own definition (name, types, views, pins, templates) is saved through
 // `saveCollectionEdit`; membership is the `collections:` key of each object.
+import { NEW_NOTE, SAVED_SEARCH } from '@/lib/words'
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { api, ConflictError } from '@/api/client'
 import type { Collection, DashboardSectionKey, Layout, ObjectSummary, Query, Row, TypeDef, ViewState, Views } from '@/api/types'
@@ -56,9 +58,9 @@ import { useTitleCtx } from '@/queries/QueryPage'
 import { DEV_INFO_TEXT, DevInfo } from '@/settings/DevInfo'
 
 export const COLLECTION_PAGE_TEXT = {
-  empty: 'Nothing in this collection yet. Add a new object or an existing one.',
+  empty: 'Nothing in this collection yet. Add a new note or an existing one.',
   addExisting: 'Add existing',
-  createEntry: 'New object',
+  createEntry: NEW_NOTE,
   pinned: 'Pinned',
   pinnedEmptyTitle: 'Nothing pinned',
   pinnedEmptyBody: "Use a row's menu to pin it to this collection.",
@@ -82,7 +84,7 @@ export function namesCollection(c: Pick<Collection, 'name' | 'formerNames'>, nam
 /** A query section's label: the query's title as its own page shows it. */
 function sectionQueryTitle(q: Pick<Query, 'name'> & Partial<Pick<Query, 'titleIsCustom' | 'definition'>>, ctx: TitleCtx): string {
   const title = q.definition ? queryTitle({ name: q.name, titleIsCustom: q.titleIsCustom ?? q.name.trim() !== '', definition: q.definition }, ctx) : q.name
-  return title || 'Query'
+  return title || SAVED_SEARCH
 }
 
 /** The sections of a collection's Overview: `pinned`, then its query sections, then the removed ones. */
@@ -213,17 +215,17 @@ function AddExistingDialog({
       <DialogContent className="border-line bg-raised-2 text-fg sm:max-w-[440px]">
         <DialogHeader>
           <DialogTitle className="text-[18px]">{COLLECTION_PAGE_TEXT.addExisting}</DialogTitle>
-          <DialogDescription className="sr-only">Pick an object to add to {collection.name}.</DialogDescription>
+          <DialogDescription className="sr-only">Pick a note to add to {collection.name}.</DialogDescription>
         </DialogHeader>
         <input
           autoFocus
-          aria-label="Search objects"
+          aria-label="Search notes"
           placeholder="Search..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="h-9 rounded-md border border-line bg-transparent px-2 text-[15px] outline-none focus:border-fg-muted"
         />
-        <div role="listbox" aria-label="Objects" className="max-h-72 overflow-y-auto">
+        <div role="listbox" aria-label="Notes" className="max-h-72 overflow-y-auto">
           {shown.map((o) => {
             const t = types.find((x) => x.id === o.type)
             return (
@@ -241,7 +243,7 @@ function AddExistingDialog({
               </div>
             )
           })}
-          {shown.length === 0 && <p className="px-2 py-2 text-[13px] text-fg-muted">No objects to add.</p>}
+          {shown.length === 0 && <p className="px-2 py-2 text-[13px] text-fg-muted">No notes to add.</p>}
         </div>
       </DialogContent>
     </Dialog>
@@ -597,7 +599,7 @@ export function CollectionPage({ id, mode = 'page', typeId, onExpand, footer }: 
                 onSelect={(e) => e.preventDefault()}
                 onCheckedChange={(on) => toggleType(t, on)}
               >
-                {t.name}
+                {typeLabel(t)}
               </DropdownMenuCheckboxItem>
             ))}
           </DropdownMenuSubContent>
@@ -646,7 +648,7 @@ export function CollectionPage({ id, mode = 'page', typeId, onExpand, footer }: 
           {types.map((t) => (
             <DropdownMenuItem key={t.id} onClick={(e) => create(t.id, mods(e))}>
               <TypeChip type={t} size={18} />
-              {`New ${t.name}`}
+              {`New ${typeLabel(t)}`}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -751,7 +753,7 @@ export function CollectionPage({ id, mode = 'page', typeId, onExpand, footer }: 
               className="flex h-7 items-center gap-1.5 rounded-full border border-line bg-raised pr-2.5 pl-1 text-[13px] font-medium hover:bg-hover"
             >
               <TypeChip type={parent} size={20} />
-              {parent.pluralName || parent.name}
+              {typePlural(parent) || typeLabel(parent)}
             </button>
           </div>
         )}

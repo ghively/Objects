@@ -78,7 +78,7 @@ describe('RelationPicker', () => {
         onChange={onChange}
       />,
     )
-    await user.type(screen.getByRole('textbox', { name: 'Search for objects' }), 'gra')
+    await user.type(screen.getByRole('textbox', { name: 'Search for notes' }), 'gra')
     expect(screen.getAllByRole('option')).toHaveLength(1)
     await user.click(screen.getByRole('option', { name: /Grace/ }))
     expect(onChange).toHaveBeenLastCalledWith([
@@ -115,7 +115,7 @@ describe('RelationPicker', () => {
         onOpenSettings={onOpenSettings}
       />,
     )
-    await user.type(screen.getByRole('textbox', { name: 'Search for objects' }), 'zzzz')
+    await user.type(screen.getByRole('textbox', { name: 'Search for notes' }), 'zzzz')
     expect(screen.getByText('Nothing found')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Edit Property' }))
     expect(onOpenSettings).toHaveBeenCalled()
@@ -129,7 +129,7 @@ describe('RelationPicker', () => {
       />,
     )
     expect(
-      screen.getByText('This set has nothing to pick from. Search everything to add objects to it.'),
+      screen.getByText('This set has nothing to pick from. Search everything to add notes to it.'),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit Property' })).not.toBeInTheDocument()
   })
@@ -179,6 +179,6 @@ describe('Object -> Tag relations (item 22)', () => {
     expect(screen.queryByRole('option', { name: /Create/ })).toBeNull()
     unmount()
     render(<RelationPicker def={relDef({ isArray: true, allowedTypes: ['person'] })} value={[]} onChange={vi.fn()} />)
-    expect(screen.getByRole('textbox', { name: 'Search for objects' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Search for notes' })).toBeInTheDocument()
   })
 })

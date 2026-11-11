@@ -5,10 +5,10 @@ export const AGENT_TEXT = {
   // Entry from the finish step.
   continueHeading: 'Next: organise with an agent',
   continueIntro:
-    'An agent can propose types and properties for what was imported. You review the proposal, try it on 50 objects, and nothing is applied without your say.',
+    'An agent can propose types and properties for what was imported. You review the proposal, try it on 50 notes, and nothing is applied without your say.',
   continueButton: 'Review proposed schema',
   // A trial copy: the batch lives in the copy, so the review opens there after the switch.
-  continueCopyIntro: 'The proposal belongs to the copy. Switch to it to review the proposed schema, try it on 50 objects and see the Import inbox.',
+  continueCopyIntro: 'The proposal belongs to the copy. Switch to it to review the proposed schema, try it on 50 notes and see the Import inbox.',
   continueCopyButton: 'Switch and review proposed schema',
   skip: 'Skip',
 
@@ -47,11 +47,11 @@ export const AGENT_TEXT = {
     `Skipped: ${items.map((i) => `${i.name} (${i.reason.replace(/\.$/, '')})`).join('; ')}.`,
 
   // Trial.
-  trialHeading: 'Trial on the first 50 objects',
+  trialHeading: 'Trial on the first 50 notes',
   trialIntro: 'Mark each result right or wrong. The rest starts only when you continue.',
   startTrial: 'Start trial',
   starting: 'Starting…',
-  trialRunning: 'The agent is reading the first objects…',
+  trialRunning: 'The agent is reading the first notes…',
   failed: 'The agent run failed. Nothing more was applied.',
   confidence: { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' },
   quote: 'Quote',
@@ -99,7 +99,7 @@ export const AGENT_TEXT = {
   splitIntro: 'Move these names to a new entity:',
   suggestedHeading: 'These look like the same thing',
   mergeSuggestion: 'Merge',
-  leftOutHeading: 'Not made into objects',
+  leftOutHeading: 'Not made into notes',
   leftOutReason: { text: 'Stays text: one page, no properties of its own', category: 'A category: kept as a tag or property value' },
   entityStatus: { accepted: 'Accepted', renamed: 'Renamed', rejected: 'Turned down' },
   undecidedEntities: (n: number) => `${pl(n, 'entity', 'entities')} still to decide`,
@@ -107,7 +107,7 @@ export const AGENT_TEXT = {
   write: 'Write',
   writing: 'Writing…',
   written: (w: { created: number; existing: number; relations: number; sections: number }) =>
-    `${pl(w.created, 'object', 'objects')} created, ${w.existing} already here. ${pl(w.relations, 'link', 'links')} and ${pl(w.sections, '"From sources" section', '"From sources" sections')} written.`,
+    `${pl(w.created, 'note', 'notes')} created, ${w.existing} already here. ${pl(w.relations, 'link', 'links')} and ${pl(w.sections, '"From sources" section', '"From sources" sections')} written.`,
   conflictsWritten: (n: number) => `${pl(n, 'value', 'values')} where Sources disagree: listed on the entity and in the report.`,
   sectionsLeft: (n: number) => `${pl(n, '"From sources" section', '"From sources" sections')} you edited were left as they are.`,
   relationsInbox: (n: number) => `${pl(n, 'low-confidence link', 'low-confidence links')} went to the Import inbox.`,
@@ -117,7 +117,7 @@ export const AGENT_TEXT = {
 
   // Done.
   doneHeading: 'Import inbox',
-  inboxCount: (n: number) => `${pl(n, 'object', 'objects')} in the Import inbox for you to look at.`,
+  inboxCount: (n: number) => `${pl(n, 'note', 'notes')} in the Import inbox for you to look at.`,
   inboxEmpty: 'The Import inbox is empty.',
   // One of this batch's Import inbox rows and why it went there.
   inboxReason: (title: string, reason: string) => `${title}: ${reason}`,

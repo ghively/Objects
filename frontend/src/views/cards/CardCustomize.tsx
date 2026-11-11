@@ -1,5 +1,6 @@
 // Customize view > Card view: per type, "Use default", a gear for the type's settings, and the
 // selected card properties (sortable, removable) with the ones that can still be added.
+import { typeLabel } from '@/lib/typeLabel'
 import { useState } from 'react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -64,7 +65,7 @@ function TypeCard({ type, state, onState }: { type: TypeDef; state: ViewState; o
   return (
     <div className="flex flex-col border-b border-line pb-1 last:border-0" data-testid="card-settings" data-type={type.id}>
       <div className="flex h-8 items-center gap-2 px-2 text-[14px] font-medium">
-        <span className="min-w-0 flex-1 truncate">{type.name}</span>
+        <span className="min-w-0 flex-1 truncate">{typeLabel(type)}</span>
         <button
           type="button"
           aria-label="Open settings"
@@ -80,7 +81,7 @@ function TypeCard({ type, state, onState }: { type: TypeDef; state: ViewState; o
         <input
           type="checkbox"
           role="switch"
-          aria-label={`Use default for ${type.name}`}
+          aria-label={`Use default for ${typeLabel(type)}`}
           checked={isDefault}
           onChange={(e) => onState({ ...state, viewDefinition: setUseDefault(type, def, e.target.checked) })}
         />

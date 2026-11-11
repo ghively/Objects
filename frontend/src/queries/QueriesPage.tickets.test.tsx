@@ -35,7 +35,7 @@ describe('QueriesPage and the Tickets view', () => {
       query({ id: 'zed', name: 'Zed list', revision: 'z' }),
     ])
     render(<QueriesPage />)
-    const list = await screen.findByRole('list', { name: 'Queries' })
+    const list = await screen.findByRole('list', { name: 'Saved searches' })
     const rows = within(list).getAllByRole('listitem')
     expect(rows.map((r) => r.getAttribute('data-query-row'))).toEqual(['abc', 'zed'])
     expect(within(list).queryByText('Tickets')).toBeNull()
@@ -44,6 +44,6 @@ describe('QueriesPage and the Tickets view', () => {
   test('test with only the Tickets view the list is empty', async () => {
     mocked.queries.mockResolvedValue([query({ id: 'work-tickets', name: 'Tickets', revision: 't', builtIn: 'tickets' })])
     render(<QueriesPage />)
-    expect(await screen.findByText('No queries')).toBeInTheDocument()
+    expect(await screen.findByText('No saved searches')).toBeInTheDocument()
   })
 })

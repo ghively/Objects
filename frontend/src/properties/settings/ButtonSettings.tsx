@@ -11,7 +11,7 @@ import { BUTTON_TEXT, reloadAutomations, useAutomations } from '@/automations/us
 
 export const BUTTON_SETTINGS_TEXT = {
   title: RULE_PICKER_TEXT.label,
-  description: 'The automation the button runs on its object.',
+  description: 'The automation the button runs on its note.',
   choose: 'Choose an automation',
 } as const
 

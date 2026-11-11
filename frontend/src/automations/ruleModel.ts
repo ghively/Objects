@@ -2,6 +2,7 @@
 // shows ("When a Task is created", "Ran 5 minutes ago"), the scope's properties, and the checks
 // the rule editor makes before it saves (the server checks again and names any problem in a 422).
 // Every string here is ours (contract "Settings > Automations" and "Rule editor").
+import { typeLabel } from '@/lib/typeLabel'
 import type {
   AutomationAction,
   AutomationActionKind,
@@ -31,7 +32,7 @@ export type RuleFields = AutomationRuleInput
 
 export const RULE_TEXT = {
   triggers: {
-    objectCreated: 'An object is created',
+    objectCreated: 'A note is created',
     propertyChanged: 'A property changes',
     schedule: 'On a schedule',
     button: 'A button is pressed',
@@ -43,7 +44,7 @@ export const RULE_TEXT = {
     removeTag: 'Remove a tag',
     addToCollection: 'Add to a collection',
     removeFromCollection: 'Remove from a collection',
-    createFromTemplate: 'Create an object',
+    createFromTemplate: 'Create a note',
     appendToDailyNote: 'Add to the daily note',
     notify: 'Send a notification',
     // M21: an agent schedule's one action; only here so the record stays exhaustive (never offered).
@@ -113,7 +114,7 @@ export function scopeTypes(scope: AutomationScope | null, types: readonly TypeDe
 
 /** The name of a scope ("Task", "Reading list"), or its id when it no longer exists. */
 export function scopeName(scope: AutomationScope, types: readonly TypeDef[], collections: readonly Collection[]): string {
-  if (scope.kind === 'type') return types.find((t) => t.id === scope.id)?.name ?? scope.id
+  if (scope.kind === 'type') return typeLabel(types.find((t) => t.id === scope.id), scope.id)
   return collections.find((c) => c.id === scope.id)?.name ?? scope.id
 }
 
@@ -315,7 +316,7 @@ function filterValueText(filter: Filter, choice: PropChoice | undefined, types: 
   if (Array.isArray(ref)) {
     const names = (ref as string[]).map((id) => {
       if (choice?.kind === 'label') return choice.def.options?.set?.find((o) => o.id === id)?.text ?? id
-      if (choice?.kind === 'entity_type') return types.find((t) => t.id === id)?.name ?? id
+      if (choice?.kind === 'entity_type') return typeLabel(types.find((t) => t.id === id), id)
       if (choice?.kind === 'entity_collections') return collections.find((c) => c.id === id)?.name ?? id
       return id
     })
@@ -348,7 +349,7 @@ export function triggerSummary(trigger: AutomationTrigger, ctx: SummaryContext):
   switch (trigger.kind) {
     case 'objectCreated': {
       if (trigger.scope.kind === 'collection')
-        return `When an object is added to ${scopeName(trigger.scope, ctx.types, ctx.collections)}`
+        return `When a note is added to ${scopeName(trigger.scope, ctx.types, ctx.collections)}`
       return `When ${article(scopeName(trigger.scope, ctx.types, ctx.collections))} is created`
     }
     case 'propertyChanged': {

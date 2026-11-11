@@ -1,4 +1,6 @@
 // "Queries": every query of the space, with New and a menu per row.
+import { SAVED_SEARCHES } from '@/lib/words'
+import { typePlural } from '@/lib/typeLabel'
 import { useMemo, type MouseEvent } from 'react'
 import { api } from '@/api/client'
 import type { Query } from '@/api/types'
@@ -19,10 +21,10 @@ import { removeQuery, useQueries } from './useQueries'
 import { QUERY_ICON } from '@/lib/defIcons'
 
 export const QUERIES_TEXT = {
-  heading: 'Queries',
+  heading: SAVED_SEARCHES,
   new: 'New',
-  emptyTitle: 'No queries',
-  emptyBody: 'Queries you save show up here.',
+  emptyTitle: 'No saved searches',
+  emptyBody: 'Searches you save show up here.',
   open: 'Open',
   pin: 'Pin to Sidebar',
   delete: 'Delete',
@@ -51,7 +53,7 @@ export function QueriesPage() {
           q,
           title: queryTitle(q, ctx),
           subtitle: titleIsCustom(q) ? autoTitle(q.definition, ctx) : '',
-          typeNames: q.definition.types.map((s) => types.find((t) => t.id === s.id)?.pluralName).filter((n): n is string => !!n),
+          typeNames: q.definition.types.map((s) => typePlural(types.find((t) => t.id === s.id))).filter((n) => !!n),
         }))
         .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })),
     [queries, ctx, types],
@@ -77,7 +79,7 @@ export function QueriesPage() {
           <p className="text-[14px] text-fg-muted">{QUERIES_TEXT.emptyBody}</p>
         </div>
       ) : (
-        <ul className="flex flex-col" aria-label="Queries">
+        <ul className="flex flex-col" aria-label={QUERIES_TEXT.heading}>
           {rows.map(({ q, title, subtitle, typeNames }) => (
             <li key={q.id} data-query-row={q.id} className="group flex items-center gap-1 rounded-lg hover:bg-hover">
               <button

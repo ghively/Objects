@@ -535,7 +535,7 @@ export function TableLayout(props: TableLayoutProps) {
   )
 
   if (!type || !config) {
-    return <p className="py-6 text-center text-[14px] text-fg-muted">A table can show only one object type at a time.</p>
+    return <p className="py-6 text-center text-[14px] text-fg-muted">A table can show only one type at a time.</p>
   }
 
   const canEditType = !type.basic && !type.readOnlyReason

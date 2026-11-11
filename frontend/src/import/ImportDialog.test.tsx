@@ -704,7 +704,7 @@ describe('ImportDialog: target, progress and finish', () => {
     const user = await previewVault()
     await user.click(screen.getByRole('radio', { name: T.thisSpaceNamed('Work') }))
     const into = await within(typeRow('Folder Books')).findByRole('combobox', { name: T.existingType })
-    expect(within(into).getAllByRole('option').map((o) => o.textContent)).toEqual([T.newType, 'Page', 'Task', 'Book'])
+    expect(within(into).getAllByRole('option').map((o) => o.textContent)).toEqual([T.newType, 'Note', 'Task', 'Book'])
   })
 
   test('test going back to a new space drops the existing type choices', async () => {

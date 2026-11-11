@@ -36,7 +36,7 @@ const paths = (r: Row[]) => r.map((x) => x.summary.path)
 
 describe('group options', () => {
   test('options per kind', () => {
-    expect(GROUP_OPTIONS('textBlock').map((o) => o.label)).toEqual(['By Text', 'By Linked Objects'])
+    expect(GROUP_OPTIONS('textBlock').map((o) => o.label)).toEqual(['By Text', 'By Linked Notes'])
     expect(GROUP_OPTIONS('number').map((o) => o.label)).toEqual(['By Exact Value', 'By Range'])
     expect(GROUP_OPTIONS('datetime').map((o) => o.label)).toEqual(['By Hour', 'By Day', 'By Week', 'By Month', 'By Year', 'Relative', 'Scheduled'])
     expect(GROUP_OPTIONS('label').map((o) => o.key)).toEqual(['default'])

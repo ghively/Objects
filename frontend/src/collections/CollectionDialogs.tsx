@@ -19,7 +19,7 @@ import { invalidateLinkIndex } from '@/links/linkIndex'
 
 export const COLLECTION_DIALOG_TEXT = {
   createTitle: 'New collection',
-  createTooltip: 'Sort objects of this type into collections; an object can sit in more than one.',
+  createTooltip: 'Sort notes of this type into collections; a note can sit in more than one.',
   defaultName: 'New Collection',
   deleteTitle: 'Delete this collection?',
   deleteBody:
@@ -31,9 +31,9 @@ export const COLLECTION_DIALOG_TEXT = {
   removeAction: 'Remove from collection',
 }
 
-/** "{n} object(s) couldn't be updated and still list this collection." (our string) */
+/** "{n} note(s) couldn't be updated and still list this collection." (our string) */
 export function skippedMessage(n: number): string {
-  return `${n} ${n === 1 ? 'object' : 'objects'} couldn't be updated and still list this collection.`
+  return `${n} ${n === 1 ? 'note' : 'notes'} couldn't be updated and still list this collection.`
 }
 
 /** "Delete {count} object(s)": the shared wording. */
@@ -186,7 +186,7 @@ export function DeleteCollectionDialog({ collection, open, onOpenChange, onDelet
         </AlertDialogHeader>
         {!result && affected !== null && (
           <p className="text-[14px]">
-            {affected === 1 ? '1 object is affected.' : `${affected} objects are affected.`}
+            {affected === 1 ? '1 note is affected.' : `${affected} notes are affected.`}
           </p>
         )}
         {skipped.length > 0 && (

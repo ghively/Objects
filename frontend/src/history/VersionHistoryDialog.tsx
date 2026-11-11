@@ -49,7 +49,7 @@ export const VERSION_HISTORY = {
   backToList: 'All versions',
   versionLabel: (n: number) => `Version ${n}`,
   empty: 'No earlier versions',
-  emptyDescription: 'Edit this object and its versions start to show up here.',
+  emptyDescription: 'Edit this note and its versions start to show up here.',
   fetchError: 'Version history unavailable',
   fetchErrorDescription: "The list of versions didn't load. Try again.",
   previewError: "Version unavailable",

@@ -58,7 +58,7 @@ describe('[[ create rows (M29)', () => {
 
   async function typeQuery(q: string): Promise<HTMLElement> {
     render(<LinkPicker />)
-    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    const input = await screen.findByRole('textbox', { name: 'Search notes' })
     // The types arrive with the link index.
     await waitFor(() => expect(mocked.space).toHaveBeenCalled())
     fireEvent.change(input, { target: { value: q } })
@@ -81,7 +81,7 @@ describe('[[ create rows (M29)', () => {
   test('Other types lists the rest and creates with the picked type', async () => {
     await typeQuery('APP01')
     fireEvent.click(await screen.findByRole('button', { name: /Other types/ }))
-    await waitFor(() => expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Application', 'Page']))
+    await waitFor(() => expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Application', 'Note']))
     fireEvent.click(screen.getByRole('button', { name: /Application/ }))
     await waitFor(() => expect(serializeBody(editor)).toBe('Hello [[APP01]]\n'))
     expect(mocked.createObject.mock.calls).toEqual([['application', { title: 'APP01' }]])
@@ -97,10 +97,10 @@ describe('[[ create rows (M29)', () => {
     expect(serializeBody(editor)).toBe('Hello [[APP01]]\n')
   })
 
-  test('no suggestion falls back to Page', async () => {
+  test('no suggestion falls back to Page (shown as Note)', async () => {
     await typeQuery('Shopping list')
     await waitFor(() => expect(createRow('page')).not.toBeNull())
-    expect(createRow('page')!.textContent).toBe("New 'Shopping list'Page")
+    expect(createRow('page')!.textContent).toBe("New 'Shopping list'Note")
     expect(createRow('host')).toBeNull()
   })
 
@@ -114,7 +114,7 @@ describe('[[ create rows (M29)', () => {
 
   test('an empty query shows recents and types as before', async () => {
     render(<LinkPicker />)
-    await screen.findByRole('textbox', { name: 'Search objects' })
+    await screen.findByRole('textbox', { name: 'Search notes' })
     await waitFor(() => expect(mocked.space).toHaveBeenCalled())
     expect(document.querySelector('[data-create-type]')).toBeNull()
     expect(screen.queryByRole('option', { name: /Other types|New '/ })).toBeNull()

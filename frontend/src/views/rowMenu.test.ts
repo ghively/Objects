@@ -39,13 +39,16 @@ describe('commonRowMenu', () => {
       'Open in side panel',
       'Open in new tab',
       'Change type',
-      'Copy object reference',
+      'Copy reference',
       'Duplicate',
-      'Delete object',
+      'Delete',
     ])
     expect(items.find((i) => i.key === 'delete')?.destructive).toBe(true)
     // "Change type" lists the other types.
-    expect(items.find((i) => i.key === 'changeType')?.children?.map((c) => c.label)).toEqual(['Book', 'DailyNote', 'Whiteboard'])
+    // M32: a type reads as the screen names it (the built-in DailyNote is "Daily note", Page is "Note").
+    expect(items.find((i) => i.key === 'changeType')?.children?.map((c) => c.label)).toEqual(['Book', 'Daily note', 'Whiteboard'])
+    const fromBook = commonRowMenu(mk({ path: 'Books/Dune.md', type: 'book', title: 'Dune' }), ctx())
+    expect(fromBook.find((i) => i.key === 'changeType')?.children?.map((c) => c.label)).toEqual(['Daily note', 'Note', 'Whiteboard'])
   })
 
   test('test duplicate hidden for daily note, template, whiteboard and read-only', () => {
@@ -60,7 +63,7 @@ describe('commonRowMenu', () => {
   test('test read-only rows offer no change type or delete', () => {
     const labels = commonRowMenu(mk({ readOnly: true }), ctx()).map((i) => i.label)
     expect(labels).not.toContain('Change type')
-    expect(labels).not.toContain('Delete object')
+    expect(labels).not.toContain('Delete')
   })
 
   test('test actions open, select, change type and delete through the context', () => {
@@ -91,6 +94,6 @@ describe('commonRowMenu', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     commonRowMenu(mk(), ctx()).find((i) => i.key === 'copyReference')!.onSelect()
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('[[Alpha]]'))
-    await vi.waitFor(() => expect(document.body.textContent).toContain('Link to object copied'))
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Link copied'))
   })
 })

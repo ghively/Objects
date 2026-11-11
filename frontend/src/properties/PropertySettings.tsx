@@ -1,3 +1,4 @@
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { DateConstraints, PropertyDef, PropertyOptions, PropertyType, TypeDef } from '@/api/types'
@@ -37,7 +38,7 @@ const TEXT = {
   heading: 'Property settings',
   explanation: 'Rename this property, describe it, and adjust how it works.',
   applyExplanation:
-    "These changes apply to every object of this type. Links that no longer fit the rules above will be removed. Apply them?",
+    "These changes apply to every note of this type. Links that no longer fit the rules above will be removed. Apply them?",
   syncExplanation:
     'Pair this property with one on the linked type, so a change on either side shows on both.',
   multiSelectOnly:
@@ -50,11 +51,11 @@ const TEXT = {
     'Some values may not fit the new kind and can be lost.',
   noTransformations: 'This property type cannot be changed.',
   confirmText: 'I know some values may be lost.',
-  deleteDescription: 'This removes the property from every object of this type, and it cannot be undone.',
+  deleteDescription: 'This removes the property from every note of this type, and it cannot be undone.',
   blocksPropertyWarning:
-    "A content property usually holds the body of an object; a label shows only when a type has more than one. Check this is not the body of your notes before deleting it.",
+    "A content property usually holds the body of a note; a label shows only when a type has more than one. Check this is not the body of your notes before deleting it.",
   onlyBlocksPropertyWarning:
-    'This type has no other content property. Deleting it removes the body of every object of this type.',
+    'This type has no other content property. Deleting it removes the body of every note of this type.',
   datePickerHeading: 'Settings for dates',
   timeDescription: 'Let values carry a time as well as a date.',
   timePreferenceDescription: 'Start new values as:',
@@ -521,9 +522,9 @@ function RelationSection({
 
   return (
     <>
-      <Section title="Linked object type" description="The type this property points to.">
+      <Section title="Linked type" description="The type this property points to.">
         <select
-          aria-label="Linked object type"
+          aria-label="Linked type"
           value={rules.allowedTypes[0] ?? ''}
           onChange={(e) => setRules((r) => ({ ...r, allowedTypes: e.target.value ? [e.target.value] : [] }))}
           className="rounded border border-line bg-raised px-2 py-1 text-[13px]"
@@ -531,14 +532,14 @@ function RelationSection({
           <option value="">Any type</option>
           {targets.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.name}
+              {typeLabel(t)}
             </option>
           ))}
         </select>
       </Section>
       <Section
         title="Single or Multi-Select"
-        description="Allow one linked object, or several."
+        description="Allow one linked note, or several."
       >
         <div className="flex gap-1.5">
           {SINGLE_MULTI.map((o) => (
@@ -554,7 +555,7 @@ function RelationSection({
       </Section>
       <Section
         title="Enable fixed set"
-        description="Offer only the objects you pick here when choosing a value."
+        description="Offer only the notes you pick here when choosing a value."
       >
         <label className="flex items-center gap-2 text-[13px]">
           <input
@@ -588,7 +589,7 @@ function RelationSection({
               onChange={(e) => e.target.value && void addToFixedSet(e.target.value)}
               className="rounded border border-line bg-raised px-2 py-1 text-[13px]"
             >
-              <option value="">Add an object…</option>
+              <option value="">Add a note…</option>
               {candidates
                 .filter((o) => !o.id || !rules.fixedSet.includes(o.id))
                 .map((o) => (
@@ -629,8 +630,8 @@ function RelationSection({
               </Choice>
             ))}
             {!singleSided && (
-              <Choice selected={false} onClick={() => void editor.setSync(def.id, null, type.name)}>
-                {`Create property "${type.name}" for "${linked.pluralName}"`}
+              <Choice selected={false} onClick={() => void editor.setSync(def.id, null, typeLabel(type))}>
+                {`Create property "${typeLabel(type)}" for "${typePlural(linked)}"`}
               </Choice>
             )}
           </div>
@@ -703,7 +704,7 @@ function LabelSection({ type, def, save }: { type: TypeDef; def: PropertyDef; sa
   return (
     <>
       {!type.basic && (
-        <Section title="Single or Multi-Select" description="Allow one label per object, or several.">
+        <Section title="Single or Multi-Select" description="Allow one label per note, or several.">
           <div className="flex gap-1.5">
             {SINGLE_MULTI.map((o) => (
               <Choice
@@ -722,7 +723,7 @@ function LabelSection({ type, def, save }: { type: TypeDef; def: PropertyDef; sa
       )}
       <Section
         title="Label set"
-        description="Add, rename or remove labels. Removing one here also clears it from every object that has it."
+        description="Add, rename or remove labels. Removing one here also clears it from every note that has it."
       >
         <div className="rounded border border-line p-1">
           <LabelMenu def={def} value={[]} onChange={() => undefined} onDefChange={(next) => save(next)} />
@@ -755,7 +756,7 @@ function ChangeKindSection({
     if (res) onOpenProperty?.(res.newPropertyId)
   }
   return (
-    <Section title="Change property type" description="Switch this property to a different kind, for every object of this type.">
+    <Section title="Change property type" description="Switch this property to a different kind, for every note of this type.">
       {kinds.length === 0 ? (
         <p className="text-[13px] text-fg-muted">{TEXT.noTransformations}</p>
       ) : (
@@ -924,7 +925,7 @@ export function PropertySettings({
             {def.type === 'uniqueId' && <UniqueIdSection type={type} def={def} save={save} />}
             {SYNCABLE_KINDS.has(def.type) && <SyncedSection key={`synced-${def.id}`} def={def} save={save} />}
             {canChangeVisibility(def) && (
-              <Section title="Visibility" description="Show or hide this property on the object page.">
+              <Section title="Visibility" description="Show or hide this property on the note's page.">
                 <div className="flex gap-1.5">
                   {VISIBILITY_OPTIONS.map((o) => (
                     <Choice

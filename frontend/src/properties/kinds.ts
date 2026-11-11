@@ -29,7 +29,7 @@ export const KIND_META: Readonly<Record<PropertyType, KindMeta>> = {
   // Both read "Date time"; only `datetime` is ever created.
   datetime: { name: 'Date time', description: 'A date, with an optional time', icon: 'ph-calendar' },
   datetimeSimple: { name: 'Date time', description: '', icon: 'ph-calendar-blank' },
-  entity: { name: 'Object', description: 'Points to one or more objects', icon: 'ph-file-text' },
+  entity: { name: 'Link', description: 'Points to one or more notes', icon: 'ph-file-text' },
   label: {
     name: 'Label',
     description: 'Pick one or more options from a list you define.',
@@ -37,50 +37,50 @@ export const KIND_META: Readonly<Record<PropertyType, KindMeta>> = {
   },
   blocks: {
     name: 'Content',
-    description: 'The body of an object, where you write notes with formatting and links.',
+    description: 'The body of a note, where you write with formatting and links.',
     icon: 'ph-list-dashes',
   },
-  coverImage: { name: 'Cover Image', description: 'One picture shown at the top of the object.', icon: 'ph-image' },
+  coverImage: { name: 'Cover Image', description: 'One picture shown at the top of the note.', icon: 'ph-image' },
   color: { name: 'Color', description: '', icon: 'ph-palette' },
   // M12: our kinds, names and descriptions (our strings)
   formula: { name: 'Formula', description: 'A value calculated from other properties.', icon: 'ph-function' },
   rollup: {
     name: 'Rollup',
-    description: 'Shows or calculates a property of related objects.',
+    description: 'Shows or calculates a property of related notes.',
     icon: 'ph-stack',
   },
-  uniqueId: { name: 'ID', description: 'A number given to each new object, with an optional prefix.', icon: 'ph-hash-straight' },
+  uniqueId: { name: 'ID', description: 'A number given to each new note, with an optional prefix.', icon: 'ph-hash-straight' },
   email: { name: 'Email', description: 'An email address.', icon: 'ph-at' },
   phone: { name: 'Phone', description: 'A phone number.', icon: 'ph-phone' },
   files: { name: 'Files', description: 'Attached files.', icon: 'ph-paperclip' },
   entity_title: {
     name: 'Title',
-    description: 'The name of the object, shown wherever it appears',
+    description: 'The name of the note, shown wherever it appears',
     icon: 'ph-text-t',
   },
   entity_icon: { name: 'Icon', description: 'An emoji or icon shown beside the title', icon: 'ph-smiley' },
   entity_description: {
     name: 'Description',
-    description: 'A short summary of what the object is about',
+    description: 'A short summary of what the note is about',
     icon: 'ph-info',
   },
-  entity_aliases: { name: 'Aliases', description: 'Other names the object goes by', icon: 'ph-cards' },
-  entity_tags: { name: 'Tags', description: 'Tags attached to the object', icon: 'ph-tag' },
-  entity_type: { name: 'Object type', description: 'What kind of object this is', icon: 'ph-notebook' },
+  entity_aliases: { name: 'Aliases', description: 'Other names the note goes by', icon: 'ph-cards' },
+  entity_tags: { name: 'Tags', description: 'Tags attached to the note', icon: 'ph-tag' },
+  entity_type: { name: 'Type', description: 'What kind of note this is', icon: 'ph-notebook' },
   entity_collections: {
     name: 'Collections',
-    description: 'The collections this object belongs to',
+    description: 'The collections this note belongs to',
     icon: 'ph-cards-three',
   },
-  entity_createdAt: { name: 'Created at', description: 'When the object was made', icon: 'ph-calendar-blank' },
+  entity_createdAt: { name: 'Created at', description: 'When the note was made', icon: 'ph-calendar-blank' },
   entity_lastUpdated: {
     name: 'Last updated',
-    description: 'When the object last changed',
+    description: 'When the note last changed',
     icon: 'ph-clock-clockwise',
   },
-  entity_backlinks: { name: 'Context', description: 'Where other objects mention this one', icon: 'ph-line-segment' },
+  entity_backlinks: { name: 'Context', description: 'Where other notes mention this one', icon: 'ph-line-segment' },
   // M14 (our strings): a button that runs an automation on its object.
-  button: { name: 'Button', description: 'Run an automation on this object with one click', icon: 'ph-cursor-click' },
+  button: { name: 'Button', description: 'Run an automation on this note with one click', icon: 'ph-cursor-click' },
   // M22 (our strings): Steps and Floor items come only from "Add work fields"; List is addable.
   steps: {
     name: 'Steps',
@@ -183,8 +183,8 @@ function buildItems(): AddPropertyItem[] {
       key: 'type_tag_multi',
       action: 'objectSelect',
       type: 'entity',
-      name: 'Object Select',
-      description: 'Points to objects of one chosen type.',
+      name: 'Link to a type',
+      description: 'Points to notes of one chosen type.',
       icon: 'ph-link',
     },
     {
@@ -192,7 +192,7 @@ function buildItems(): AddPropertyItem[] {
       action: 'coverImage',
       type: 'coverImage',
       name: 'Cover Image',
-      description: 'One picture shown at the top of the object.',
+      description: 'One picture shown at the top of the note.',
       icon: 'ph-image',
     },
     ...ADDABLE_KINDS.map(

@@ -1,5 +1,6 @@
 // The inline (linkToken) view of an object: its icon and title, and a type chip when the view
 // spans several types.
+import { typeLabel } from '@/lib/typeLabel'
 import type { ReactNode } from 'react'
 import type { Row, TypeDef } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
@@ -42,7 +43,7 @@ export function InlineToken({
           className="shrink-0 rounded-md bg-[var(--chip-bg)] px-1.5 py-[1px] text-[12px] text-[var(--chip-fg)]"
           style={chipStyle(type.color)}
         >
-          {type.name}
+          {typeLabel(type)}
         </span>
       )}
       {trailing != null && (

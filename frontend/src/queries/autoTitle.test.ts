@@ -18,6 +18,23 @@ const def = (over: Partial<QueryDefinition> = {}): QueryDefinition => ({
   ...over,
 })
 
+describe('autoTitle type names (M32)', () => {
+  test('test the built-in Page and DailyNote read Notes and Daily notes; a renamed type keeps its plural', () => {
+    const named = {
+      types: [
+        { id: 'page', name: 'Page', pluralName: 'Pages', basic: true },
+        { id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true },
+        { id: 'server', name: 'Server', pluralName: 'Servers', basic: false },
+      ],
+      tagIdsToTitles: { t1: 'urgent' },
+    }
+    expect(autoTitle(def({ types: [{ id: 'page' }, { id: 'dailynote' }, { id: 'server' }] }), named)).toBe('Notes, Daily notes, Servers')
+    expect(autoTitle(def({ types: [{ id: 'page' }], tags: { ids: ['t1'], operator: 'or' } }), named)).toBe('Notes tagged urgent')
+    const renamed = { ...named, types: [{ id: 'page', name: 'Doc', pluralName: 'Docs', basic: true }] }
+    expect(autoTitle(def({ types: [{ id: 'page' }] }), renamed)).toBe('Docs')
+  })
+})
+
 describe('autoTitle', () => {
   test('test autoTitle types and tags, All notes without types; custom title sticks; absent titleIsCustom with a name counts as custom', () => {
     expect(autoTitle(def(), ctx)).toBe('All notes')

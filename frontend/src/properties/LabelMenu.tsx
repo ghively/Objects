@@ -13,7 +13,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Icon as IconValue, LabelOption, PropertyDef, StatusCategory } from '@/api/types'
 import { ColorPicker } from '@/components/ColorPicker'
 import { Icon, IconOrEmoji } from '@/components/Icon'
@@ -102,6 +102,8 @@ export function LabelMenu({ def, value, onChange, onDefChange, onClose, onOpenSe
   const isStatus = !!def.options.isStatus
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<string | null>(null)
+  /** M32: the option "Create" just made; its "Edit label" opens with the name selected. */
+  const [created, setCreated] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -147,6 +149,7 @@ export function LabelMenu({ def, value, onChange, onDefChange, onClose, onOpenSe
     }
     setQuery('')
     if (!select) {
+      setCreated(option.id)
       setEditing(option.id)
       return
     }
@@ -194,7 +197,11 @@ export function LabelMenu({ def, value, onChange, onDefChange, onClose, onOpenSe
         option={editingOption}
         set={set}
         canDelete={!isLastDone(editingOption)}
-        onBack={() => setEditing(null)}
+        selectName={created === editingOption.id}
+        onBack={() => {
+          setEditing(null)
+          setCreated(null)
+        }}
         onSave={(next) => void onDefChange(withSet(set.map((o) => (o.id === next.id ? next : o))))}
         onDelete={() => {
           setEditing(null)
@@ -407,11 +414,15 @@ function OptionRow({
   )
 }
 
-/** The "Edit label" submenu: name (saved on blur), colour, icon and delete. */
+/**
+ * The "Edit label" submenu: name (saved on blur), colour, icon and delete. `selectName` (M32, a
+ * label "Create" just made) opens it with the prefilled name selected, so typing replaces it.
+ */
 function EditLabel({
   option,
   set,
   canDelete,
+  selectName,
   onBack,
   onSave,
   onDelete,
@@ -419,12 +430,18 @@ function EditLabel({
   option: LabelOption
   set: LabelOption[]
   canDelete: boolean
+  selectName?: boolean
   onBack(): void
   onSave(next: LabelOption): void
   onDelete(): void
 }) {
   const [text, setText] = useState(option.text)
   const [iconOpen, setIconOpen] = useState(false)
+  const nameRef = useRef<HTMLInputElement>(null)
+  const selectOnOpen = useRef(!!selectName)
+  useEffect(() => {
+    if (selectOnOpen.current) nameRef.current?.select()
+  }, [])
   const t = text.trim()
   const duplicate = set.some((o) => o.id !== option.id && sameText(o.text, t))
 
@@ -447,6 +464,7 @@ function EditLabel({
         <span className="text-[13px] text-fg-muted">Edit label</span>
       </div>
       <input
+        ref={nameRef}
         aria-label="Label name"
         value={text}
         maxLength={MAX_TEXT}

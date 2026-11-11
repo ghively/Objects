@@ -71,7 +71,7 @@ describe('zoom steps', () => {
 })
 
 describe('graph controls', () => {
-  test('the count pill shows the objects shown after the filters', async () => {
+  test('the count pill shows the notes shown after the filters', async () => {
     render(<GraphPage onOpenTarget={vi.fn()} />)
     await sigmaReady()
     // The done task is hidden by default.
@@ -116,7 +116,7 @@ describe('graph controls', () => {
     await waitFor(() => expect(zoom).toHaveTextContent('100%'))
   })
 
-  test('Open as list lists the objects shown; a pick peeks it with them as the pager', async () => {
+  test('Open as list lists the notes shown; a pick peeks it with them as the pager', async () => {
     const user = userEvent.setup()
     const onOpenTarget = vi.fn()
     render(<GraphPage onOpenTarget={onOpenTarget} />)

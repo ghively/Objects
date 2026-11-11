@@ -19,7 +19,7 @@ export const CALENDAR_TEXT = {
   more: (n: number) => `+${n} more`,
   noDate: (n: number) => `No date (${n})`,
   noDateHeading: 'No date',
-  newOn: (day: Day) => `New object on ${formatLong(day)}`,
+  newOn: (day: Day) => `New note on ${formatLong(day)}`,
   previous: 'Previous',
   next: 'Next',
   today: 'Today',

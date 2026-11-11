@@ -1,6 +1,7 @@
 // A query: header (icon, title, menu), "Edit query" with the builder, and its results in a data
 // view. Filter, sort and group live in `definition`; `view` holds the layout, table and card
 // settings and the details toggle.
+import { typeLabel } from '@/lib/typeLabel'
 import { useCallback, useMemo, useState } from 'react'
 import type { Query, QueryDefinition, TypeDef, ViewState } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
@@ -34,18 +35,18 @@ import { QUERY_ICON } from '@/lib/defIcons'
 import { DEV_INFO_TEXT, DevInfo } from '@/settings/DevInfo'
 
 export const QUERY_TEXT = {
-  edit: 'Edit query',
+  edit: 'Edit saved search',
   closeEditor: 'Close editor',
   pinToSidebar: 'Pin to Sidebar',
-  pinToType: 'Pin to object type',
-  unpinFromType: 'Unpin from object type',
+  pinToType: 'Pin to type',
+  unpinFromType: 'Unpin from type',
   pinToDashboard: 'Pin to dashboard',
   unpinFromDashboard: 'Unpin from dashboard',
   delete: 'Delete',
-  notReadyTitle: 'Query isn’t ready',
-  notReadyBody: 'The draft is kept, but it lists nothing until it has a search term, a tag or an object type.',
+  notReadyTitle: 'Saved search isn’t ready',
+  notReadyBody: 'The draft is kept, but it lists nothing until it has a search term, a tag or a type.',
   empty: 'No content found',
-  unknown: 'Unknown query',
+  unknown: 'Unknown saved search',
 }
 
 /**
@@ -200,7 +201,7 @@ export function QueryPage({ id }: { id: string }) {
           <PopoverTrigger asChild>
             <button
               type="button"
-              aria-label="Query icon"
+              aria-label="Saved search icon"
               disabled={readOnly}
               className="flex size-8 items-center justify-center rounded-lg border border-line hover:bg-hover"
             >
@@ -219,7 +220,7 @@ export function QueryPage({ id }: { id: string }) {
         </Popover>
         <input
           id="query-name"
-          aria-label="Query name"
+          aria-label="Saved search name"
           value={draft ?? title}
           readOnly={readOnly}
           onChange={(e) => setDraft(e.target.value)}
@@ -260,7 +261,7 @@ export function QueryPage({ id }: { id: string }) {
             {queryTypes.map((t) => (
               <DropdownMenuItem key={t.id} onSelect={() => toggleType(t)}>
                 <Icon name={typePins[t.id] ? 'ph-push-pin-slash' : 'ph-push-pin'} size={14} />
-                {(typePins[t.id] ? QUERY_TEXT.unpinFromType : QUERY_TEXT.pinToType) + (queryTypes.length > 1 ? ` (${t.name})` : '')}
+                {(typePins[t.id] ? QUERY_TEXT.unpinFromType : QUERY_TEXT.pinToType) + (queryTypes.length > 1 ? ` (${typeLabel(t)})` : '')}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSub>
@@ -303,7 +304,7 @@ export function QueryPage({ id }: { id: string }) {
       <DevInfo className="mx-4 mb-2 max-w-md" rows={[{ label: DEV_INFO_TEXT.queryId, value: q.id }]} />
       {readOnly && (
         <p role="status" className="px-4 pb-2 text-[13px] text-fg-muted">
-          {`This query's file couldn't be read, so it opens read-only. Fix the file to edit it.`}
+          {`This saved search's file couldn't be read, so it opens read-only. Fix the file to edit it.`}
         </p>
       )}
       {notice && (

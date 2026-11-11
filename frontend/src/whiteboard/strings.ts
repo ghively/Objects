@@ -16,8 +16,8 @@ export const WB = {
   toolMove: s('Move'),
   toolHand: s('Hand'),
   toolText: s('Text'),
-  toolLink: s('Existing object'),
-  toolCreate: s('New object'),
+  toolLink: s('Existing note'),
+  toolCreate: s('New note'),
   toolImage: s('Image'),
   toolPdf: s('PDF'),
   toolAudio: s('Audio'),
@@ -95,9 +95,9 @@ export const WB = {
   viewEmbed: s('Embed'),
 
   // Quick-create on a connector drop (M8; "Link {name}" is a template: QUICK_CREATE_LINK_TYPED below)
-  quickCreateObjects: s('Objects'),
-  quickCreateCreateObject: s('Create Object'),
-  quickCreateLinkObject: s('Link Object'),
+  quickCreateObjects: s('Notes'),
+  quickCreateCreateObject: s('Create note'),
+  quickCreateLinkObject: s('Link any note'),
   quickCreateShapes: s('Shapes'),
   quickCreateNone: s('Nothing'),
   quickCreateDiscard: s('Remove'),
@@ -137,7 +137,7 @@ export const WB = {
   weblinkInvalid: s('Invalid URL format'),
 
   // Empty and lost states
-  emptyStateDescription: s('Add a block or object to get started.'),
+  emptyStateDescription: s('Add a block or note to get started.'),
   lostTitle: s('Nothing in this view'),
   lostDescription: s("Jump back to the content to carry on."),
   lostBackToContent: s('Back to content'),
@@ -146,14 +146,14 @@ export const WB = {
   clearWhiteboard: s('Clear Whiteboard'),
   clearWhiteboardHeading: s('Clear this whiteboard?'),
   clearWhiteboardExplanation: s(
-    'Everything on the canvas, objects and connectors, will be removed. Undo brings it back.',
+    'Everything on the canvas, connectors included, will be removed. Undo brings it back.',
   ),
   clearWhiteboardConfirm: s('Clear Whiteboard'),
 
   // The Whiteboard type
   typeName: s('Whiteboard'),
   typePluralName: s('Whiteboards'),
-  typeDescription: s('A boundless board for laying out blocks and objects'),
+  typeDescription: s('A boundless board for laying out blocks and notes'),
   typeCreate: s('Create whiteboard'),
   propCanvas: s('Canvas'),
   propNotes: s('Notes'),
@@ -189,7 +189,7 @@ export const WB = {
   shortcutResize: s('Resize selection'),
   shortcutResizeDescription: s('The right and bottom edges move; the top-left corner stays put'),
   shortcutResizeLarge: s('Resize the selection in bigger steps'),
-  shortcutCycle: s('Cycle selected objects'),
+  shortcutCycle: s('Cycle selected items'),
   shortcutCycleBack: s('Select the previous item'),
   shortcutUndo: s('Undo last change'),
   shortcutRedo: s('Redo last change'),
@@ -211,7 +211,7 @@ export const WB = {
   inspectorPin: s('Pin'),
   inspectorUnpin: s('Unpin'),
   statText: s('Text'),
-  statObjects: s('Objects'),
+  statObjects: s('Notes'),
   statMedia: s('Media'),
   statShapes: s('Shapes'),
   statFrames: s('Frames'),
@@ -228,7 +228,7 @@ export const WB = {
   newerVersion: s('This whiteboard was saved by a newer version of Object.', true),
   changedElsewhere: s('Changed elsewhere. Reloaded.', true),
   saveFailed: s('Could not save the whiteboard.', true),
-  searchObjects: s('Search objects', true),
+  searchObjects: s('Search notes', true),
   pickType: s('Pick a type', true),
   // M8: the per-node lock
   nodeLock: s('Lock', true),

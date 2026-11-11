@@ -1,3 +1,4 @@
+import { typeLabel } from '@/lib/typeLabel'
 import { IconOrEmoji } from '@/components/Icon'
 import { typeOf, useLinkIndex } from '@/links/linkIndex'
 import { chipStyle } from '@/theme/palette'
@@ -19,7 +20,7 @@ export function TypeChipCell({ value, readOnly, onChangeType }: TypeChipCellProp
       style={chipStyle(type?.color)}
     >
       <IconOrEmoji icon={type?.icon ?? null} size={12} fallback="ph-cube" />
-      {type?.name ?? value ?? '—'}
+      {type ? typeLabel(type) : (value ?? '—')}
     </span>
   )
   if (readOnly || !onChangeType) return <div className="py-0.5">{chip}</div>

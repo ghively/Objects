@@ -16,7 +16,7 @@ export const TEMPLATE_REPEAT_TEXT = {
   menu: 'Repeat',
   repeating: 'Repeats',
   title: 'Repeat template',
-  description: 'Create a new object from this template on a schedule.',
+  description: 'Create a new note from this template on a schedule.',
   turnedOn: 'Turned on',
   remove: 'Remove repeat',
   cancel: 'Cancel',

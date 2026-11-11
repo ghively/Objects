@@ -45,7 +45,7 @@ describe('chart settings page', () => {
     render(<Harness onChange={() => {}} />)
     expect(screen.getByRole('button', { name: 'Chart type' }).textContent).toContain('Bar')
     expect(screen.getByRole('button', { name: 'X axis' }).textContent).toContain('Status')
-    expect(screen.getByRole('button', { name: 'Y axis' }).textContent).toContain('Count of objects')
+    expect(screen.getByRole('button', { name: 'Y axis' }).textContent).toContain('Count')
     expect(screen.getByRole('button', { name: 'Split by' }).textContent).toContain('None')
     expect(screen.queryByRole('button', { name: 'Calculation' })).toBeNull()
     expect(screen.queryByRole('switch', { name: 'Cumulative' })).toBeNull()
@@ -73,7 +73,7 @@ describe('chart settings page', () => {
     expect(last()).toMatchObject({ yProperty: 'points', yCalc: 'sum' })
     pick('Calculation', 'Average')
     expect(last().yCalc).toBe('average')
-    pick('Y axis', 'Count of objects')
+    pick('Y axis', 'Count')
     expect(last()).toMatchObject({ yProperty: null, yCalc: 'countAll' })
 
     pick('Split by', 'Status')

@@ -62,7 +62,7 @@ describe('[[ trigger', () => {
     await waitFor(() => expect(useLinkPicker.getState().range).toEqual({ from: end, to: end + 2 }))
 
     render(<LinkPicker />)
-    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    const input = await screen.findByRole('textbox', { name: 'Search notes' })
     await screen.findByText('Ada Lovelace')
     fireEvent.change(input, { target: { value: 'ada' } })
     fireEvent.keyDown(input, { key: 'Enter' })
@@ -89,7 +89,7 @@ describe('[[ trigger', () => {
   test('cancelling the picker leaves the [[ and the query typed in it', async () => {
     await typeBrackets()
     render(<LinkPicker />)
-    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    const input = await screen.findByRole('textbox', { name: 'Search notes' })
     fireEvent.change(input, { target: { value: 'ada' } })
     fireEvent.keyDown(input, { key: 'Escape' })
     await waitFor(() => expect(useLinkPicker.getState().range).toBeNull())
@@ -103,7 +103,7 @@ describe('[[ trigger', () => {
   test('cancelling with an empty query leaves just the [[', async () => {
     await typeBrackets()
     render(<LinkPicker />)
-    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    const input = await screen.findByRole('textbox', { name: 'Search notes' })
     fireEvent.keyDown(input, { key: 'Escape' })
     await waitFor(() => expect(useLinkPicker.getState().range).toBeNull())
     expect(editor.state.doc.textContent).toBe('Hello [[')
@@ -126,7 +126,7 @@ describe('[[ trigger', () => {
     expect(end).not.toBeNull()
     expect(useLinkPicker.getState().range).toEqual({ from: end, to: end! + 1 })
     render(<LinkPicker />)
-    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    const input = await screen.findByRole('textbox', { name: 'Search notes' })
     await screen.findByText('Ada Lovelace')
     fireEvent.change(input, { target: { value: 'ada' } })
     fireEvent.keyDown(input, { key: 'Enter' })
@@ -144,7 +144,7 @@ describe('[[ trigger', () => {
   test('cancelling the picker leaves the @ and the query typed in it', async () => {
     await typeAt('Hello ')
     render(<LinkPicker />)
-    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    const input = await screen.findByRole('textbox', { name: 'Search notes' })
     fireEvent.change(input, { target: { value: 'ada' } })
     fireEvent.keyDown(input, { key: 'Escape' })
     await waitFor(() => expect(useLinkPicker.getState().range).toBeNull())
@@ -159,7 +159,7 @@ describe('[[ trigger', () => {
     expect(useLinkPicker.getState().mode).toBe('embed')
 
     render(<LinkPicker />)
-    const input = await screen.findByRole('textbox', { name: 'Search objects' })
+    const input = await screen.findByRole('textbox', { name: 'Search notes' })
     expect(input).toHaveAttribute('placeholder', 'Embed…')
     await screen.findByText('Ada Lovelace')
     fireEvent.change(input, { target: { value: 'ada' } })
@@ -217,14 +217,15 @@ describe('picker rows', () => {
     const rows = names()
     expect(rows[0]).toContain('Plan') // recent; a path that no longer exists is skipped
     expect(rows.filter((r) => r?.includes('Missing'))).toHaveLength(0)
-    expect(rows.slice(1).map((r) => r?.replace(/\d+$/, ''))).toEqual(['Pages', 'People'])
+    expect(rows.slice(1).map((r) => r?.replace(/\d+$/, ''))).toEqual(['Notes', 'People'])
   })
 
   test('picking a type row lists its objects; Backspace in the empty box goes back', async () => {
     render(<LinkPicker />)
-    const input = await screen.findByRole('textbox', { name: 'Search objects' })
-    fireEvent.click(within(await screen.findByRole('option', { name: /Pages/ })).getByRole('button'))
-    await waitFor(() => expect(names().map((n) => n?.replace(/Page$/, ''))).toEqual(['Notes', 'Plan']))
+    const input = await screen.findByRole('textbox', { name: 'Search notes' })
+    fireEvent.click(within(await screen.findByRole('option', { name: /^Notes/ })).getByRole('button'))
+    // Each row ends with its type as the screen names it ("Note" for the built-in Page).
+    await waitFor(() => expect(names()).toEqual(['NotesNote', 'PlanNote']))
     fireEvent.keyDown(input, { key: 'Backspace' })
     await waitFor(() => expect(names()[0]).toContain('Plan'))
     expect(names().some((n) => n?.includes('People'))).toBe(true)
@@ -236,7 +237,7 @@ describe('picker rows', () => {
     Object.defineProperty(Element.prototype, 'scrollIntoView', { value: scroll, configurable: true, writable: true })
     try {
       render(<LinkPicker />)
-      const input = await screen.findByRole('textbox', { name: 'Search objects' })
+      const input = await screen.findByRole('textbox', { name: 'Search notes' })
       await screen.findByRole('option', { name: /People/ })
       fireEvent.keyDown(input, { key: 'ArrowDown' })
       fireEvent.keyDown(input, { key: 'ArrowDown' })
@@ -253,7 +254,7 @@ describe('picker rows', () => {
 
   test('the picker opens as a popover at the caret, not a centred dialog', async () => {
     render(<LinkPicker />)
-    const pop = await screen.findByRole('dialog', { name: 'Link to an object' })
+    const pop = await screen.findByRole('dialog', { name: 'Link to a note' })
     expect(pop).toHaveAttribute('data-slot', 'popover-content')
   })
 })

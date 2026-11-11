@@ -3,6 +3,7 @@
 // editor over the scope's properties; not for schedules), Then (the actions, drag to reorder) and
 // a footer with "Turned on", "Cancel" and "Save". A 422 shows its message above the footer; a
 // 409 reloads the rule's revision and asks to save again. Every string here is ours.
+import { typeLabel } from '@/lib/typeLabel'
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -60,7 +61,7 @@ import {
 export const RULE_EDITOR_TEXT = {
   newTitle: 'New automation',
   editTitle: 'Edit automation',
-  description: 'Choose when it runs, which objects it applies to and what it does.',
+  description: 'Choose when it runs, which notes it applies to and what it does.',
   name: 'Name',
   namePlaceholder: 'Stamp completion date',
   when: 'When',
@@ -75,8 +76,8 @@ export const RULE_EDITOR_TEXT = {
   save: 'Save',
   saving: 'Saving…',
   trigger: 'Trigger',
-  scope: 'Objects',
-  anyObject: 'Any object',
+  scope: 'Notes',
+  anyObject: 'Any note',
   property: 'Property',
   toAny: 'to any value',
   to: 'to',
@@ -102,7 +103,7 @@ export const RULE_EDITOR_TEXT = {
   placeholders: 'You can use {title} {link} {date:YYYY-MM-DD}',
   choose: 'Choose…',
   conflict: 'This automation was changed elsewhere. Save again to keep your version.',
-  schedulesHaveNoConditions: 'Scheduled automations run without an object, so they have no conditions.',
+  schedulesHaveNoConditions: 'Scheduled automations run without a note, so they have no conditions.',
 } as const
 
 const T = RULE_EDITOR_TEXT
@@ -284,13 +285,13 @@ function Section({ title, help, children }: { title: string; help?: string; chil
 
 const TRIGGER_KINDS: AutomationTriggerKind[] = ['objectCreated', 'propertyChanged', 'schedule', 'button']
 
-/** Scope picker values: `type:<id>`, `collection:<id>`, or `any` (a button's "Any object"). */
+/** Scope picker values: `type:<id>`, `collection:<id>`, or `any` (a button's "Any note"). */
 const scopeValue = (s: AutomationScope | null) => (s ? `${s.kind}:${s.id}` : 'any')
 
 function scopeOptions(types: readonly TypeDef[], collections: readonly Collection[], withAny: boolean): MenuOption[] {
   return [
     ...(withAny ? [{ value: 'any', label: T.anyObject, icon: 'ph-asterisk' }] : []),
-    ...types.map((t) => ({ value: `type:${t.id}`, label: t.name, icon: t.icon ?? 'ph-file-text' })),
+    ...types.map((t) => ({ value: `type:${t.id}`, label: typeLabel(t), icon: t.icon ?? 'ph-file-text' })),
     ...collections.map((c) => ({ value: `collection:${c.id}`, label: c.name, icon: c.icon ?? 'ph-stack' })),
   ]
 }
@@ -785,7 +786,7 @@ function CreateFields({
           label={T.type}
           value={action.typeId}
           onChange={(typeId) => onChange({ ...action, typeId, templateId: null, relateVia: null })}
-          options={types.map((t) => ({ value: t.id, label: t.name, icon: t.icon ?? 'ph-file-text' }))}
+          options={types.map((t) => ({ value: t.id, label: typeLabel(t), icon: t.icon ?? 'ph-file-text' }))}
           placeholder={T.choose}
           className="min-w-[8rem]"
         />

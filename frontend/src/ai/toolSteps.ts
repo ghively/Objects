@@ -79,7 +79,7 @@ const LINES: Record<string, Piece[]> = {
   // Object's tools (short names)
   search: ['Searched notes', c(" for '", 'query', "'")],
   query: ['Queried notes'],
-  run_saved_query: ['Ran a saved query'],
+  run_saved_query: ['Ran a saved search'],
   peek: ['Looked at', c(' ', 'path')],
   read: ['Read', c(' ', 'path')],
   backlinks: ['Found links to', c(' ', 'path')],

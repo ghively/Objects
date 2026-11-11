@@ -1,7 +1,7 @@
 import type { DragEndEvent } from '@dnd-kit/core'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createElement, type ComponentProps } from 'react'
+import { createElement, useState, type ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { LabelOption, PropertyDef } from '@/api/types'
 import { propertyDef } from '@/test/mockApi'
@@ -166,6 +166,40 @@ describe('LabelMenu', () => {
     const next: PropertyDef = onDefChange.mock.calls[0][0]
     const created = next.options.set!.find((o) => !STATUS_SET.some((s) => s.id === o.id))!
     expect(created).toMatchObject({ text: 'New status', statusCategory: 'blocked' })
+  })
+
+  it('test a new status label opens with its name selected, so typing replaces "New status" (M32)', async () => {
+    const user = userEvent.setup()
+    const saved = vi.fn<(next: PropertyDef) => void>()
+    function Harness() {
+      const [def, setDef] = useState(labelDef(STATUS_SET, { isStatus: true }))
+      return (
+        <LabelMenu
+          def={def}
+          value={[]}
+          onChange={vi.fn()}
+          onDefChange={(next) => {
+            saved(next)
+            setDef(next)
+          }}
+        />
+      )
+    }
+    render(<Harness />)
+    await user.click(within(screen.getByRole('group', { name: 'Blocked' })).getByRole('button', { name: 'Create' }))
+    const name = await screen.findByRole<HTMLInputElement>('textbox', { name: 'Label name' })
+    expect(name).toHaveValue('New status')
+    expect(name).toHaveFocus()
+    expect([name.selectionStart, name.selectionEnd]).toEqual([0, 'New status'.length])
+    await user.keyboard('Waiting{Enter}')
+    const created = saved.mock.calls.at(-1)![0].options.set!.find((o) => !STATUS_SET.some((s) => s.id === o.id))!
+    expect(created).toMatchObject({ text: 'Waiting', statusCategory: 'blocked' })
+
+    // Renaming a label that was already there keeps the caret where a click puts it: nothing is selected.
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await user.click(screen.getAllByRole('button', { name: 'Edit label' })[0])
+    const existing = screen.getByRole<HTMLInputElement>('textbox', { name: 'Label name' })
+    expect(existing.selectionEnd! - existing.selectionStart!).toBe(0)
   })
 
   it('test dragging a status option to Done sets statusCategory done', () => {

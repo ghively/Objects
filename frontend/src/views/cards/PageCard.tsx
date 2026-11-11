@@ -3,6 +3,7 @@
 // properties the page's panel shows (one labelled row each, "Empty" when unset; hidden ones and
 // empty "hide when empty" ones left out; a Table shows its table), then the first lines of the body. Clicking it, or Enter,
 // opens the object. Larger than the wide card; nothing in it is edited (our calls).
+import { typeLabel } from '@/lib/typeLabel'
 import type { MouseEvent } from 'react'
 import type { PropertyType, Row, TypeDef } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
@@ -64,7 +65,7 @@ export function PageCard({ row, type, onOpen }: { row: Row; type?: TypeDef; onOp
             style={chipStyle(type.color)}
           >
             <IconOrEmoji icon={type.icon} fallback="ph-file-text" size={12} />
-            <span className="truncate">{type.name}</span>
+            <span className="truncate">{typeLabel(type)}</span>
           </span>
         )}
         <h3 className="flex min-w-0 items-center gap-2.5 text-[26px] leading-tight font-bold text-fg">

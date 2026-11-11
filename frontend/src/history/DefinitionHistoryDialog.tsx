@@ -18,6 +18,7 @@
  * brought back" toast; a read-only definition (its file can't be read) previews but can't be
  * restored.
  */
+import { typeLabel } from '@/lib/typeLabel'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConfirmRequiredError, ConflictError } from '@/api/client'
 import { definitionHistoryApi, definitionPath, type DefinitionKind, type DefinitionVersion } from '@/api/d2Api'
@@ -41,7 +42,7 @@ import { reloadDefinitions } from '@/types/useDefinitions'
 import { formatVersionTime } from './VersionHistoryDialog'
 import { prettyDefinition, summarizeDefinition } from './definitionSummary'
 
-const WHAT: Record<DefinitionKind, string> = { types: 'object type', collections: 'collection', queries: 'query' }
+const WHAT: Record<DefinitionKind, string> = { types: 'type', collections: 'collection', queries: 'saved search' }
 
 /**
  * The dialog's strings: the object dialog's (`VERSION_HISTORY`) where they fit, written out here
@@ -99,7 +100,7 @@ export function DefinitionHistoryDialog({ open, onOpenChange, kind, id, current,
   const types = useLinkIndex((s) => s.types)
   const nameOf = useMemo(() => {
     if (typeName) return typeName
-    const names = new Map(types.map((t) => [t.id, t.name]))
+    const names = new Map(types.map((t) => [t.id, typeLabel(t)]))
     return (tid: string) => names.get(tid) ?? tid
   }, [typeName, types])
   const [versions, setVersions] = useState<DefinitionVersion[] | null>(null)

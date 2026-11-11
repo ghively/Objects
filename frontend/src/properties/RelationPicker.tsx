@@ -1,3 +1,4 @@
+import { typeLabel } from '@/lib/typeLabel'
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/api/client'
 import type { EntityRef, ObjectSummary, PropertyDef, TypeDef } from '@/api/types'
@@ -23,11 +24,11 @@ export interface RelationPickerProps {
 }
 
 export const RELATION_PICKER_TEXT = {
-  search: 'Search for objects',
+  search: 'Search for notes',
   // searchOrCreate: a relation to the Tag type (catalog section 5)
   searchOrCreate: 'Search or Create',
   nothingFound: 'Nothing found',
-  nothingToSelect: 'This set has nothing to pick from. Search everything to add objects to it.',
+  nothingToSelect: 'This set has nothing to pick from. Search everything to add notes to it.',
   editProperty: 'Edit Property',
   /** Item 22's Tag row, and M29's create rows (one per type). */
   create: (q: string) => `Create '${q}'`,
@@ -261,7 +262,7 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
             >
               <TypeChip type={t} size={18} />
               <span className="min-w-0 flex-1 truncate">{RELATION_PICKER_TEXT.create(q)}</span>
-              <span className="shrink-0 text-[12px] text-fg-muted">{t.name}</span>
+              <span className="shrink-0 text-[12px] text-fg-muted">{typeLabel(t)}</span>
               {suggested && (
                 <span className="shrink-0 rounded bg-hover px-1.5 text-[12px] text-fg-muted">{SUGGEST_TEXT.suggested}</span>
               )}

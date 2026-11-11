@@ -16,6 +16,7 @@
  * type's default template applies), links (or embeds) it as an existing object would be, and sets
  * the space's last type.
  */
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 import type { Editor } from '@tiptap/core'
 import { Selection } from '@tiptap/pm/state'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -226,7 +227,7 @@ export function LinkPicker() {
     for (const o of objects) counts.set(o.type, (counts.get(o.type) ?? 0) + 1)
     const typeRows = types
       .filter((t) => counts.has(t.id))
-      .sort((a, b) => a.pluralName.localeCompare(b.pluralName, undefined, { sensitivity: 'base' }))
+      .sort((a, b) => typePlural(a).localeCompare(typePlural(b), undefined, { sensitivity: 'base' }))
       .map((t) => ({ kind: 'type' as const, t, count: counts.get(t.id) ?? 0 }))
     const head: Row[] = [...recent.map((o) => ({ kind: 'object' as const, o })), ...typeRows]
     // No recents and no types to browse: the first few objects, as before.
@@ -330,7 +331,7 @@ export function LinkPicker() {
         align="start"
         sideOffset={6}
         role="dialog"
-        aria-label={mode === 'embed' ? 'Embed an object' : 'Link to an object'}
+        aria-label={mode === 'embed' ? 'Embed a note' : 'Link to a note'}
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           inputRef.current?.focus()
@@ -344,8 +345,8 @@ export function LinkPicker() {
           {heading && <TypeChip type={heading} size={20} />}
           <input
             ref={inputRef}
-            aria-label="Search objects"
-            placeholder={heading ? heading.pluralName : mode === 'embed' ? 'Embed…' : 'Link to…'}
+            aria-label="Search notes"
+            placeholder={heading ? typePlural(heading) : mode === 'embed' ? 'Embed…' : 'Link to…'}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value)
@@ -378,8 +379,8 @@ export function LinkPicker() {
             className="h-11 min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-fg-muted"
           />
         </div>
-        <ul ref={listRef} role="listbox" aria-label="Objects" className="max-h-[320px] overflow-auto p-1.5">
-          {rows.length === 0 && <li className="px-3 py-2 text-fg-muted italic">No matching objects</li>}
+        <ul ref={listRef} role="listbox" aria-label="Notes" className="max-h-[320px] overflow-auto p-1.5">
+          {rows.length === 0 && <li className="px-3 py-2 text-fg-muted italic">No matching notes</li>}
           {rows.map((row, i) => {
             const type = row.kind === 'object' ? typeOf(row.o.type) : row.kind === 'otherTypes' ? undefined : row.t
             const key =
@@ -405,14 +406,14 @@ export function LinkPicker() {
                   {row.kind === 'object' ? (
                     <>
                       <span className="min-w-0 flex-1 truncate">{row.o.title}</span>
-                      {type && <span className="text-[13px] text-fg-muted">{type.name}</span>}
+                      {type && <span className="text-[13px] text-fg-muted">{typeLabel(type)}</span>}
                     </>
                   ) : row.kind === 'create' && otherTypes ? (
-                    <span className="min-w-0 flex-1 truncate">{row.t.name}</span>
+                    <span className="min-w-0 flex-1 truncate">{typeLabel(row.t)}</span>
                   ) : row.kind === 'create' ? (
                     <>
                       <span className="min-w-0 flex-1 truncate">{NEW_OBJECT_TEXT.newNamed(query.trim())}</span>
-                      <span className="text-[13px] text-fg-muted">{row.t.name}</span>
+                      <span className="text-[13px] text-fg-muted">{typeLabel(row.t)}</span>
                       {row.suggested && (
                         <span className="rounded bg-hover px-1.5 text-[12px] text-fg-muted">{SUGGEST_TEXT.suggested}</span>
                       )}
@@ -424,7 +425,7 @@ export function LinkPicker() {
                     </>
                   ) : (
                     <>
-                      <span className="min-w-0 flex-1 truncate">{row.t.pluralName}</span>
+                      <span className="min-w-0 flex-1 truncate">{typePlural(row.t)}</span>
                       <span className="text-[13px] text-fg-muted tabular-nums">{row.count}</span>
                       <Icon name="ph-caret-right" size={12} />
                     </>

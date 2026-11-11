@@ -1,3 +1,4 @@
+import { typeLabel } from '@/lib/typeLabel'
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import type { Icon as IconValue, PropertyDef, PropertyOptions, PropertyType, TypeDef } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
@@ -37,7 +38,7 @@ export function addableItems(type: TypeDef): AddPropertyItem[] {
   return ADD_PROPERTY_ITEMS.filter((i) => !(isSystemKind(i.type) && has.has(i.type)))
 }
 
-/** "Add Property": pick a kind (or "Object Select" › a type), then name it and "Create". */
+/** "Add Property": pick a kind (or "Link to a type" › a type), then name it and "Create". */
 export function AddPropertyMenu({ type, types, onSave, onClose }: AddPropertyMenuProps) {
   const [step, setStep] = useState<Step>({ kind: 'list' })
   const [query, setQuery] = useState('')
@@ -52,7 +53,7 @@ export function AddPropertyMenu({ type, types, onSave, onClose }: AddPropertyMen
 
   const targets = useMemo(() => {
     const q = typeQuery.trim().toLowerCase()
-    return objectSelectTypes(types).filter((t) => !q || t.name.toLowerCase().includes(q))
+    return objectSelectTypes(types).filter((t) => !q || typeLabel(t).toLowerCase().includes(q))
   }, [types, typeQuery])
 
   const create = (d: Draft) => {
@@ -196,22 +197,22 @@ export function AddPropertyMenu({ type, types, onSave, onClose }: AddPropertyMen
             autoFocus
             value={typeQuery}
             onChange={(e) => setTypeQuery(e.target.value)}
-            placeholder="Search Object Types"
-            aria-label="Search Object Types"
+            placeholder="Search types"
+            aria-label="Search types"
             className="min-w-0 flex-1 rounded border border-line bg-transparent px-2 py-1 text-[14px] outline-none"
           />
         </div>
-        <ul aria-label="Object types" className="max-h-80 overflow-auto">
+        <ul aria-label="Types" className="max-h-80 overflow-auto">
           {targets.map((t) => (
             <li key={t.id}>
               <button
                 type="button"
-                aria-label={t.name}
-                onClick={() => form('entity', t.name, { isArray: true, allowedTypes: [t.id], hasFixedSet: false, fixedSet: [] })}
+                aria-label={typeLabel(t)}
+                onClick={() => form('entity', typeLabel(t), { isArray: true, allowedTypes: [t.id], hasFixedSet: false, fixedSet: [] })}
                 className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[14px] hover:bg-hover"
               >
                 <IconOrEmoji icon={t.icon} size={14} fallback="ph-cube" />
-                <span className="truncate">{t.name}</span>
+                <span className="truncate">{typeLabel(t)}</span>
               </button>
             </li>
           ))}

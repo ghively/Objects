@@ -4,9 +4,13 @@
 // "Reminder" row; there every change carries `{date, repeat, remind}` together. Any other date
 // property with `supportsReminders` (M8) shows the same "Reminder" row, written on its own through
 // `PUT /api/tasks/reminder` (the owner's `reminder.onChange`).
-import { useEffect, useId, useMemo, useState } from 'react'
+// M32: the fields also read a weekday ("friday", "next friday") through the editor's `parseDate`;
+// text they can't read shows `DATE_TEXT.unreadable`; Enter in a field sets the date and calls
+// `onClose` (the owner closes its popover).
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { DateConstraints, DateValue, Resolution } from '@/api/types'
 import { Switch } from '@/components/ui/switch'
+import { parseDate } from '@/editor/slash/parseDate'
 import { CustomRepeatDialog } from '@/tasks/CustomRepeatDialog'
 import { REMINDER_MISFIT_HINT, ReminderMenu } from '@/tasks/ReminderMenu'
 import { RepeatMenu } from '@/tasks/RepeatMenu'
@@ -14,6 +18,12 @@ import { formatRepeat, parseRepeat } from '@/tasks/repeat'
 import { parseRemind } from '@/tasks/remind'
 import { fromWallClock, wallClock } from '@/lib/zonedTime'
 import { formatDate } from './format'
+
+/** The picker's own strings (M32). */
+export const DATE_TEXT = {
+  /** Under a date field whose text could not be read. */
+  unreadable: 'Can\'t read that date. Try "friday" or "nov 20".',
+} as const
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 /** The time a day gets when it gains a time and has none to keep. */
@@ -96,6 +106,9 @@ function parseDayPart(t: string, nowInstant: Date): Date | null {
     if (month < 0 || (m[1].length > 3 && !MONTH_NAMES[month].startsWith(m[1]))) return null
     return validDate(m[3] ? Number(m[3]) : now.getFullYear(), month, Number(m[2]))
   }
+  // M32: the words the `/` menu reads too ("friday", "fri", "next friday", "15 march").
+  const worded = /^(\d{4})-(\d{2})-(\d{2})$/.exec(parseDate(t, dayString(today)) ?? '')
+  if (worded) return validDate(+worded[1], +worded[2] - 1, +worded[3])
   return null
 }
 
@@ -125,7 +138,8 @@ function parseTimePart(t: string): { h: number; min: number } | null {
 /**
  * What the user typed into a date field, read the way the natural-language field reads
  * it: ISO dates and timestamps; Yesterday, Today, Tomorrow, "next week"; "in N days" and
- * "in N weeks"; "March 14th" (optionally with a year); and any of these followed by
+ * "in N weeks"; a weekday ("friday", "next friday"); "March 14th" (optionally with a year), "nov 20",
+ * "20 nov"; and any of these followed by
  * "at 1:59 PM". A day without a time is a day value; with a time it is a local time. `null` when
  * nothing could be read.
  */
@@ -222,6 +236,8 @@ export interface DatePickerProps {
    * when `constraints.supportsReminders`; a pick on an empty date first sets the shown date.
    */
   reminder?: { value: string | null; onChange(remind: string | null): void }
+  /** M32: Enter in a date field, once the date is set (or was already the one shown): close the picker. */
+  onClose?(): void
 }
 
 /** The value the picker shows when the property is empty: the defaults when set, else now. */
@@ -248,36 +264,73 @@ function PointInput({
   resolution,
   placeholder,
   onCommit,
+  onDone,
 }: {
   label: string
   point: string
   resolution: Resolution
   placeholder: string
   onCommit(text: string): boolean
+  /** Enter, once the text is the date (set just now, or unchanged). */
+  onDone?(): void
 }) {
   const shown = formatDate({ start: point, resolution })
   const [text, setText] = useState(shown)
-  useEffect(() => setText(shown), [shown])
-  const commit = () => {
-    if (text.trim() === shown) return
-    if (!onCommit(text)) setText(shown)
+  /** M32: the text could not be read as a date (said under the field until it is typed in again). */
+  const [unreadable, setUnreadable] = useState(false)
+  const errorId = useId()
+  /** The text already set as the date, so the blur that follows Enter doesn't set it twice. */
+  const committed = useRef<string | null>(null)
+  useEffect(() => {
+    setText(shown)
+    setUnreadable(false)
+    committed.current = null
+  }, [shown])
+  /** Sets the date from the text. False when the text is not a date: it stays, with the message. */
+  const commit = (): boolean => {
+    const t = text.trim()
+    if (t === shown || text === committed.current) return true
+    if (t === '') {
+      // An emptied field is not a date and not a mistake: the date shown comes back.
+      setText(shown)
+      return false
+    }
+    if (onCommit(text)) {
+      committed.current = text
+      return true
+    }
+    setUnreadable(true)
+    return false
   }
   return (
-    <input
-      aria-label={label}
-      value={text}
-      placeholder={placeholder}
-      title='Type a date in plain words, e.g. "next week at 3 pm"'
-      onChange={(e) => setText(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          commit()
-        }
-      }}
-      className="h-8 w-full rounded-md border border-line bg-raised px-2 text-[14px] text-fg outline-none placeholder:text-fg-muted focus:border-fg-muted"
-    />
+    <div className="min-w-0 flex-1">
+      <input
+        aria-label={label}
+        aria-invalid={unreadable || undefined}
+        aria-describedby={unreadable ? errorId : undefined}
+        value={text}
+        placeholder={placeholder}
+        title='Type a date in plain words, e.g. "friday" or "next week at 3 pm"'
+        onChange={(e) => {
+          setText(e.target.value)
+          setUnreadable(false)
+          committed.current = null
+        }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            if (commit()) onDone?.()
+          }
+        }}
+        className="h-8 w-full rounded-md border border-line bg-raised px-2 text-[14px] text-fg outline-none placeholder:text-fg-muted focus:border-fg-muted"
+      />
+      {unreadable && (
+        <p id={errorId} role="alert" className="px-1 pt-1 text-[12px] text-[var(--danger)]">
+          {DATE_TEXT.unreadable}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -352,7 +405,7 @@ function Toggle({
  * - `endTimeSettings: 'notAllowed'` hides "End Date"; `'required'` keeps it on.
  * - `hideDeleteOption` hides "Remove date".
  */
-export function DatePicker({ value, constraints, onChange, now: nowProp, task, onTaskChange, reminder }: DatePickerProps) {
+export function DatePicker({ value, constraints, onChange, now: nowProp, task, onTaskChange, reminder, onClose }: DatePickerProps) {
   const c = useMemo(() => constraints ?? {}, [constraints])
   const now = useMemo(() => nowProp ?? new Date(), [nowProp])
   const current = useMemo(() => value ?? initialValue(c, now), [value, c, now])
@@ -504,13 +557,14 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
     <div className="flex w-72 flex-col gap-2 p-2 text-fg" data-testid="date-picker">
       <div>
         {isRange && <div className="px-1 pb-1 text-[12px] font-medium text-fg-muted">Starts</div>}
-        <div className="flex items-center gap-2">
+        <div className="flex items-start gap-2">
           <PointInput
             label="Starts"
             point={start}
             resolution={resolution}
             placeholder="March 14th at 1:59 PM"
             onCommit={commitText('start')}
+            onDone={onClose}
           />
           {resolution === 'time' && (
             <TimeInput label="Start time" point={start} onChange={(iso) => emit({ start: iso, end, resolution })} />
@@ -539,13 +593,14 @@ export function DatePicker({ value, constraints, onChange, now: nowProp, task, o
       {isRange && end && (
         <div>
           <div className="px-1 pb-1 text-[12px] font-medium text-fg-muted">End Date</div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <PointInput
               label="End Date"
               point={end}
               resolution={resolution}
               placeholder="End Date"
               onCommit={commitText('end')}
+              onDone={onClose}
             />
             {resolution === 'time' && (
               <TimeInput label="End time" point={end} onChange={(iso) => emit({ start, end: iso, resolution })} />

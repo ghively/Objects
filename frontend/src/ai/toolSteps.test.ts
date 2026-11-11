@@ -36,7 +36,7 @@ describe('toolStepLine', () => {
     expect(line('create_task', { title: 'Call' })).toBe("Created 'Call'")
     expect(line('create_object', { title: 'Note' })).toBe("Created 'Note'")
     expect(line('query')).toBe('Queried notes')
-    expect(line('run_saved_query')).toBe('Ran a saved query')
+    expect(line('run_saved_query')).toBe('Ran a saved search')
     expect(line('peek', { path: 'B.md' })).toBe('Looked at B.md')
     expect(line('backlinks', { path: 'B.md' })).toBe('Found links to B.md')
     expect(line('daily_note', { date: '2026-11-05' })).toBe('Opened the daily note for 2026-11-05')

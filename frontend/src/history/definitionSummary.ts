@@ -20,8 +20,8 @@ export const SUMMARY_TEXT = {
   pluralName: 'Plural name',
   description: 'Description',
   properties: 'Properties',
-  objectTypes: 'Object types',
-  excludedTypes: 'Excluded object types',
+  objectTypes: 'Types',
+  excludedTypes: 'Excluded types',
   search: 'Search',
   filters: 'Filters',
   sorts: 'Sorts',
@@ -31,8 +31,8 @@ export const SUMMARY_TEXT = {
   propertiesAdded: (names: string) => `Properties added since: ${names}`,
   propertiesRemoved: (names: string) => `Properties removed since: ${names}`,
   propertyRenamed: (from: string, to: string) => `Property “${from}” renamed to “${to}”`,
-  typesAdded: (names: string) => `Object types added since: ${names}`,
-  typesRemoved: (names: string) => `Object types removed since: ${names}`,
+  typesAdded: (names: string) => `Types added since: ${names}`,
+  typesRemoved: (names: string) => `Types removed since: ${names}`,
   changed: (label: string) => `${label} changed`,
 } as const
 
