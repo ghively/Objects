@@ -13,14 +13,29 @@
  *
  * "Starter sets" (M32, item 12) is the last group: the "Everyday set" (Person, Meeting, Project,
  * Book) and the "IT operations set", the two starting points the space dialog offered before it
- * stopped asking. One click adds the set (`POST /api/space/setup`: it writes only the types the
+ * stopped asking. A set is added through `POST /api/space/setup` (it writes only the types the
  * space lacks, and the IT set also turns the Work page on unless the switch was set), a toast says
  * what was added, and the gallery, the types and the space's info are read again. The dialog stays
  * open, so the new types show as "Added".
+ *
+ * Fix pass W2: a set writes many files (the IT set: its types, their templates and thirty tags),
+ * so a click asks first. The confirmation names the types the space does not have yet
+ * (`starterSetMissing`) and, for the IT set, says when the Work page gets turned on (the switch
+ * was never set and Work is off: what the server does). A set with nothing left to add reads
+ * "Added" and cannot be clicked.
  */
 import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { api } from '@/api/client'
-import type { Icon as IconValue, TypeDef, TypeTemplate } from '@/api/types'
+import type { Icon as IconValue, SpaceInfo, TypeDef, TypeTemplate } from '@/api/types'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
 import { Button } from '@/components/ui/button'
@@ -71,10 +86,30 @@ export const CREATE_TYPE_TEXT = {
   starterNothing: 'This space already has every type in that set.',
   /** Added to the toast when the set turned the Work page on (the IT operations set). */
   starterWorkOn: 'The Work page is now on for this space.',
+  // Fix pass W2: the confirmation a set's card opens (our strings).
+  starterConfirmTitle: (set: string) => `Add the ${set}?`,
+  /**
+   * What the set adds: the types the space lacks, by name (`null`: the gallery could not say).
+   * `extras`: the IT set also writes its types' templates and its tags; how many of each is the
+   * server's to know, so no number is given.
+   */
+  starterConfirmBody: (names: readonly string[] | null, extras: boolean) => {
+    const kept = 'Types you already have are left as they are.'
+    if (names === null) return `This adds the set's types${extras ? ', their templates and tags' : ''} to this space. ${kept}`
+    const what = `${names.length} ${names.length === 1 ? 'type' : 'types'} (${names.join(', ')})`
+    const more = !extras ? '' : names.length === 1 ? ", the set's templates and tags" : ', their templates and tags'
+    return `This adds ${what}${more} to this space. ${kept}`
+  },
+  /** The IT set, when it will turn the Work page on. */
+  starterConfirmWork: 'The Work page is turned on for this space.',
+  starterConfirmCancel: 'Cancel',
+  starterConfirmAdd: 'Add',
 }
 
+type StarterSetup = 'basic' | 'itops'
+
 /** The two starter sets, in gallery order (the space dialog's `SETUPS` gives the icons). */
-export const STARTER_SETS: { setup: 'basic' | 'itops'; icon: string; label: string; description: string }[] = [
+export const STARTER_SETS: { setup: StarterSetup; icon: string; label: string; description: string }[] = [
   {
     setup: 'basic',
     icon: SETUPS.find((s) => s.value === 'basic')?.icon ?? 'ph-shapes',
@@ -88,6 +123,71 @@ export const STARTER_SETS: { setup: 'basic' | 'itops'; icon: string; label: stri
     description: CREATE_TYPE_TEXT.itopsSetDescription,
   },
 ]
+
+/**
+ * What a starter set is made of, as far as the client has to know it to say what a set adds
+ * (`basicsetup.py` is the truth). `section`: every gallery entry of that section is the set's.
+ * `types`: the set's other types, by id and name; the gallery lists most of them (its entry gives
+ * the name and whether the space has the type), and Source is the one it does not offer.
+ */
+const STARTER_SET_TYPES: Record<StarterSetup, { section: string | null; types: readonly { id: string; name: string }[]; extras: boolean }> = {
+  basic: {
+    section: null,
+    types: [
+      { id: 'person', name: 'Person' },
+      { id: 'meeting', name: 'Meeting' },
+      { id: 'project', name: 'Project' },
+      { id: 'book', name: 'Book' },
+    ],
+    extras: false,
+  },
+  itops: {
+    section: 'itOperations',
+    types: [
+      { id: 'person', name: 'Person' },
+      { id: 'meeting', name: 'Meeting' },
+      { id: 'project', name: 'Project' },
+      { id: 'source', name: 'Source' },
+    ],
+    // Its types' default templates and the seed tags.
+    extras: true,
+  },
+}
+
+/**
+ * The names of the types `setup` would add to a space: the set's types the space does not have
+ * yet. A type counts as there when the gallery says so (`added`) or the space has a type of its
+ * id or its name, which is the server's rule for leaving one out. `null` when the gallery holds
+ * none of the set's own section (it could not be read), so nothing true can be listed.
+ */
+export function starterSetMissing(
+  setup: StarterSetup,
+  gallery: readonly TypeTemplate[] | null,
+  types: readonly Pick<TypeDef, 'id' | 'name'>[],
+): string[] | null {
+  const set = STARTER_SET_TYPES[setup]
+  const entries = gallery ?? []
+  const ofSection = set.section === null ? [] : entries.filter((t) => t.section === set.section)
+  if (set.section !== null && ofSection.length === 0) return null
+  const members = [
+    ...ofSection.map((t) => ({ id: t.key, name: t.name, added: t.added })),
+    ...set.types.map((m) => {
+      const entry = entries.find((t) => t.key === m.id)
+      return { id: m.id, name: entry?.name ?? m.name, added: entry?.added ?? false }
+    }),
+  ]
+  const has = (m: { id: string; name: string; added: boolean }) =>
+    m.added || types.some((t) => t.id === m.id || t.name.toLowerCase() === m.name.toLowerCase())
+  return members.filter((m) => !has(m)).map((m) => m.name)
+}
+
+/**
+ * Whether adding `setup` turns the Work page on, as far as the client can tell: only the IT set
+ * does, only when the switch was never set by hand, and it is news only while Work is off.
+ */
+export function starterSetTurnsWorkOn(setup: StarterSetup, space: Pick<SpaceInfo, 'workOn' | 'workEnabled'> | null): boolean {
+  return setup === 'itops' && space !== null && space.workOn === false && (space.workEnabled ?? null) === null
+}
 
 /** The titles of the section keys the gallery data is known to use. */
 const SECTION_TITLES: Record<string, string> = {
@@ -191,11 +291,20 @@ export function CreateTypeDialog({ open, onOpenChange, onCreated }: CreateTypeDi
   const [opened, setOpened] = useState<readonly (string | null)[]>([])
   const foldId = useId()
   const sections = useMemo(() => gallerySections(gallery ?? []), [gallery])
+  // Fix pass W2: the set whose confirmation is open, and what each set would still add.
+  const [confirmSet, setConfirmSet] = useState<StarterSetup | null>(null)
+  const spaceTypes = useLinkIndex((s) => s.types)
+  const space = useSpaceInfo((s) => s.space)
+  const missing = useMemo(
+    () => ({ basic: starterSetMissing('basic', gallery, spaceTypes), itops: starterSetMissing('itops', gallery, spaceTypes) }),
+    [gallery, spaceTypes],
+  )
 
   useEffect(() => {
     if (!open) return
     setStep({ kind: 'gallery' })
     setOpened([])
+    setConfirmSet(null)
     setName('')
     setPluralName('')
     setIcon(DEFAULT_ICON)
@@ -235,7 +344,7 @@ export function CreateTypeDialog({ open, onOpenChange, onCreated }: CreateTypeDi
    * with the fresh space info: the toast names the types that are new, then everything that lists
    * types reads them again. The dialog stays on the gallery.
    */
-  const addStarterSet = async (setup: 'basic' | 'itops') => {
+  const addStarterSet = async (setup: StarterSetup) => {
     if (busy) return
     setBusy(true)
     setError(null)
@@ -354,21 +463,30 @@ export function CreateTypeDialog({ open, onOpenChange, onCreated }: CreateTypeDi
               </div>
             )
           })}
-          {/* M32: the starter sets, last. One click adds the set; the dialog stays open. */}
+          {/* M32: the starter sets, last. A click asks first (W2); the dialog stays open. */}
           <div role="group" aria-label={CREATE_TYPE_TEXT.starterSets} data-starter-sets="" className="flex flex-col gap-1.5">
             <h3 className="text-[12px] font-semibold text-fg-muted">{CREATE_TYPE_TEXT.starterSets}</h3>
             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              {STARTER_SETS.map((s) => (
-                <Card key={s.setup} disabled={busy} onClick={() => void addStarterSet(s.setup)}>
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-line">
-                    <Icon name={s.icon} size={16} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-semibold">{s.label}</span>
-                    <span className="line-clamp-2 block text-[12px] text-fg-muted">{s.description}</span>
-                  </span>
-                </Card>
-              ))}
+              {STARTER_SETS.map((s) => {
+                // Nothing left to add: the set reads "Added", as a type's card does, and is not offered.
+                const added = missing[s.setup]?.length === 0
+                return (
+                  <Card key={s.setup} disabled={busy || added} onClick={() => setConfirmSet(s.setup)}>
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-line">
+                      <Icon name={s.icon} size={16} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5 text-[14px] font-semibold">
+                        {s.label}
+                        {added && (
+                          <span className="rounded bg-hover px-1 text-[11px] font-medium text-fg-muted">{CREATE_TYPE_TEXT.added}</span>
+                        )}
+                      </span>
+                      <span className="line-clamp-2 block text-[12px] text-fg-muted">{s.description}</span>
+                    </span>
+                  </Card>
+                )
+              })}
             </div>
             {errorEl}
           </div>
@@ -479,9 +597,39 @@ export function CreateTypeDialog({ open, onOpenChange, onCreated }: CreateTypeDi
     )
   }
 
+  const confirming = STARTER_SETS.find((s) => s.setup === confirmSet)
+
   return (
     <Dialog open={open} onOpenChange={(o) => onOpenChange?.(o)}>
-      <DialogContent className="border-line bg-raised-2 text-fg sm:max-w-[560px]">{body}</DialogContent>
+      <DialogContent className="border-line bg-raised-2 text-fg sm:max-w-[560px]">
+        {body}
+        {/* Fix pass W2: a set is added only from here. Inside the dialog, so it stacks on it. */}
+        <AlertDialog open={confirming !== undefined} onOpenChange={(o) => !o && setConfirmSet(null)}>
+          {confirming && (
+            <AlertDialogContent className="border-line bg-raised-2 text-fg">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-[17px]">{CREATE_TYPE_TEXT.starterConfirmTitle(confirming.label)}</AlertDialogTitle>
+                <AlertDialogDescription className="text-[14px] text-fg-muted">
+                  {CREATE_TYPE_TEXT.starterConfirmBody(missing[confirming.setup], STARTER_SET_TYPES[confirming.setup].extras)}
+                  {starterSetTurnsWorkOn(confirming.setup, space) && ` ${CREATE_TYPE_TEXT.starterConfirmWork}`}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{CREATE_TYPE_TEXT.starterConfirmCancel}</AlertDialogCancel>
+                <Button
+                  onClick={() => {
+                    const setup = confirming.setup
+                    setConfirmSet(null)
+                    void addStarterSet(setup)
+                  }}
+                >
+                  {CREATE_TYPE_TEXT.starterConfirmAdd}
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          )}
+        </AlertDialog>
+      </DialogContent>
     </Dialog>
   )
 }

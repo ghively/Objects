@@ -195,12 +195,105 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     expect(mocked.spaceSetup).not.toHaveBeenCalled()
   })
 
-  test('test one click adds the Everyday set, says what was added and reads the gallery and types again (M32)', async () => {
-    const user = userEvent.setup()
-    const gallery = vi.fn(async () => M32_GALLERY)
+  // Fix pass W2: a set is added only after a confirmation that names what it adds.
+  // The gallery as the back end sends it for the two sets: the Everyday set's four types and the
+  // IT operations group; nothing for Source (the IT set makes it; the gallery does not offer it).
+  const setGallery = (have: readonly string[] = []): TypeTemplate[] =>
+    [
+      tpl('idea', 'personal', 'Idea', 'Ideas'),
+      tpl('meeting', 'useCases', 'Meeting', 'Meetings'),
+      tpl('person', 'useCases', 'Person', 'People'),
+      tpl('project', 'useCases', 'Project', 'Projects'),
+      tpl('book', 'media', 'Book', 'Books'),
+      tpl('host', 'itOperations', 'Host', 'Hosts'),
+      tpl('runbook', 'itOperations', 'Runbook', 'Runbooks'),
+    ].map((t) => ({ ...t, added: have.includes(t.key) }))
+  const withSetGallery = (have: readonly string[] = []) => {
+    const gallery = vi.fn(async () => setGallery(have))
     ;(api as unknown as { typeGallery: () => Promise<TypeTemplate[]> }).typeGallery = gallery
-    useLinkIndex.setState({ types: [NOTE_TYPE, EVERYDAY[2]], objects: [], loaded: true })
-    useSpaceInfo.setState({ space: { name: 's', root: '/s', types: [NOTE_TYPE, EVERYDAY[2]], workOn: false }, loaded: true })
+    return gallery
+  }
+  const HOST = typeDef({ id: 'host', name: 'Host', pluralName: 'Hosts' })
+  const RUNBOOK = typeDef({ id: 'runbook', name: 'Runbook', pluralName: 'Runbooks' })
+  const SOURCE = typeDef({ id: 'source', name: 'Source', pluralName: 'Sources' })
+  const inSpace = (types: TypeDef[], work: { workOn?: boolean; workEnabled?: boolean | null } = {}) => {
+    useLinkIndex.setState({ types, objects: [], loaded: true })
+    useSpaceInfo.setState({ space: { name: 's', root: '/s', types, workOn: false, workEnabled: null, ...work }, loaded: true })
+  }
+  /** The set's card, once the gallery has loaded (the cards know what the space has from it). */
+  const setCard = async (name: RegExp) => {
+    await screen.findByRole('group', { name: 'Personal' })
+    return within(screen.getByRole('group', { name: 'Starter sets' })).getByRole('button', { name })
+  }
+
+  test('test clicking a starter set asks first, naming the types the space lacks; Cancel adds nothing (W2)', async () => {
+    const user = userEvent.setup()
+    withSetGallery(['project'])
+    inSpace([NOTE_TYPE, EVERYDAY[2]])
+    render(<CreateTypeDialog open />)
+    await user.click(await setCard(/Everyday set/))
+    const confirm = await screen.findByRole('alertdialog', { name: 'Add the Everyday set?' })
+    expect(confirm).toHaveTextContent('This adds 3 types (Person, Meeting, Book) to this space. Types you already have are left as they are.')
+    // The Everyday set never touches the Work page.
+    expect(confirm).not.toHaveTextContent('Work page')
+    expect(within(confirm).getAllByRole('button').map((b) => b.textContent)).toEqual(['Cancel', 'Add'])
+    // Asking wrote nothing.
+    expect(mocked.spaceSetup).not.toHaveBeenCalled()
+    await user.click(within(confirm).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(mocked.spaceSetup).not.toHaveBeenCalled()
+    expect(toasts()).toEqual([])
+    // Back on the gallery, the set still offered.
+    expect(await setCard(/Everyday set/)).toBeEnabled()
+  })
+
+  test('test the IT operations set says its types, templates and tags, and that the Work page is turned on (W2)', async () => {
+    const user = userEvent.setup()
+    withSetGallery(['person', 'meeting', 'project', 'book'])
+    inSpace([NOTE_TYPE, ...EVERYDAY])
+    render(<CreateTypeDialog open />)
+    await user.click(await setCard(/IT operations set/))
+    const confirm = await screen.findByRole('alertdialog', { name: 'Add the IT operations set?' })
+    // Person, Meeting and Project are the set's too, but the space has them; Source is not in the gallery.
+    expect(confirm).toHaveTextContent(
+      'This adds 3 types (Host, Runbook, Source), their templates and tags to this space. Types you already have are left as they are.',
+    )
+    expect(confirm).toHaveTextContent('The Work page is turned on for this space.')
+    expect(mocked.spaceSetup).not.toHaveBeenCalled()
+  })
+
+  test('test the IT operations set does not promise the Work page when it is on already or was switched off by hand (W2)', async () => {
+    const user = userEvent.setup()
+    withSetGallery()
+    // Switched off by hand: the set leaves the switch alone.
+    inSpace([NOTE_TYPE], { workOn: false, workEnabled: false })
+    const { unmount } = render(<CreateTypeDialog open />)
+    await user.click(await setCard(/IT operations set/))
+    let confirm = await screen.findByRole('alertdialog', { name: 'Add the IT operations set?' })
+    expect(confirm).toHaveTextContent('This adds 6 types (Host, Runbook, Person, Meeting, Project, Source), their templates and tags to this space.')
+    expect(confirm).not.toHaveTextContent('Work page')
+    unmount()
+    // Already on (here: read as on from the space's data, no switch stored).
+    inSpace([NOTE_TYPE], { workOn: true, workEnabled: null })
+    render(<CreateTypeDialog open />)
+    await user.click(await setCard(/IT operations set/))
+    confirm = await screen.findByRole('alertdialog', { name: 'Add the IT operations set?' })
+    expect(confirm).not.toHaveTextContent('Work page')
+  })
+
+  test('test one type left to add is said in the singular (W2)', async () => {
+    const user = userEvent.setup()
+    withSetGallery(['person', 'meeting', 'project'])
+    inSpace([NOTE_TYPE, EVERYDAY[0], EVERYDAY[1], EVERYDAY[2]])
+    render(<CreateTypeDialog open />)
+    await user.click(await setCard(/Everyday set/))
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('This adds 1 type (Book) to this space. Types you already have are left as they are.')
+  })
+
+  test('test Add adds the Everyday set, says what was added and reads the gallery and types again (M32, W2)', async () => {
+    const user = userEvent.setup()
+    const gallery = withSetGallery(['project'])
+    inSpace([NOTE_TYPE, EVERYDAY[2]])
     const after = { name: 's', root: '/s', types: [NOTE_TYPE, ...EVERYDAY], workOn: false }
     mocked.spaceSetup.mockResolvedValueOnce(after)
     // What the app reads again afterwards (the link index's own fetch of the space).
@@ -208,10 +301,14 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     const onOpenChange = vi.fn()
     const onCreated = vi.fn()
     render(<CreateTypeDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
-    const group = await screen.findByRole('group', { name: 'Starter sets' })
+    await user.click(await setCard(/Everyday set/))
     expect(gallery).toHaveBeenCalledTimes(1)
-    await user.click(within(group).getByRole('button', { name: /Everyday set/ }))
+    // The click alone adds nothing.
+    expect(mocked.spaceSetup).not.toHaveBeenCalled()
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Add' }))
     await waitFor(() => expect(mocked.spaceSetup).toHaveBeenCalledWith('basic'))
+    expect(mocked.spaceSetup).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
     // Only the types the space did not have (it had Project already).
     await waitFor(() => expect(toasts()).toEqual(['Added: Person, Meeting, Book.']))
     await waitFor(() => expect(gallery).toHaveBeenCalledTimes(2))
@@ -224,40 +321,80 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     expect(mocked.createType).not.toHaveBeenCalled()
   })
 
-  test('test a set the space already has says so; the IT operations set says when it turns Work on (M32)', async () => {
+  test('test a set whose types are all in the space reads "Added" and cannot be clicked (W2)', async () => {
     const user = userEvent.setup()
-    withM32Gallery()
-    const HOST = typeDef({ id: 'host', name: 'Host', pluralName: 'Hosts' })
-    useLinkIndex.setState({ types: [NOTE_TYPE, ...EVERYDAY], objects: [], loaded: true })
-    useSpaceInfo.setState({ space: { name: 's', root: '/s', types: [NOTE_TYPE, ...EVERYDAY], workOn: false }, loaded: true })
-    const same = { name: 's', root: '/s', types: [NOTE_TYPE, ...EVERYDAY], workOn: false }
-    mocked.spaceSetup.mockResolvedValueOnce(same)
-    mocked.space.mockResolvedValue(same)
+    withSetGallery(['person', 'meeting', 'project', 'book'])
+    inSpace([NOTE_TYPE, ...EVERYDAY])
     render(<CreateTypeDialog open />)
-    const group = await screen.findByRole('group', { name: 'Starter sets' })
-    await user.click(within(group).getByRole('button', { name: /Everyday set/ }))
-    await waitFor(() => expect(toasts()).toEqual(['This space already has every type in that set.']))
+    const everyday = await setCard(/Everyday set/)
+    expect(everyday).toHaveTextContent('Everyday setAdded')
+    expect(everyday).toBeDisabled()
+    await user.click(everyday)
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(mocked.spaceSetup).not.toHaveBeenCalled()
+    // The IT operations set still has types to add: offered, not "Added".
+    const it = await setCard(/IT operations set/)
+    expect(it).toBeEnabled()
+    expect(it).not.toHaveTextContent('Added')
+  })
 
-    const withIt = { name: 's', root: '/s', types: [NOTE_TYPE, ...EVERYDAY, HOST], workEnabled: true, workOn: true }
+  test('test a set reads "Added" as soon as it was added, and the IT set says when it turned Work on (M32, W2)', async () => {
+    const user = userEvent.setup()
+    const gallery = withSetGallery(['person', 'meeting', 'project', 'book'])
+    inSpace([NOTE_TYPE, ...EVERYDAY])
+    const withIt = { name: 's', root: '/s', types: [NOTE_TYPE, ...EVERYDAY, HOST, RUNBOOK, SOURCE], workEnabled: true, workOn: true }
     mocked.spaceSetup.mockResolvedValueOnce(withIt)
     mocked.space.mockResolvedValue(withIt)
-    await user.click(within(screen.getByRole('group', { name: 'Starter sets' })).getByRole('button', { name: /IT operations set/ }))
+    render(<CreateTypeDialog open />)
+    await user.click(await setCard(/IT operations set/))
+    // The gallery the dialog reads again after the set: everything is in the space now.
+    gallery.mockImplementation(async () => setGallery(['person', 'meeting', 'project', 'book', 'host', 'runbook']))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Add' }))
     await waitFor(() => expect(mocked.spaceSetup).toHaveBeenLastCalledWith('itops'))
-    await waitFor(() => expect(toasts()).toContain('Added: Host. The Work page is now on for this space.'))
+    await waitFor(() => expect(toasts()).toContain('Added: Host, Runbook, Source. The Work page is now on for this space.'))
     expect(useSpaceInfo.getState().space?.workOn).toBe(true)
+    await waitFor(async () => expect(await setCard(/IT operations set/)).toBeDisabled())
+    expect(await setCard(/IT operations set/)).toHaveTextContent('IT operations setAdded')
+  })
+
+  test('test a set with a type the gallery does not list (Source) is not "Added" until the space has it (W2)', async () => {
+    withSetGallery(['person', 'meeting', 'project', 'book', 'host', 'runbook'])
+    inSpace([NOTE_TYPE, ...EVERYDAY, HOST, RUNBOOK])
+    const user = userEvent.setup()
+    render(<CreateTypeDialog open />)
+    const it = await setCard(/IT operations set/)
+    expect(it).toBeEnabled()
+    await user.click(it)
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent("This adds 1 type (Source), the set's templates and tags to this space.")
   })
 
   test('test a set that cannot be added shows the error and no toast (M32)', async () => {
     const user = userEvent.setup()
-    withM32Gallery()
+    withSetGallery()
+    inSpace([NOTE_TYPE])
     mocked.spaceSetup.mockRejectedValueOnce(new Error('This space is read-only.'))
     render(<CreateTypeDialog open />)
-    const group = await screen.findByRole('group', { name: 'Starter sets' })
-    await user.click(within(group).getByRole('button', { name: /Everyday set/ }))
+    await user.click(await setCard(/Everyday set/))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Add' }))
     expect(await within(screen.getByRole('group', { name: 'Starter sets' })).findByRole('alert')).toHaveTextContent('This space is read-only.')
     expect(toasts()).toEqual([])
     // The set can be tried again.
-    expect(within(screen.getByRole('group', { name: 'Starter sets' })).getByRole('button', { name: /Everyday set/ })).toBeEnabled()
+    expect(await setCard(/Everyday set/)).toBeEnabled()
+  })
+
+  test('test while the gallery could not be read a set is still offered, in general words (W2)', async () => {
+    const user = userEvent.setup()
+    ;(api as unknown as { typeGallery: () => Promise<TypeTemplate[]> }).typeGallery = vi.fn(async () => {
+      throw new Error('offline')
+    })
+    inSpace([NOTE_TYPE])
+    render(<CreateTypeDialog open />)
+    const card = within(await screen.findByRole('group', { name: 'Starter sets' })).getByRole('button', { name: /IT operations set/ })
+    expect(card).toBeEnabled()
+    await user.click(card)
+    expect(await screen.findByRole('alertdialog', { name: 'Add the IT operations set?' })).toHaveTextContent(
+      "This adds the set's types, their templates and tags to this space. Types you already have are left as they are.",
+    )
   })
 
   test('a template shows its properties and creates the type from it', async () => {

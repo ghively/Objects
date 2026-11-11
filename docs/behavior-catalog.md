@@ -279,10 +279,15 @@ shows under its key as words. "IT operations" is always the last group and start
 disclosure that shows its entries when opened, and the fold is not remembered (a reopened gallery has it collapsed
 again). (M32) "Starter sets" is the last group, under IT operations: "Everyday set" ("Comes with types for people,
 meetings, projects and books.") and "IT operations set" ("Includes hosts, software, applications, runbooks and
-incidents."). One click adds the set (`POST /api/space/setup` with `basic` or `itops`; it writes only the types the
-space lacks), a toast says what was added ("Added: Person, Meeting, Book.", or "This space already has every type
-in that set."; the IT set adds "The Work page is now on for this space." when it turned Work on), the gallery and
-the types are read again and the gallery stays open, the set's types now marked "Added".
+incidents."). (M32 fix pass) A click on a set asks first: "Add the Everyday set?" / "Add the IT operations set?",
+naming the types the space does not have yet ("This adds 3 types (Person, Meeting, Book) to this space. Types you
+already have are left as they are."; the IT set names every type it adds the same way and reads "…, their
+templates and tags to this space. …", then "The Work page is turned on for this space." when its switch was never
+set and Work is off), with "Cancel" and "Add". "Add" adds the set (`POST /api/space/setup` with `basic` or `itops`; it writes only
+the types the space lacks), a toast says what was added ("Added: Person, Meeting, Book."; the IT set adds "The Work
+page is now on for this space." when it turned Work on), the gallery and the types are read again and the gallery
+stays open, the set's types now marked "Added". A set whose types are all in the space reads "Added" itself and
+cannot be clicked.
 - Meetings (who attended, and when), People, Projects (status, collaborators, meetings).
 - Research: Atomic notes, Definitions.
 - Media: Books (authors, rating, genre), Films, TV series, Podcasts.
