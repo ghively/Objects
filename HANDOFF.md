@@ -1,6 +1,6 @@
 # Handoff: pick up Object
 
-Updated 2026-11-10 (M1-M31 are built, gated and on `master`, the only live branch; M31 built everything the same day's full milestone audit listed as not built: `docs/superpowers/plans/milestone-audit-2026-11-10.md`). You are continuing "Object", a local, Markdown-backed notes app with its own object model. A space keeps its metadata in `.object/` and its cache in `.object-cache/`. Read this file, then `CLAUDE.md` (rules), then `CONTINUE.md` (process). The long history and every gate's numbers live in `docs/superpowers/plans/remaining-work.md`; its "What remains" section is the current to-do list.
+Updated 2026-11-11 (**the bar changed: `CLAUDE.md`'s "Notes first" rule**, Gene's direction of 2026-11-11. M32, notes first, is built and integrated on top of M1-M31: the analysis is `docs/superpowers/plans/notes-first-analysis-2026-11-11.md`, the plan `2026-11-11-m32-notes-first.md`, the hand checks `m32-acceptance.md`; its whole-milestone review, fix pass and gate come next. M1-M31 are built, gated and on `master`, the only live branch; M31 built everything the 2026-11-10 milestone audit listed as not built: `docs/superpowers/plans/milestone-audit-2026-11-10.md`). You are continuing "Object", a local, Markdown-backed notes app with its own object model. A space keeps its metadata in `.object/` and its cache in `.object-cache/`. Read this file, then `CLAUDE.md` (rules), then `CONTINUE.md` (process). The long history and every gate's numbers live in `docs/superpowers/plans/remaining-work.md`; its "What remains" section is the current to-do list.
 
 ## Where things stand
 
@@ -37,7 +37,9 @@ BROWSER=/usr/bin/true uv run objectapp --space <folder> --port 88xx --browser --
 
 ## What to do next, in order
 
-0. **Read the audit** `docs/superpowers/plans/milestone-audit-2026-11-10.md`: M1-M31 (the IT ops type model, M28-M30, and M31, completion, built and gated 2026-11-10) are built and reachable; its "Remaining work" section is the current to-do list, ahead of the items below.
+0. **Read the notes-first analysis** `docs/superpowers/plans/notes-first-analysis-2026-11-11.md`, then the M32 plan `2026-11-11-m32-notes-first.md` and `m32-acceptance.md`. Gene's direction of 2026-11-11 is the bar now (`CLAUDE.md`, "Notes first"): Object is a go-to notes app, the manual note-taking and task-tracking path comes first, AI is a helper, and the work dashboard and the IT types are things you turn on. M32 rebuilt the default path around that (Home, Notes in the sidebar, a save you can trust, keys that work while you type, a plain Tasks page, Work as an optional page per space, a new space that just starts, everyday words) and is built and integrated; **its review, fix pass and gate are the next step**, then Gene's hand checks. Judge new work by what the default path feels like to someone writing notes, not only by whether a feature exists.
+
+   The 2026-11-10 audit, `docs/superpowers/plans/milestone-audit-2026-11-10.md`, still holds for what it checked: M1-M31 (the IT ops type model, M28-M30, and M31, completion, built and gated 2026-11-10) are built and reachable; its "Remaining work" section is the to-do list behind M32, ahead of the items below.
 
 1. **Set up** (fresh clone): install `uv` and Node 22+; `uv sync`; `cd frontend && npm ci` (not `npm install`).
 2. **Gene's hands-on checks**, M1-M27 (435 boxes, none ticked: 255 for M1-M9, 37 for M10-M15, 134 for M16-M27 and 9 in `m27-ui-acceptance.md`). The automated run covered what a headless harness can; what is left for him is listed by reason in `auto-acceptance-2026-11-08.md`. Run them on a copy of his space (never his real data first), and fix what they find, one finding per commit with a regression test.
