@@ -1102,6 +1102,13 @@ class Space:
         self._work_data: bool | None = None
         """M32: `_has_work_data`'s answer, worked out again only after the index above or the
         types changed (so `work_on` stays a lookup)."""
+        self.file_times: dict[str, str] = {}
+        """M32: path -> the file's modification time as a stamp (`now_stamp`'s form), for the
+        notes whose front matter holds neither ``lastUpdated`` nor ``createdAt`` (a ``.md``
+        put into the folder by hand or by another tool). Kept by every rescan
+        (`_note_file_time`: one stat when such a file is read, none per request); the
+        summaries the app's lists read show it as ``lastUpdated`` (`server`), so the note
+        has its place in Notes and Home's Recent. Never written to the file."""
         self._hidden_fields: dict[str, _HiddenFields] = {}
         """M32: type id -> the built-in ticket and work fields its file holds that are not
         listed while Work is off (`_hide_work_fields`); a type write puts them back
@@ -1169,6 +1176,7 @@ class Space:
             entry = self._work_entry(raw)
             if entry is not None:
                 self._work_values[rel] = entry
+            self._note_file_time(rel, raw)
         self._work_data = None
         # M32: the Task type gets every ticket and work field only while Work is on; with Work
         # off a type lists only those with a value or that the user changed (`_top_up`).
@@ -1269,6 +1277,21 @@ class Space:
             return None
         valued = frozenset(k for k in hit if _fm_has_value(raw.fm[k]))
         return (raw.typeName, valued) if valued else None
+
+    def _note_file_time(self, rel: str, raw: RawObject | None) -> None:
+        """Keep `file_times` for ``rel`` (``raw`` None: the file is gone). Reads the file's
+        time only when its front matter has no stamp of its own; never writes."""
+        if raw is None or _str_or_none(raw.fm.get("lastUpdated")) or _str_or_none(raw.fm.get("createdAt")):
+            self.file_times.pop(rel, None)
+            return
+        try:
+            ns = os.stat(self.root / rel).st_mtime_ns
+        except OSError:
+            self.file_times.pop(rel, None)
+            return
+        millis = ns // 1_000_000
+        at = datetime.fromtimestamp(millis // 1000, UTC).replace(microsecond=(millis % 1000) * 1000)
+        self.file_times[rel] = now_stamp(at)
 
     def _hidden_steps(self, type_id: str) -> bool:
         """Whether the type's file holds a Steps property that is not listed (Work is off)."""
@@ -3622,6 +3645,7 @@ class Space:
             self._raw.pop(rel, None)
             gone = self._summaries.pop(rel, None)
             self._checked_rels.discard(rel)
+            self.file_times.pop(rel, None)
             entry = self._work_values.pop(rel, None)
             if entry is not None:
                 # M32: its ticket and work values move with the file (the rescan below reads
@@ -6582,6 +6606,7 @@ class Space:
                 self._summaries.pop(rel, None)
                 self._checked_rels.discard(rel)
                 self._note_work_values(rel, None)
+                self._note_file_time(rel, None)
             else:
                 self._raw[rel] = raw
                 # A template never makes a type (`infer_types_from` skips it), so one whose
@@ -6592,6 +6617,7 @@ class Space:
                 }:
                     self._merge_types(infer_types_from(self._raw.values()))
                 self._note_work_values(rel, raw)
+                self._note_file_time(rel, raw)
                 self._summaries[rel] = self._summarize(raw)
             after = self._summaries.get(rel)
             if _names_key(before) != _names_key(after):

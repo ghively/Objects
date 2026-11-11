@@ -266,6 +266,14 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
 
 42. A new note's body no longer opens with `# <title>` (the section above).
 
+**The fix pass**
+
+43. A note whose front matter has neither `lastUpdated` nor `createdAt` (a `.md` put into the folder by hand or by
+    another tool) reads its file's modification time as `lastUpdated` in the summaries the app's lists read
+    (`GET /api/objects`, and the `summary` of `GET /api/object`), in the form of Object's own stamps, so it has its
+    place in Notes and in Home's Recent. Nothing is written to the file for it; the rows, saved searches, formulas
+    and `/api/v1` still see no `lastUpdated` for such a note.
+
 ## Known limits
 
 - Notes made before this change that open with `# <title>` keep that line (no file is rewritten), so those show
@@ -302,6 +310,7 @@ On a copy of a space, or a new one, in the app. The groups follow the analysis's
 
 - [ ] A new tab (`+` or Ctrl+T) and the first open show Home: "New note", "Today's note", "Recent" (the last 12 notes edited, newest first, daily notes included) and "Tasks" (overdue and today; a tick completes one; "Nothing due today." when there is none).
 - [ ] An empty space's Home says "Nothing here yet. Start a note, or open today." above the two buttons.
+- [ ] A `.md` file dropped into the space's folder by hand shows in Notes and in Home's Recent, placed by the file's date; the file itself is not changed by that.
 - [ ] Settings > Editor > "When this space opens" offers Home, and "Where I left off" with nothing to restore lands on Home.
 
 **A new note, by mouse and by key**

@@ -1258,7 +1258,23 @@ def create_app(
         # A JSONResponse is encoded here, on the worker thread; a plain return would run
         # FastAPI's per-value `jsonable_encoder` on the event loop (audit 2026-11-01 B2:
         # 120 ms per request at 5,000 objects, stalling SSE and every other request).
-        return SafeJSONResponse([asdict(s) for s in space.list(type or None)])
+        out = [asdict(s) for s in space.list(type or None)]
+        times = space.file_times
+        if times:
+            # M32: a note with no stamp of its own (put in by hand) reads its file's time.
+            for item in out:
+                if not item["lastUpdated"] and not item["createdAt"]:
+                    item["lastUpdated"] = times.get(item["path"])
+        return SafeJSONResponse(out)
+
+    def summary_out(summary: Any) -> dict[str, Any]:
+        """A summary as the app's lists read it: ``lastUpdated`` is the file's modification
+        time (`Space.file_times`) for a note whose front matter has neither ``lastUpdated``
+        nor ``createdAt``, as in `list_objects`. Nothing is written for it."""
+        out = asdict(summary)
+        if not out["lastUpdated"] and not out["createdAt"]:
+            out["lastUpdated"] = space.file_times.get(out["path"])
+        return out
 
     @api.get("/object")
     def get_object(path: str):
@@ -1277,7 +1293,7 @@ def create_app(
         # lossy display copy can never be saved back over the original bytes.
         return _display_safe(
             {
-                "summary": asdict(summary),
+                "summary": summary_out(summary),
                 "frontmatter": fm,
                 "body": of.body,
                 "version": version,
