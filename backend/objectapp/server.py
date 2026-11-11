@@ -443,7 +443,7 @@ class CreateObjectRequest(BaseModel):
     body: str | None = None
     """M14: the new object's body, written in the creating write (replaces the template's)."""
     appendBody: str | None = None
-    """M14: text added below the body the object gets (its heading or template's)."""
+    """M14: text added below the body the object gets (its template's; alone when that is empty)."""
     clientId: str | None = None
 
 
