@@ -161,7 +161,7 @@ describe('TypePage', () => {
     expect(visible).toEqual([
       'Recently Opened (Overview only)',
       'Collections (Overview only)',
-      'Queries (Overview only)',
+      'Saved searches (Overview only)',
       'Not in any collection',
       'Not tagged',
     ])
@@ -174,7 +174,7 @@ describe('TypePage', () => {
     await user.click(await screen.findByRole('button', { name: 'Customize Overview' }))
     // Collections and Queries can't be removed.
     expect(screen.queryByRole('button', { name: 'Hide Collections' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Hide Queries' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Hide Saved searches' })).toBeNull()
     await user.click(await screen.findByRole('button', { name: 'Hide Recently Opened' }))
     expect(screen.getByText('Hidden Sections')).toBeInTheDocument()
     expect(within(screen.getAllByTestId('hidden-section')[0]).getByText('Recently Opened (Overview only)')).toBeInTheDocument()
@@ -201,7 +201,7 @@ describe('TypePage', () => {
     expect(screen.getByText('Hidden Sections')).toBeInTheDocument()
     const hidden = await screen.findAllByTestId('hidden-section')
     expect(hidden.map((e) => e.querySelector('.truncate')?.textContent)).toEqual(['Backlog', 'Not in any collection', 'Not tagged', 'No backlinks'])
-    expect(within(hidden[3]).getByText('Objects that nothing else links to.')).toBeInTheDocument()
+    expect(within(hidden[3]).getByText('Notes that nothing else links to.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Show No backlinks' }))
     await waitFor(() => expect(lastSaved()[1].dashboard.sections.at(-1)).toEqual({ key: 'noBacklinks', collapsed: false }))
   })
@@ -216,7 +216,7 @@ describe('TypePage', () => {
     expect(within(chips).getByTestId('tag-chip')).toHaveTextContent('Linux4')
   })
 
-  test('Add a section lists the queries of the type under "Queries & Views"', async () => {
+  test('Add a section lists the saved searches of the type under "Saved searches & Views"', async () => {
     const user = userEvent.setup()
     const q = query({ id: 'q1', name: 'Open tasks', definition: { ...query({ id: 'x' }).definition, types: [{ id: 'task' }] } })
     mocked.queries.mockResolvedValue([q])
@@ -224,7 +224,7 @@ describe('TypePage', () => {
     render(<TypePage type={TASK} />)
     await user.click(await screen.findByRole('button', { name: 'Customize Overview' }))
     await user.click(await screen.findByRole('button', { name: 'Add a section' }))
-    expect(await screen.findByText('Queries & Views')).toBeInTheDocument()
+    expect(await screen.findByText('Saved searches & Views')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Add Open tasks' }))
     await waitFor(() => expect(lastSaved()[1].dashboard.sections.at(-1)).toEqual({ key: 'query:q1', collapsed: false }))
   })
@@ -250,7 +250,7 @@ describe('TypePage', () => {
     load(views({ activeTab: 'overview' }, ['recentlyAccessed']))
     render(<TypePage type={TASK} />)
     expect(await screen.findByText('Nothing opened recently')).toBeInTheDocument()
-    expect(screen.getByText('Objects you open show up here.')).toBeInTheDocument()
+    expect(screen.getByText('Notes you open show up here.')).toBeInTheDocument()
   })
 
   test('an uncustomised query shows its automatic title in the Queries section and as a tab', async () => {
@@ -273,9 +273,9 @@ describe('TypePage', () => {
     expect(await screen.findByText('No collections')).toBeInTheDocument()
     expect(screen.getByText('Create a collection to see it here.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New collection' })).toBeEnabled()
-    expect(screen.getByText('No queries')).toBeInTheDocument()
-    expect(screen.getByText('Queries you save show up here.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Create query' })).toBeInTheDocument()
+    expect(screen.getByText('No saved searches')).toBeInTheDocument()
+    expect(screen.getByText('Searches you save show up here.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New saved search' })).toBeInTheDocument()
   })
 
   test('Query Recommendations show without query sections and picking one creates the query', async () => {
@@ -319,7 +319,7 @@ describe('TypePage', () => {
     await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', { values: { done: true } }))
   })
 
-  test('test Save as query creates query with type and filters and opens it', async () => {
+  test('test Save as a saved search creates query with type and filters and opens it', async () => {
     const user = userEvent.setup()
     const v = views({ activeTab: 'all' })
     const filterGroup = {
@@ -332,7 +332,7 @@ describe('TypePage', () => {
     render(<TypePage type={TASK} />)
     await screen.findByTestId('data-view')
     await user.click(screen.getByRole('button', { name: 'More' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Save as query' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Save as a saved search' }))
     await waitFor(() => expect(mocked.createQuery).toHaveBeenCalled())
     expect(mocked.createQuery.mock.calls[0][0]).toMatchObject({
       definition: {
@@ -345,14 +345,14 @@ describe('TypePage', () => {
     await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'query', id: 'new-query' }))
   })
 
-  test('Save as query is only offered on the All tab', async () => {
+  test('Save as a saved search is only offered on the All tab', async () => {
     const user = userEvent.setup()
     load(views({ activeTab: 'overview' }))
     render(<TypePage type={TASK} />)
     await user.click(await screen.findByRole('button', { name: 'More' }))
-    expect(await screen.findByRole('menuitem', { name: 'Object type settings' })).toBeInTheDocument()
+    expect(await screen.findByRole('menuitem', { name: 'Type settings' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'New collection' })).not.toHaveAttribute('aria-disabled', 'true')
-    expect(screen.queryByRole('menuitem', { name: 'Save as query' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Save as a saved search' })).not.toBeInTheDocument()
   })
 
   test('test the All tab toolbar sits in the tab row, right-aligned, under the header divider', async () => {
@@ -471,5 +471,33 @@ describe('TypePage default list view', () => {
     render(<TypePage type={TASK} />)
     await screen.findByText('Alpha')
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  test('test the built-in Page and DailyNote types read Notes and Daily notes; a renamed one keeps its name (M32)', async () => {
+    const page = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true, revision: 'r1', propertyDefinitions: [TITLE] })
+    const { unmount } = render(<TypePage type={page} />)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Notes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New note' })).toBeInTheDocument()
+    expect(screen.queryByText('New Page')).toBeNull()
+    unmount()
+
+    const daily = typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true, revision: 'r1', propertyDefinitions: [TITLE] })
+    const second = render(<TypePage type={daily} />)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Daily notes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New daily note' })).toBeInTheDocument()
+    second.unmount()
+
+    // A type the user named keeps its own words.
+    render(<TypePage type={{ ...page, name: 'Doc', pluralName: 'Docs' }} />)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Docs' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New Doc' })).toBeInTheDocument()
+  })
+
+  test('test the Overview suggests saved searches, not queries (M32)', async () => {
+    load(views({ activeTab: 'overview' }, ['recentlyAccessed']))
+    render(<TypePage type={TASK} />)
+    const rec = await screen.findByTestId('query-recommendations')
+    expect(within(rec).getByRole('heading', { name: 'Suggested saved searches' })).toBeInTheDocument()
+    expect(screen.queryByText('Query Recommendations')).toBeNull()
   })
 })

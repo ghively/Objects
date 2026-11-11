@@ -1,28 +1,37 @@
-# The Tasks dashboard
+# Tasks
 
-**Tasks** in the sidebar opens one dashboard for every task you have, work tickets included: a ticket is a task with desk fields. It opens calm, on the single **Now** card.
+**Tasks** in the sidebar is a plain list of what you have to do. It opens on **Today**. A task is a note with a tick box and, if you want, a date.
 
-## From top to bottom
+## The lists
 
-1. **The header**: the title, **Search work** (typing switches to Everything, filtered; Esc clears) and **Create task**.
-2. **The brain-dump bar**: type anything and press Enter. It is saved at once as a Capture, to file later from the **Captures** view. Beside it: **Energy** (Low, Medium, High; press the chosen one again to clear it), **Just one thing** (shows only Now and dims the rest) and the agent pill.
-3. **The focus rail**: today's focus lines, when your daily note has them.
-4. **The view row**, then the view.
+- **Today**: what is due today, with **Overdue** above it.
+- **Upcoming**: the next 14 days, one group per day, then **Later**.
+- **Inbox**: tasks with no date yet.
+- **All**: every task.
+- **Done**: the ones you finished.
 
-## Views
+**More** holds the other lists: Status, Deadline, Recurring, Reminders, Tags and Context.
 
-- **Drive**, always on the row: **Now** (the best next thing for your energy), **Inbox**, **Today**, **Your queues**, **Agent queue**, **Captures**.
-- **More views** folds the rest:
-  - **Plan**: Scheduled, Flow, Projects map, On the floor.
-  - **Manage**: Status, Open, Deadline, Recurring, Reminders, Context, Tags, All.
-  - **Review**: Stuck, Wins, Alerts, Tickets, Everything, Completed.
+## Adding a task
 
-A folded view you have open stays on the row. **Today** is the day's timeline (meetings, focus lines, the now-line, deadline countdowns) with **Today's tasks** (overdue and due today) under it.
+Type in **Add a task** at the top and press Enter. The task is added and the box stays ready for the next one. **New task** in the header makes an empty task and opens it, for when you want to write more than a title.
 
-## Adding tasks
+In a note, Ctrl+Shift+T turns the line you are on into a task.
 
-The task lists each have a quick add at the top: a task added there gets the values the list's filter implies. **Create task** in the header makes a blank one, which opens in the peek with the title ready to type.
+## Dates
 
-## Hidden task management
+Date words anywhere in what you type set the date: "friday", "tomorrow", "nov 20", "next week". The date shows as a chip beside the text. Press Backspace on the chip to remove it; the words then stay in the title.
 
-With "Hide Task Management" on for the space, the dashboard stays (it is the work dashboard too) but leaves out the task lists and Today's tasks.
+On a row, click the date chip to change it: **Today**, **Tomorrow**, **Next week** or **No date**, or pick a day. An overdue date shows in red.
+
+## Finishing and finding
+
+Tick a task to finish it: its title is struck through and it is listed under **Done**. Untick it to bring it back. **Search tasks** in the header narrows the list to what you type.
+
+## The Work page (optional)
+
+If you also handle tickets, alerts or queues of requests, a second page can sit under Tasks. Turn on "Use the Work page in this space" in Settings, under Work.
+
+**Work** then opens a dashboard on the single **Now** card: the best next thing for the energy you have. Its top bar has **Search work**, **Create task** and **Brain dump** (type anything and press Enter; it is kept as a Capture to file later), with **Energy** (Low, Medium, High) and **Just one thing** beside it. The view row shows Now, Inbox, Today, Your queues, Agent queue and Captures, and **More views** folds the rest: Plan, Manage and Review.
+
+Tasks and projects also get ticket fields while the Work page is on. Turn the switch off and Tasks is the plain list again; nothing you made is removed.

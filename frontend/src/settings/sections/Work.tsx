@@ -1,4 +1,7 @@
-// "Work" (M22, our section; Space group, after Automations): "Your name in Activity" (a device
+// "Work" (M22, our section; Space group, after Automations). M32: its first row is the Work
+// switch, "Use the Work page in this space" (`workEnabled` in `.object/space.json`, through
+// `setWorkEnabled`); while the Work page is off the rest of the section stays where it is, every
+// control disabled under one line ("Turn on the Work page to use these."). Then "Your name in Activity" (a device
 // setting, `activityName`, the name every work write puts in `## Activity`) and "Jira site" (a
 // space setting, `jiraSite` in `.object/space.json`, which makes a Jira ticket's browse link). A
 // refused save (422) shows the server's message under its field. M23 adds its alert rows after
@@ -7,15 +10,23 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import { Icon } from '@/components/Icon'
+import { WORK } from '@/lib/words'
+import { cn } from '@/lib/utils'
 import { useSettings } from '@/settings/useSettings'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { WorkAgentSettings } from '@/work/agent/WorkAgentSettings'
 import { WORK_AGENT_TEXT } from '@/work/agent/workAgentText'
-import { SaveError, SecondaryButton, SectionHeader, SettingGroup, errorText } from '../controls'
+import { setWorkEnabled, useWorkOn } from '@/work/useWorkOn'
+import { SaveError, SecondaryButton, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
 
 export const WORK_TEXT = {
-  heading: 'Work', // our string
-  description: 'How your work items are logged and linked.', // our string
+  heading: WORK, // our string
+  description: 'An optional page for tickets, queues and alerts, and how its items are logged and linked.', // our string
+  // M32: the Work switch (per space) and the line over the rest while it is off.
+  usePage: 'Use the Work page in this space',
+  usePageHelp:
+    'Adds a Work page under Tasks: the Now view, queues, captures, alerts and tickets, and ticket fields on tasks and projects. Off: Tasks is a plain task list.',
+  offNote: 'Turn on the Work page to use these.',
   yourName: 'Your name in Activity', // our string
   yourNameHelp: 'The name each step action, note and field change puts in the Activity log on this device.', // our string
   jiraSite: 'Jira site', // our string
@@ -24,7 +35,7 @@ export const WORK_TEXT = {
   // M23: the monitoring folder watch (all our strings).
   alertFolder: 'Alert folder',
   alertFolderHelp:
-    'The folder your monitoring jobs write their JSON results to. Their alerts become Alert objects. Leave it empty to turn this off.',
+    'The folder your monitoring jobs write their JSON results to. Each alert becomes a note of the Alert type. Leave it empty to turn this off.',
   alertFolderPlaceholder: 'C:\\Monitoring\\results',
   alertIntervals: 'Alert intervals',
   alertIntervalsHelp:
@@ -34,14 +45,14 @@ export const WORK_TEXT = {
   addInterval: 'Add an interval',
   removeInterval: 'Remove',
   alertType: 'Alert type',
-  alertTypeHelp: 'Alerts are ordinary objects of the Alert type, made when the first alert arrives.',
+  alertTypeHelp: 'Alerts are ordinary notes of the Alert type, made when the first alert arrives.',
   addAlertType: 'Add the Alert type',
   alertTypeExists: 'The Alert type exists.',
 } as const
 
 const T = WORK_TEXT
 
-export const WORK_SEARCH: string[] = [T.yourName, T.jiraSite, T.alertFolder, T.alertIntervals, T.addAlertType, WORK_AGENT_TEXT.group, WORK_AGENT_TEXT.acts, WORK_AGENT_TEXT.autoRun, WORK_AGENT_TEXT.readTools, WORK_AGENT_TEXT.deskSync]
+export const WORK_SEARCH: string[] = [T.usePage, T.yourName, T.jiraSite, T.alertFolder, T.alertIntervals, T.addAlertType, WORK_AGENT_TEXT.group, WORK_AGENT_TEXT.acts, WORK_AGENT_TEXT.autoRun, WORK_AGENT_TEXT.readTools, WORK_AGENT_TEXT.deskSync]
 
 /** Longest alert folder path the server accepts (`settings.WORK_ALERT_FOLDER_MAX`). */
 export const MAX_ALERT_FOLDER = 500
@@ -64,6 +75,8 @@ export function WorkSection() {
   const [site, setSite] = useState(storedSite)
   const [nameError, setNameError] = useState<string | null>(null)
   const [siteError, setSiteError] = useState<string | null>(null)
+  const workOn = useWorkOn()
+  const [switchError, setSwitchError] = useState<string | null>(null)
 
   useEffect(() => {
     void useSpaceInfo.getState().ensure()
@@ -100,48 +113,70 @@ export function WorkSection() {
   return (
     <div>
       <SectionHeader icon="ph-briefcase" heading={T.heading} description={T.description} />
-      <SettingGroup title={T.yourName} help={T.yourNameHelp}>
-        <input
-          aria-label={T.yourName}
-          value={name}
-          maxLength={MAX_ACTIVITY_NAME}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={commitName}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              commitName()
-            }
-          }}
-          className={INPUT}
-        />
-        <SaveError error={nameError} />
-      </SettingGroup>
-      <SettingGroup title={T.jiraSite} help={T.jiraSiteHelp}>
-        <input
-          aria-label={T.jiraSite}
-          type="text"
-          inputMode="url"
-          value={site}
-          maxLength={MAX_JIRA_SITE}
-          placeholder={T.jiraSitePlaceholder}
-          disabled={!space}
-          onChange={(e) => setSite(e.target.value)}
-          onBlur={commitSite}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              commitSite()
-            }
-          }}
-          className={INPUT}
-        />
-        <SaveError error={siteError} />
-      </SettingGroup>
-      <AlertFolderGroup />
-      <AlertIntervalsGroup />
-      <AlertTypeGroup />
-      <WorkAgentSettings />
+      <SwitchRow
+        title={T.usePage}
+        help={T.usePageHelp}
+        checked={workOn}
+        onChange={(on) => {
+          if (!space) return
+          setSwitchError(null)
+          setWorkEnabled(on).catch((e: unknown) => setSwitchError(errorText(e)))
+        }}
+      >
+        <SaveError error={switchError} />
+      </SwitchRow>
+      {!workOn && (
+        <p data-work-off-note="" className="flex gap-1.5 text-[13px] text-fg-muted">
+          <Icon name="ph-info" size={14} className="mt-0.5 shrink-0" />
+          {T.offNote}
+        </p>
+      )}
+      {/* Off: nothing is removed. A disabled fieldset disables every control inside it (the work
+          agent group's too), so nothing here can be changed until the Work page is on. */}
+      <fieldset disabled={!workOn} data-work-settings={workOn ? 'on' : 'off'} className={cn('min-w-0', !workOn && 'opacity-60')}>
+        <SettingGroup title={T.yourName} help={T.yourNameHelp}>
+          <input
+            aria-label={T.yourName}
+            value={name}
+            maxLength={MAX_ACTIVITY_NAME}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                commitName()
+              }
+            }}
+            className={INPUT}
+          />
+          <SaveError error={nameError} />
+        </SettingGroup>
+        <SettingGroup title={T.jiraSite} help={T.jiraSiteHelp}>
+          <input
+            aria-label={T.jiraSite}
+            type="text"
+            inputMode="url"
+            value={site}
+            maxLength={MAX_JIRA_SITE}
+            placeholder={T.jiraSitePlaceholder}
+            disabled={!space}
+            onChange={(e) => setSite(e.target.value)}
+            onBlur={commitSite}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                commitSite()
+              }
+            }}
+            className={INPUT}
+          />
+          <SaveError error={siteError} />
+        </SettingGroup>
+        <AlertFolderGroup />
+        <AlertIntervalsGroup />
+        <AlertTypeGroup />
+        <WorkAgentSettings />
+      </fieldset>
     </div>
   )
 }

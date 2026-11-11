@@ -32,7 +32,7 @@ describe('CardViewSettings', () => {
   test('test CardViewSettings writes defaultViewType and smallCardViewConfig', async () => {
     const user = userEvent.setup()
     render(<CardViewSettings typeId="project" />)
-    expect(screen.getByText('The view used when an object of this type is linked or added as a block in your content.')).toBeInTheDocument()
+    expect(screen.getByText('The view used when a note of this type is linked or added as a block in your content.')).toBeInTheDocument()
     expect(screen.getByText('The properties a small card of this type shows by default.')).toBeInTheDocument()
 
     const group = screen.getByRole('radiogroup', { name: 'Default link view' })

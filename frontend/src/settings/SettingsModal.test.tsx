@@ -47,7 +47,7 @@ describe('SettingsModal', () => {
     expect(within(groups[1]).getAllByRole('button').map((b) => b.textContent)).toEqual([
       'Space Settings',
       'Version control',
-      'Object Types',
+      'Types',
       'Task management',
       'Automations',
       'Work',

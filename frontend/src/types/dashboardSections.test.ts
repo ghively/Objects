@@ -57,7 +57,7 @@ describe('buildSections', () => {
     expect(s.map((x) => [x.key, x.label, x.icon, x.inFullView])).toEqual([
       ['recentlyAccessed', 'Recently Opened', 'ph-clock-clockwise', false],
       ['collections', 'Collections', 'ph-cards-three', false],
-      ['queries', 'Queries', 'ph-list-magnifying-glass', false],
+      ['queries', 'Saved searches', 'ph-list-magnifying-glass', false],
       ['inNoCollection', 'Not in any collection', 'ph-placeholder', true],
       ['notTagged', 'Not tagged', 'ph-tag', true],
     ])
@@ -254,10 +254,10 @@ describe('No backlinks section (M5)', () => {
       label: 'No backlinks',
       icon: 'ph-line-segment',
       inFullView: true,
-      description: 'Objects that nothing else links to.',
+      description: 'Notes that nothing else links to.',
     })
     expect(SECTION_TEXT.noBacklinks).toBe('No backlinks')
-    expect(SECTION_TEXT.noBacklinksDescription).toBe('Objects that nothing else links to.')
+    expect(SECTION_TEXT.noBacklinksDescription).toBe('Notes that nothing else links to.')
 
     // Added: a visible section and a header tab; buildSections keeps it.
     const v = showSection(views(OLD), all, add[0])

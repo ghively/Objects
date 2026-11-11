@@ -38,7 +38,7 @@ export const TEMPLATE_TEXT = {
   explanation:
     "A template fills in properties and lays out content up front, so you don't rebuild it each time.",
   empty: 'No templates yet',
-  notAvailable: 'Templates are not available for this object type.',
+  notAvailable: 'Templates are not available for this type.',
   edit: 'Edit Template',
   markDefault: 'Mark as Default',
   isDefault: 'Default',

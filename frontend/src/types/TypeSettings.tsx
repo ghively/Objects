@@ -1,7 +1,12 @@
 /**
- * Object Type Settings, in this order: breadcrumb; icon, name, plural, colour and
- * description; Properties; Templates; Name patterns (M29); Work (M22: "Add work fields"); Configuration › Page, Card view
- * and linking; Delete object type.
+ * Type settings, in this order: breadcrumb; icon, name, plural, colour and
+ * description; Properties; Templates; Name patterns (M29); Work (M22: "Add work fields"; M32: only
+ * while the Work page is on for the space, `useWorkOn()`); Configuration › Page, Card view
+ * and linking; Delete type.
+ *
+ * M32 wording: the built-in Page and DailyNote types read "Note" / "Notes" and "Daily note" /
+ * "Daily notes" here too (`lib/typeLabel`), in the breadcrumb and in their (disabled) name fields;
+ * the type file keeps its stored names.
  *
  * Every edit saves at once through `useTypeEditor` (text fields 400 ms after the last keystroke,
  * and on blur). A type whose file can't be read shows why and disables every control. The
@@ -31,7 +36,9 @@ import { IconPicker } from '@/components/IconPicker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Switch } from '@/components/ui/switch'
 import { DefinitionHistoryDialog, DEFINITION_HISTORY } from '@/history/DefinitionHistoryDialog'
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 import { cn } from '@/lib/utils'
+import { TYPES } from '@/lib/words'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTypeEditor } from '@/object/useTypeEditor'
 import { AddPropertyMenu, BASIC_TYPE_INFO } from '@/properties/AddPropertyMenu'
@@ -43,11 +50,12 @@ import { FULL_VIEW_LAYOUTS, LAYOUTS } from '@/views/model'
 import { CardViewSettings } from './CardViewSettings'
 import { isBasicDailyNote } from './dashboardSections'
 import { NamePatternsSection, NAME_PATTERNS_TEXT } from './NamePatternsSection'
-import { DeleteTypeDialog } from './DeleteTypeDialog'
+import { DELETE_TYPE_TEXT, DeleteTypeDialog } from './DeleteTypeDialog'
 import { PageLayoutCards } from './PageLayoutCards'
 import { TemplateManager, TEMPLATE_TEXT } from './TemplateManager'
 import { WorkFieldsSection, WORK_FIELDS_TEXT } from './WorkFieldsSection'
 import { DEV_INFO_TEXT, DevInfo } from '@/settings/DevInfo'
+import { useWorkOn } from '@/work/useWorkOn'
 
 /** Put a type the server saved outside the type editor (Add work fields) into the index. */
 function adoptSavedType(t: TypeDef) {
@@ -60,7 +68,7 @@ function adoptSavedType(t: TypeDef) {
 export const SAVE_DELAY_MS = 400
 
 export const TYPE_SETTINGS_TEXT = {
-  breadcrumb: 'Object Types',
+  breadcrumb: TYPES,
   icon: 'Icon',
   name: 'Name',
   pluralName: 'Plural of name',
@@ -72,7 +80,7 @@ export const TYPE_SETTINGS_TEXT = {
   addProperty: 'Add Property',
   templates: 'Templates',
   configuration: 'Configuration',
-  configurationExplanation: "Settings for how this type's objects appear and act on pages, on cards and in the calendar.",
+  configurationExplanation: "Settings for how this type's notes appear and act on pages, on cards and in the calendar.",
   page: 'Page',
   pageLayout: 'Page layout',
   pageLayoutExplanation: 'How pages of this type are laid out.',
@@ -80,37 +88,39 @@ export const TYPE_SETTINGS_TEXT = {
   fontExplanation: 'The typeface that pages of this type use.',
   wideLayout: 'Wide layout',
   wideLayoutExplanation:
-    'Set the default layout mode for this object type. This will only affect the default page layout and will not make any difference for encyclopedia, profile, or index card designs.',
+    'Set the default layout mode for this type. This will only affect the default page layout and will not make any difference for encyclopedia, profile, or index card designs.',
   coverImageMode: 'Cover image mode',
   coverImageModeExplanation:
-    'Choose whether cover images of objects of this type should be displayed as wide or small cover images by default. This setting only applies when the object type has a cover image property.',
+    'Choose whether cover images of notes of this type should be displayed as wide or small cover images by default. This setting only applies when the type has a cover image property.',
   coverDisplay: 'Display of cover image',
   coverDisplayExplanation: 'How the cover image fits its space.',
   // Polish item 20 (our wording for the explanation).
   defaultListView: 'Default list view',
   defaultListViewExplanation:
-    'Choose the layout the object type page opens in. A view you have already changed on that page keeps its own layout.',
+    "Choose the layout the type's page opens in. A view you have already changed on that page keeps its own layout.",
   calendar: 'Calendar',
   calendarSettings: 'Calendar Settings',
   calendarExplanation:
-    'Because this type has a date property, its objects show up in the calendar. Set how below.',
+    'Because this type has a date property, its notes show up in the calendar. Set how below.',
   createFromCalendar: 'Quick-create from the calendar',
   createFromCalendarExplanation:
-    "Adds a button to each calendar day that creates an object of this type with that day's date filled in.",
+    "Adds a button to each calendar day that creates a note of this type with that day's date filled in.",
   createShow: 'Show',
   createOnce: 'Show for one per day',
   createHide: 'Hide',
   hideFromSidebar: 'Keep out of the calendar sidebar',
   hideFromSidebarExplanation:
-    "The calendar sidebar lists a day's objects and events. Turn this on to leave this type's objects out of it.",
+    "The calendar sidebar lists a day's notes and events. Turn this on to leave this type's notes out of it.",
   reviewing: 'Reviewing',
   reviewingExplanation: "You can mark daily notes as reviewed. Hide the option if you don't need it.",
   hideReviewing: 'Hide reviewing',
-  deleteHeading: 'Delete object type',
-  // The saved-queries part is our string (see DeleteTypeDialog).
-  deleteExplanation:
-    'Moves the object type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
-  deleteAction: 'Delete object type',
+  deleteHeading: DELETE_TYPE_TEXT.action,
+  // The saved-searches part is our string (see DeleteTypeDialog).
+  deleteExplanation: DELETE_TYPE_TEXT.description,
+  deleteAction: DELETE_TYPE_TEXT.action,
+  // M32 (were "Basic object types…" and "Unknown object type")
+  basicNoRename: 'Basic types cannot be renamed.',
+  unknown: 'Unknown type',
 }
 
 const FONTS: readonly { value: TypeFont; name: string }[] = [
@@ -125,7 +135,7 @@ export interface TypeSettingsProps {
   onOpenTemplate?(path: string): void
   /** The breadcrumb's type name: open the type's page. */
   onOpenType?(typeId: string): void
-  /** After "Delete object type" moved the type to the Trash. */
+  /** After "Delete type" moved the type to the Trash. */
   onDeleted?(): void
 }
 
@@ -331,16 +341,21 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
     [editor],
   )
 
+  // A basic type's names can't be edited (the fields are disabled), so they show what the rest of
+  // the app calls the type ("Note" / "Notes" for the built-in Page); nothing is saved from them.
+  const fixedNames = type?.basic === true
   const name = useDraft(
-    type?.name ?? '',
-    (v) => v.trim() !== type?.name && patch({ name: v.trim() }),
+    fixedNames ? typeLabel(type) : (type?.name ?? ''),
+    (v) => !fixedNames && v.trim() !== type?.name && patch({ name: v.trim() }),
     true,
   )
   const plural = useDraft(
-    type?.pluralName ?? '',
-    (v) => v.trim() !== type?.pluralName && patch({ pluralName: v.trim() }),
+    fixedNames ? typePlural(type) : (type?.pluralName ?? ''),
+    (v) => !fixedNames && v.trim() !== type?.pluralName && patch({ pluralName: v.trim() }),
     true,
   )
+  // M32: the Work section belongs to the Work page; it shows only while that is on for the space.
+  const workOn = useWorkOn()
   const description = useDraft(type?.description ?? '', (v) => {
     if (v !== (type?.description ?? '')) patch({ description: v })
   })
@@ -349,7 +364,7 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
     return (
       <div className="flex h-full items-center justify-center p-8 text-center">
         <div>
-          <p className="font-semibold">Unknown object type</p>
+          <p className="font-semibold">{TYPE_SETTINGS_TEXT.unknown}</p>
           <p className="mt-1 text-fg-muted">{typeId}</p>
         </div>
       </div>
@@ -378,7 +393,7 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
             className="flex items-center gap-1.5 rounded px-1 font-semibold hover:bg-hover"
           >
             <TypeChip type={type} size={22} />
-            {type.name}
+            {typeLabel(type)}
           </button>
         </nav>
         {/* M31: the type definition's kept versions. */}
@@ -433,7 +448,7 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
                 aria-label={TYPE_SETTINGS_TEXT.name}
                 value={name.draft}
                 disabled={basic}
-                title={basic ? 'Basic object types cannot be renamed.' : undefined}
+                title={basic ? TYPE_SETTINGS_TEXT.basicNoRename : undefined}
                 onChange={(e) => name.onChange(e.target.value)}
                 onBlur={name.onBlur}
                 onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
@@ -520,9 +535,11 @@ export function TypeSettings({ typeId, onOpenTemplate, onOpenType, onDeleted }: 
             <NamePatternsSection type={type} editor={editor} disabled={readOnly} showError={false} />
           </Section>
 
-          <Section title={WORK_FIELDS_TEXT.heading}>
-            <WorkFieldsSection type={type} onSaved={adoptSavedType} />
-          </Section>
+          {workOn && (
+            <Section title={WORK_FIELDS_TEXT.heading}>
+              <WorkFieldsSection type={type} onSaved={adoptSavedType} />
+            </Section>
+          )}
 
           <Section title={TYPE_SETTINGS_TEXT.configuration} explanation={TYPE_SETTINGS_TEXT.configurationExplanation}>
             <section aria-label={TYPE_SETTINGS_TEXT.page}>

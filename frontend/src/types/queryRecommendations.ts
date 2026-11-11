@@ -1,7 +1,9 @@
-// "Query Recommendations": ready-made queries an Overview offers while it has no query sections.
+// "Suggested saved searches" (was "Query Recommendations"): ready-made queries an Overview offers
+// while it has no query sections.
 // Titles: "Kanban by {property}", "Filter {property} is
 // empty", "Filter {property} by" (one item per option), and for booleans "Checked" / "Unchecked".
 import type { Filter, Layout, PropertyDef, QueryDefinition, TypeDef } from '@/api/types'
+import { typeLabel } from '@/lib/typeLabel'
 import { emptyFilterGroup } from '@/views/model'
 
 export interface QueryRecommendation {
@@ -43,19 +45,19 @@ export function queryRecommendations(type: TypeDef): QueryRecommendation[] {
       })
       for (const o of def.options.set ?? []) {
         out.push({
-          title: `${type.name} · ${def.name} · ${o.text}`,
+          title: `${typeLabel(type)} · ${def.name} · ${o.text}`,
           definition: definition(type.id, [filter(def, type.id, 'contains', [o.id])]),
           layout: 'list',
         })
       }
     } else if (def.type === 'boolean') {
       out.push({
-        title: `${type.name} · ${def.name} · Checked`,
+        title: `${typeLabel(type)} · ${def.name} · Checked`,
         definition: definition(type.id, [filter(def, type.id, 'isChecked')]),
         layout: 'list',
       })
       out.push({
-        title: `${type.name} · ${def.name} · Unchecked`,
+        title: `${typeLabel(type)} · ${def.name} · Unchecked`,
         definition: definition(type.id, [filter(def, type.id, 'isNotChecked')]),
         layout: 'list',
       })

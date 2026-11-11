@@ -35,7 +35,7 @@ import { useSettingsModal } from '../useSettingsModal'
 
 export const AUTOMATIONS_TEXT = {
   heading: 'Automations', // our string
-  description: 'Rules that edit your objects for you, on this computer.', // our string
+  description: 'Rules that edit your notes for you, on this computer.', // our string
   create: 'New automation', // our string
   empty: 'No automations yet', // our string
   log: 'Run log', // our string

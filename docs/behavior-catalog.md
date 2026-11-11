@@ -55,15 +55,18 @@ Object has no accounts.
   `appIcon`), each showing the bolt in its colour; the choice recolours the browser tab's icon at once and the
   app window's from the next start (the window takes an icon only when it opens).
 - AI Assistant: "Hide AI features" switch.
-- Editor: Disable spellcheck; Spellcheck language (Experimental); Open objects as a full page (Alt+Shift click
-  opens the preview instead); Show properties by default (ours, 2026-11-09; on by default; off: objects open with
-  the properties panel hidden, and the properties button shows it for that object by saving `hideProperties:
+- Editor: Disable spellcheck; Spellcheck language (Experimental); Open notes as a full page (M32: was "Open objects
+  as a full page"; on by default now; Alt+Shift click opens the preview instead); Show properties by default (ours,
+  2026-11-09; on by default; (M32) it applies to types that have properties of their own: a plain Note or Daily
+  note starts with the panel closed; off: every note opens with the properties panel hidden, and the properties
+  button shows it for that note by saving `hideProperties:
   false`, hiding again removes the key); Insert links inline by default; Type icons on inline links;
   Turn off automatic numbered lists (so `1. ` at block start converts by default); How nested backlinks
   show at first (Just the linking block | Full path above); Keep type settings inside Settings only;
   Hide outliner lines; Toggle style (Toggle | Bullet); Hide App Menu; When Object
   starts (Space on this device: Last opened space | Specific space; When this space opens, per space and per
-  device: Where I left off | Calendar | Calendar today | Specific object); Highlight Style (Default with a
+  device: Where I left off | Home (M32) | Calendar | Calendar today | Specific note (M32: was "Specific object",
+  its picker "Select a note")); Highlight Style (Default with a
   rail and notes section | Minimal); Backlink sections start as (Backlinks Open | Closed; Unlinked
   Mentions Open | Closed | Hidden); Backlink content view (Embed default).
   (M31) "Hide App Menu" (a switch after "Hide outliner lines"; device setting `hideAppMenu`, off by default): Object's
@@ -120,6 +123,14 @@ Object has no accounts.
   takes the sub-items and dependencies pairs (Parent item / Sub-items, Blocked by / Blocking; a table or
   timeline view's Customize › Sub-items and dependencies; decision AC-1). Field lists per built-in
   type are in audit item 28.
+  - (M32) On screen the Settings section is "Types" ("Edit the types in this space.", "Your types", "Basic types",
+    "Custom types"); its rows for the built-in Page and DailyNote types read "Notes" and "Daily notes".
+  - (M32) Type settings on screen: the breadcrumb reads "Types"; "Delete type" ("Move this type to the Trash?":
+    "Moves the type, all its notes, its templates and the saved searches of only this type to the Trash; other saved
+    searches stop using it. You can restore them from there for 30 days."); the explanations say "notes" where they
+    said "objects". The built-in Page type shows "Note" / "Notes" and the built-in DailyNote "Daily note" / "Daily
+    notes" in the breadcrumb and in their (fixed) Name and Plural fields; the type file keeps `Page` / `DailyNote`.
+    The "Work" section ("Add work fields"; Object's own, M22) shows only while the Work page is on for the space.
   - Add Property › **Table** (M31, after Files; ours: "A small table: a header row of column names, then rows of
     text."): stored as a Markdown table in a `|-` block (header row first; a hand-written YAML list of rows reads the
     same; only line 2 is the separator, and a cell of dashes is written `\-`, `|` as `\|` and `\` as `\\`, read back
@@ -134,7 +145,14 @@ Object has no accounts.
     read-only page preview: cover, type label, icon and title, the description, the properties the object's panel
     shows (hidden and empty "hide when empty" ones left out, "Empty" otherwise), then the body's first lines; a click
     or Enter opens the object.
-- Task management: "Hide Task Management" per space.
+- Task management: "Hide Tasks in this space" per space (M32; was "Hide Task Management", key `hideTaskManagement`
+  unchanged): "Hides the Tasks page, its entry in the sidebar and the task features in this space. Other spaces are
+  not changed." Tasks already made are kept.
+- Work (Object's own; M32): the first row is the switch "Use the Work page in this space" (`workEnabled` in
+  `.object/space.json`; "Adds a Work page under Tasks: the Now view, queues, captures, alerts and tickets, and ticket
+  fields on tasks and projects. Off: Tasks is a plain task list."). Off: the rest of the section (Your name in
+  Activity, Jira site, the alert rows, the work agent group, Desk sync) stays in place with every control disabled
+  under one line, "Turn on the Work page to use these."; nothing is removed.
 - Automations (M14): in the rule editor, "Set a property" on a date needs a date or "Now" ticked; with neither it
   shows "Pick a date or tick Now." under the value and Save refuses with the same message (it would write the
   date empty, `completed: null`). A rule saved like that before keeps running unchanged; opening it shows the
@@ -149,6 +167,9 @@ Object has no accounts.
   properties, a type's id, folder and each property's key in type settings, a property's key and id in property
   settings, a query's id on its page, and a collection's id and the open view's key on its page. Views have no
   ids of their own (they live inside their type, collection or query).
+  (M32) On screen the box's labels read "Note id" and "Saved search id" (were "Object id", "Query id"), and the
+  Settings texts say "notes" where they said "objects" (Automations, Full Export "Exported 4 notes…", Import
+  Content "12 notes", the API token scopes "Search, filter and read notes." / "Also create notes, …").
   A token's scope is "Read only", "Read and write" or "Synced facts only" (Object's own, M29: reads, and fills synced
   properties; section 10f).
 - Web Extension: Chrome, Edge, Safari, Firefox capture extension; Web Highlights.
@@ -244,12 +265,19 @@ page | **Weblink** (not in Object: no Weblink viewer): search.
 ## 3. "Add new object type" gallery (the `+` next to "Object Types")
 
 A popover: "Add new object type", "Create your own", then template groups with a one-line description each.
+(M32) On screen the gallery is headed "Add a type"; its buttons read "Create type" and its form "Create your own
+type". The groups and their order are the gallery data's (`typetemplates.py`): "Create your own", then Personal,
+Use cases, Research, Media, Planning and reflection and the unsectioned row; a section the screen has no title for
+shows under its key as words. "IT operations" is always the last group and starts collapsed: its heading is a
+disclosure that shows its entries when opened, and the fold is not remembered (a reopened gallery has it collapsed
+again). "Starter sets" (the Everyday set and the IT operations set) are not in the gallery yet: no route applies a
+starting point to a space that already has one (`POST /api/space/setup` answers 409).
 - Meetings (who attended, and when), People, Projects (status, collaborators, meetings).
 - Research: Atomic notes, Definitions.
 - Media: Books (authors, rating, genre), Films, TV series, Podcasts.
 - Planning and reflection: Weeks, Months (for weekly and monthly reviews; the Calendar's daily notes already cover
   each day, so the gallery offers no Day type; removed 2026-11-09).
-- IT operations (Object's own, M28): Hosts, Software, Applications, Containers, Configurations, Locations,
+- IT operations (Object's own, M28; (M32) last and collapsed): Hosts, Software, Applications, Containers, Configurations, Locations,
   Networks, Vendors, Scripts, Commands, Runbooks, Prompts, Incidents — the IT ops starter's types that the groups
   above don't already offer (People, Meetings and Projects stay the entries above; Source isn't offered, imports
   make it). Each comes with its default template (the older entries add none) and one saved query; its relations
@@ -548,6 +576,14 @@ Each starter template pre-fills the new type's properties.
   decision D1). How-to guides opens a read-only list (People, Meetings, Projects, Books — one per basic-setup type —
   and The Tasks dashboard); a guide shows read-only with "All guides" to go back. The guides ship with the app and
   are never seeded into a space as objects (they would land in All notes and the counts).
+  (M32, notes first) The list is Tasks, People, Meetings, Projects, Books. "Tasks" (was "The Tasks dashboard")
+  explains the plain Tasks page (Today / Upcoming / Inbox / All / Done, More, "Add a task" with date words, the date
+  chip, "Search tasks", "New task"), with a short last section "The Work page (optional)" for the dashboard. The
+  type guides say to add the type from the `+` beside Types (a new space no longer asks for a starting point).
+  Getting started opens with "Your first five minutes" (write a note, today's note, link with `[[`, a task with a
+  date, Ctrl+K, tags), then "Finding your way around", "Types and properties (optional)", one paragraph on the
+  Assistant as a helper that acts only when asked, Spaces and "Where your files live"; one line says the Work page
+  and the IT operations types are off until turned on. No help text calls a note an "object".
 - **Theme toggle** in the sidebar footer switches dark and light immediately (it persists).
 
 ## 8. Search, New menu, view toolbar
@@ -577,6 +613,12 @@ Each starter template pre-fills the new type's properties.
   - Type page header: type icon + plural name; search icon; `...` (New collection, Pin to sidebar, Pin to…,
     Object type settings, Import CSV, Save as query, Delete object type; "New from template" is in the sidebar's
     type menu); a split "New" button.
+    (M32) On screen: the heading of the built-in Page type reads "Notes" and of the built-in DailyNote "Daily
+    notes" (a renamed type keeps its own plural); the `...` items read "Type settings", "Save as a saved search" and
+    "Delete type"; the New button reads "New note" / "New daily note" for those two types, else "New {type}". On the
+    Overview, "Queries" is "Saved searches" ("No saved searches", "Searches you save show up here.", "New saved
+    search", "Saved searches & Views", "Suggested saved searches"), and the built-in sections' texts say "Notes"
+    ("Notes you open show up here.", "Notes that nothing else links to.").
 - **Filter editor** (decision C1; `views/FilterEditor.tsx`, `views/filter.ts`):
   - Popover body: rows that start "where", then the group operator (a menu "and | or" on the second row, plain
     text on the rest), Property, Operator, value editor and a `…` menu (Turn into group, Remove; Remove only, one

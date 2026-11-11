@@ -2,6 +2,7 @@
 // Pure functions over the saved `Views`, the type, and the space's collections and queries.
 import type { Collection, DashboardSection, DashboardSectionKey, Icon, Query, Row, TypeDef, Views } from '@/api/types'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
+import { SAVED_SEARCH, SAVED_SEARCHES } from '@/lib/words'
 import { queryTitle, type TitleCtx } from '@/queries/autoTitle'
 
 /**
@@ -28,21 +29,25 @@ export const SECTION_TEXT = {
   all: 'All',
   recentlyAccessed: 'Recently Opened',
   recentlyEmptyTitle: 'Nothing opened recently',
-  recentlyEmptyBody: 'Objects you open show up here.',
+  recentlyEmptyBody: 'Notes you open show up here.',
   collections: 'Collections',
   collectionsEmptyTitle: 'No collections',
   collectionsEmptyBody: 'Create a collection to see it here.',
   createCollection: 'New collection',
-  queries: 'Queries',
-  queriesEmptyTitle: 'No queries',
-  queriesEmptyBody: 'Queries you save show up here.',
-  createQuery: 'Create query',
+  // M32: a query is a "saved search" on screen (the keys, routes and files keep `query`).
+  queries: SAVED_SEARCHES,
+  queriesEmptyTitle: 'No saved searches',
+  queriesEmptyBody: 'Searches you save show up here.',
+  createQuery: 'New saved search',
+  /** A saved search with no title of its own. */
+  untitledQuery: SAVED_SEARCH,
+  recommendations: 'Suggested saved searches',
   inNoCollection: 'Not in any collection',
-  inNoCollectionDescription: "Objects that aren't in any collection yet.",
+  inNoCollectionDescription: "Notes that aren't in any collection yet.",
   notTagged: 'Not tagged',
-  notTaggedDescription: 'Objects without a top-level tag.',
+  notTaggedDescription: 'Notes without a top-level tag.',
   noBacklinks: 'No backlinks',
-  noBacklinksDescription: 'Objects that nothing else links to.',
+  noBacklinksDescription: 'Notes that nothing else links to.',
   unreviewed: 'Unreviewed',
   unreviewedDescription: 'Daily notes still waiting to be reviewed.',
   openAll: 'Open all',
@@ -50,7 +55,7 @@ export const SECTION_TEXT = {
   visibleSections: 'Visible Sections',
   hiddenSections: 'Hidden Sections',
   addSection: 'Add a section',
-  queriesAndViews: 'Queries & Views',
+  queriesAndViews: `${SAVED_SEARCHES} & Views`,
   dashboardOnly: ' (Overview only)',
   sectionEmpty: 'This section has nothing in it.',
 }
@@ -179,7 +184,7 @@ function describe(type: TypeDef, key: string, ctx: SectionCtx): Described | null
   if (isQueryKey(key)) {
     const q = ctx.queries.find((x) => x.id === keyId(key))
     if (!q) return null
-    return { key, defaultLabel: queryTitle(q, ctx.titleCtx ?? NO_TITLE_CTX) || 'Query', icon: QUERY_ICON, ownIcon: q.icon, inFullView: true, refId: q.id }
+    return { key, defaultLabel: queryTitle(q, ctx.titleCtx ?? NO_TITLE_CTX) || SECTION_TEXT.untitledQuery, icon: QUERY_ICON, ownIcon: q.icon, inFullView: true, refId: q.id }
   }
   return null
 }

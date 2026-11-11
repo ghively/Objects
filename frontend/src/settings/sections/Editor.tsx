@@ -8,6 +8,8 @@ import { api } from '@/api/client'
 import type { DeviceSettings, OpenOnStartMode, SpaceEntry, Tri } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { typeLabel, typePlural } from '@/lib/typeLabel'
+import { HOME } from '@/lib/words'
 import { ensureLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { referencesSettings } from '@/references/referencesUi'
 import { useSettings } from '@/settings/useSettings'
@@ -30,14 +32,16 @@ export const EDITOR_TEXT = {
     "Typing '1.' and a space at the start of a text block will no longer turn it into a numbered list.",
   disableSpellcheck: 'Disable spellcheck',
   disableSpellcheckDescription: 'Turns off the system spellchecker in the editor and all text fields.',
-  fullPage: 'Open objects as a full page',
+  // M32: "Open notes as a full page" (was "Open objects…"; on by default now).
+  fullPage: 'Open notes as a full page',
   fullPageDescription:
-    'Clicking an object opens it as a full page. Images and PDFs keep opening in the preview, and you can still preview anything else by clicking with Option-Shift (Mac) or Alt-Shift (Windows) held down.',
+    'Clicking a note opens it as a full page. Images and PDFs keep opening in the preview, and you can still preview anything else by clicking with Option-Shift (Mac) or Alt-Shift (Windows) held down.',
   propertiesByDefault: 'Show properties by default', // our string
+  // M32: the panel starts closed for a type with no properties of its own (Note, Daily note).
   propertiesByDefaultDescription:
-    'Open objects with their properties panel showing. Off: the panel starts hidden; the properties button shows it for that object.', // our string
+    'Notes of a type that has properties of its own open with the properties panel showing. A plain Note or Daily note has none, so its panel starts closed. Off: the panel starts hidden for every type; the properties button shows it for that note.', // our string
   inlineIcons: 'Type icons on inline links',
-  inlineIconsDescription: 'Put a small colored type icon before each inline link to an object.',
+  inlineIconsDescription: 'Put a small colored type icon before each inline link.',
   outliner: 'Hide outliner lines',
   outlinerDescription: 'Removes the vertical guide lines beside blocks nested in a toggle.',
   // M31
@@ -51,12 +55,12 @@ export const EDITOR_TEXT = {
     lastOpenedPage: 'Where I left off',
     today: 'Calendar today',
     calendar: 'Calendar',
-    specificObject: 'Specific object',
-    // M32 contract: the label only; the option joins `OPEN_MODES` with lane F1's settings work.
-    home: 'Home',
+    specificObject: 'Specific note',
+    // M32: the Home tab (`openOnStart` mode `home`; `nav/startup.ts` acts on it).
+    home: HOME,
   },
-  specificObjectDescription: 'The object shown when the app starts or you switch to this space.',
-  selectObject: 'Select object',
+  specificObjectDescription: 'The note shown when the app starts or you switch to this space.',
+  selectObject: 'Select a note',
   startup: 'When Object starts', // our string
   startupDescription:
     'Pick the space this device opens first, and what it shows on start or when you switch to it.',
@@ -68,7 +72,7 @@ export const EDITOR_TEXT = {
   // M8
   backlinkSections: 'Backlink sections start as',
   backlinkSectionsDescription:
-    'Whether each section is expanded or collapsed when an object page opens. Each object can still override it.',
+    'Whether each section is expanded or collapsed when a note opens. Each note can still override it.',
   sections: {
     backlinks: 'Backlinks',
     relatedContent: 'Related Content',
@@ -78,7 +82,7 @@ export const EDITOR_TEXT = {
   backlinkContentView: 'Backlink content view',
   backlinkContentViewDescription: 'How backlink content shows at first. With nothing picked, it is embedded.',
   hiddenTypes: 'Types without related content',
-  hiddenTypesDescription: 'Pages of the types picked here leave out the related content section.',
+  hiddenTypesDescription: 'Notes of the types picked here leave out the related content section.',
   clearAll: 'Clear all',
   // M8
   nestedBacklinks: 'How nested backlinks show at first',
@@ -98,7 +102,7 @@ export const EDITOR_TEXT = {
   experimental: 'Experimental',
   inlineLinks: 'Insert links inline by default',
   inlineLinksDescription:
-    'Linking to an object always makes an inline link, even at the start of an empty block.',
+    'Linking to a note always makes an inline link, even at the start of an empty block.',
   hideType: 'Keep type settings inside Settings only',
   hideTypeDescription:
     'Removes the controls for editing properties and type settings from pages. Settings is still where you change them.',
@@ -167,12 +171,12 @@ function HiddenTypes({ value, onChange }: { value: string[]; onChange(next: stri
               type="button"
               role="checkbox"
               aria-checked={checked}
-              aria-label={t.pluralName || t.name}
+              aria-label={typePlural(t) || typeLabel(t)}
               onClick={() => onChange(checked ? value.filter((id) => id !== t.id) : [...value, t.id])}
               className={`inline-flex h-8 items-center gap-1.5 rounded-md border bg-raised px-2.5 text-[14px] text-fg hover:bg-hover ${checked ? 'border-fg-muted' : 'border-line'}`}
             >
               <Icon name={checked ? 'ph-check-square' : 'ph-square'} size={14} />
-              <span className="truncate">{t.pluralName || t.name}</span>
+              <span className="truncate">{typePlural(t) || typeLabel(t)}</span>
             </button>
           )
         })}
@@ -234,7 +238,8 @@ function SpellCheckLangInput({ value, onSave }: { value: string | null; onSave(n
   )
 }
 
-const OPEN_MODES: OpenOnStartMode[] = ['lastOpenedPage', 'calendar', 'today', 'specificObject']
+// M32: Home follows "Where I left off" (which itself falls back to Home when nothing was open).
+const OPEN_MODES: OpenOnStartMode[] = ['lastOpenedPage', 'home', 'calendar', 'today', 'specificObject']
 
 function ObjectSelect({ value, onSelect }: { value: string | undefined; onSelect(path: string): void }) {
   const [open, setOpen] = useState(false)

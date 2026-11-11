@@ -23,16 +23,16 @@ export const INTEGRATIONS_TEXT = {
   description: 'Let programs on this computer, like an AI assistant, use this space.',
   tokens: 'API tokens',
   tokensHelp:
-    'Each token gives one program access to this space through the local API. Objects marked "Exclude from AI" (a tag or the excludeFromAI property) are never shown to it.',
+    'Each token gives one program access to this space through the local API. Notes marked "Exclude from AI" (a tag or the excludeFromAI property) are never shown to it.',
   empty: 'No tokens yet.',
   newToken: 'New API token',
   nameLabel: 'Token name',
   namePlaceholder: 'e.g. Claude Code',
   scope: 'Access',
   read: 'Read only',
-  readHelp: 'Search, query and read objects.',
+  readHelp: 'Search, filter and read notes.',
   readWrite: 'Read and write',
-  readWriteHelp: 'Also create objects, edit properties and sections, rename and move to the Trash.',
+  readWriteHelp: 'Also create notes, edit properties and sections, rename and move to the Trash.',
   // M29 (our strings): a token that reads and fills synced properties only.
   sync: 'Synced facts only',
   syncHelp: 'Read, and fill synced properties (POST /api/v1/synced).',
@@ -54,7 +54,7 @@ export const INTEGRATIONS_TEXT = {
   developer: 'Developer settings',
   devInfo: 'Show developer information',
   devInfoHelp:
-    "Show ids and developer details in the app: an object's id and file path under its properties, a type's id, folder and property keys in its settings, a property's key, and the ids of queries and collections. Each has a copy button.",
+    "Show ids and developer details in the app: a note's id and file path under its properties, a type's id, folder and property keys in its settings, a property's key, and the ids of saved searches and collections. Each has a copy button.",
 } as const
 
 const T = INTEGRATIONS_TEXT

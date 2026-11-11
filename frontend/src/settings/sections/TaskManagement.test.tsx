@@ -14,7 +14,7 @@ import { currentTarget, useTabs } from '@/nav/tabs'
 import { typeDef } from '@/test/mockApi'
 import { resetSettingsModal, useSettingsModal } from '@/settings/useSettingsModal'
 import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
-import { TaskManagementSection } from './TaskManagement'
+import { TASK_MANAGEMENT_SEARCH, TaskManagementSection } from './TaskManagement'
 
 const mocked = vi.mocked(api)
 const TASK = typeDef({ id: 'task', name: 'Task', pluralName: 'Tasks', basic: true })
@@ -37,7 +37,7 @@ describe('TaskManagementSection', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Task management' })).toBeInTheDocument()
     expect(screen.getByText(/delete the Task type from this space/)).toBeInTheDocument()
     await waitFor(() => expect(useSpaceInfo.getState().space).not.toBeNull())
-    const sw = screen.getByRole('switch', { name: 'Hide Task Management' })
+    const sw = screen.getByRole('switch', { name: 'Hide Tasks in this space' })
     expect(sw).toHaveAttribute('aria-checked', 'false')
     await user.click(sw)
     await waitFor(() => expect(mocked.patchSpace).toHaveBeenCalledWith({ hideTaskManagement: true }, { baseRevision: 's1' }))
@@ -49,11 +49,16 @@ describe('TaskManagementSection', () => {
     expect(useSettingsModal.getState().isOpen).toBe(false)
   })
 
-  test('test the hide explanation says "you can hide them"', async () => {
+  test('test the hide switch says exactly what it hides (M32)', async () => {
     render(<TaskManagementSection />)
-    const text = await screen.findByText(/If you don't want to use tasks in Object/)
-    expect(text).toHaveTextContent('you can hide them.')
-    expect(text).not.toHaveTextContent('simply')
+    const row = screen.getByRole('region', { name: 'Hide Tasks in this space' })
+    expect(row).toHaveTextContent(
+      'Hides the Tasks page, its entry in the sidebar and the task features in this space. Other spaces are not changed.',
+    )
+    expect(row).toHaveTextContent('Tasks you already made are kept. To remove them too, delete the Task type from this space.')
+    // The old label named a thing the app no longer calls by that name.
+    expect(screen.queryByText(/Hide Task Management/)).toBeNull()
+    expect(TASK_MANAGEMENT_SEARCH).toContain('Hide Tasks in this space')
   })
 
 })

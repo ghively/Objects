@@ -1,5 +1,5 @@
 // The Overview tab: the type's dashboard sections (collapsible, reorderable through "Customize
-// Overview") and, while no query section exists, "Query Recommendations".
+// Overview") and, while no query section exists, "Suggested saved searches".
 import {
   closestCenter,
   DndContext,
@@ -15,6 +15,7 @@ import type { DataViewDefinition, TypeDef, ViewState } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useMemo, useState, type ReactNode } from 'react'
+import { typePlural } from '@/lib/typeLabel'
 import { useLinkIndex } from '@/links/linkIndex'
 import { DataView, type Pipeline } from '@/views/DataView'
 import { applyFilters } from '@/views/filter'
@@ -265,7 +266,7 @@ function SectionHeading({
         onClick={openAll}
         className="rounded-md px-1.5 py-0.5 text-[13px] text-fg-muted hover:bg-hover hover:text-fg"
       >
-        {section.inFullView ? SECTION_TEXT.openAll : `View all ${type.pluralName}`}
+        {section.inFullView ? SECTION_TEXT.openAll : `View all ${typePlural(type)}`}
       </button>
     </div>
   )
@@ -326,8 +327,8 @@ export function TypeOverview({
         )
       })}
       {recommendations.length > 0 && (
-        <section aria-label="Query Recommendations" data-testid="query-recommendations">
-          <h2 className="mb-2 text-[16px] font-semibold">Query Recommendations</h2>
+        <section aria-label={SECTION_TEXT.recommendations} data-testid="query-recommendations">
+          <h2 className="mb-2 text-[16px] font-semibold">{SECTION_TEXT.recommendations}</h2>
           <div className="flex flex-col">
             {recommendations.map((r) => (
               <button

@@ -1,6 +1,6 @@
 /**
- * "Move this object type to the Trash?": moves the type, its objects, its templates and the saved queries of
- * only this type to the app's Trash (restorable for 30 days; other queries drop the type until
+ * "Move this type to the Trash?": moves the type, its notes, its templates and the saved searches of
+ * only this type to the app's Trash (restorable for 30 days; other saved searches drop the type until
  * it is restored), so "This can't be undone." is not shown.
  */
 import { useState } from 'react'
@@ -19,11 +19,11 @@ import { Button } from '@/components/ui/button'
 import { invalidateLinkIndex } from '@/links/linkIndex'
 
 export const DELETE_TYPE_TEXT = {
-  title: 'Move this object type to the Trash?',
-  // The saved-queries part is our string (what a type delete does to queries is our choice).
+  title: 'Move this type to the Trash?',
+  // The saved-searches part is our string (what a type delete does to them is our choice).
   description:
-    'Moves the object type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
-  action: 'Delete object type',
+    'Moves the type, all its notes, its templates and the saved searches of only this type to the Trash; other saved searches stop using it. You can restore them from there for 30 days.',
+  action: 'Delete type',
 }
 
 export interface DeleteTypeDialogProps {

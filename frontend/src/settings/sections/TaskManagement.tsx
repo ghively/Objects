@@ -1,5 +1,7 @@
-// "Task management": hide the Tasks page for this space (`space.json` `hideTaskManagement`) and
-// open the Task type's settings.
+// "Task management": hide Tasks for this space (`space.json` `hideTaskManagement`) and open the
+// Task type's settings. M32: Tasks is its own plain page, so the switch says what it hides there
+// (the Tasks page, its sidebar entry and the task features); before, it left the task lists out of
+// the dashboard. The key and what is stored are unchanged.
 import { useState } from 'react'
 import type { TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
@@ -10,11 +12,11 @@ import { openTypeSettings, useSettingsTypes } from './ObjectTypes'
 export const TASK_MANAGEMENT_TEXT = {
   heading: 'Task management',
   description: 'Plan and track tasks right next to your notes.',
-  hide: 'Hide Task Management',
+  hide: 'Hide Tasks in this space', // M32, our string (was "Hide Task Management")
   hideDescription:
-    "If you don't want to use tasks in Object, you can hide them. You are changing this setting for your active space, not for all spaces.", // our string
+    'Hides the Tasks page, its entry in the sidebar and the task features in this space. Other spaces are not changed.', // our string
   hideInfo:
-    'Tasks you already made stay put. To remove them too, delete the Task type from this space.',
+    'Tasks you already made are kept. To remove them too, delete the Task type from this space.',
   customization: 'Task type settings',
   customizationDescription: 'Set the color, how task links behave and more.', // .taskObjectCustomization.description
   openSettings: 'Open settings', // .taskObjectCustomization.button

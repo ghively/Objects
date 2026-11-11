@@ -30,15 +30,16 @@ beforeEach(() => {
 })
 
 describe('ObjectTypesSection', () => {
-  test('test object types rows open type settings', async () => {
+  test('test the Types rows open type settings', async () => {
     const user = userEvent.setup()
     useSettingsModal.getState().open('objectTypes')
     render(<ObjectTypesSection />)
-    expect(screen.getByRole('heading', { level: 2, name: 'Object Types' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Your object types' })).toBeInTheDocument()
-    const basic = screen.getByRole('group', { name: 'Basic object types' })
-    expect(within(basic).getAllByRole('button').map((b) => b.textContent)).toEqual(['Pages', 'Tasks'])
-    const custom = screen.getByRole('group', { name: 'Custom object types' })
+    expect(screen.getByRole('heading', { level: 2, name: 'Types' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Your types' })).toBeInTheDocument()
+    const basic = screen.getByRole('group', { name: 'Basic types' })
+    // M32: the built-in Page type reads "Notes".
+    expect(within(basic).getAllByRole('button').map((b) => b.textContent)).toEqual(['Notes', 'Tasks'])
+    const custom = screen.getByRole('group', { name: 'Custom types' })
     expect(within(custom).getAllByRole('button').map((b) => b.textContent)).toEqual(['Servers'])
 
     await user.click(within(custom).getByRole('button', { name: 'Servers' }))
