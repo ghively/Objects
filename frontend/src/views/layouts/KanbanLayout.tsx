@@ -13,7 +13,8 @@ import { isSynced } from '@/properties/synced'
 import { cn } from '@/lib/utils'
 import type { LayoutProps } from '../DataView'
 import { findDef, rowValue } from '../filter'
-import { canDropRow, groupRows, hasLaterParagraphs, syncedOnRow, valueForGroup, type Group } from '../group'
+import { typePlural } from '@/lib/typeLabel'
+import { canDropRow, groupRows, hasLaterParagraphs, OTHER_ID, syncedOnRow, UNGROUPED_LABEL, valueForGroup, type Group } from '../group'
 import { matchingValues } from '../matching'
 import { LOAD_PAGE } from '../model'
 import { propertyChoices } from '../properties'
@@ -128,10 +129,14 @@ export function KanbanLayout(props: LayoutProps) {
   const entry = groupBy?.groups[0]
   // The definition the columns follow: the grouping's type's, as `groupRows` resolves it.
   const groupDef = entry ? findDef(ctx.types, entry.propertyId, entry.typeId, ctx.viewTypeIds) : undefined
-  const { groups } = useMemo(
-    () => groupRows(flat, groupBy, state.viewDefinition.groupByConfig, ctx),
-    [flat, groupBy, state.viewDefinition.groupByConfig, ctx],
-  )
+  // A board with nothing to group by has one column: its title is the type's plural when the view
+  // shows one type ("Recipes"), "Notes" otherwise. Display only: nothing of it is stored.
+  const ungroupedLabel = viewTypes.length === 1 ? typePlural(viewTypes[0]) : UNGROUPED_LABEL
+  const { groups } = useMemo(() => {
+    const out = groupRows(flat, groupBy, state.viewDefinition.groupByConfig, ctx)
+    if (entry && groupDef) return out
+    return { ...out, groups: out.groups.map((g) => (g.id === OTHER_ID && g.label === UNGROUPED_LABEL ? { ...g, label: ungroupedLabel } : g)) }
+  }, [flat, groupBy, state.viewDefinition.groupByConfig, ctx, entry, groupDef, ungroupedLabel])
   const update = (g: Group) => (groupBy && groupDef ? valueForGroup(groupBy, g, groupDef) : null)
   // A card whose own value can't be written by a drop (a long text past its first paragraph, or a
   // synced value) never starts a drag, so no column lights up for it.

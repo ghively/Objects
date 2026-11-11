@@ -704,6 +704,9 @@ Each starter template pre-fills the new type's properties.
   type, else the type made last); footer hints.
 - **View toolbar** (type pages, `All` tab): count pill, Filter, Sort, Group by, a layout dropdown, Customize.
   - Layouts (`views/model.ts`): List, Wall, Kanban, Gallery, Table, Embed, Calendar, Timeline, Chart, Gallery strip.
+    A Kanban board with nothing to group by has one column, titled with the type's plural when the view shows one
+    type ("Recipes", "Add to Recipes"; "Notes" for the Note type), and "Notes" when it shows several (M32; the
+    title is not stored).
     Chart export (the Customize page): **Export PNG** renders the frame at 2x; **Export SVG** saves the chart's own
     SVG as vector shapes with its styles written on the shapes and the legend drawn below (fix pass 2026-11-09);
     the number chart, which draws no SVG, exports its rendered frame.

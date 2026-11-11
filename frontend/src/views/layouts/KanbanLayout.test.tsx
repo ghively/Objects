@@ -153,6 +153,37 @@ describe('KanbanLayout', () => {
     expect(onWritten.mock.calls[0][1]).toBe(res)
   })
 
+  // The M32 review, F10: a board with nothing to group by has one column, and it was titled
+  // "Notes" for every type (a board of recipes read "Notes").
+  test("test an ungrouped board's one column is titled with the type's plural; \"Notes\" for the Note type and for several types", () => {
+    const plain = (id: string, name: string, pluralName: string, basic = false) =>
+      typeDef({ id, name, pluralName, basic, propertyDefinitions: [propertyDef({ id: 'title', type: 'entity_title', name: 'Title' })] })
+    const RECIPE = plain('recipe', 'Recipe', 'Recipes')
+    const PAGE = plain('page', 'Page', 'Pages', true)
+    const of = (type: string, n: number) => row({ summary: objectSummary({ path: `${type}/N${n}.md`, type, title: `N${n}` }), values: {} })
+    const board = (types: ReturnType<typeof plain>[]) => (
+      <DataView
+        rows={types.map((t, i) => of(t.id, i))}
+        types={types}
+        scope={{ typeIds: types.map((t) => t.id) }}
+        state={kanban()}
+        onState={vi.fn()}
+        layouts={['kanban']}
+      />
+    )
+    const title = () => {
+      expect(columns()).toHaveLength(1)
+      return [columns()[0].firstElementChild?.firstElementChild?.textContent, within(columns()[0]).getByRole('button', { name: /^Add to / }).getAttribute('aria-label')]
+    }
+    const { rerender } = render(board([RECIPE]))
+    expect(title()).toEqual(['Recipes', 'Add to Recipes'])
+    // The built-in Page type reads "Notes" (`typePlural`), and so does a board of several types.
+    rerender(board([PAGE]))
+    expect(title()).toEqual(['Notes', 'Add to Notes'])
+    rerender(board([RECIPE, PAGE]))
+    expect(title()).toEqual(['Notes', 'Add to Notes'])
+  })
+
   test('a drop of a row whose type has the key as text writes nothing (audit 2026-11-01 #12)', async () => {
     const NOTE = typeDef({ id: 'note', name: 'Note', pluralName: 'Notes', propertyDefinitions: [propertyDef({ id: 'status', type: 'text', name: 'Status' })] })
     const textRow = row({ summary: objectSummary({ path: 'Notes/N1.md', type: 'note' }), values: { status: 'Done' } })

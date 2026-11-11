@@ -124,7 +124,8 @@ type Config = DataViewDefinition['groupByConfig']
 export const OTHER_ID = 'other'
 /**
  * The label of the one group an ungrouped view has. A list or table shows no header for it; a
- * board shows it as its single column's title ("Add to Notes"). M32: it read "Objects".
+ * board shows its single column under the type's plural when it has one type, under this otherwise
+ * (`KanbanLayout`: "Add to Recipes", "Add to Notes"). M32: it read "Objects".
  */
 export const UNGROUPED_LABEL = NOTES
 const TEXT_MAX = 500
