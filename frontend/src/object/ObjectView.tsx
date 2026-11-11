@@ -70,6 +70,7 @@ import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type Panel
 import { ImportSourceLine, importSourceOf } from './ImportSourceLine'
 import { counterpartEditor } from './CounterpartRows'
 import { PropertyPanel } from './PropertyPanel'
+import { SaveMark } from './SaveMark'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
 import { COLLECTION_ICON } from '@/lib/defIcons'
@@ -1359,6 +1360,8 @@ export function ObjectView({
         </span>
       </button>
       <div className="flex min-w-0 items-center gap-2">
+      {/* M32: first in the right-aligned group, so "Saving…" / "Saved" never moves the buttons. */}
+      <SaveMark key={path} path={path} />
       <FindBar path={path} editorRef={editorRef} />
       <div className="flex h-10 shrink-0 items-center gap-0.5 rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] px-1">
         {mode === 'page' && (

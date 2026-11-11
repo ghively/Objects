@@ -320,6 +320,9 @@ Each starter template pre-fills the new type's properties.
 - **Full page**: the same content, with the property pane docked on the left (Status, Time frame,
   Collaborators... one block per property, each "Empty" when unset) and the outline as a column of short
   dashes at the right edge (hover opens the outline popover). The browser tab title is the object title.
+- **Save mark** (M32): in a note's toolbar (page and peek), left of its buttons: "Saving…" while typed text waits
+  for its save or a save runs, then a check and "Saved", which fades to the check alone after two seconds. A note
+  nobody typed in shows nothing. A failed save keeps the editor's "Changes not saved. Retrying…" and adds nothing.
 - **Header**, top to bottom: type pill (icon + name; click to change type), a relation button, then any
   property surfaced in the header (a Status chip such as "In Progress"), a "Collections" chip; the title in
   large bold; the Description property as a paragraph under the title; a "Tags" row of colored tag chips with a
