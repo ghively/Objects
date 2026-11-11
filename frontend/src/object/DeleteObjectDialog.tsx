@@ -1,5 +1,5 @@
 /**
- * "Delete this object?": moves the object to the app's Trash (restorable for 30 days; not the
+ * 'Delete “Title”?' (M32; "Delete this note?" without a title): moves the object to the app's Trash (restorable for 30 days; not the
  * computer's own). Its button counts like every other delete button (`deleteObjectsLabel`). The view that owns the object renders it, so the request carries the
  * version the view last saved (`baseVersion`).
  *
@@ -18,12 +18,16 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { deleteObjectsLabel } from '@/lib/deleteText'
+import { NOTE_LOWER } from '@/lib/words'
 
 export const DELETE_OBJECT_TEXT = {
-  title: 'Delete this object?',
+  /** M32: the heading without a title to name (it was "Delete this object?"). */
+  title: `Delete this ${NOTE_LOWER}?`,
+  /** M32: the heading names what is deleted. */
+  titleFor: (title: string) => `Delete “${title}”?`,
   description: 'Moves it to the Trash, where it can be restored for 30 days.',
-  /** The `…` menu row; the dialog's button is `deleteObjectsLabel(1)`. */
-  action: 'Delete object',
+  /** The `…` menu row (M32: was "Delete object"); the dialog's button is `deleteObjectsLabel(1)`. */
+  action: 'Delete',
 }
 
 interface DeleteRequestState {
@@ -48,9 +52,11 @@ export interface DeleteObjectDialogProps {
   onOpenChange(open: boolean): void
   /** Do the delete (the owner sends its current `baseVersion`); reject to show the error. */
   onConfirm(): Promise<void>
+  /** M32: the title of what is deleted, named in the heading. */
+  title?: string
 }
 
-export function DeleteObjectDialog({ open, onOpenChange, onConfirm }: DeleteObjectDialogProps) {
+export function DeleteObjectDialog({ open, onOpenChange, onConfirm, title }: DeleteObjectDialogProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -77,7 +83,9 @@ export function DeleteObjectDialog({ open, onOpenChange, onConfirm }: DeleteObje
     >
       <AlertDialogContent className="border-line bg-raised-2 text-fg">
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-[17px]">{DELETE_OBJECT_TEXT.title}</AlertDialogTitle>
+          <AlertDialogTitle className="text-[17px]">
+            {title?.trim() ? DELETE_OBJECT_TEXT.titleFor(title.trim()) : DELETE_OBJECT_TEXT.title}
+          </AlertDialogTitle>
           <AlertDialogDescription className="text-[14px] text-fg-muted">{DELETE_OBJECT_TEXT.description}</AlertDialogDescription>
         </AlertDialogHeader>
         {error && (

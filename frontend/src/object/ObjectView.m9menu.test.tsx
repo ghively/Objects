@@ -84,7 +84,7 @@ describe('ObjectView … menu (M9)', () => {
     expect(at('Export')).toBe(at('Present') + 1)
     // The sections: present, export … then version history, text stats (Gene, 2026-10-29).
     expect(at('Export')).toBeLessThan(at('Version history'))
-    expect(at('Duplicate')).toBe(at('Merge into object') - 1)
+    expect(at('Duplicate')).toBe(at('Merge into note') - 1)
   })
 
   test('rows show their shortcut: Find, Present and Delete', async () => {

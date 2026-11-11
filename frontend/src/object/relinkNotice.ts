@@ -4,6 +4,7 @@
  */
 import type { RenameResult } from '@/api/types'
 import { showToast } from '@/editor/media/upload'
+import { NOTE_LOWER, NOTES_LOWER } from '@/lib/words'
 
 const BOARD_SUFFIX = '.whiteboard.json'
 
@@ -16,10 +17,10 @@ export function relinkedObjectCount(res: Pick<RenameResult, 'path' | 'relinked'>
   return objects.size
 }
 
-/** "Updated links in 3 objects" (null for none). */
+/** "Updated links in 3 notes" (null for none; M32: was "objects"). */
 export function relinkedText(count: number): string | null {
   if (count <= 0) return null
-  return `Updated links in ${count} ${count === 1 ? 'object' : 'objects'}`
+  return `Updated links in ${count} ${count === 1 ? NOTE_LOWER : NOTES_LOWER}`
 }
 
 /** Show the notice for a finished rename. */

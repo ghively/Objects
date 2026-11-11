@@ -7,6 +7,7 @@
  */
 import type { BodyContext, ReferencesTab } from '@/api/types'
 import { cpToUtf16 } from '@/lib/codepoints'
+import { NOTE_LOWER, NOTES_LOWER } from '@/lib/words'
 
 export interface ReferencesUi {
   tab: ReferencesTab
@@ -55,8 +56,8 @@ export const REFERENCES_TEXT = {
 /** Each tab's label and info tooltip. */
 export const TAB_META: Record<ReferencesTab, { label: string; info?: string }> = {
   all: { label: 'All' },
-  backlinks: { label: 'Backlinks', info: 'Links to this object' },
-  related: { label: 'Related Content', info: 'Similar objects' },
+  backlinks: { label: 'Backlinks', info: `Links to this ${NOTE_LOWER}` },
+  related: { label: 'Related Content', info: `Similar ${NOTES_LOWER}` },
   mentions: { label: 'Mentions', info: 'Unlinked name matches' },
   relatedTags: { label: 'Related tags' },
 }

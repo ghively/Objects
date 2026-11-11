@@ -274,7 +274,7 @@ describe('serialized writes', () => {
     const title = screen.getByRole('textbox', { name: 'Title' })
     await user.clear(title)
     await user.type(title, 'Plans{Enter}')
-    await waitFor(() => expect(screen.getByText('Updated links in 3 objects')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Updated links in 3 notes')).toBeInTheDocument())
     document.querySelector('[data-editor-toasts]')?.remove()
   })
 

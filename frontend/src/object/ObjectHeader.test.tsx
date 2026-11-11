@@ -257,6 +257,19 @@ describe('ObjectHeader', () => {
     expect(mocked.ensureTag).not.toHaveBeenCalledWith('Docs')
   })
 
+  // M32, wording: a type's name on screen goes through `typeLabel`.
+  test('the type chip reads "Note" for the built-in Page and "Daily note" for DailyNote; a renamed type keeps its name', () => {
+    const chip = () => document.querySelector('[data-type-chip]') as HTMLElement
+    const first = render(<ObjectHeader summary={page()} type={PAGE} />)
+    expect(chip()).toHaveTextContent(/^Note$/)
+    first.unmount()
+    const second = render(<ObjectHeader summary={page({ path: 'DailyNotes/2026-11-11.md', type: 'dailynote' })} type={DAILY} />)
+    expect(chip()).toHaveTextContent(/^Daily note$/)
+    second.unmount()
+    render(<ObjectHeader summary={page()} type={typeDef({ id: 'page', name: 'Jotting', pluralName: 'Jottings' })} />)
+    expect(chip()).toHaveTextContent(/^Jotting$/)
+  })
+
   // M32, item 2: the title hands over to the body.
   test.each(['Enter', 'ArrowDown', 'Tab'])('%s in the title asks for the body, and the title commits as the focus leaves', async (key) => {
     const user = userEvent.setup()

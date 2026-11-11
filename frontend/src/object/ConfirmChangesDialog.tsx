@@ -2,6 +2,7 @@
  * Asks before a type edit that changes objects' values (the server answered 428): shows the
  * server's explanation and how many files would change. Confirm resends the edit with `confirm`.
  */
+import { NOTE_LOWER, NOTES_LOWER } from '@/lib/words'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +31,7 @@ export function ConfirmChangesDialog({ open, detail, affected, onConfirm, onCanc
           <AlertDialogDescription className="text-[14px] text-fg-muted">{detail}</AlertDialogDescription>
         </AlertDialogHeader>
         <p data-affected={affected} className="text-[14px]">
-          {affected === 1 ? '1 object will change.' : `${affected} objects will change.`}
+          {affected === 1 ? `1 ${NOTE_LOWER} will change.` : `${affected} ${NOTES_LOWER} will change.`}
         </p>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>

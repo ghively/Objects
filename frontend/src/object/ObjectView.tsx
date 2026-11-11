@@ -44,7 +44,9 @@ import { installLinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, typeOf, useLinkIndex, ensureLinkIndex } from '@/links/linkIndex'
 import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
 import { formatKeys, isEditableTarget, keysFor, matches } from '@/lib/shortcuts'
+import { typeLabel } from '@/lib/typeLabel'
 import { cn } from '@/lib/utils'
+import { NOTE_LOWER, TYPE_SETTINGS } from '@/lib/words'
 import { revealMenuLabel } from '@/lib/platformText'
 import { takeBodyFocus } from '@/nav/focusRequest'
 import { canGoBack, usePeek, useTabs, type Target } from '@/nav/tabs'
@@ -174,7 +176,8 @@ export const FIND_IN_PAGE_MENU_ITEM = 'Find in page'
 /** M8 menu items and the focus-mode button. */
 export const OBJECT_M8_TEXT = {
   versionHistory: 'Version history',
-  mergeObject: 'Merge into object',
+  /** M32: was "Merge into object". */
+  mergeObject: `Merge into ${NOTE_LOWER}`,
   mergeTag: 'Merge into tag',
   present: 'Present',
   addToWhiteboard: 'Add to whiteboard',
@@ -206,10 +209,19 @@ export const OBJECT_AI_TEXT = {
 export const OBJECT_MENU_TEXT = {
   import: 'Import',
   copy: 'Copy',
-  copyReference: 'Copy object reference',
-  referenceCopied: 'Link to object copied',
+  /** M32: was "Copy object reference" / "Link to object copied". */
+  copyReference: 'Copy reference',
+  referenceCopied: 'Link copied',
   copyAsMarkdown: 'Copy as Markdown',
   markdownCopied: 'Markdown copied',
+} as const
+
+/** M32: the view's notices, in the glossary's words (each said "object"). */
+export const OBJECT_VIEW_TEXT = {
+  cantOpen: `Couldn't open this ${NOTE_LOWER}.`,
+  fileGone: `This ${NOTE_LOWER}'s file was deleted or moved on disk. Edits here aren't saved.`,
+  readOnly: (reason: string) => `This ${NOTE_LOWER} opens read-only: ${reason}. Fix the file to edit it.`,
+  readOnlyFrontmatter: `This ${NOTE_LOWER}'s frontmatter couldn't be read, so it opens read-only. Fix the file to edit it.`,
 } as const
 
 /** Write `text` to the clipboard, then toast `done`. */
@@ -910,7 +922,7 @@ export function ObjectView({
       void editorRef.current?.resume(versionRef.current)
       if (err instanceof ConflictError) {
         enqueueRef.current(false)
-        throw new Error('The object changed on disk. It has been reloaded; try again.', { cause: err })
+        throw new Error(`This ${NOTE_LOWER} changed on disk. It has been reloaded; try again.`, { cause: err })
       }
       throw err
     }
@@ -1245,7 +1257,7 @@ export function ObjectView({
                 {otherTypes.map((t) => (
                   <DropdownMenuItem key={t.id} onSelect={() => setChangeTo(t)}>
                     <TypeChip type={t} size={18} />
-                    {t.name}
+                    {typeLabel(t)}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuSubContent>
@@ -1253,7 +1265,7 @@ export function ObjectView({
             {type && (
               <DropdownMenuItem data-type-setting="" onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
                 <Icon name="ph-gear-six" size={14} />
-                Object type settings
+                {TYPE_SETTINGS}
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
@@ -1523,14 +1535,14 @@ export function ObjectView({
       />
       {recoveryDialog}
       {typeEditor.dialog}
-      <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} />
+      <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} title={summary?.title} />
       {exportOpen && <ExportDialog open onOpenChange={setExportOpen} path={path} prepare={settle} />}
       {importOpen && type && <ImportCsvDialog type={type} open onOpenChange={setImportOpen} />}
       {summary && (
         <Dialog open={collectionsOpen} onOpenChange={setCollectionsOpen}>
           <DialogContent className="w-auto border-line bg-raised p-0 text-fg sm:max-w-none">
             <DialogTitle className="sr-only">Edit collections</DialogTitle>
-            <DialogDescription className="sr-only">Choose the collections this object belongs to.</DialogDescription>
+            <DialogDescription className="sr-only">{`Choose the collections this ${NOTE_LOWER} belongs to.`}</DialogDescription>
             <CollectionPicker
               value={summary.collections ?? []}
               typeId={summary.type}
@@ -1592,7 +1604,7 @@ export function ObjectView({
       >
         {!detail || !summary ? (
           error ? (
-            <p className="text-[14px] text-fg-muted">{`Couldn't open this object. ${error}`}</p>
+            <p className="text-[14px] text-fg-muted">{`${OBJECT_VIEW_TEXT.cantOpen} ${error}`}</p>
           ) : (
             <p className="text-[14px] text-fg-muted">Loading…</p>
           )
@@ -1600,7 +1612,7 @@ export function ObjectView({
           <>
             {deleted && (
               <div role="alert" className="mb-3 rounded-lg border border-danger/60 bg-raised px-3 py-2 text-[14px]">
-                This object's file was deleted or moved on disk. Edits here aren't saved.
+                {OBJECT_VIEW_TEXT.fileGone}
               </div>
             )}
             {/* The header's Tags row (the inline view's only header row; the calendar shows the date). */}
@@ -1647,7 +1659,7 @@ export function ObjectView({
             <div className="mx-auto w-full max-w-[var(--page-content-width)] px-12 pt-10 pb-24" data-object-path={path}>
               {error ? (
                 <div className="rounded-lg border border-line bg-raised p-4">
-                  <p className="font-semibold">Couldn't open this object.</p>
+                  <p className="font-semibold">{OBJECT_VIEW_TEXT.cantOpen}</p>
                   <p className="mt-1 text-fg-muted">{error}</p>
                 </div>
               ) : (
@@ -1701,9 +1713,7 @@ export function ObjectView({
           <>
             {readOnly && (
               <div role="status" className="mb-4 rounded-lg border border-line bg-raised px-3 py-2 text-[14px] text-fg-muted">
-                {summary.readOnlyReason
-                  ? `This object opens read-only: ${summary.readOnlyReason}. Fix the file to edit it.`
-                  : "This object's frontmatter couldn't be read, so it opens read-only. Fix the file to edit it."}
+                {summary.readOnlyReason ? OBJECT_VIEW_TEXT.readOnly(summary.readOnlyReason) : OBJECT_VIEW_TEXT.readOnlyFrontmatter}
               </div>
             )}
             {isTemplate && (
@@ -1721,7 +1731,7 @@ export function ObjectView({
             )}
             {deleted && !trashId && (
               <div role="alert" className="mb-4 rounded-lg border border-danger/60 bg-raised px-3 py-2 text-[14px]">
-                This object's file was deleted or moved on disk. Edits here aren't saved.
+                {OBJECT_VIEW_TEXT.fileGone}
               </div>
             )}
             {/* M32, item 11: the text has at least 60% of the window (not while the properties sit

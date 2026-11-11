@@ -5,6 +5,7 @@ import { useCalendar } from '@/calendar/useCalendar'
 import { CollectionPeek } from '@/collections/CollectionPeek'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Icon } from '@/components/Icon'
+import { NOTE } from '@/lib/words'
 import { stemOf, summaryOf, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { useIsWhiteboard } from '@/whiteboard/isWhiteboard'
@@ -126,7 +127,7 @@ export function ObjectPeek() {
           className="flex h-[min(850px,calc(100vh-48px))] w-[min(1240px,calc(100vw-48px))] max-w-none gap-0 overflow-hidden rounded-2xl border-line bg-panel p-0 sm:max-w-none"
         >
           <DialogTitle className="sr-only">{title}</DialogTitle>
-          <DialogDescription className="sr-only">Object preview</DialogDescription>
+          <DialogDescription className="sr-only">{`${NOTE} preview`}</DialogDescription>
           {path &&
             (whiteboard ? (
               <WhiteboardPageLazy

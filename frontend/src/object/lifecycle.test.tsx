@@ -9,6 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
+import { deleteObjectsLabel } from '@/lib/deleteText'
 import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
@@ -86,12 +87,13 @@ describe('delete', () => {
     const user = userEvent.setup()
     await openPage()
     const menu = await openMore(user)
-    const del = within(menu).getByRole('menuitem', { name: /^Delete object/ })
+    const del = within(menu).getByRole('menuitem', { name: /^Delete/ })
     await user.click(del)
     const dialog = await screen.findByRole('alertdialog')
-    expect(within(dialog).getByText('Delete this object?')).toBeInTheDocument()
+    // M32: the dialog names the note.
+    expect(within(dialog).getByText('Delete “Notes”?')).toBeInTheDocument()
     expect(within(dialog).getByText('Moves it to the Trash, where it can be restored for 30 days.')).toBeInTheDocument()
-    await user.click(within(dialog).getByRole('button', { name: 'Delete 1 object' }))
+    await user.click(within(dialog).getByRole('button', { name: deleteObjectsLabel(1) }))
     await waitFor(() => expect(mocked.deleteObject).toHaveBeenCalledWith(PATH, { baseVersion: 'v1' }))
 
     const banner = await screen.findByRole('status', { name: 'Deleted content' })
@@ -105,8 +107,8 @@ describe('delete', () => {
   test('Go back returns to the previous target', async () => {
     const user = userEvent.setup()
     await openPage()
-    await user.click(within(await openMore(user)).getByRole('menuitem', { name: /^Delete object/ }))
-    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete 1 object' }))
+    await user.click(within(await openMore(user)).getByRole('menuitem', { name: /^Delete/ }))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: deleteObjectsLabel(1) }))
     const banner = await screen.findByRole('status', { name: 'Deleted content' })
     await user.click(within(banner).getByRole('button', { name: 'Go back' }))
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'type', typeId: 'project' })
@@ -127,7 +129,7 @@ describe('change type', () => {
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Change type' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Task' }))
 
-    const dialog = await screen.findByRole('dialog', { name: 'Change object type?' })
+    const dialog = await screen.findByRole('dialog', { name: 'Change type?' })
     expect(within(dialog).getByText('Property Mappings')).toBeInTheDocument()
     await waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Map stage' })).toHaveValue('status'))
     expect(within(dialog).getByRole('combobox', { name: 'Map owner' })).toHaveValue('')
@@ -211,7 +213,7 @@ describe('templates', () => {
     render(<Harness />)
     const marker = screen.getByRole('region', { name: 'Template' })
     expect(within(marker).getByRole('textbox', { name: 'Template Name' })).toHaveValue('Kickoff')
-    expect(within(marker).getByText('A template fills in new objects for you.')).toBeInTheDocument()
+    expect(within(marker).getByText('A template fills in new notes for you.')).toBeInTheDocument()
     await user.click(within(marker).getByRole('button', { name: 'Make default' }))
     await waitFor(() => expect(mocked.saveType).toHaveBeenCalledTimes(1))
     const [saved, opts] = mocked.saveType.mock.calls[0]

@@ -202,7 +202,7 @@ Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down
 page up/down.
 (M31) Select all top-level blocks Ctrl+Alt+Shift+A and Copy deep link Ctrl+Alt+Shift+L (our keys; ⌃⇧⌘A / ⌃⇧⌘L on
 macOS) work in the page or the open peek, caret in the editor included: the first selects every top-level block as a
-block selection, the second copies the object's reference `[[Title]]` (as Copy > "Copy object reference"; Object has
+block selection, the second copies the object's reference `[[Title]]` (as Copy > "Copy reference", M32: was "Copy object reference"; Object has
 no URL scheme, our call) and toasts "Deep link copied". Home, End, Page Up and Page Down ("Page up", "Page down") scroll
 the page outside text fields.
 
@@ -329,6 +329,16 @@ Each starter template pre-fills the new type's properties.
   at the end of the text (under a last block that holds no text, a divider or an image, on a new empty line). In a
   narrow layout (the side panel open, a small window) the properties card follows the text, before the
   references, where it used to sit above the text; the 60% minimum does not apply there, so the card stays near.
+- **Words on the note page** (M32, the glossary): the type chip, the "Change type" list and the type beside a
+  reference read "Note" for the built-in Page type and "Daily note" for DailyNote (a renamed type keeps its
+  name). The `…` menu: "Type settings" (was "Object type settings"), "Merge into note" (was "Merge into
+  object"), Copy > "Copy reference" with the toast "Link copied", "Delete" (was "Delete object"); "Change type",
+  "Open as page" and the two AI rows are unchanged and stay where they were. The delete dialog names the note:
+  'Delete “Title”?' ("Delete this note?" without a title), over "Moves it to the Trash, where it can be restored
+  for 30 days." Change type asks "Change type?". Notices say "note": "Couldn't open this note.", "This note is in
+  the Trash.", "This note opens read-only: …", "This note's file was deleted or moved on disk. Edits here aren't
+  saved.", "3 notes will change.", "A template fills in new notes for you."; the reference tabs' tooltips are
+  "Links to this note" and "Similar notes".
 - **Save mark** (M32): in a note's toolbar (page and peek), left of its buttons: "Saving…" while typed text waits
   for its save or a save runs, then a check and "Saved", which fades to the check alone after two seconds. A note
   nobody typed in shows nothing. A failed save keeps the editor's "Changes not saved. Retrying…" and adds nothing.
@@ -345,7 +355,8 @@ Each starter template pre-fills the new type's properties.
   file name and the caret stays where it was. A note opened with a request for its body (Today's note: the end of
   its text) takes the caret there once its editor is ready. Renaming an object (its title, a
   table's title cell, a whiteboard's name) rewrites the links to it in other objects and then says so with a short
-  notice, "Updated links in 3 objects" ("1 object"); nothing is shown when no other object linked to it.
+  notice, "Updated links in 3 notes" ("1 note"; M32: was "objects"); nothing is shown when no other object linked
+  to it.
 - **Whiteboard changed outside** (its `.whiteboard.json` edited in another program while the board is open): the
   board reloads and says "Changed elsewhere. Reloaded."; another view of the same board in this window (a page
   and a peek) follows silently.

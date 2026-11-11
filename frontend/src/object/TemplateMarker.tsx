@@ -13,14 +13,15 @@ import { makeDefaultTemplate } from './UseTemplateMenu'
 import { repeatOf, TEMPLATE_REPEAT_TEXT, TemplateRepeatDialog } from '@/automations/TemplateRepeatDialog'
 import { useAutomations } from '@/automations/useAutomations'
 import type { TypeEditor } from './useTypeEditor'
+import { NOTE_LOWER, NOTES_LOWER } from '@/lib/words'
 
 export const TEMPLATE_MARKER_TEXT = {
   label: 'Template',
   namePlaceholder: 'Template Name',
-  hint: 'A template fills in new objects for you.',
+  hint: `A template fills in new ${NOTES_LOWER} for you.`,
   makeDefault: 'Make default',
   isDefault: 'Default',
-  defaultTooltip: 'Every new object of this type starts from this one.',
+  defaultTooltip: `Every new ${NOTE_LOWER} of this type starts from this one.`,
   manage: 'Manage',
 }
 

@@ -12,12 +12,14 @@ import { Fragment, useState, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { CounterpartRow, EntityRef, PropertyDef } from '@/api/types'
 import { IconOrEmoji } from '@/components/Icon'
+import { typeLabel } from '@/lib/typeLabel'
 import { summaryOf, typeOf } from '@/links/linkIndex'
 import { RelationCell } from '@/properties/cells/RelationCell'
 
 export const COUNTERPART_TEXT = {
   /** The picker's hint when the merged row's sources are several types. */
-  mixed: 'Pick an object of {types}.',
+  /** M32: was "Pick an object of {types}." */
+  mixed: 'Pick one of {types}.',
 }
 
 const COUNTERPART_ICON = 'ph-arrows-left-right'
@@ -90,7 +92,7 @@ export function mergeCounterparts(rows: CounterpartRow[], defs: PropertyDef[]): 
 
 /** "Script, Command or Runbook". */
 function typeNames(ids: string[]): string {
-  const names = ids.map((id) => typeOf(id)?.name ?? id)
+  const names = ids.map((id) => typeLabel(typeOf(id), id))
   return names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`
 }
 

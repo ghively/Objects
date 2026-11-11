@@ -18,7 +18,8 @@ import {
 } from '@/components/ui/dialog'
 
 export const CHANGE_TYPE_TEXT = {
-  heading: 'Change object type?',
+  /** M32: was "Change object type?". */
+  heading: 'Change type?',
   description: 'Choose where each property goes in the new type. Anything left unmatched can be dropped.',
   mappings: 'Property Mappings',
   lossy: "These two properties don't hold the same kind of value, so part of it may not carry over.",

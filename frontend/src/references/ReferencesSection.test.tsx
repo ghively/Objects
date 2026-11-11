@@ -98,8 +98,8 @@ describe('ReferencesSection', () => {
     await renderSection()
     const labels = screen.getAllByRole('tab').map((t) => t.querySelector('span')?.textContent)
     expect(labels).toEqual(['All', 'Backlinks', 'Related Content', 'Mentions', 'Related tags'])
-    expect(tab(/^Backlinks/).querySelector('[title="Links to this object"]')).not.toBeNull()
-    expect(tab(/^Related Content/).querySelector('[title="Similar objects"]')).not.toBeNull()
+    expect(tab(/^Backlinks/).querySelector('[title="Links to this note"]')).not.toBeNull()
+    expect(tab(/^Related Content/).querySelector('[title="Similar notes"]')).not.toBeNull()
     expect(tab(/^Mentions/).querySelector('[title="Unlinked name matches"]')).not.toBeNull()
     expect(tab(/^All/)).toHaveAttribute('title', 'Click again to hide')
     expect(tab(/^Backlinks/)).not.toHaveAttribute('title')
@@ -249,6 +249,9 @@ describe('ReferencesSection', () => {
     expect(within(bea).getByText('via Works with')).toBeInTheDocument()
     expect(within(bea).queryByText('Mentions in text')).toBeNull()
     expect(within(bea).getByText('Person')).toBeInTheDocument() // the type chip's name
+    // M32: the built-in Page type reads "Note" beside a reference.
+    expect(within(alpha).getByText('Note')).toBeInTheDocument()
+    expect(within(alpha).queryByText('Page')).toBeNull()
   })
 
   test('backlink click peeks with the backlinks list; ctrl+click opens a tab', async () => {

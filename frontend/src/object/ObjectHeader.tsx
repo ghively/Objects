@@ -12,6 +12,7 @@ import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
 import { ImagePicker } from '@/components/ImagePicker'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { typeLabel } from '@/lib/typeLabel'
 import { useTabs } from '@/nav/tabs'
 import { AliasesCell } from '@/properties/cells/AliasesCell'
 import { DescriptionCell } from '@/properties/cells/DescriptionCell'
@@ -210,7 +211,8 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesCh
           className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[color-mix(in_srgb,var(--chip-bg)_85%,white)] bg-[var(--chip-bg)] px-2 text-[15px] font-medium text-[var(--chip-fg)]"
         >
           <IconOrEmoji icon={type?.icon ?? null} fallback="ph-file-text" size={15} />
-          {type?.name ?? summary.type}
+          {/* M32: the built-in Page reads "Note", DailyNote "Daily note"; a renamed type keeps its name. */}
+          {typeLabel(type, summary.type)}
         </span>
       </div>
 

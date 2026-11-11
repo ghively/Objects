@@ -14,6 +14,7 @@
 import { useState, type MouseEvent, type ReactNode } from 'react'
 import type { BacklinkEntry, BodyContext, ObjectSummary } from '@/api/types'
 import { Icon } from '@/components/Icon'
+import { typeLabel } from '@/lib/typeLabel'
 import { cn } from '@/lib/utils'
 import { stemOf, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
@@ -75,7 +76,7 @@ export function EntryHeader({
         {type && (
           <span className="flex shrink-0 items-center gap-1 text-[13px] text-fg-muted">
             <TypeChip type={type} size={18} />
-            {type.name}
+            {typeLabel(type)}
           </span>
         )}
       </button>

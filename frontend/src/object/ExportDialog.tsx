@@ -24,6 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import { showToast } from '@/editor/media/upload'
 import { downloadUrl } from '@/lib/download'
 import { cn } from '@/lib/utils'
+import { NOTES_LOWER, SAVED_SEARCHES_LOWER } from '@/lib/words'
 
 /** The export dialog's strings. */
 export const EXPORT_TEXT = {
@@ -43,7 +44,7 @@ export const EXPORT_TEXT = {
     "Dense two-column PDF, headings numbered. A page layout only, not any journal's template.",
   options: 'Options',
   includeEmbedded: 'Include embeds',
-  includeEmbeddedDescription: "PDF only: embedded objects come along; tags, queries and collections are left out.",
+  includeEmbeddedDescription: `PDF only: embedded ${NOTES_LOWER} come along; tags, ${SAVED_SEARCHES_LOWER} and collections are left out.`,
   includeOutline: 'Include outline',
   includeOutlineDescription: 'Puts a list of the headings before the content.',
   hideEmptyProperties: 'Hide empty properties',

@@ -62,7 +62,7 @@ describe('useTypeEditor', () => {
     })
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog).toHaveTextContent('Removing values from 3 objects.')
-    expect(dialog).toHaveTextContent('3 objects will change.')
+    expect(dialog).toHaveTextContent('3 notes will change.')
     expect(mocked.saveType).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await act(async () => {
@@ -92,7 +92,7 @@ describe('useTypeEditor', () => {
       pending = editor.save({ ...PROJECT })
     })
     await screen.findByRole('alertdialog')
-    expect(screen.getByText('1 object will change.')).toBeInTheDocument()
+    expect(screen.getByText('1 note will change.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     let res: unknown = 'unset'
     await act(async () => {
