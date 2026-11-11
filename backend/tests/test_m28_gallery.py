@@ -37,9 +37,9 @@ def test_gallery_has_itops() -> None:
     keys = [c["key"] for c in cat]
     ours = [c for c in cat if c["section"] == "itOperations"]
     assert [c["key"] for c in ours] == list(ITOPS_KEYS)
-    # After "Planning and reflection", before the unsectioned row.
-    assert keys.index("host") == keys.index("month") + 1
-    assert keys[keys.index("incident") + 1 :] == ["organization", "area"]
+    # M32: the last group, after the unsectioned row (Organization, Area).
+    assert keys.index("host") == keys.index("area") + 1
+    assert keys[keys.index("incident") + 1 :] == []
     assert TEMPLATE_KEYS == tuple(keys)
     # Person, Meeting and Project stay the basic entries; Source is not offered.
     assert keys.count("person") == keys.count("meeting") == keys.count("project") == 1

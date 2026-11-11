@@ -245,6 +245,14 @@ A popover: "Add new object type", "Create your own", then template groups with a
   point at the space's own types (Location's "Part of" at Location; Application's "Runs on" at Host once the space
   has one, any type before) and keep their named other side.
 - Organizations, Areas (areas of responsibility).
+- Personal (M32; Object's own, the first group): Ideas (Status: New, Exploring, Kept, Dropped), Goals (Status: Not
+  started, In progress, Achieved, Dropped; Target date), Habits (Frequency: Daily, Weekly, Monthly), Recipes (Cover
+  image, Servings, Prep time, Source link), Trips (Start, End, Location), Journal entries (Date; Mood: Great, Good,
+  Okay, Low); each also has Notes and one saved search (New ideas, Goals in progress, Daily habits, All recipes
+  A-Z, This year's trips, This month's entries).
+- Order of the groups (M32): Create your own, Personal, Use cases, Research, Media, Planning and reflection,
+  Organizations and Areas, then IT operations last, closed until it is opened (the gallery data's `collapsed`).
+  The Projects entry carries the ticket and work fields only while Work is on for the space (M32).
 Each starter template pre-fills the new type's properties.
 
 ## 4. Sidebar details

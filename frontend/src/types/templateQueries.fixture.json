@@ -1,4 +1,414 @@
 {
+  "idea": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "lastUpdated",
+        "name": "Last updated",
+        "type": "entity_lastUpdated",
+        "options": {}
+      },
+      {
+        "key": "status",
+        "name": "Status",
+        "type": "label",
+        "options": {
+          "isArray": false,
+          "set": [
+            {
+              "id": "new",
+              "text": "New",
+              "icon": null,
+              "color": "blue"
+            },
+            {
+              "id": "exploring",
+              "text": "Exploring",
+              "icon": null,
+              "color": "sky"
+            },
+            {
+              "id": "kept",
+              "text": "Kept",
+              "icon": null,
+              "color": "cyan"
+            },
+            {
+              "id": "dropped",
+              "text": "Dropped",
+              "icon": null,
+              "color": "teal"
+            }
+          ]
+        }
+      }
+    ],
+    "query": {
+      "name": "New ideas",
+      "definition": {
+        "types": [
+          {
+            "id": "idea"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "status",
+              "option": "contains",
+              "referenceValue": [
+                "new"
+              ],
+              "typeId": "idea"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "lastUpdated",
+            "option": "descending",
+            "typeId": "idea"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "goal": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "status",
+        "name": "Status",
+        "type": "label",
+        "options": {
+          "isArray": false,
+          "set": [
+            {
+              "id": "not-started",
+              "text": "Not started",
+              "icon": null,
+              "color": "blue"
+            },
+            {
+              "id": "in-progress",
+              "text": "In progress",
+              "icon": null,
+              "color": "sky"
+            },
+            {
+              "id": "achieved",
+              "text": "Achieved",
+              "icon": null,
+              "color": "cyan"
+            },
+            {
+              "id": "dropped",
+              "text": "Dropped",
+              "icon": null,
+              "color": "teal"
+            }
+          ]
+        }
+      },
+      {
+        "key": "targetDate",
+        "name": "Target date",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "day"
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "Goals in progress",
+      "definition": {
+        "types": [
+          {
+            "id": "goal"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "status",
+              "option": "contains",
+              "referenceValue": [
+                "in-progress"
+              ],
+              "typeId": "goal"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "targetDate",
+            "option": "ascending",
+            "typeId": "goal"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "habit": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "frequency",
+        "name": "Frequency",
+        "type": "label",
+        "options": {
+          "isArray": false,
+          "set": [
+            {
+              "id": "daily",
+              "text": "Daily",
+              "icon": null,
+              "color": "blue"
+            },
+            {
+              "id": "weekly",
+              "text": "Weekly",
+              "icon": null,
+              "color": "sky"
+            },
+            {
+              "id": "monthly",
+              "text": "Monthly",
+              "icon": null,
+              "color": "cyan"
+            }
+          ]
+        }
+      }
+    ],
+    "query": {
+      "name": "Daily habits",
+      "definition": {
+        "types": [
+          {
+            "id": "habit"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "frequency",
+              "option": "contains",
+              "referenceValue": [
+                "daily"
+              ],
+              "typeId": "habit"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "typeId": "habit"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "recipe": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "All recipes A-Z",
+      "definition": {
+        "types": [
+          {
+            "id": "recipe"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "typeId": "recipe"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "grid"
+        }
+      }
+    }
+  },
+  "trip": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "startDate",
+        "name": "Start",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "day"
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "This year's trips",
+      "definition": {
+        "types": [
+          {
+            "id": "trip"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "startDate",
+              "option": "is",
+              "referenceValue": {
+                "relative": "thisYear"
+              },
+              "typeId": "trip"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "startDate",
+            "option": "ascending",
+            "typeId": "trip"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "journalEntry": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "date",
+        "name": "Date",
+        "type": "datetime",
+        "options": {
+          "constraints": {
+            "resolutionPreference": "day"
+          }
+        }
+      }
+    ],
+    "query": {
+      "name": "This month's entries",
+      "definition": {
+        "types": [
+          {
+            "id": "journalEntry"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "date",
+              "option": "is",
+              "referenceValue": {
+                "relative": "thisMonth"
+              },
+              "typeId": "journalEntry"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "date",
+            "option": "descending",
+            "typeId": "journalEntry"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
   "meeting": {
     "properties": [
       {
@@ -709,6 +1119,138 @@
       }
     }
   },
+  "organization": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      },
+      {
+        "key": "category",
+        "name": "Category",
+        "type": "label",
+        "options": {
+          "isArray": false,
+          "set": [
+            {
+              "id": "company",
+              "text": "Company",
+              "icon": null,
+              "color": "blue"
+            },
+            {
+              "id": "startup",
+              "text": "Startup",
+              "icon": null,
+              "color": "sky"
+            },
+            {
+              "id": "nonprofit",
+              "text": "Nonprofit",
+              "icon": null,
+              "color": "cyan"
+            },
+            {
+              "id": "ngo",
+              "text": "NGO",
+              "icon": null,
+              "color": "teal"
+            },
+            {
+              "id": "government",
+              "text": "Government",
+              "icon": null,
+              "color": "emerald"
+            },
+            {
+              "id": "university",
+              "text": "University",
+              "icon": null,
+              "color": "green"
+            }
+          ]
+        }
+      }
+    ],
+    "query": {
+      "name": "Companies",
+      "definition": {
+        "types": [
+          {
+            "id": "organization"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": [
+            {
+              "type": "filter",
+              "propertyId": "category",
+              "option": "contains",
+              "referenceValue": [
+                "company"
+              ],
+              "typeId": "organization"
+            }
+          ]
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "typeId": "organization"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
+  "area": {
+    "properties": [
+      {
+        "key": "title",
+        "name": "Title",
+        "type": "entity_title",
+        "options": {}
+      }
+    ],
+    "query": {
+      "name": "All areas A-Z",
+      "definition": {
+        "types": [
+          {
+            "id": "area"
+          }
+        ],
+        "filterGroup": {
+          "type": "filterGroup",
+          "operator": "and",
+          "elements": []
+        },
+        "sorts": [
+          {
+            "propertyId": "title",
+            "option": "ascending",
+            "typeId": "area"
+          }
+        ],
+        "groupBy": null
+      },
+      "view": {
+        "viewDefinition": {
+          "dataViewLayout": "list"
+        }
+      }
+    }
+  },
   "host": {
     "properties": [
       {
@@ -1403,138 +1945,6 @@
             "propertyId": "lastUpdated",
             "option": "descending",
             "typeId": "incident"
-          }
-        ],
-        "groupBy": null
-      },
-      "view": {
-        "viewDefinition": {
-          "dataViewLayout": "list"
-        }
-      }
-    }
-  },
-  "organization": {
-    "properties": [
-      {
-        "key": "title",
-        "name": "Title",
-        "type": "entity_title",
-        "options": {}
-      },
-      {
-        "key": "category",
-        "name": "Category",
-        "type": "label",
-        "options": {
-          "isArray": false,
-          "set": [
-            {
-              "id": "company",
-              "text": "Company",
-              "icon": null,
-              "color": "blue"
-            },
-            {
-              "id": "startup",
-              "text": "Startup",
-              "icon": null,
-              "color": "sky"
-            },
-            {
-              "id": "nonprofit",
-              "text": "Nonprofit",
-              "icon": null,
-              "color": "cyan"
-            },
-            {
-              "id": "ngo",
-              "text": "NGO",
-              "icon": null,
-              "color": "teal"
-            },
-            {
-              "id": "government",
-              "text": "Government",
-              "icon": null,
-              "color": "emerald"
-            },
-            {
-              "id": "university",
-              "text": "University",
-              "icon": null,
-              "color": "green"
-            }
-          ]
-        }
-      }
-    ],
-    "query": {
-      "name": "Companies",
-      "definition": {
-        "types": [
-          {
-            "id": "organization"
-          }
-        ],
-        "filterGroup": {
-          "type": "filterGroup",
-          "operator": "and",
-          "elements": [
-            {
-              "type": "filter",
-              "propertyId": "category",
-              "option": "contains",
-              "referenceValue": [
-                "company"
-              ],
-              "typeId": "organization"
-            }
-          ]
-        },
-        "sorts": [
-          {
-            "propertyId": "title",
-            "option": "ascending",
-            "typeId": "organization"
-          }
-        ],
-        "groupBy": null
-      },
-      "view": {
-        "viewDefinition": {
-          "dataViewLayout": "list"
-        }
-      }
-    }
-  },
-  "area": {
-    "properties": [
-      {
-        "key": "title",
-        "name": "Title",
-        "type": "entity_title",
-        "options": {}
-      }
-    ],
-    "query": {
-      "name": "All areas A-Z",
-      "definition": {
-        "types": [
-          {
-            "id": "area"
-          }
-        ],
-        "filterGroup": {
-          "type": "filterGroup",
-          "operator": "and",
-          "elements": []
-        },
-        "sorts": [
-          {
-            "propertyId": "title",
-            "option": "ascending",
-            "typeId": "area"
           }
         ],
         "groupBy": null

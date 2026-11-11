@@ -26,6 +26,14 @@ those are **our choice**:
   offered (imports make it and its objects). Plan ``2026-11-09-m28-itops-starter-and-relations.md``.
   M29: so the gallery's Host has the starter's five synced facts, and Host, Network and Software
   carry the starter's name patterns (`TypeTemplate.namePatterns`).
+- M32, section ``personal`` (the gallery's first group; all **our choice**, existing property
+  kinds only): Idea (Status: New, Exploring, Kept, Dropped; Notes), Goal (Status: Not started,
+  In progress, Achieved, Dropped; Target date; Notes), Habit (Frequency: Daily, Weekly, Monthly;
+  Notes), Recipe (Cover image, Servings a number, Prep time a text, Source a URL, Notes), Trip
+  (Start and End dates, Location, Notes), Journal entry (Date, Mood: Great, Good, Okay, Low;
+  Notes). The groups' order is `SECTION_ORDER` (Personal first, IT operations last and closed
+  until opened: `COLLAPSED_SECTIONS`, each catalog entry's ``collapsed``). The Project entry has
+  M22's ticket and work fields only while Work is on for the space (`_props`).
 
 A relation names the template key of its target ("person"); when the type is created it
 points at the space's type made from that template (or named like it), else at any type. An IT
@@ -46,6 +54,8 @@ from typing import Any
 from .typemodel import Icon, PropertyDefinition, TypeDefinition, system_property_defs
 
 __all__ = [
+    "COLLAPSED_SECTIONS",
+    "SECTION_ORDER",
     "TEMPLATE_KEYS",
     "TEMPLATE_QUERIES",
     "TemplateQuery",
@@ -62,8 +72,8 @@ class TypeTemplate:
     key: str
     """The template key, stored as the type's ``templateKey``."""
     section: str | None
-    """Gallery group: ``useCases`` (our choice), ``research``, ``media``,
-    ``planningAndReflection``, ``itOperations`` (M28) or None."""
+    """Gallery group: ``personal`` (M32), ``useCases`` (our choice), ``research``, ``media``,
+    ``planningAndReflection``, ``itOperations`` (M28) or None (`SECTION_ORDER`)."""
     name: str
     pluralName: str
     description: str
@@ -211,8 +221,86 @@ def _area():
     return [_b()._prop("content", "Content", "blocks")]
 
 
-# In the gallery's order (catalog section 3).
+# -- M32: the "Personal" group (our choice throughout; existing property kinds only) ------------
+
+
+def _idea():
+    return [_label("status", "Status", ("New", "Exploring", "Kept", "Dropped")), _b()._notes()]
+
+
+def _goal():
+    return [
+        _label("status", "Status", ("Not started", "In progress", "Achieved", "Dropped")),
+        _date("targetDate", "Target date"),
+        _b()._notes(),
+    ]
+
+
+def _habit():
+    return [_label("frequency", "Frequency", ("Daily", "Weekly", "Monthly")), _b()._notes()]
+
+
+def _recipe():
+    b = _b()
+    return [
+        b._cover(),
+        b._prop("servings", "Servings", "number"),
+        b._prop("prepTime", "Prep time", "text", description="For example 20 min"),
+        # key `link`: `source` is reserved (a basic media field), as Podcast's `url` is
+        b._prop("link", "Source", "url"),
+        b._notes(),
+    ]
+
+
+def _trip():
+    b = _b()
+    return [
+        _date("startDate", "Start"),
+        _date("endDate", "End"),
+        b._prop("location", "Location", "text"),
+        b._notes(),
+    ]
+
+
+def _journal_entry():
+    return [
+        _date("date", "Date"),
+        _label("mood", "Mood", ("Great", "Good", "Okay", "Low")),
+        _b()._notes(),
+    ]
+
+
+SECTION_ORDER: tuple[str | None, ...] = (
+    "personal", "useCases", "research", "media", "planningAndReflection", None, "itOperations",
+)  # fmt: skip
+"""M32: the gallery's groups in order, after "Create your own": Personal first, IT operations
+last (None is the untitled row, Organization and Area). `_TEMPLATES` is in this order, so
+`template_catalog` is too."""
+COLLAPSED_SECTIONS: frozenset[str] = frozenset({"itOperations"})
+"""M32: the groups the gallery shows closed until they are opened (each catalog entry of one
+carries ``collapsed: true``)."""
+
+# In the gallery's order (catalog section 3; `SECTION_ORDER`).
 _TEMPLATES: tuple[TypeTemplate, ...] = (
+    # M32: Personal.
+    TypeTemplate("idea", "personal", "Idea", "Ideas",
+                 "A thought worth keeping, and where it stands.",
+                 "ph-lightbulb-filament", "yellow", _idea),
+    TypeTemplate("goal", "personal", "Goal", "Goals",
+                 "Something you are working toward, with a target date.",
+                 "ph-target", "green", _goal),
+    TypeTemplate("habit", "personal", "Habit", "Habits",
+                 "Something you do regularly, and how often.",
+                 "ph-repeat", "teal", _habit),
+    TypeTemplate("recipe", "personal", "Recipe", "Recipes",
+                 "A dish you cook: servings, time and where it came from.",
+                 "ph-cooking-pot", "orange", _recipe),
+    TypeTemplate("trip", "personal", "Trip", "Trips",
+                 "A journey: when, where, and what you planned.",
+                 "ph-airplane-tilt", "sky", _trip),
+    TypeTemplate("journalEntry", "personal", "Journal entry", "Journal entries",
+                 "A dated entry in your journal, with how the day felt.",
+                 "ph-notebook", "purple", _journal_entry),
     TypeTemplate("meeting", "useCases", "Meeting", "Meetings",
                  "Notes from a meeting: who came, when, and what was said.",
                  "ph-users-three", "orange", _from_basic("meeting")),
@@ -247,8 +335,15 @@ _TEMPLATES: tuple[TypeTemplate, ...] = (
     TypeTemplate("month", "planningAndReflection", "Month", "Months",
                  "One entry per month, for monthly reviews and plans.",
                  "ph-calendar-dots", "cyan", _period),
+    # The untitled row. M32: before IT operations, which is the gallery's last group.
+    TypeTemplate("organization", None, "Organization", "Organizations",
+                 "Companies, schools and other groups, with their people.",
+                 "ph-buildings", "gray", _organization),
+    TypeTemplate("area", None, "Area", "Areas",
+                 "Ongoing parts of your life or work, such as Health or Home.",
+                 "ph-squares-four", "lime", _area),
     # M28: the IT ops types (names, descriptions, icons and colours as `basicsetup.itops_types`;
-    # `test_m28_gallery.py` holds them to it).
+    # `test_m28_gallery.py` holds them to it). M32: the last group, closed until opened.
     TypeTemplate("host", "itOperations", "Host", "Hosts",
                  "A server, workstation or network device: what runs on it and where it is.",
                  "ph-hard-drives", "blue", _from_itops("host")),
@@ -288,12 +383,6 @@ _TEMPLATES: tuple[TypeTemplate, ...] = (
     TypeTemplate("incident", "itOperations", "Incident", "Incidents",
                  "Something that broke: what it affected, why, and how it was resolved.",
                  "ph-warning-octagon", "red", _from_itops("incident")),
-    TypeTemplate("organization", None, "Organization", "Organizations",
-                 "Companies, schools and other groups, with their people.",
-                 "ph-buildings", "gray", _organization),
-    TypeTemplate("area", None, "Area", "Areas",
-                 "Ongoing parts of your life or work, such as Health or Home.",
-                 "ph-squares-four", "lime", _area),
 )  # fmt: skip
 
 TEMPLATE_KEYS = tuple(t.key for t in _TEMPLATES)
@@ -366,6 +455,18 @@ TEMPLATE_QUERIES: dict[str, TemplateQuery] = {
     "organization": TemplateQuery("Companies", (("category", "contains", Option("Company")),),
                                   (("title", "ascending"),)),
     "area": TemplateQuery("All areas A-Z", (), (("title", "ascending"),)),
+    # M32: the Personal entries (our choice).
+    "idea": TemplateQuery("New ideas", (("status", "contains", Option("New")),),
+                          (("lastUpdated", "descending"),)),
+    "goal": TemplateQuery("Goals in progress", (("status", "contains", Option("In progress")),),
+                          (("targetDate", "ascending"),)),
+    "habit": TemplateQuery("Daily habits", (("frequency", "contains", Option("Daily")),),
+                           (("title", "ascending"),)),
+    "recipe": TemplateQuery("All recipes A-Z", (), (("title", "ascending"),), "grid"),
+    "trip": TemplateQuery("This year's trips", (("startDate", "is", _rel("thisYear")),),
+                          (("startDate", "ascending"),)),
+    "journalEntry": TemplateQuery("This month's entries", (("date", "is", _rel("thisMonth")),),
+                                  (("date", "descending"),)),
     # M28: the IT ops entries (plan 2026-11-09-m28, Task 7; our choice).
     "host": TemplateQuery("Production hosts", (("environment", "contains", Option("Production")),),
                           (("title", "ascending"),), "table"),
@@ -496,6 +597,8 @@ def template_catalog(types: list[TypeDefinition], work: bool = False) -> list[di
             {
                 "key": tpl.key,
                 "section": tpl.section,
+                # M32: whether the entry's group starts closed in the gallery (IT operations).
+                "collapsed": tpl.section in COLLAPSED_SECTIONS,
                 "name": tpl.name,
                 "pluralName": tpl.pluralName,
                 "description": tpl.description,
