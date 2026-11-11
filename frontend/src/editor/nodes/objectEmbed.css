@@ -11,3 +11,30 @@
 .object-editor .object-embed-body { min-width: 0; cursor: default; }
 .object-editor .object-embed-loading { height: 32px; }
 .object-editor .object-embed-unresolved { display: inline-block; }
+
+/* An inline row (a note's link token, a task with its checkbox) is one line of text, so the hover
+   toolbar would cover its title: it stands above the row instead, at the row's own side (left,
+   centre or right as the block is aligned), and never over the text. The strip under it keeps the
+   hover while the pointer crosses from the row to the toolbar. */
+.object-editor .object-embed[data-view='inline'] .resizable-embed-frame > .resizable-embed-toolbar {
+  top: auto;
+  bottom: calc(100% + 2px);
+  right: auto;
+  left: 0;
+}
+.object-editor .object-embed[data-view='inline'] .resizable-embed-frame > .resizable-embed-toolbar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 4px;
+}
+.object-editor .object-embed[data-view='inline'] .resizable-embed[data-align='center'] > .resizable-embed-frame > .resizable-embed-toolbar {
+  left: 50%;
+  transform: translateX(-50%);
+}
+.object-editor .object-embed[data-view='inline'] .resizable-embed[data-align='right'] > .resizable-embed-frame > .resizable-embed-toolbar {
+  left: auto;
+  right: 0;
+}

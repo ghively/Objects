@@ -7,3 +7,10 @@ div:has(> [data-slot='leading'] [data-task-done]) [data-testid='card-title'] {
   color: var(--text-muted);
   text-decoration: line-through;
 }
+
+/* The same for a task embedded in a note (the row "Make this line a task" leaves): its checkbox
+   stands before the title's button, and a ticked one strikes the title as the lists do. */
+.object-embed-task:has(> [data-task-done]) > button .truncate {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}

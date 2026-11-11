@@ -634,7 +634,10 @@ Each starter template pre-fills the new type's properties.
   Task titled with its text and is replaced by the task's link card, whatever the line is: a paragraph, a heading,
   a list line (the list is split around it; nested lines become the task's body) or a to-do (a ticked one is made
   Done). With blocks selected: every to-do in them, or the first block when they hold none. A line without text
-  and a code block are left alone, and a task that can't be made changes nothing.
+  and a code block are left alone, and a task that can't be made changes nothing. The task's row in the note has
+  its circle before the title: a ticked task's title is struck through there as it is in the lists, and the row's
+  hover toolbar (align left / centre / right, `…`) stands above the row, at the side the block is aligned to,
+  never over the title (the same for any link shown as one line).
 - **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves. The note's save
   mark does not fade (M32).
 - **Edited lines are written in the editor's standard Markdown form**: the line of a block you edit is rewritten
