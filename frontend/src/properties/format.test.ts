@@ -8,6 +8,7 @@ import {
   formatNumber,
   parseNumberInput,
   placeholderFor,
+  shownDescription,
   progressFraction,
   propertyIsEmpty,
 } from './format'
@@ -170,6 +171,22 @@ describe('placeholderFor', () => {
   it('test an empty table cell is blank', () => {
     expect(placeholderFor(propertyDef({ id: 'a', description: 'Who owns it' }), 'table')).toBe('')
     expect(placeholderFor(propertyDef({ id: 'a' }), 'panel')).toBe('Empty')
+  })
+
+  // M32: the built-in system properties' stored descriptions say "object"; the screen says "note".
+  test('test a built-in description reads in the glossary\'s words; one the user wrote is kept', () => {
+    const shown = (description: string) => placeholderFor(propertyDef({ id: 'a', description }))
+    expect(shown('Tags attached to the object')).toBe('Tags attached to the note')
+    expect(shown('A short summary of what the object is about')).toBe('A short summary of what the note is about')
+    expect(shown('Other names the object goes by')).toBe('Other names the note goes by')
+    expect(shown('The collections this object belongs to')).toBe('The collections this note belongs to')
+    expect(shown('When the object was made')).toBe('When the note was made')
+    expect(shown('When the object last changed')).toBe('When the note last changed')
+    expect(shown('The name of the object, shown wherever it appears')).toBe('The name of the note, shown wherever it appears')
+    expect(shown('What kind of object this is')).toBe('What kind of note this is')
+    // Not a built-in text: shown as written, "object" and all.
+    expect(shown('The object of the meeting')).toBe('The object of the meeting')
+    expect(shownDescription(propertyDef({ id: 'a' }))).toBe('')
   })
 })
 

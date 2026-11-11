@@ -238,9 +238,30 @@ export function propertyIsEmpty(def: Pick<PropertyDef, 'type'>, value: unknown):
   }
 }
 
-/** The text an empty cell shows: the property's description, else "Empty". */
+/**
+ * M32 (the glossary: never "object" in default UI text): the descriptions the built-in system
+ * properties are stored with, as the screen shows them. Display only, as `lib/typeLabel` does for
+ * a type's name: the type files keep their text, and a description the user changed is theirs.
+ */
+const BUILT_IN_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  'The name of the object, shown wherever it appears': 'The name of the note, shown wherever it appears',
+  'The collections this object belongs to': 'The collections this note belongs to',
+  'A short summary of what the object is about': 'A short summary of what the note is about',
+  'When the object was made': 'When the note was made',
+  'When the object last changed': 'When the note last changed',
+  'Tags attached to the object': 'Tags attached to the note',
+  'Other names the object goes by': 'Other names the note goes by',
+  'What kind of object this is': 'What kind of note this is',
+}
+
+/** A property's description as the screen shows it (a built-in one in the glossary's words). */
+export function shownDescription(def: Pick<PropertyDef, 'description'>): string {
+  const text = def.description?.trim() ?? ''
+  return BUILT_IN_DESCRIPTIONS[text] ?? text
+}
+
 /** An empty value's placeholder: the description, else "Empty"; none in a table cell (blank). */
 export function placeholderFor(def: Pick<PropertyDef, 'description'>, density?: 'panel' | 'table'): string {
   if (density === 'table') return ''
-  return def.description?.trim() || 'Empty'
+  return shownDescription(def) || 'Empty'
 }
