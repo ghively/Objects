@@ -24,13 +24,16 @@ can show is Gene's hand checks in ``m32-acceptance.md``):
     (the whole folder, byte for byte), the first task writes ``task.json`` and its ``.md`` only,
     a second one its ``.md`` only; ticking it with the built-in Done status stamps
     ``completed`` (only ``status``, ``completed`` and ``lastUpdated`` lines change; a space that
-    has no ``space.json`` is not given one by an edit);
+    has no ``space.json`` is not given one by an edit); a daily note refused because a file of
+    another kind holds its name (409) writes nothing, not even the DailyNote type;
  3. the Work switch's default (item 10): off on a plain space; on, with nothing stored and
-    nothing written, for a space whose notes carry a Ticket ID (``space-work``), for the IT
-    starter's space (``space-itops``, and a new space made with ``setup: 'itops'``, which stores
-    ``workEnabled: true``), once a type named Capture exists, and from the moment a note gets a
-    Ticket ID until it loses it; the default is never stored (``space.json`` gains no
-    ``workEnabled``; the first edit of a space adds only its ``spaceId``, as before M32);
+    nothing written, for a space whose tasks carry ticket and work values (``space-work``), for
+    the IT starter's space (``space-itops``, and a new space made with ``setup: 'itops'``, which
+    stores ``workEnabled: true``), once a type named Capture exists, from the moment a Task gets
+    a Ticket ID until it loses it, and while a task has steps; a "Ticket ID" on a note of the
+    user's own type (or on a Note) does not turn it on; the default is never stored
+    (``space.json`` gains no ``workEnabled``; the first edit of a space adds only its
+    ``spaceId``, as before M32);
  4. the Work switch set by hand (item 10): ``PUT /api/space`` ``{patch: {workEnabled}}`` writes
     only ``.object/space.json``; with Work off the Task lists no ticket or work field without a
     value, keeps the one a task holds a value for (the value is read back), and no "Tickets"
@@ -40,8 +43,9 @@ can show is Gene's hand checks in ``m32-acceptance.md``):
  5. starter sets after the start (item 12): in a space that already started, ``POST
     /api/space/setup`` ``blank`` is 409; ``basic`` adds only the Person, Meeting, Project and
     Book types; ``itops`` then adds only the types the space lacks (with their templates and
-    seed Tags) and turns Work on; nothing that existed is replaced, a repeat writes nothing,
-    and a later ``basic`` keeps the ``itops`` marker;
+    seed Tags) and turns Work on; nothing that existed is replaced, a repeat writes nothing
+    (every file's hash, size and modification time, ``space.json`` included), and a later
+    ``basic`` keeps the ``itops`` marker;
  6. the type gallery (item 12): ``GET /api/type-gallery`` opens with the ``personal`` section
     (Idea, Goal, Habit, Recipe, Trip, Journal entry), ends with the IT operations entries, and
     only those are ``collapsed``; a personal entry makes its type; reading writes nothing;
@@ -54,7 +58,21 @@ can show is Gene's hand checks in ``m32-acceptance.md``):
     note made through the app's route has no ``# <title>`` line in its body, with or without a
     default template; "New note" then a title typed (a rename) leaves the body empty; a body
     sent with the create is kept as sent;
-10. the fixture folders are unchanged.
+10. type files that already store the ticket and work fields, with Work off (the fix pass): a
+    ``task.json`` that holds all 26 lists none of them (none has a value, none was changed) and
+    is not rewritten; saving the Task with Work off keeps every definition the file held, in
+    its order; with Work on they are all listed again. A ``project.json`` as the basic set
+    made it before M32 (25 fields and ``completed``) likewise: none listed, nothing written,
+    Work reads off; a Project marked done is still stamped ``completed`` (and cleared on
+    reopen); on, off and on again leave the type files as they were;
+11. the Work agent's queue with Work off (the fix pass; a copy of ``space-work``, no agent set,
+    so nothing runs here: that an entry already pending waits and then runs is
+    ``backend/tests/test_m32_fix_loop.py``, with the fake ``claude``): a brain dump saved while
+    Work is off is not queued, and is once Work is on again;
+12. the fixture folders are unchanged.
+
+"Reading wrote nothing" runs `READS`: what Home, Notes, the Tasks page, the calendar and the type
+gallery read, the ``/api/tasks/*`` and ``/api/work/*`` GET routes, and the reads of daily notes.
 
 Each check prints ``[ok]`` or ``[FAIL]``; ends with ``RESULT: PASS`` or exits non-zero.
 """
@@ -101,8 +119,38 @@ READS: tuple[tuple[str, str, Any, dict[str, str]], ...] = (
     ("GET", "/search", None, {"q": "note"}),
     ("GET", "/settings", None, {}),
     ("GET", "/ui", None, {}),
+    # daily notes: the list, the rows and the DailyNote type's views
+    ("GET", "/objects", None, {"type": "dailynote"}),
+    ("POST", "/rows", {"typeIds": ["dailynote"]}, {}),
+    ("GET", "/views/dailynote", None, {}),
+    ("GET", "/views/task", None, {}),
+    # the Work page's reads (they answer whether Work is on or off)
+    ("GET", "/work/items", None, {}),
+    ("GET", "/work/today", None, {}),
+    ("GET", "/work/board", None, {}),
+    ("GET", "/work/focus", None, {}),
+    ("GET", "/work/wins", None, {}),
+    ("GET", "/work/alerts", None, {}),
+    ("GET", "/work/captures", None, {}),
+    ("GET", "/work/agent", None, {}),
+    ("GET", "/work/agent-settings", None, {}),
+    ("GET", "/work/agent/create-info", None, {}),
+    ("GET", "/work/read-tools", None, {}),
+    ("GET", "/work/floor/general", None, {}),
+    ("GET", "/work/keep-on-top", None, {}),
+    ("GET", "/work/desk-sync", None, {}),
 )
-"""What Home, Notes, the Tasks page, the calendar and the type gallery read when they open."""
+"""What Home, Notes, the Tasks page, the calendar and the type gallery read when they open, and
+(the fix pass) the daily-note reads and the ``/api/work/*`` GET routes."""
+PATH_READS: tuple[tuple[str, str], ...] = (
+    ("/object", "task"),
+    ("/tasks/overdue", "task"),
+    ("/tasks/stats", "task"),
+    ("/work/item", "task"),
+    ("/object", "dailynote"),
+)
+"""GET routes asked about one note (``?path=``) of the type, when the space has one. They may
+refuse (422: not a recurring task, no work fields) but must not fail (5xx) and must not write."""
 
 
 # -- plumbing ------------------------------------------------------------------------------
@@ -114,7 +162,18 @@ def tree(root: Path) -> dict[str, str]:
             for p in sorted(root.rglob("*")) if p.is_file()}
 
 
-def differ(a: dict[str, str], b: dict[str, str]) -> list[str]:
+def stamped(root: Path) -> dict[str, tuple[str, int, int]]:
+    """Every file under ``root`` with its hash, size and modification time: a file written
+    again with the same bytes still shows (the fix pass; `tree` alone would not see it)."""
+    out = {}
+    for p in sorted(root.rglob("*")):
+        if p.is_file():
+            st = p.stat()
+            out[p.relative_to(root).as_posix()] = (hashlib.sha256(p.read_bytes()).hexdigest(), st.st_size, st.st_mtime_ns)
+    return out
+
+
+def differ(a: dict, b: dict) -> list[str]:
     return sorted(k for k in a.keys() | b.keys() if a.get(k) != b.get(k))
 
 
@@ -135,6 +194,13 @@ def read_all(served: Served) -> list[str]:
         code, _res = served.http(method, route, payload, **query)
         if code != 200:
             bad.append(f"{method} {route} {code}")
+    for route, type_id in PATH_READS:
+        code, found = served.http("GET", "/objects", None, type=type_id)
+        if code != 200 or not found:
+            continue  # the space has no note of that type (yet)
+        code, _res = served.http("GET", route, None, path=found[0]["path"])
+        if code >= 500 or (route == "/object" and code != 200):
+            bad.append(f"GET {route} ({type_id}) {code}")
     return bad
 
 
@@ -305,6 +371,21 @@ def check_older_space(run: Run, tmp: Path) -> None:
                    and differ(after2, tree(root)) == [made["path"]],
                    "only its status, completed and lastUpdated lines changed",
                    f"removed {sorted(removed)}, added {sorted(added)}; files {differ(after2, tree(root))}")
+
+        # A daily note that is refused writes nothing: not the on-demand DailyNote type either.
+        other = root / "DailyNotes" / f"{DAY}.md"
+        other.parent.mkdir(exist_ok=True)
+        other.write_text(f"---\ntype: 'Page'\ntitle: {DAY}\n---\nNot a daily note.\n", encoding="utf-8", newline="\n")
+        served.space.rescan_file(f"DailyNotes/{DAY}.md")
+        held = stamped(root)
+        code, res = served.http("POST", "/daily-notes", {"date": DAY})
+        run.report(code == 409 and res.get("reason") == "nameTaken" and stamped(root) == held
+                   and not (types_dir / "dailynote.json").exists(),
+                   "a daily note refused because another file holds its name (409) writes nothing, no dailynote.json",
+                   f"{code} {res}", *differ(held, stamped(root)))
+        bad = read_all(served)
+        run.report(not bad and stamped(root) == held, "reading (tasks, work and daily-note routes too) wrote nothing",
+                   *bad, *differ(held, stamped(root)))
     finally:
         served.stop()
 
@@ -346,15 +427,39 @@ def check_work_default(run: Run, spaces: Spaces, tmp: Path) -> None:
     served = Served(root)
     try:
         run.report(info(served)["workOn"] is False and work_keys(served) == set(), "a plain new space: Work is off")
+        # A "Ticket ID" property on a type of the user's own, or on a note, is not work data.
+        code, flight_type = served.http("POST", "/types", {"name": "Flight", "pluralName": "Flights"})
+        assert code == 201, (code, flight_type)
+        flight = create(served, flight_type["id"], title="To Lisbon")
         note = create(served, "page", title="Printer")
-        code, _res = set_props(served, note["path"], {"ticketId": "INC0012345"})
+        code, _res = set_props(served, flight["path"], {"ticketId": "TP1337"})
+        code2, _res = set_props(served, note["path"], {"ticketId": "INC0012345"})
+        res = info(served)
+        run.report(code == 200 and code2 == 200 and res["workOn"] is False and work_keys(served) == set()
+                   and fm_of(root, flight["path"]).get("ticketId") == "TP1337",
+                   "a \"Ticket ID\" on a note of the user's own type (a Flight) or on a Note does not turn Work on",
+                   f"{code}, {code2}; workOn {res['workOn']!r}")
+        # A Ticket ID on a Task does, and taking it off turns the default off again.
+        task = create(served, "task", title="Printer jams", body="")
+        code, _res = set_props(served, task["path"], {"ticketId": "INC0012345"})
         res = info(served)
         run.report(code == 200 and res["workOn"] is True and res["workEnabled"] is None and work_keys(served) == FIELD_KEYS,
-                   "a Ticket ID on a note turns the default on (the Task gains the fields in memory)",
+                   "a Ticket ID on a Task turns the default on (the Task gains the fields in memory)",
                    f"{code}; workOn {res['workOn']!r}")
-        code, _res = set_props(served, note["path"], {}, remove=["ticketId"])
+        code, _res = set_props(served, task["path"], {}, remove=["ticketId"])
         run.report(code == 200 and info(served)["workOn"] is False and work_keys(served) == set(),
                    "and off again when the last Ticket ID is gone", f"{code}; workOn {info(served)['workOn']!r}")
+        # Steps on a task, with no Ticket ID, are work data too (a file written outside the app).
+        stepped = root / "Tasks" / "Badge audit.md"
+        stepped.write_text("---\ntype: 'Task'\ntitle: 'Badge audit'\nsteps:\n  - id: q4m2xa\n    kind: do\n"
+                           "    state: open\n    text: Walk the east door\n---\n", encoding="utf-8", newline="\n")
+        served.space.rescan_file("Tasks/Badge audit.md")
+        res = info(served)
+        run.report(res["workOn"] is True and res["workEnabled"] is None,
+                   "steps on a task turn the default on without a Ticket ID", f"workOn {res['workOn']!r}")
+        stepped.unlink()
+        served.space.rescan_file("Tasks/Badge audit.md")
+        run.report(info(served)["workOn"] is False, "and off again when that task is gone", f"workOn {info(served)['workOn']!r}")
         code, _res = served.http("POST", "/types", {"name": "Capture", "pluralName": "Captures"})
         res = info(served)
         run.report(code == 201 and res["workOn"] is True and res["workEnabled"] is None,
@@ -451,8 +556,11 @@ def check_starter_sets(run: Run, spaces: Spaces) -> None:
                    "\"basic\" adds only the Person, Meeting, Project and Book types (and its marker in space.json)",
                    f"{code}; {differ(start, basic)}")
         run.report(res["workOn"] is False and "workEnabled" not in config(root), "Work stays off after the basic set")
+        basic_at = stamped(root)
         code, _res = served.http("POST", "/space/setup", {"setup": "basic"})
-        run.report(code == 200 and tree(root) == basic, "\"basic\" again writes nothing", f"{code}; {differ(basic, tree(root))}")
+        run.report(code == 200 and stamped(root) == basic_at,
+                   "\"basic\" again writes nothing (no file's bytes, size or time changed, space.json included)",
+                   f"{code}; {differ(basic_at, stamped(root))}")
 
         code, res = served.http("POST", "/space/setup", {"setup": "itops"})
         itops = tree(root)
@@ -467,11 +575,13 @@ def check_starter_sets(run: Run, spaces: Spaces) -> None:
         cfg = config(root)
         run.report(cfg.get("setup") == "itops" and cfg.get("workEnabled") is True and res["workOn"] is True,
                    "the IT operations set turns Work on for the space (workEnabled: true)", f"{cfg}")
+        itops_at = stamped(root)
         code, _res = served.http("POST", "/space/setup", {"setup": "itops"})
-        run.report(code == 200 and tree(root) == itops, "\"itops\" again writes nothing", f"{code}; {differ(itops, tree(root))}")
+        run.report(code == 200 and stamped(root) == itops_at,
+                   "\"itops\" again writes nothing (bytes, size and time)", f"{code}; {differ(itops_at, stamped(root))}")
         code, _res = served.http("POST", "/space/setup", {"setup": "basic"})
-        run.report(code == 200 and tree(root) == itops and config(root).get("setup") == "itops",
-                   "a later \"basic\" keeps the itops marker and writes nothing", f"{code}; {differ(itops, tree(root))}")
+        run.report(code == 200 and stamped(root) == itops_at and config(root).get("setup") == "itops",
+                   "a later \"basic\" keeps the itops marker and writes nothing", f"{code}; {differ(itops_at, stamped(root))}")
         code, _res = served.http("POST", "/space/setup", {"setup": "everything"})
         run.report(code == 422 and tree(root) == itops, "an unknown set is 422", f"{code}")
     finally:
@@ -642,6 +752,149 @@ def check_title_once(run: Run, spaces: Spaces) -> None:
         served.stop()
 
 
+# -- 10. type files that already store the fields, with Work off -------------------------------
+
+
+def type_keys(served: Served, type_id: str) -> set[str]:
+    from objectapp.workfields import FIELD_KEYS
+
+    t = next(t for t in info(served)["types"] if t["id"] == type_id)
+    return {p["key"] for p in t["propertyDefinitions"]} & FIELD_KEYS
+
+
+def stored_keys(root: Path, type_id: str) -> list[str]:
+    data = json.loads((root / ".object" / "types" / f"{type_id}.json").read_text("utf-8"))
+    return [p["key"] for p in data["propertyDefinitions"]]
+
+
+def check_stored_fields(run: Run, spaces: Spaces) -> None:
+    print("\n10. Type files that already store the ticket and work fields, with Work off")
+    from objectapp.basicsetup import basic_types
+    from objectapp.typemodel import write_type_json
+    from objectapp.workfields import FIELD_KEYS, field_defs
+
+    # (a) a task.json that holds all 26 (a Task type saved while Work was on)
+    code, root = spaces.make("Stored task fields")
+    assert code == 201, code
+    task_json = root / ".object" / "types" / "task.json"
+    data = json.loads(task_json.read_text("utf-8"))
+    data["propertyDefinitions"] += [d.to_json() for d in field_defs(task=True, project_type_ids=[])]
+    task_json.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
+    held_keys = stored_keys(root, "task")
+    run.report(FIELD_KEYS <= set(held_keys), "the Task type file holds all 26 ticket and work fields", f"{len(held_keys)}")
+    before = stamped(root)
+    served = Served(root)
+    try:
+        res = info(served)
+        run.report(res["workOn"] is False and type_keys(served, "task") == set(),
+                   "with Work off the Task lists none of them (no value, none changed)",
+                   f"workOn {res['workOn']!r}; {sorted(type_keys(served, 'task'))}")
+        bad = read_all(served)
+        run.report(not bad and stamped(root) == before, "and the type file is unchanged: opening and reading wrote nothing",
+                   *bad, *differ(before, stamped(root)))
+        task = next(t for t in res["types"] if t["id"] == "task")
+        task["description"] = "Things to do"
+        code, saved = served.http("PUT", "/types/task", {"type": task, "baseRevision": task["revision"]})
+        after_save = stamped(root)
+        # (The first edit of a space also stores its id in space.json, as before M32.)
+        wrote = [k for k in differ(before, after_save) if k != SPACE_JSON]
+        run.report(code == 200 and wrote == [".object/types/task.json"] and stored_keys(root, "task") == held_keys
+                   and type_keys(served, "task") == set() and set(config(root)) <= {"name", "setup", "spaceId"},
+                   "saving the Task with Work off keeps every definition the file held, in its order, and lists none",
+                   f"{code}; {differ(before, after_save)}")
+        code, res = switch(served, True)
+        run.report(code == 200 and type_keys(served, "task") == FIELD_KEYS, "with Work on they are all listed again",
+                   f"{code}; {len(type_keys(served, 'task'))}")
+        code, res = switch(served, False)
+        run.report(code == 200 and type_keys(served, "task") == set()
+                   and differ(after_save, stamped(root)) == [SPACE_JSON],
+                   "and off again: none listed; on and off wrote only space.json", f"{code}; {differ(after_save, stamped(root))}")
+    finally:
+        served.stop()
+
+    # (b) a project.json as the basic set made it before M32
+    code, root = spaces.make("Old basic", "basic")
+    assert code == 201, code
+    project = next(t for t in basic_types(work=True) if t.id == "project")
+    (root / ".object" / "types" / "project.json").unlink()
+    write_type_json(root, project, "")
+    held_keys = stored_keys(root, "project")
+    run.report(FIELD_KEYS - {"project"} <= set(held_keys) and "completed" in held_keys,
+               "the Project type file holds the 25 ticket and work fields and completed (the pre-M32 basic set)",
+               f"{len(held_keys)}")
+    before = stamped(root)
+    served = Served(root)
+    try:
+        res = info(served)
+        run.report(res["workOn"] is False and res["workEnabled"] is None and type_keys(served, "project") == set()
+                   and type_keys(served, "task") == set(),
+                   "Work reads off and the Project lists none of them",
+                   f"workOn {res['workOn']!r}; {sorted(type_keys(served, 'project'))}")
+        bad = read_all(served)
+        run.report(not bad and stamped(root) == before, "opening and reading wrote nothing", *bad, *differ(before, stamped(root)))
+        made = create(served, "project", title="Garden")
+        created = stamped(root)
+        code, _res = set_props(served, made["path"], {"status": ["Completed"]})
+        fm = fm_of(root, made["path"])
+        wrote = [k for k in differ(created, stamped(root)) if k != SPACE_JSON]  # the space's id, on its first edit
+        run.report(code == 200 and fm.get("status") == "Completed" and bool(fm.get("completed"))
+                   and wrote == [made["path"]] and "workEnabled" not in config(root),
+                   "a Project marked done is stamped completed with Work off (only its own file changed)",
+                   f"{code}; completed {fm.get('completed')!r}; {differ(created, stamped(root))}")
+        code, _res = set_props(served, made["path"], {"status": ["Planned"]})
+        run.report(code == 200 and "completed" not in fm_of(root, made["path"]), "and reopened, the stamp is cleared", f"{code}")
+        types_before = {k: v for k, v in stamped(root).items() if k.startswith(".object/types/")}
+        code, _res = switch(served, True)
+        on_keys = type_keys(served, "project")
+        code2, _res = switch(served, False)
+        off_keys = type_keys(served, "project")
+        code3, _res = switch(served, True)
+        types_after = {k: v for k, v in stamped(root).items() if k.startswith(".object/types/")}
+        run.report((code, code2, code3) == (200, 200, 200) and on_keys == FIELD_KEYS - {"project"} and off_keys == set()
+                   and types_after == types_before,
+                   "Work on lists the 25 again, off none; on, off and on left every type file as it was",
+                   f"{len(on_keys)} on, {len(off_keys)} off; {differ(types_before, types_after)}")
+    finally:
+        served.stop()
+
+
+# -- 11. the Work agent's queue with Work off -------------------------------------------------
+
+
+def check_loop_off(run: Run, tmp: Path) -> None:
+    print("\n11. The Work agent's queue with Work off")
+    import time
+
+    root = copy_space("space-work", tmp / "loop-off")
+    served = Served(root)
+
+    def carrying() -> int:
+        code, res = served.http("GET", "/work/agent")
+        assert code == 200, (code, res)
+        return int(res["carrying"])
+
+    def settled(want: int, seconds: float) -> int:
+        end = time.monotonic() + seconds
+        while time.monotonic() < end and carrying() != want:
+            time.sleep(0.1)
+        return carrying()
+
+    try:
+        code, _res = switch(served, False)
+        base = carrying()
+        code2, cap = served.http("POST", "/work/captures", {"text": "a stray thought", "fromView": "now"})
+        time.sleep(1.0)  # the loop has had its chance
+        run.report(code == 200 and code2 == 201 and carrying() == base,
+                   "a brain dump saved while Work is off is saved and not queued for the Work agent",
+                   f"{code}, {code2}; carrying {carrying()} (was {base})")
+        code, _res = switch(served, True)
+        got = settled(base + 1, 15)
+        run.report(code == 200 and got == base + 1, "with Work on again it is queued (and waits: no agent is set here)",
+                   f"{code}; carrying {got} (was {base})")
+    finally:
+        served.stop()
+
+
 # -- main ----------------------------------------------------------------------------------
 
 
@@ -669,7 +922,9 @@ def main(argv: list[str] | None = None) -> int:
         check_daily_note(run, spaces)
         check_activity_name(run, tmp)
         check_title_once(run, spaces)
-        print("\n10. The fixtures")
+        check_stored_fields(run, spaces)
+        check_loop_off(run, tmp)
+        print("\n12. The fixtures")
         run.report(all(tree(FIXTURES / n) == fixtures_before[n] for n in FIXTURE_NAMES), "the fixture folders are unchanged")
     except Exception as exc:  # report a crash as a failure, then clean up
         run.report(False, f"the run stopped: {exc!r}")

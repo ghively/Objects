@@ -102,14 +102,23 @@ def on_work_write(
     removals: list[str],
     now: datetime,
     explicit: set[str],
+    *,
+    system: bool = True,
+    work_type: bool | None = None,
 ) -> None:
     """Infer System and stamp ``completed`` for a work type; edit ``sets``/``removals`` in place.
 
     ``fm`` is the front matter before the write, ``sets`` the encoded values about to be
     written, ``removals`` the keys about to be removed and ``explicit`` the keys the caller
     itself sets or removes (those keep the caller's value).
+
+    M32: a plain property write made while Work is off for the space passes ``system`` False
+    (no System is inferred) and says itself whether ``t`` is a work type (``work_type``: with
+    Work off its Steps may be in its file without being listed); ``completed`` is stamped and
+    cleared whatever the switch says.
     """
-    if t is None or not is_work_type(t):
+    if t is None or not (is_work_type(t) if work_type is None else work_type):
         return
-    _infer_system(t, fm, sets, explicit)
+    if system:
+        _infer_system(t, fm, sets, explicit)
     _stamp_completed(t, fm, sets, removals, now, explicit)

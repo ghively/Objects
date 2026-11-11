@@ -71,6 +71,7 @@ __all__ = [
     "WorkLoop",
     "loop_for",
     "on_change_event",
+    "wake_for",
     "outcome",
     "precheck",
     "run_timeout",
@@ -115,6 +116,15 @@ def on_change_event(space: Space, event: ChangeEvent) -> None:
         loop = _loops.get(WorkLoop._key(space))
     if loop is not None:
         loop.on_change(event)
+
+
+def wake_for(space: Space) -> None:
+    """Wake the space's loop, if it has one (M32: `server`'s ``PUT /api/space`` after the Work
+    switch moved, so what waited while Work was off is looked at now and not at the next poll)."""
+    with _loops_lock:
+        loop = _loops.get(WorkLoop._key(space))
+    if loop is not None:
+        loop.wake()
 
 
 def run_timeout() -> float:
@@ -300,7 +310,15 @@ class WorkLoop:
             time.sleep(0.05)
         return False
 
+    def _work_on(self) -> bool:
+        """M32: whether Work is on for the space (`Space.work_on`). While it is off the loop does
+        nothing of its own: no scan, no claim, no auto-run, and a new brain dump is not queued.
+        What is already pending is left as it is and runs once Work is on again."""
+        return self.space.work_on()
+
     def _usable(self) -> bool:
+        if not self._work_on():
+            return False
         settings = self.read_settings()
         if not settings.get("workAgentActs"):
             return False
@@ -375,7 +393,7 @@ class WorkLoop:
         go, then the item is looked at for auto-run as after a notice (decision S3). The writes of
         an agent's run or another program (``api:``), an automation's, the alert watch's and ones
         with no origin (made outside the app) count for nothing."""
-        if event.kind != "changed" or not _from_ui(event.origin):
+        if event.kind != "changed" or not _from_ui(event.origin) or not self._work_on():
             return
         path = event.path
         try:
@@ -486,6 +504,8 @@ class WorkLoop:
         return entry
 
     def _auto_check(self, path: str) -> bool:
+        if not self._work_on():
+            return False  # M32: nothing is queued again, held or run while Work is off
         item = self._item(path)
         if item is not None and not item.get("done"):
             self._requeue_approved(item)
@@ -533,7 +553,11 @@ class WorkLoop:
 
     # -- captures ----------------------------------------------------------------------------
 
-    def enqueue_capture(self, capture: dict, parsed: Any, item: dict | None) -> dict:
+    def enqueue_capture(self, capture: dict, parsed: Any, item: dict | None) -> dict | None:
+        """Queue a saved brain dump. M32: not while Work is off for the space (None); the scan
+        queues it once Work is on again, as it does one whose queueing failed."""
+        if not self._work_on():
+            return None
         with self._cap_lock:
             return self._enqueue_capture(capture, parsed, item)
 
@@ -570,7 +594,9 @@ class WorkLoop:
 
     def scan_unqueued_captures(self) -> int:
         """Queue each New brain dump nothing carries. One whose filing run failed is not queued again
-        by the scan until it changes or the app restarts."""
+        by the scan until it changes or the app restarts. M32: nothing while Work is off."""
+        if not self._work_on():
+            return 0
         count = 0
         for cap in captures.list_captures(self.space, "new"):
             with self._cap_lock:
@@ -650,12 +676,15 @@ class WorkLoop:
             try:
                 self._busy = True
                 self._passes += 1
-                try:
-                    self.scan_unqueued_captures()
-                except Exception:
-                    log.exception("Scanning for unqueued brain dumps failed")
-                self._requeue_changed()
-                ran = self._pass()
+                if self._work_on():  # M32: with Work off for the space the worker only waits
+                    try:
+                        self.scan_unqueued_captures()
+                    except Exception:
+                        log.exception("Scanning for unqueued brain dumps failed")
+                    self._requeue_changed()
+                    ran = self._pass()
+                else:
+                    ran = False
             except Exception:
                 log.exception("The work loop failed")
                 ran = False
@@ -667,7 +696,10 @@ class WorkLoop:
             self._wake.clear()
 
     def _pass(self) -> bool:
-        """Claim and run (or settle) the first due entry. True when the queue changed."""
+        """Claim and run (or settle) the first due entry. True when the queue changed. M32: with
+        Work off for the space nothing is claimed, settled or withdrawn."""
+        if not self._work_on():
+            return False
         settings = self.read_settings()
         if not settings.get("workAgentActs"):
             return False

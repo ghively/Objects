@@ -19,7 +19,7 @@ uv run python scripts/m32_acceptance.py [--keep]
 
 Every space the script touches is a new one in a temporary folder, made through `POST /api/spaces` the way the app's
 "Create space" dialog now calls it (`setup: 'blank'`), or a copy of a synthetic fixture: `space-blocks` (it never had a
-Task or a DailyNote type), `space-work` (its notes carry Ticket IDs) and `space-itops` (made by the IT operations
+Task or a DailyNote type), `space-work` (its tasks carry Ticket IDs and steps) and `space-itops` (made by the IT operations
 starter before M32). The fixtures are hashed before and after and never touched. `OBJECT_STATE_DIR` and
 `OBJECT_CACHE_DIR` point at temporary folders outside every space, so "nothing was written" is a comparison of the
 whole space folder, dot folders included. `create_app` is served on a free `127.0.0.1` port per space. No agent, no
@@ -38,13 +38,16 @@ screen, so it is in the hand checks):
    listed with no file behind them; opening, listing and reading leave the whole folder byte for byte the same; the
    first task writes `task.json` and its `.md` only (no ticket field in the type file, an empty body), a second task
    only its `.md`, and the DailyNote type stays unwritten. Ticking the task with the built-in Done status stamps
-   `completed`, and only its `status`, `completed` and `lastUpdated` lines change.
+   `completed`, and only its `status`, `completed` and `lastUpdated` lines change. A daily note refused because a
+   file of another kind holds its name (409) writes nothing, not the DailyNote type either (the fix pass).
 3. **The Work switch's default** (item 10). Off on a plain new space. On, with no switch stored and nothing written by
-   reading, for `space-work` (Ticket IDs; the Task has all 26 ticket and work fields and "Tickets" is listed) and
-   `space-itops` (the starter's marker). A new space made with the IT operations starter stores `workEnabled: true`.
-   In a plain space a Ticket ID put on a note turns the default on and taking it off turns it off again; a type named
-   Capture turns it on; `space.json` never gains a `workEnabled` from any of this (the first edit of a space adds
-   only its `spaceId`, as before M32).
+   reading, for `space-work` (its tasks hold ticket and work values; the Task has all 26 ticket and work fields and
+   "Tickets" is listed) and `space-itops` (the starter's marker). A new space made with the IT operations starter
+   stores `workEnabled: true`. In a plain space (the fix pass) a "Ticket ID" on a note of the user's own type (a
+   Flight) or on a Note does not turn Work on; a Ticket ID put on a Task turns the default on and taking it off
+   turns it off again; steps on a task turn it on without a Ticket ID; a type named Capture turns it on;
+   `space.json` never gains a `workEnabled` from any of this (the first edit of a space adds only its `spaceId`, as
+   before M32).
 4. **The Work switch set by hand** (item 10). `PUT /api/space` with `workEnabled` true, then false, then true: each
    writes only `.object/space.json`. On: every ticket and work field and the "Tickets" saved search. A Requester is
    given to one task. Off: the Task lists exactly that one field (the value is still on its task and read back; the
@@ -53,7 +56,9 @@ screen, so it is in the hand checks):
 5. **Starter sets after the start** (item 12). In a space that already started: `blank` is 409; `basic` adds only
    the Person, Meeting, Project and Book types and leaves Work off; again, it writes nothing; `itops` then adds only
    the types the space lacks (14), with their templates and seed Tags, replaces nothing and turns Work on
-   (`workEnabled: true`); again, nothing; a later `basic` keeps the `itops` marker; an unknown set is 422.
+   (`workEnabled: true`); again, nothing; a later `basic` keeps the `itops` marker; an unknown set is 422. "Writes
+   nothing" for the repeats compares every file's hash, size and modification time, `space.json` included (the fix
+   pass: a repeat used to write `space.json` again with the same bytes).
 6. **The type gallery** (item 12). `GET /api/type-gallery` opens with the `personal` section (Idea, Goal, Habit,
    Recipe, Trip, Journal entry), ends with the IT operations entries, and only those are `collapsed`; with Work off
    its Project lists no ticket field; reading writes nothing. Adding Recipe makes its type (Cover image, Servings,
@@ -69,7 +74,20 @@ screen, so it is in the hand checks):
    made with a title has no `# <title>` line in its body; a line turned into a task keeps its children as the body
    with no heading above them; a body sent with the create is kept as sent; a type whose default template has an
    empty body gives an empty body, and one with text gives that text.
-10. The fixture folders are unchanged.
+10. **Type files that already store the ticket and work fields, with Work off** (the fix pass). A `task.json` that
+    holds all 26 (a Task saved while Work was on): the Task lists none of them, the file is not rewritten, a save of
+    the Task with Work off keeps every definition the file held in its order, and Work on lists them all again. A
+    `project.json` as the basic set made it before M32 (the 25 fields and `completed`): Work reads off, the Project
+    lists none, nothing is written; a Project marked done is stamped `completed` and reopened it is cleared; on, off
+    and on again leave every type file as it was.
+11. **The Work agent's queue with Work off** (the fix pass; a copy of `space-work`). A brain dump saved while Work
+    is off is saved and not queued; with Work on again it is queued. No agent is set in the script, so nothing runs
+    there: that an entry already pending waits while Work is off and runs once it is on again, and that no step is
+    auto-run, is `backend/tests/test_m32_fix_loop.py` (the M24 loop fixture and the fake `claude`).
+12. The fixture folders are unchanged.
+
+"Reading wrote nothing" in checks 1, 2, 3, 4 and 10 now also asks the `/api/tasks/*` and `/api/work/*` GET routes
+and the daily-note reads (the list, the rows, a daily note itself, the DailyNote type's views).
 
 ## Automated results
 
@@ -188,14 +206,29 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
     first task or daily note. A type of that id, name or former name stays the only one.
 22. `blank` is refused once a space has a start; `basic` and `itops` can be added later and write only the types the
     space lacks, by id and by name; a later `basic` keeps an `itops` marker.
-23. The Work default is worked out from the data each time: taking the last Ticket ID off turns it off again, until
-    the switch is set by hand.
-24. With Work off a ticket or work field is on the Task exactly when it is saved in `task.json` or some Task holds a
-    value for it: the switch never hides a value and drops no saved definition.
-25. With Work off a plain property write does not run the work hook and the Work loop is not told of edits; the work
-    routes themselves answer as before when called.
+23. The Work default follows the data, until the switch is set by hand. Work data is (the fix pass): a value for a
+    built-in ticket or work field (a Ticket ID, steps, a Requester…) on a note of the basic Task or of a work type, a
+    Capture or an Alert type, or the IT starter's marker. A `ticketId` on a note of any other type is the user's own
+    property and counts for nothing. Taking the last such value off turns the default off again. The answer is a
+    flag kept where notes are indexed, not a scan per request; when it flips, the windows are told (`types` and
+    `queries` on the event stream, as `PUT /api/space` sends them).
+24. With Work off (the fix pass) one rule for the basic Task and every work type: a built-in ticket or work field is
+    listed only when some note of the type holds a value for it, or its stored definition differs from the built-in
+    one (the user changed it). An unchanged one without a value is left out of what the type lists, whatever the
+    type file holds; the file is not rewritten for it, and a save made with Work off keeps those definitions in the
+    file, in their order. The switch never hides a value and drops no saved definition. A type written for its first
+    use (the first task of an older space) stores none of the fields a load tops up; a save of the Task made while
+    Work is on still stores them (M4's rule, as before M32), which no longer matters once Work is off.
+25. With Work off a plain property write does not infer the System from a Ticket ID; a work type's `completed` is
+    still stamped when its status reaches the done stage and cleared on reopen, as before M32 (the fix pass). The
+    Work loop is not told of edits and (the fix pass) does nothing of its own: it claims no entry, scans nothing,
+    auto-runs no step and queues no new brain dump; what is already pending waits and runs once Work is on again.
+    The work routes themselves answer as before when called, for a note whose type lists Steps (with Work off: some
+    note of the type has a step); for any other they answer "This object has no work fields.", as they do for a
+    plain task.
 26. The IT operations starter stores `workEnabled: true` unless the user already set the switch.
-27. The basic set's Project and the gallery's Project carry the ticket and work fields only while Work is on.
+27. The basic set's Project and the gallery's Project are made with the ticket and work fields only while Work is on;
+    a Project that has them in its file (made before M32, or while Work was on) lists them by call 24's rule.
 28. An empty `activityName` reads "You" where the name is shown and "the user" in an agent's prompt ("You approved
     this step" would read as the agent's own approval).
 29. `POST /api/daily-notes` for a day that has its note answers 200 with `existing: true`; the client still treats
@@ -233,6 +266,14 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
 
 42. A new note's body no longer opens with `# <title>` (the section above).
 
+**The fix pass**
+
+43. A note whose front matter has neither `lastUpdated` nor `createdAt` (a `.md` put into the folder by hand or by
+    another tool) reads its file's modification time as `lastUpdated` in the summaries the app's lists read
+    (`GET /api/objects`, and the `summary` of `GET /api/object`), in the form of Object's own stamps, so it has its
+    place in Notes and in Home's Recent. Nothing is written to the file for it; the rows, saved searches, formulas
+    and `/api/v1` still see no `lastUpdated` for such a note.
+
 ## Known limits
 
 - Notes made before this change that open with `# <title>` keep that line (no file is rewritten), so those show
@@ -242,6 +283,15 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
   Two editors on one path share one save state.
 - Raw mode has no title-to-body caret placement and no way back to the title by key.
 - The Work default follows the data (call 23).
+- A type of the user's own named "Capture" turns the Work default on: the Capture type is found by its name, as
+  before M32 (`captures.find_capture_type`). Setting the switch off in Settings > Work settles it.
+- A space with a type of the user's own named Task (not the basic one), or with any type whose id is `task`, keeps
+  that type as the only one: the built-in Task is not offered beside it (call 21), so such a space has no built-in
+  task fields until that type is renamed.
+- With Work off a value put on a ticket or work field the type does not list (through the API, or in the file) is
+  written as it is given (a plain value or a list; the picker's `{start, …}` form of a date is refused), not through
+  the field's kind; the field is listed and read by its kind from then on. This was so for the Task before the fix
+  pass, and is now so for a work type's unlisted fields too.
 - `> ` is a toggle, `| ` a quote (call 1).
 - `m24_acceptance.py` gives its fake agent run 3 seconds; on a loaded machine two of its checks can fail for that
   reason alone (see the results above).
@@ -253,13 +303,14 @@ On a copy of a space, or a new one, in the app. The groups follow the analysis's
 **First launch of a new space**
 
 - [ ] "Create space" asks for a name and a folder only (plus "Import from…" and "Do I need a new space?"); no question about a starting point. Switching to it opens Home and nothing is asked.
-- [ ] Opening an empty folder as a space asks nothing, and the folder stays empty until you make something.
+- [ ] Opening an empty folder as a space asks nothing, and no note or visible file is made until you make something (the hidden `.object/types/page.json` and `tag.json` are written, as before M32).
 - [ ] In the new space the sidebar reads Notes, Calendar, Tasks (no Work), and "New task" and "Add a task" work at once.
 
 **Landing on Home**
 
 - [ ] A new tab (`+` or Ctrl+T) and the first open show Home: "New note", "Today's note", "Recent" (the last 12 notes edited, newest first, daily notes included) and "Tasks" (overdue and today; a tick completes one; "Nothing due today." when there is none).
 - [ ] An empty space's Home says "Nothing here yet. Start a note, or open today." above the two buttons.
+- [ ] A `.md` file dropped into the space's folder by hand shows in Notes and in Home's Recent, placed by the file's date; the file itself is not changed by that.
 - [ ] Settings > Editor > "When this space opens" offers Home, and "Where I left off" with nothing to restore lands on Home.
 
 **A new note, by mouse and by key**

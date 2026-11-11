@@ -96,7 +96,13 @@ from .spaceconfig import work_on as config_work_on
 from .recurrence import week_start_of
 from .taskhook import TaskResult, on_status_change
 from .workfields import FIELD_KEYS as WORK_FIELD_KEYS
-from .workfields import topup_work_fields, work_type_ids
+from .workfields import (
+    field_defs,
+    is_work_type,
+    project_type_ids,
+    topup_work_fields,
+    work_type_ids,
+)
 from .workhook import STEPS_GATED, on_work_write
 from .workview import BUILT_IN as TICKETS_BUILT_IN
 from .workview import TICKETS_ID, apply_types, for_storage, tickets_default
@@ -916,6 +922,46 @@ def _refuse_synced(pdef: PropertyDefinition | None) -> None:
         raise InvalidValue(SYNCED_READ_ONLY.format(name=pdef.name, source=pdef.synced.source))
 
 
+_HiddenFields = list[tuple[str | None, PropertyDefinition]]
+"""M32: the ticket and work field definitions a type's file holds that are not listed while
+Work is off, in the file's order, each with the key of the definition stored just before it."""
+
+
+def _same_field(p: PropertyDefinition, builtin: PropertyDefinition) -> bool:
+    """Whether ``p`` is the built-in ticket or work field as `workfields.field_defs` makes it
+    (the user changed nothing about it). Project's ``allowedTypes`` are left out: the app fills
+    them with the space's Project types of the moment the definition was made."""
+    a, b = p.to_json(), builtin.to_json()
+    if p.key == "project":
+        for data in (a, b):
+            if isinstance(data.get("options"), dict):
+                data["options"].pop("allowedTypes", None)
+    return a == b
+
+
+def _merge_hidden(
+    defs: list[PropertyDefinition], hidden: _HiddenFields
+) -> list[PropertyDefinition]:
+    """``defs`` with each of ``hidden`` it lacks put back where its file had it: right after
+    the definition stored before it (at the end when that one is gone)."""
+    out = list(defs)
+    have = {p.key for p in out} | {p.id for p in out}
+    for after, p in hidden:
+        if p.key in have or p.id in have:
+            continue  # the list has its own definition of that key: it stands
+        at = len(out)
+        if after is None:
+            at = 0
+        else:
+            for i, q in enumerate(out):
+                if q.key == after:
+                    at = i + 1
+                    break
+        out.insert(at, p)
+        have |= {p.key, p.id}
+    return out
+
+
 def _fm_has_value(value: object) -> bool:
     """Whether a front matter value is one: None, an empty or blank text and an empty list or
     map are not (M32: the Work switch's "this field has a value" and "a Ticket ID")."""
@@ -1021,6 +1067,7 @@ class Space:
 
     def _forget_type_ids(self) -> None:
         self._type_ids = None
+        self._work_data = None  # M32: which notes are work data depends on the types
 
     @property
     def name(self) -> str:
@@ -1048,9 +1095,27 @@ class Space:
         """(`space.json`'s stat key, the name read with it) for `name`."""
         self._config_cache: tuple[tuple | None, dict[str, Any]] | None = None
         """(`space.json`'s stat key, the data read with it) for `work_on` (M32)."""
-        self._ticket_paths: set[str] = set()
-        """M32: the notes that hold a Ticket ID (``ticketId`` with a value), kept by every
-        rescan: part of the Work switch's default (`_has_work_data`)."""
+        self._work_values: dict[str, tuple[str, frozenset[str]]] = {}
+        """M32: path -> (the note's type name, the ticket and work field keys it holds a value
+        for), for the notes that hold one; kept by every rescan (`_note_work_values`). Behind
+        the Work switch's default (`_has_work_data`) and the fields listed with Work off."""
+        self._work_data: bool | None = None
+        """M32: `_has_work_data`'s answer, worked out again only after the index above or the
+        types changed (so `work_on` stays a lookup)."""
+        self.file_times: dict[str, str] = {}
+        """M32: path -> the file's modification time as a stamp (`now_stamp`'s form), for the
+        notes whose front matter holds neither ``lastUpdated`` nor ``createdAt`` (a ``.md``
+        put into the folder by hand or by another tool). Kept by every rescan
+        (`_note_file_time`: one stat when such a file is read, none per request); the
+        summaries the app's lists read show it as ``lastUpdated`` (`server`), so the note
+        has its place in Notes and Home's Recent. Never written to the file."""
+        self._hidden_fields: dict[str, _HiddenFields] = {}
+        """M32: type id -> the built-in ticket and work fields its file holds that are not
+        listed while Work is off (`_hide_work_fields`); a type write puts them back
+        (`_write_type_json`), so the file keeps them."""
+        self.work_listing_rev = 0
+        """M32: bumped whenever a type's listed ticket and work fields changed in memory (the
+        Work switch moved, a value came or went); `server` tells the windows."""
         self._work_applied: bool | None = None
         """M32: the Work switch the in-memory Task type was last topped up for (None while
         the space is loading); `work_on` follows a change (`_follow_work_switch`)."""
@@ -1107,10 +1172,14 @@ class Space:
         self._add_placeholders(inferred)
         self._merge_types(inferred)
         self._add_on_demand_types()
-        self._ticket_paths = {
-            rel for rel, raw in self._raw.items() if _fm_has_value(raw.fm.get("ticketId"))
-        }
-        # M32: the Task type gets every ticket and work field only while Work is on.
+        for rel, raw in self._raw.items():
+            entry = self._work_entry(raw)
+            if entry is not None:
+                self._work_values[rel] = entry
+            self._note_file_time(rel, raw)
+        self._work_data = None
+        # M32: the Task type gets every ticket and work field only while Work is on; with Work
+        # off a type lists only those with a value or that the user changed (`_top_up`).
         self._work_applied = config_work_on(self._space_config(), self._has_work_data())
         for t in self.types:
             self._top_up(t)
@@ -1200,27 +1269,82 @@ class Space:
         self._config_cache = (key, data)
         return data
 
+    def _work_entry(self, raw: RawObject) -> tuple[str, frozenset[str]] | None:
+        """`_work_values`' entry for a note: its type name and the ticket and work field keys it
+        holds a value for (an empty text or list is no value); None when it holds none."""
+        hit = WORK_FIELD_KEYS & raw.fm.keys()
+        if not hit:
+            return None
+        valued = frozenset(k for k in hit if _fm_has_value(raw.fm[k]))
+        return (raw.typeName, valued) if valued else None
+
+    def _note_file_time(self, rel: str, raw: RawObject | None) -> None:
+        """Keep `file_times` for ``rel`` (``raw`` None: the file is gone). Reads the file's
+        time only when its front matter has no stamp of its own; never writes."""
+        if raw is None or _str_or_none(raw.fm.get("lastUpdated")) or _str_or_none(raw.fm.get("createdAt")):
+            self.file_times.pop(rel, None)
+            return
+        try:
+            ns = os.stat(self.root / rel).st_mtime_ns
+        except OSError:
+            self.file_times.pop(rel, None)
+            return
+        millis = ns // 1_000_000
+        at = datetime.fromtimestamp(millis // 1000, UTC).replace(microsecond=(millis % 1000) * 1000)
+        self.file_times[rel] = now_stamp(at)
+
+    def _hidden_steps(self, type_id: str) -> bool:
+        """Whether the type's file holds a Steps property that is not listed (Work is off)."""
+        return any(
+            p.key == "steps" and p.type == "steps" for _a, p in self._hidden_fields.get(type_id, ())
+        )
+
+    def _is_work_kind(self, t: TypeDefinition | None) -> bool:
+        """The basic Task or a work type (`workfields.is_work_type`), whether or not its Steps
+        are listed just now: with Work off they are not while no note has a step."""
+        return t is not None and (is_task_type(t) or is_work_type(t) or self._hidden_steps(t.id))
+
     def _has_work_data(self) -> bool:
-        """Whether the space already holds work data: a Ticket ID on any note, a Capture type
-        (`captures.find_capture_type`: a type named "Capture") or an Alert type
-        (`alerttype.is_alert_type`). Memory only: the index every rescan keeps and the types."""
-        if self._ticket_paths:
-            return True
+        """Whether the space already holds work data: a Task or a work type's note holds a
+        value for a built-in ticket or work field (a Ticket ID, steps, a Requester…), or the
+        space has a Capture type (`captures.find_capture_type`: a type named "Capture") or an
+        Alert type (`alerttype.is_alert_type`). A ``ticketId`` on a note of any other type is
+        the user's own property and counts for nothing. Memory only, and worked out again
+        only after a rescan changed which notes hold such a value, or the types changed."""
+        found = self._work_data
+        if found is None:
+            with self._lock:
+                found = self._work_data = self._find_work_data()
+        return found
+
+    def _find_work_data(self) -> bool:
         from .alerttype import is_alert_type
         from .captures import CAPTURE_TYPE_NAME
 
         capture = CAPTURE_TYPE_NAME.casefold()
-        return any(t.name.casefold() == capture or is_alert_type(t) for t in self.types)
+        if any(t.name.casefold() == capture or is_alert_type(t) for t in self.types):
+            return True
+        if not self._work_values:
+            return False
+        tasks = {t.id for t in self.types if is_task_type(t)}
+        kinds = tasks | {t.id for t in self.types if self._is_work_kind(t)}
+        for type_name, valued in self._work_values.values():
+            type_id = self._type_id(type_name)
+            # Project (the relation to a Project) is a built-in field of the Task only.
+            if type_id in kinds and (type_id in tasks or valued - {"project"}):
+                return True
+        return False
 
     def work_on(self) -> bool:
         """M32: whether Work is on for this space (`spaceconfig.work_on`).
 
         ``space.json``'s ``workEnabled`` when it is true or false; else the default: on when
         the space already holds work data (the IT operations starter's marker, a Capture or an
-        Alert type, a Ticket ID on any note), off otherwise. Reads ``space.json`` (only when
-        its stat changed) and memory; never writes a file, so the default is not stored by
-        being read. When the answer changed since the Task type was last topped up, the type
-        follows in memory at once (`_follow_work_switch`).
+        Alert type, a value for a ticket or work field on a Task or a work type's note:
+        `_has_work_data`), off otherwise. Reads ``space.json`` (only when its stat changed)
+        and a flag kept in memory; never writes a file, so the default is not stored by being
+        read. When the answer changed since the types were last listed for it, they follow in
+        memory at once (`_follow_work_switch`).
         """
         on = config_work_on(self._space_config(), self._has_work_data())
         if self._work_applied is not None and on != self._work_applied:
@@ -1229,83 +1353,140 @@ class Space:
 
     def _valued_work_keys(self, type_id: str) -> set[str]:
         """The ticket and work field keys some object of the type holds a value for (templates
-        included; an empty text or list is no value). Memory only."""
-        keys: set[str] = set()
+        included; an empty text or list is no value). Memory only (`_work_values`)."""
         with self._lock:
-            raws = list(self._raw.values())
-        for raw in raws:
-            hit = WORK_FIELD_KEYS & raw.fm.keys()
-            if hit and self._type_id(raw.typeName) == type_id:
-                keys |= {k for k in hit if _fm_has_value(raw.fm[k])}
+            entries = list(self._work_values.values())
+        keys: set[str] = set()
+        for type_name, valued in entries:
+            if self._type_id(type_name) == type_id:
+                keys |= valued
         return keys
 
+    def _builtin_work_fields(self, t: TypeDefinition) -> dict[str, PropertyDefinition]:
+        """The built-in ticket and work fields of ``t`` by key (Project on the Task only)."""
+        task = is_task_type(t)
+        projects = project_type_ids(self.types) if task else []
+        return {d.key: d for d in field_defs(task=task, project_type_ids=projects)}
+
+    def _hide_work_fields(self, t: TypeDefinition, *, from_file: bool) -> None:
+        """Work is off: take out of ``t`` (the basic Task or a work type, holding every
+        definition it has) the built-in ticket and work fields that no note of the type holds
+        a value for and the user did not change (`_same_field`), and remember them
+        (`_hidden_fields`) so that a type write keeps them in the file and Work on lists them
+        again. A field with a value, and one whose definition differs from the built-in one,
+        stays listed. Memory only.
+
+        ``from_file`` False: ``t`` is the in-memory type, where the Task also holds fields
+        topped up in memory; those its file doesn't hold are dropped, not remembered.
+        """
+        if not (is_task_type(t) or is_work_type(t)):
+            self._hidden_fields.pop(t.id, None)
+            return
+        builtin = self._builtin_work_fields(t)
+        valued = self._valued_work_keys(t.id)
+        hidden: _HiddenFields = []
+        kept: list[PropertyDefinition] = []
+        after: str | None = None
+        for p in t.propertyDefinitions:
+            d = builtin.get(p.key)
+            if d is not None and p.key not in valued and _same_field(p, d):
+                hidden.append((after, p))
+            else:
+                kept.append(p)
+            after = p.key
+        if hidden and is_task_type(t) and not from_file:
+            stored = self._stored_type(t.id)
+            in_file = {p.key for p in stored.propertyDefinitions} if stored is not None else set()
+            hidden = [(a, p) for a, p in hidden if p.key in in_file]
+        t.propertyDefinitions = kept
+        if hidden:
+            self._hidden_fields[t.id] = hidden
+        else:
+            self._hidden_fields.pop(t.id, None)
+
+    def _show_work_fields(self, t: TypeDefinition) -> None:
+        """Put the definitions `_hide_work_fields` took out of ``t`` back where its file has
+        them. Memory only."""
+        hidden = self._hidden_fields.pop(t.id, None)
+        if hidden:
+            t.propertyDefinitions = _merge_hidden(t.propertyDefinitions, hidden)
+
     def _top_up(self, t: TypeDefinition) -> TypeDefinition:
-        """Give ``t`` the fields a load tops up, in memory; return it. Never writes.
+        """Give ``t`` (as its file holds it) the fields a load tops up and list its ticket and
+        work fields as the Work switch says, in memory; return it. Never writes.
 
         The Task fields (`topup_task_type`), and for the basic Task M22's ticket and work
-        fields: all of them while Work is on (as before M32). With Work off (M32) only those
-        some Task holds a value for; the ones saved in the type's file are in ``t`` already.
-        So the rule is: **a ticket or work field (Steps and Project included) is on the Task
-        with Work off exactly when it is saved in ``task.json`` or some Task has a value for
-        it** - the switch never hides a value and never drops a saved definition.
+        fields: all of them while Work is on (as before M32).
+
+        With Work off (M32) one rule for the basic Task and every work type: **a built-in
+        ticket or work field (Steps and Project included) is listed only when some note of
+        the type holds a value for it, or its stored definition differs from the built-in
+        one (the user changed it).** The unchanged ones without a value are left out of what
+        the type lists, whatever its file holds (`_hide_work_fields`); the file is not
+        rewritten for it and keeps them (`_write_type_json`). The switch never hides a value.
         """
         topup_task_type(t)
-        if not is_task_type(t):
-            return t
         if self.work_on():
+            self._hidden_fields.pop(t.id, None)
             return topup_work_fields(t, self.types)
-        return topup_work_fields(t, self.types, only=self._valued_work_keys(t.id))
+        self._hide_work_fields(t, from_file=True)
+        if is_task_type(t):
+            topup_work_fields(t, self.types, only=self._valued_work_keys(t.id))
+        return t
 
     def _follow_work_switch(self, on: bool) -> None:
-        """Bring the in-memory Task type in line with a Work switch that changed (the user
-        set it, or the default moved with the space's data). On: the missing ticket and work
-        fields are added. Off: those neither saved in the type's file nor holding a value on
-        any Task go (`_top_up`'s rule). Memory only; no file is written either way."""
+        """Bring the in-memory types in line with a Work switch that changed (the user set
+        it, or the default moved with the space's data). On: every definition a type's file
+        holds is listed again and the Task gets the ticket and work fields it lacks. Off:
+        the unchanged ones no note holds a value for go (`_top_up`'s rule). Memory only; no
+        file is written either way."""
         with self._lock:
             if on == self._work_applied:
                 return
             self._work_applied = on
             for t in list(self.types):
-                if not is_task_type(t) or t.readOnlyReason:
+                if t.readOnlyReason:
                     continue
-                before = [p.key for p in t.propertyDefinitions]
-                if on:
-                    topup_work_fields(t, self.types)
-                else:
-                    stored = self._stored_type(t.id)
-                    keep = {p.key for p in stored.propertyDefinitions} if stored else set()
-                    keep |= self._valued_work_keys(t.id)
-                    t.propertyDefinitions = [
-                        p
-                        for p in t.propertyDefinitions
-                        if p.key not in WORK_FIELD_KEYS or p.key in keep
-                    ]
-                if [p.key for p in t.propertyDefinitions] != before:
-                    self._types_changed(t.id)
+                self._relist(t, on)
+
+    def _relist(self, t: TypeDefinition, on: bool) -> None:
+        """List ``t``'s ticket and work fields for the Work switch ``on`` (see `_top_up`),
+        starting from every definition it has; the listeners hear of a change."""
+        if not self._is_work_kind(t):
+            return
+        before = [p.key for p in t.propertyDefinitions]
+        self._show_work_fields(t)
+        if on:
+            topup_work_fields(t, self.types)
+        else:
+            topup_work_fields(t, self.types, only=self._valued_work_keys(t.id))
+            self._hide_work_fields(t, from_file=False)
+        if [p.key for p in t.propertyDefinitions] != before:
+            self.work_listing_rev += 1
+            self._types_changed(t.id)
 
     def _note_work_values(self, rel: str, raw: RawObject | None) -> None:
-        """M32, on every rescan of ``rel`` (``raw`` None: the file is gone): keep the Ticket ID
-        index behind the Work default, and with Work off give the Task type the definition
-        of a ticket or work field this Task now holds a value for (a value written outside
-        the app is never left without its property)."""
-        had = bool(self._ticket_paths)
-        if raw is not None and _fm_has_value(raw.fm.get("ticketId")):
-            self._ticket_paths.add(rel)
+        """M32, on every rescan of ``rel`` (``raw`` None: the file is gone): keep the index of
+        ticket and work field values behind the Work default (`_work_values`); and with Work
+        off, list the fields of the note's type again when the keys it holds a value for
+        changed: a value written outside the app is never left without its property, and a
+        field whose last value went is no longer listed."""
+        old = self._work_values.get(rel)
+        new = self._work_entry(raw) if raw is not None else None
+        if new == old:
+            return
+        if new is None:
+            del self._work_values[rel]
         else:
-            self._ticket_paths.discard(rel)
-        if bool(self._ticket_paths) != had:
-            self.work_on()  # the default may have moved: the Task type follows
-        hit = WORK_FIELD_KEYS & raw.fm.keys() if raw is not None else None
-        if not hit or self._work_applied is not False:
+            self._work_values[rel] = new
+        self._work_data = None
+        self.work_on()  # the default may have moved: the types follow
+        if self._work_applied is not False:
             return
-        t = self.type_by_id(self._type_id(raw.typeName))
-        if not is_task_type(t):
-            return
-        have = {p.key for p in t.propertyDefinitions}
-        new = {k for k in hit if k not in have and _fm_has_value(raw.fm[k])}
-        if new:
-            topup_work_fields(t, self.types, only=new)
-            self._types_changed(t.id)
+        for type_id in {self._type_id(entry[0]) for entry in (old, new) if entry is not None}:
+            t = self.type_by_id(type_id)
+            if t is not None and not t.readOnlyReason:
+                self._relist(t, False)
 
     def refresh_type(self, type_id: str) -> tuple[TypeDefinition | None, str]:
         """The type and its file's revision, reloading it when the file changed outside the app.
@@ -1620,7 +1801,16 @@ class Space:
         raise AssertionError("unreachable")
 
     def _write_type_json(self, t: TypeDefinition, base_revision: str) -> str:
-        """`write_type_json` with the version-history hook (the type file's bytes before the save)."""
+        """`write_type_json` with the version-history hook (the type file's bytes before the save).
+
+        M32: the ticket and work fields that are in the type's file but not listed while Work
+        is off (`_hidden_fields`) are put back where the file had them, so no type write made
+        with Work off takes a definition out of the file."""
+        hidden = self._hidden_fields.get(t.id)
+        if hidden:
+            full = copy.copy(t)
+            full.propertyDefinitions = _merge_hidden(t.propertyDefinitions, hidden)
+            t = full
         return write_type_json(self.root, t, base_revision, before_write=self._call_before_write)
 
     def _call_before_write(self, rel: str, data: bytes, object_id: str | None = None) -> None:
@@ -3001,7 +3191,10 @@ class Space:
 
         ``task[0]`` receives the Task hook's result; ``requested`` the asked-for values a
         recurrence replaced. M32: ``work`` False (a generic property write while Work is off
-        for the space) leaves the work hook out; the work service's own write always runs it.
+        for the space) leaves out the System inferred from a Ticket ID; a work type's
+        ``completed`` is stamped and cleared whatever the switch says, as before M32 (with
+        Work off its Steps may be in its file without being listed: `_is_work_kind`). The
+        work service's own write always runs the whole hook.
         """
 
         def hook(fm: dict, sets: dict[str, Any], removals: list[str]) -> None:
@@ -3016,6 +3209,11 @@ class Space:
                 requested.update({k: v for k, v in asked.items() if sets.get(k) != v})
             if work:
                 on_work_write(t, fm, sets, removals, now, explicit)
+            else:
+                on_work_write(
+                    t, fm, sets, removals, now, explicit,
+                    system=False, work_type=self._is_work_kind(t),
+                )
 
         return hook
 
@@ -3447,10 +3645,12 @@ class Space:
             self._raw.pop(rel, None)
             gone = self._summaries.pop(rel, None)
             self._checked_rels.discard(rel)
-            if rel in self._ticket_paths:
-                # M32: the Ticket ID moves with the file (the rescan below reads it again).
-                self._ticket_paths.discard(rel)
-                self._ticket_paths.add(new_rel)
+            self.file_times.pop(rel, None)
+            entry = self._work_values.pop(rel, None)
+            if entry is not None:
+                # M32: its ticket and work values move with the file (the rescan below reads
+                # them again), so the Work default does not flicker in between.
+                self._work_values[new_rel] = entry
             if gone is not None:
                 self._names_changed(gone, None)
             self._fire(SpaceChange("object", rel))
@@ -3921,12 +4121,26 @@ class Space:
     # -- create ---------------------------------------------------------------
 
     def _persist_type(self, t: TypeDefinition) -> bool:
-        """Write an inferred-only type's JSON (the first time it is used); True if written."""
+        """Write an inferred-only type's JSON (the first time it is used); True if written.
+
+        M32: the basic Task is written without the built-in ticket and work fields it was
+        topped up with in memory (all of them while Work is on): a load adds them again
+        while Work is on, and storing them is what would keep them on the Task for good. One
+        the user changed is written."""
         if t.readOnlyReason or type_revision(self.root, t.id):
             return False
+        out = t
+        if is_task_type(t):
+            builtin = self._builtin_work_fields(t)
+            out = copy.copy(t)
+            out.propertyDefinitions = [
+                p
+                for p in t.propertyDefinitions
+                if not (p.key in builtin and _same_field(p, builtin[p.key]))
+            ]
         try:
             self._check_type_free(t.id)
-            self._write_type_json(t, "")
+            self._write_type_json(out, "")
         except (RevisionConflict, TypeReadOnly):
             return False
         self._types_changed(t.id)
@@ -4034,7 +4248,6 @@ class Space:
         data = join_object(of).encode("utf-8")
         version = version_of(data)
         with self._lock:
-            self._persist_type(t)
             folder = t.folder.strip("/")
             (self.root / folder).mkdir(parents=True, exist_ok=True)
             free = unique_path
@@ -4048,6 +4261,9 @@ class Space:
                     break
             else:
                 raise OSError(f"Could not find a free file name for {stem!r}")
+            # A type used for the first time is written once its object is (M32 fix pass: a
+            # create that fails leaves no type file behind).
+            self._persist_type(t)
         self._call_after_write(self._created_notice(rel))
         return rel, version
 
@@ -4333,10 +4549,11 @@ class Space:
             data = join_object(of).encode("utf-8")
             folder = t.folder.strip("/") or "DailyNotes"
             rel = f"{folder}/{day}.md"
-            self._persist_type(t)
             placed = self._place(rel, data)
             if not placed:
-                self._daily_note_taken(rel, day)
+                self._daily_note_taken(rel, day)  # raises: a refused note writes nothing
+            # The on-demand type is written once its first note is (M32 fix pass).
+            self._persist_type(t)
         self._call_after_write(self._created_notice(rel))
         return rel, version_of(data)
 
@@ -4778,6 +4995,7 @@ class Space:
                 raise
             self.trash.write_json(folder / "manifest.json", manifest)
             self.types = [t for t in self.types if t.id != type_def.id]
+            self._hidden_fields.pop(type_def.id, None)
             self._types_changed(type_def.id)
             return TrashItem(
                 id=trash_id,
@@ -4800,6 +5018,7 @@ class Space:
             self.refresh_type(type_id)
             return
         self.types = [t for t in self.types if t.id != type_id]
+        self._hidden_fields.pop(type_id, None)
         self._loaded_revisions.pop(type_id, None)
         self._merge_types(infer_types_from(self._raw.values()))
         self._types_changed(type_id)
@@ -4924,6 +5143,7 @@ class Space:
             self.types = [
                 t for t in self.types if t.id != restored.id and t.name.lower() != name
             ]
+            self._top_up(restored)  # M32: listed as a load lists it (the Work switch)
             self.types.append(restored)
             self.types.sort(key=lambda t: (t.name.lower(), t.name))
             self._types_changed(restored.id)
@@ -5187,8 +5407,13 @@ class Space:
                 starter = basic_types(work=self.work_on())
                 retarget = {t.id: named[t.name.lower()] for t in starter
                             if t.id not in taken and t.name.lower() in named}  # fmt: skip
+                types_dir = self.root / ".object" / "types"
                 for t in starter:
                     if t.id in taken or t.id in retarget:
+                        continue
+                    if (types_dir / f"{t.id}.json").exists():
+                        # A type file put there since the space was opened (a sync, by hand)
+                        # and not loaded: never replaced, as `write_itops_types` leaves it.
                         continue
                     retarget_relations(t, retarget)
                     self._write_type_json(t, "")
@@ -5202,8 +5427,14 @@ class Space:
                     builtin = self.type_by_id(type_id)
                     if builtin is not None and builtin.basic:
                         self._persist_type(builtin)
-            marker = spaceconfig.read(self.root)[0].get("setup")
-            if not (setup == "basic" and marker == "itops"):
+            config = spaceconfig.read(self.root)[0]
+            marker = config.get("setup")
+            # A set asked for again finds its marker (and, for the IT operations set, a Work
+            # switch) already there: space.json is not written again.
+            settled = marker == setup and (
+                setup != "itops" or isinstance(config.get("workEnabled"), bool)
+            )
+            if not (setup == "basic" and marker == "itops") and not settled:
                 # M32: the IT operations starter turns Work on for its space (unless the user
                 # already set the switch), in the same write as the marker.
                 spaceconfig.set_internal(
@@ -5235,6 +5466,8 @@ class Space:
             if full.parent == types_dir and full.suffix == ".json":
                 t = self._stored_type(full.stem)
                 if t is not None:
+                    # M32: listed as a load lists it (a switch the user set off stays off).
+                    self._top_up(t)
                     self.types = [x for x in self.types if x.id != t.id]
                     self.types.append(t)
                     loaded.append(t.id)
@@ -5257,9 +5490,9 @@ class Space:
             if types_dir.is_dir():
                 taken |= {f.stem for f in types_dir.glob("*.json")}
             if t.id in taken:
-                raise InvalidValue(f'An object type with the id "{t.id}" already exists.')
+                raise InvalidValue(f'A type with the id "{t.id}" already exists.')
             if self._name_taken(t.name):
-                raise InvalidValue(f'An object type named "{t.name}" already exists.')
+                raise InvalidValue(f'A type named "{t.name}" already exists.')
             t = copy.deepcopy(t)
             self._write_type_json(t, "")
             self.types.append(t)
@@ -5296,7 +5529,7 @@ class Space:
 
             tpl = get_template(template)
             if tpl is None:
-                raise InvalidValue(f'Unknown object type template "{template}".')
+                raise InvalidValue(f'Unknown type template "{template}".')
             name = name or tpl.name
             plural_name = plural_name or tpl.pluralName
             icon = icon if icon is not None else tpl.icon
@@ -5304,7 +5537,7 @@ class Space:
         name = " ".join(str(name or "").split())
         plural = " ".join(str(plural_name or "").split())
         if not name or not plural:
-            raise InvalidValue("An object type needs a name and a plural name.")
+            raise InvalidValue("A type needs a name and a plural name.")
         color = color or "gray"
         if color not in THEME_COLORS:
             raise InvalidValue(f'Unknown color "{color}".')
@@ -5313,7 +5546,7 @@ class Space:
             raise InvalidValue("Unknown icon.")
         with self._lock:
             if self._name_taken(name):
-                raise InvalidValue(f'An object type named "{name}" already exists.')
+                raise InvalidValue(f'A type named "{name}" already exists.')
             types_dir = self.root / ".object" / "types"
             taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
             if types_dir.is_dir():
@@ -5407,7 +5640,7 @@ class Space:
 
         with self._lock:
             if self._name_taken(name):
-                raise InvalidValue(f'An object type named "{name}" already exists.')
+                raise InvalidValue(f'A type named "{name}" already exists.')
             types_dir = self.root / ".object" / "types"
             taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
             if types_dir.is_dir():
@@ -5523,12 +5756,27 @@ class Space:
             if current != (base_revision or ""):
                 raise RevisionConflict(current)
             stored = self._stored_type(mem.id)
-            old = self._top_up(stored) if stored is not None else mem
+            hidden_before = self._hidden_fields.get(mem.id)
+            old = self._top_up(stored) if stored is not None else copy.deepcopy(mem)
             new = copy.deepcopy(t)
+            # M32: with Work off the type lists its ticket and work fields by `_top_up`'s
+            # rule, and so does the window that sends this save. The ones its file holds but
+            # doesn't list are no part of the edit: both sides get them back (in the file's
+            # order) before the edit is planned, so the save neither removes them from the
+            # file nor asks to delete a property.
+            hidden = self._hidden_fields.get(old.id) or []
+            if hidden:
+                old.propertyDefinitions = _merge_hidden(old.propertyDefinitions, hidden)
+                # One the caller sends back unchanged (a window that listed the type while
+                # Work was on, "Add work fields" asked again) keeps the file's place too.
+                held = {p.key: p.to_json() for _after, p in hidden}
+                new.propertyDefinitions = _merge_hidden(
+                    [p for p in new.propertyDefinitions if held.get(p.key) != p.to_json()], hidden
+                )
             if is_task_type(old) and not self.work_on():
-                # M32: a window that listed the Task while Work was on still holds every
-                # ticket and work field; with Work off the ones the type doesn't have (not
-                # saved, no value) are left out of the save, as they are out of the type.
+                # A window that listed the Task while Work was on still holds every ticket
+                # and work field; with Work off the ones the type doesn't have (not saved,
+                # no value) are left out of the save, as they are out of the type.
                 have = {p.key for p in old.propertyDefinitions}
                 new.propertyDefinitions = [
                     p
@@ -5584,6 +5832,10 @@ class Space:
             # already resolve to the edited type (a renamed type by its new name).
             self._check_type_free(new.id, current)
             self._types_saving.add(new.id)
+            if not self.work_on():
+                # M32: in memory (and in the answer) the saved type lists its ticket and work
+                # fields by the rule again; the file gets them all (`_write_type_json`).
+                self._hide_work_fields(new, from_file=True)
             self.types = [new if x.id == new.id else x for x in self.types]
             self._types_changed(new.id)
         # The files are rewritten outside the lock (each `_write` takes it for its own
@@ -5597,6 +5849,10 @@ class Space:
         except BaseException:
             with self._lock:
                 self.types = [mem if x.id == new.id else x for x in self.types]
+                if hidden_before:
+                    self._hidden_fields[mem.id] = hidden_before
+                else:
+                    self._hidden_fields.pop(mem.id, None)
                 self._types_changed(new.id)
                 for rel in members:
                     self.rescan_file(rel)
@@ -5643,7 +5899,7 @@ class Space:
         Returns (ops, whether a property is deleted).
         """
         if not new.name or not new.pluralName:
-            raise InvalidValue("An object type needs a name and a plural name.")
+            raise InvalidValue("A type needs a name and a plural name.")
         if new.color != old.color and new.color not in THEME_COLORS:
             raise InvalidValue(f'Unknown color "{new.color}".')
         ops: list[_TypeOp] = []
@@ -5653,7 +5909,7 @@ class Space:
             if old.basic:
                 raise InvalidValue(BASIC_LOCKED)
             if self._name_taken(new.name, except_id=old.id):
-                raise InvalidValue(f'An object type named "{new.name}" already exists.')
+                raise InvalidValue(f'A type named "{new.name}" already exists.')
             former = [f for f in old.formerNames if f.lower() != new.name.lower()]
             if old.name.lower() != new.name.lower() and old.name.lower() not in (
                 f.lower() for f in former
@@ -5921,7 +6177,7 @@ class Space:
             if t is None:
                 raise KeyError(type_id)
             if t.basic:
-                raise InvalidValue("Basic object types cannot be deleted.")
+                raise InvalidValue("Basic types cannot be deleted.")
             objects = self._type_members(type_id, templates=False)
             if not confirm:
                 n = len(objects)
@@ -6355,6 +6611,7 @@ class Space:
                 self._summaries.pop(rel, None)
                 self._checked_rels.discard(rel)
                 self._note_work_values(rel, None)
+                self._note_file_time(rel, None)
             else:
                 self._raw[rel] = raw
                 # A template never makes a type (`infer_types_from` skips it), so one whose
@@ -6365,6 +6622,7 @@ class Space:
                 }:
                     self._merge_types(infer_types_from(self._raw.values()))
                 self._note_work_values(rel, raw)
+                self._note_file_time(rel, raw)
                 self._summaries[rel] = self._summarize(raw)
             after = self._summaries.get(rel)
             if _names_key(before) != _names_key(after):
