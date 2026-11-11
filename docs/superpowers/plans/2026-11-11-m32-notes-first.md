@@ -131,3 +131,12 @@ wording changed only on screen; unlinked mentions; a second hands-on walk of the
 3. The Work default reads as on for a space that already has work data, so Gene's work space keeps its dashboard
    without a step, and a new personal space never sees it.
 4. Back-end error messages keep their wording unless an M32 flow shows them on screen.
+
+Settled by the review (2026-11-11; the record is `m32-acceptance.md`, "The review and the fix pass" and "Our calls"):
+
+5. The sidebar's first entry, its tab and its heading read "All notes"; the Note type's row reads "Notes".
+6. "Hide Tasks in this space" hides Tasks only; with Work on, the Work page stays (M23's rule).
+7. Work data, which turns the Work default on: a value for a built-in ticket or work field on a basic Task or a work
+   type's note, a Capture or an Alert type, or the IT starter's marker. A `ticketId` on any other type does not count.
+8. A typed title is saved after a pause (2 s after the last key) and when the window goes, not only on Enter.
+9. The new-note key makes a Note everywhere except on a type's own page, where it makes one more of that type.

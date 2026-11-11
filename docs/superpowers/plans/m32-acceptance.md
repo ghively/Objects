@@ -1,9 +1,12 @@
 # M32 acceptance: notes first
 
 Status (2026-11-11): built 2026-11-11 (the contract `37f189c7` and `c5e8fdbe`, then lanes A, B, C, D, E, F1 and F2 by
-file ownership, all merged at `ea0c2ebb`), then the two integrate steps (the front end's cross-lane fixes, and this
-one: the title heading, `scripts/m32_acceptance.py`, this file, the acceptance sweep and the back-end suite). The
-whole-milestone review, its fix pass and the full gate come next. Gene's hand checks below are unticked.
+file ownership, all merged at `ea0c2ebb`), integrated in two steps (the back end's: the title heading,
+`scripts/m32_acceptance.py`, this file, the acceptance sweep and the back-end suite; and the front end's cross-lane
+fixes, merged at `ebaee077`), then one whole-milestone review (three reviewers at once, read-only), one fix pass
+(three lanes by file ownership, merged at `aeda6e71`) and the full gate at `GATE_HEAD` (the numbers are under
+"Automated results", "The gate"). M32 is on `master`. Gene's hand checks below are unticked, and twelve choices are
+left for him ("Choices left for Gene").
 
 Plan: `2026-11-11-m32-notes-first.md` (Gene's four decisions of 2026-11-11, the glossary, the item table, the
 contract). Behind it: `notes-first-analysis-2026-11-11.md`. The bar is Gene's direction of 2026-11-11 (`CLAUDE.md`,
@@ -32,7 +35,7 @@ screen, so it is in the hand checks):
    Opened, it lists those four types (Page is the one the screen calls Note) and asks nothing (`needsSetup` false); the
    Task's statuses are Not Started, Next Up, In Progress, On Hold, Done, the last in the done category; Work is off
    (`workEnabled` null, `workOn` false), the Task has no ticket or work field, and no saved search is listed. Opening,
-   listing and reading (what Home, Notes, the Tasks page, the calendar, search and the type gallery read) write
+   listing and reading (what Home, All notes, the Tasks page, the calendar, search and the type gallery read) write
    nothing. The first note, the first task and the first daily note each write only their own `.md`.
 2. **An older space without a Task type** (item 8; a copy of `space-blocks`). The built-in Task and DailyNote are
    listed with no file behind them; opening, listing and reading leave the whole folder byte for byte the same; the
@@ -91,7 +94,7 @@ and the daily-note reads (the list, the rows, a daily note itself, the DailyNote
 
 ## Automated results
 
-Run on 2026-11-11 at `ea0c2ebb` plus this integration (Linux, the shared venv's Python with the worktree's `backend`
+**The integrate step.** Run on 2026-11-11 at `ea0c2ebb` plus this integration (Linux, the shared venv's Python with the worktree's `backend`
 first; `objectapp-mcp` through the `uv` shim where a script starts it):
 
 | What | Command | Result |
@@ -121,6 +124,23 @@ passed), and the test now waits for that pass. The suite was not run in full aga
 `test_spaces.py::test_startup_on_a_taken_port_exits_with_a_message` leaves an unhandled thread exception by design.
 
 The front-end suite, `tsc`, lint and the build are the front end's integrate step and the gate after the review.
+
+### The gate (after the fix pass)
+
+Run on 2026-11-11 at `GATE_HEAD`, after the review and the fix pass below:
+
+| What | Result |
+|---|---|
+| The back-end suite | GATE_BACKEND |
+| The front-end suite | GATE_FRONTEND |
+| `tsc`, lint, build | clean |
+| The acceptance sweep | GATE_SWEEP |
+| M32 acceptance | RESULT: PASS (94 checks) |
+
+The fix pass took `scripts/m32_acceptance.py` from 75 checks to 94 (the parts marked "the fix pass" in checks 2, 3,
+5, 10 and 11 above). The full back-end suite, run after the fix pass's first back-end merge, found one more fault
+(`test_m31_fix_import.py::test_remodel_carries_every_type`: a space remodelled from a space where Work is on came out
+with Work off); it was fixed in the same pass (call 44).
 
 ## The title heading (the integrate step's finding)
 
@@ -161,7 +181,145 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
 - For Gene: whether an import should stop adding the heading, and whether the note page should hide a first heading
   that repeats the title, for the notes that already have one.
 
-## Our calls (gathered from the plan, the lanes and the integrate steps)
+## The review and the fix pass
+
+One whole-milestone review on 2026-11-11 at `ebaee077`: three reviewers at once, read-only. Then one fix pass in
+three lanes by file ownership, merged at `aeda6e71`, and the gate. Nothing was reviewed a second time.
+
+### What the review found
+
+**The back-end code** (`backend/**`, `scripts/**`)
+
+- Critical: none.
+- Important: the Work agent kept running after Work was switched off; the 26 ticket fields stayed on Task for good
+  once its type file was written with Work on; a Project of a pre-M32 "basic setup" showed 25 of them with Work off;
+  the Work default turned on from a `ticketId` on any note (a user's "Flight" type with a "Ticket ID" property) and
+  missed tasks with Steps only.
+- Minor: no event when the default flips; a Project marked done got no `completed` with Work off; `basic` failed
+  halfway beside an unloaded type file; a repeated set rewrote `space.json` with the same bytes; a refused daily
+  note still wrote the type file; "object type" in the New type dialog's errors; a hand check that could not pass as
+  worded.
+- Checked and right: never write on read, over every GET route on ten spaces; no value lost with Work off; property
+  and body writes change only their own lines (BOM, CRLF); no stored name, key, API field or type id renamed.
+
+**The front-end code** (`frontend/**`)
+
+- Critical: none.
+- Important: renaming an open note whose text opens with `# Old title` put the old heading back on the next save;
+  the save on close was a plain request whenever the window had the focus (it lost 9 of 10, and only with the
+  browser short of connections); quick add read everyday words as dates ("Buy sun cream" became "Buy cream", on
+  Sunday); a double click on New made two notes and a held Alt+N six.
+- Minor: a second "Today's note" left a focus request behind; a hand-made note with no stamps was missing from
+  Recent; the save mark was read out at every save; tab and menu roles had no arrow keys; six tests accepted the old
+  word; an ungrouped board's column was titled "Notes" for every type.
+- Checked and right: nothing is sent on open, focus or caret moves (18 notes, an md5 of the whole space); decision 1
+  held; unlinked mentions are always shown; old tabs restore.
+
+**A second hands-on walk** of the analysis's 14 journeys on the built app (5 spaces, 210 screenshots)
+
+- Critical: a typed title was not saved until Enter, Tab or a click, so a close lost it.
+- Important: a starter set wrote up to 57 files on one click with no confirmation; the new-note key made a Task on a
+  task's page.
+- Minor: "Pick a date" opened without focus; Add Property ignored Enter and did not select the default name; Create
+  space's after-create screen overflowed, and a missing Location was refused without a hint; backlinks and mentions
+  were always below the fold with no sign above it; no tick on a task's own page; the Tasks entry reopened on the
+  last list; an embedded task's toolbar covered its title; "page" wording left in the Shortcuts sheet, the AI chat,
+  Settings, type settings and the Trash; the palette found no command for "new"; a 404 for the references of a note
+  just deleted.
+
+### The analysis's 15 findings, as the walk found them
+
+Of the 15 findings in `notes-first-analysis-2026-11-11.md`: 9 gone, 5 partly, 1 unchanged by Gene's decision 1. This
+is the state at `ebaee077`, before the fix pass; what the walk still found wrong is its list above.
+
+| # | The analysis's finding | On the built app |
+|---|---|---|
+| 1 | A new space cannot make tasks | gone |
+| 2 | Typing can be lost | partly |
+| 3 | Enter in the title throws the caret away | gone |
+| 4 | The keys that start writing are dead while you write | gone |
+| 5 | The app opens on a dead end | gone |
+| 6 | The Tasks page is the work dashboard | gone |
+| 7 | A task carries a help desk | gone |
+| 8 | The note page gives the text 42% of the window | partly |
+| 9 | Dating a task takes five steps | gone |
+| 10 | Markdown habits misfire | partly |
+| 11 | Nothing lists what you wrote lately | gone |
+| 12 | AI and agents hold the top of the app | unchanged, by decision 1 |
+| 13 | IT is one of three first-run choices | gone |
+| 14 | Settings: four of seventeen sections are AI, agents, work or integrations | partly |
+| 15 | The words are a database's | partly |
+
+### What the fix pass changed
+
+One pass, three lanes. F numbers are the front-end reviewer's findings and W numbers the walk's, as the code's
+comments name them.
+
+**Back end** (merged at `61282486`, and `27c0084d` for the remodel fix `20e05e28`)
+
+- The Work loop does nothing while Work is off; pending entries wait and run when it is on again (call 25).
+- One rule for the basic Task and every work type with Work off: a built-in ticket or work field is listed only when
+  a note of the type holds a value for it or its stored definition differs from the built-in one. Type files are
+  never rewritten for it, and a save with Work off keeps the hidden definitions in the file. The first task in an
+  older space with Work on no longer stores the topped-up fields (call 24).
+- Work data, which sets the default: a value for a built-in ticket or work field on a basic Task or a work type's
+  note, a Capture or an Alert type, or the `itops` marker. A `ticketId` on any other type does not count (call 23).
+- The windows are told (`types`, and `queries` when the switch moved) when the default flips with the data.
+- A work type's `completed` is stamped and cleared whatever the switch.
+- `basic` skips a starter type whose file is already there; a repeated set writes nothing (hash, size, modification
+  time).
+- A refused daily note or first task writes no type file.
+- The words: 'A type named "X" already exists.', "A type needs a name and a plural name.", "Basic types cannot be
+  deleted."
+- A note with neither `lastUpdated` nor `createdAt` reads its file time as `lastUpdated` in `GET /api/objects` and
+  `GET /api/object` (nothing written), so it is in All notes and Recent (call 43).
+- Found by the full suite after the first merge (`test_m31_fix_import.py::test_remodel_carries_every_type`): a space
+  remodelled into a new space from a space where Work is on came out with Work off, so its Incident type listed 23
+  fewer fields (the files held them). The new space now stores the source's switch (call 44).
+- `scripts/m32_acceptance.py`: 94 checks.
+
+**Front end 1** (merged at `aeda6e71`)
+
+- F1: a rename keeps the server's heading (`object/titleHeading.ts` mirrors `rename_object`; checked against the
+  Python rule on 8,022 generated texts).
+- F2: every body save that fits is a keepalive request (in `api.saveBody`, a 60 KiB budget over the saves in
+  flight); text a close could not save is kept in local storage per space and note and offered on the next open in
+  "Recover unsaved changes"; `forgetSaved` clears the entries the file already holds when the space opens (calls 12,
+  14 and 50).
+- W1: a typed title is committed 2 s after the last key, and on `pagehide`, hidden and unmount (the rename is a
+  keepalive request); the focus, the caret and the keys typed during the rename are kept; a refused title shows one
+  toast and is not tried again until the text changes; a tab left on the old path by a closing window is moved on
+  the next start (call 45).
+- F3: quick add reads a shortened weekday or a bare month and day only as the last words or after on, by, due or
+  next; "for" before date words is left out of the title; a line under the field reads
+  `Adds "Call the bank" on Nov 13, 2026` (call 17).
+- F4, W5: New makes one note per press (a double click, a held key); the new-note key makes a Note everywhere except
+  on a type's own page, where it makes one more of that type; its label is "New note" (calls 6 and 46).
+- F5: "Today's note" asked for while it is open puts the caret at its end. F7: only "Saved" is announced. F8, W7:
+  arrow keys on the Tasks tabs and the date menu; "Pick a date" opens with the caret in the field.
+- F10: an ungrouped board's column reads the type's plural. F11: the sidebar's first entry, its tab and its heading
+  read "All notes" (call 9). F12: "Hide Tasks in this space" hides Tasks, not Work (call 38).
+- W6: an embedded task's toolbar stands above the row, and a ticked one is struck through. W10: a quiet count on the
+  type chip's row ("2 backlinks · 1 mention") that opens and scrolls to the section (call 48). W11: a tick beside a
+  task's title on its own page (call 49). W14: the sidebar's Tasks entry opens on Today, and a restored tab keeps its
+  list (call 15). W19: no references request for a note just deleted.
+- Not a regression, nothing changed: W4 (empty ticket fields were hidden when empty before M32 too; with Work on a
+  task's pane shows Steps and the rest under the type's fields only when they hold a value) and W18 (the Saved
+  searches page never listed the built-in "Tickets").
+
+**Front end 2** (merged at `d32bdbd3`)
+
+- W2: a starter set asks first ("Add the Everyday set?", "Add the IT operations set?"), naming the types the space
+  lacks, "their templates and tags" for the IT set, and "The Work page is turned on for this space." when that is
+  so; its card reads "Added" once the space has it (call 47).
+- W8: Add Property takes arrow keys and Enter to pick the kind, and the default name is selected.
+- W9: Create space says "The space is made as a new folder with its name inside this folder." and 'The folder "…"
+  does not exist.'; the after-create screen is headed "Space created" and stays inside the box.
+- W17: the palette has "New note", "New task" and "Today's note" (the old names are still found).
+- W16: "note" where a note is meant in the Shortcuts sheet, the AI chat's text, Settings (Editor, Offline & Sync),
+  type settings ("Layout") and the "Related" tab; the Trash names a type by its name.
+
+## Our calls (gathered from the plan, the lanes, the integrate steps and the fix pass)
 
 **The plan**
 
@@ -175,26 +333,36 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
 
 5. The tab strip's `+` and Ctrl+T open an empty tab, so they land on Home (they used to copy the page in view).
 6. Alt+N is the new-note key and Alt+Shift+N the New menu's in a browser tab, which keeps Ctrl+N and Ctrl+U for
-   itself; the app window takes both pairs. Raw mode keeps Ctrl+U as "undo selection".
+   itself; the app window takes both pairs. Raw mode keeps Ctrl+U as "undo selection". The new-note key makes a Note
+   everywhere except on a type's own page (the fix pass; call 46).
 7. The start choice "Home" starts the active tab over (a pinned or persistent tab keeps its page; an empty tab is
    used first).
-8. Notes: "This week" is the five days before yesterday, so the list never empties on a Monday.
-9. Two sidebar rows read "Notes": the main entry (every note) and the Page type's row. Left for the review.
+8. All notes: "This week" is the five days before yesterday, so the list never empties on a Monday.
+9. The sidebar's first entry (every note), its tab and its heading read "All notes"; the Note type's row under Types
+   reads "Notes" (the fix pass; before it both rows read "Notes").
 10. A popped-out note closes first when a new note is made by key, so the new one is seen.
 11. The palette starts each opening empty (a reopen during the closing animation too).
 
 **The editor and saving (lane A)**
 
-12. The save on `pagehide` is the hook's own keepalive request; the 3 s limit counts from the first unsaved key.
+12. Every body save that fits is a keepalive request, so the browser finishes it after the window has gone (the fix
+    pass: in `api.saveBody`, with a 60 KiB budget over the saves in flight; before it the save on close was a plain
+    request whenever the window had the focus). The 3 s limit counts from the first unsaved key.
 13. "Make this block a task" reads "Make this line a task" and acts on the line holding the caret.
-14. Known limit, accepted: text typed while a save is in flight, followed by a real window close in that instant.
+14. Text a close could not save is kept in the browser's local storage and offered on the next open (the fix pass;
+    call 50). The limit that remains, accepted: a note over the keepalive size whose save could not leave before the
+    page died is offered on the next open, not saved by itself.
 
 **Tasks and Work (lane C)**
 
-15. The Tasks page remembers the last list per space in the browser, not in `ui.json`: changing tabs writes no file.
+15. The sidebar's Tasks entry opens on Today (the fix pass; it reopened on the last list). A restored tab keeps its
+    list, remembered in the browser, not in `ui.json`: changing tabs writes no file.
 16. Upcoming is one group per day for the next 14 days, then "Later".
-17. Quick add also reads "in 3 days" and `2026-11-20`; an "on", "by" or "due" just before the date words is left out
-    of the title; a month and day already past this year means next year's.
+17. Quick add also reads "in 3 days" and `2026-11-20`; an "on", "by", "due" or "for" just before the date words is
+    left out of the title; a month and day already past this year means next year's. A shortened weekday ("sun") and
+    a bare month and day ("3 may") are read as a date only as the last words or right after "on", "by", "due" or
+    "next", so "Buy sun cream" keeps its words; and the task that will be saved is shown under the field
+    (`Adds "Call the bank" on Nov 13, 2026`) (the fix pass).
 18. "Add a Done status" moves an option already named Done into the done category instead of adding a second one.
 19. With Work off the dashboard's global parts (keys, toasts, overlays, the keep-on-top window, fetches) do nothing;
     with Work on the Work page keeps its own words ("Search work", "Create task").
@@ -241,8 +409,8 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
 31. The properties pane starts closed for a type with no properties of its own; a Daily note's Date and Reviewed do
     not count as its own.
 32. In a narrow window the properties card follows the text instead of pushing it down.
-33. With Work off every work row on a note page (steps, lists, floor items) is hidden, also one that holds a value.
-    The plan says no value is hidden and the back end keeps such fields: left for the review.
+33. With Work off a work row on a note page (steps, lists, floor items) that holds a value is shown; only the empty
+    ones are left out (the integrate step; the lane had hidden every one). No value is hidden by the switch.
 34. A rename that moves the file hands the note, the caret and the unsaved text to the view on the new path; with
     the note open in two places, one view claims them.
 35. The save mark shows nothing on a note nobody typed in, and fades to the check alone.
@@ -253,7 +421,9 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
     remembered.
 37. Settings > Work: with the switch off the rest of the section stays, disabled, under "Turn on the Work page to use
     these."
-38. "Hide Task Management" reads "Hide Tasks in this space" (the key is unchanged).
+38. "Hide Task Management" reads "Hide Tasks in this space" (the key is unchanged). It hides Tasks (the page, its
+    sidebar entry and the task features), not Work: with Work on, the Work entry and page stay (the fix pass; the
+    integrate step hid both, and this puts M23's rule back).
 
 **Wording elsewhere (lane F2)**
 
@@ -271,7 +441,7 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
 43. A note whose front matter has neither `lastUpdated` nor `createdAt` (a `.md` put into the folder by hand or by
     another tool) reads its file's modification time as `lastUpdated` in the summaries the app's lists read
     (`GET /api/objects`, and the `summary` of `GET /api/object`), in the form of Object's own stamps, so it has its
-    place in Notes and in Home's Recent. Nothing is written to the file for it; the rows, saved searches, formulas
+    place in All notes and in Home's Recent. Nothing is written to the file for it; the rows, saved searches, formulas
     and `/api/v1` still see no `lastUpdated` for such a note.
 44. A space remodelled from a space where Work is on is a space where Work is on: an import that makes a new space
     from an Object space creates it with `workEnabled: true` when Work is on in the source (its stored switch, the IT
@@ -280,14 +450,41 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
     its own `setup` marker (`blank`: the starter did not make it). The source is only read; an import into an
     existing space leaves that space's switch alone. Without this the new space read Work off, and by call 24 its
     carried types listed none of their unchanged ticket fields, though their files held them all.
+45. A typed title is saved without Enter: it is committed 2 s after the last key in the title, and at once when the
+    window goes or is hidden or the note is left. Not on every key, since a commit renames the file: one per pause.
+    The focus, the caret and the keys typed during the rename are kept; a refused title shows one toast and is not
+    tried again until the text changes.
+46. The new-note key has one exception. It makes a Note everywhere, also on a task's or any other note's page; on a
+    type's own page, where its notes are listed, it makes one more of that type, as that page's own New button does
+    (the Daily notes page makes a Note: a daily note is made by its date). The key's label is "New note". One press
+    makes one note: a double click on New and a held key make no second one.
+47. A starter set asks before it writes. "Add the Everyday set?" or "Add the IT operations set?" names the types the
+    space lacks (the IT set also "their templates and tags"), says that the types you already have are left as they
+    are, and says "The Work page is turned on for this space." when that is so. The set's card reads "Added" once
+    the space has it.
+48. A note says above the fold how many backlinks and mentions it has: a quiet count on the type chip's row
+    ("2 backlinks · 1 mention"), each part only when it is not zero. A click opens that tab and scrolls to the
+    section. The numbers are the section's own; nothing more is fetched.
+49. A task's own page has the tick its rows have, beside the title.
+50. Text a close could not save is kept in the browser's local storage, per space and note (it was the tab's session
+    storage, which does not outlive the window), and offered the next time the note opens in "Recover unsaved
+    changes", beside the version on disk; nothing is written without the user's word. Entries the file already
+    holds are cleared when the space opens.
 
 ## Known limits
 
 - Notes made before this change that open with `# <title>` keep that line (no file is rewritten), so those show
   their title twice until the line is removed by hand; a rename still keeps such a line in step with the title.
   Imported pages keep the heading their importer writes.
-- Text typed while a save is in flight, then a real window close in that instant, can miss the last keys (call 14).
-  Two editors on one path share one save state.
+- A note over the keepalive size (60 KiB over the saves in flight) whose save could not leave before the page died
+  is not saved by itself: its text is kept in the browser and offered on the next open (calls 12, 14 and 50). Two
+  editors on one path share one save state.
+- A real close with a title typed in the last 2 s and text still unsaved or in flight loses that title; the text is
+  safe (call 45).
+- A rename on the server also rewrites the note's links to itself in its own text; the open editor does not mirror
+  that (it mirrors the heading), so such a link is put back by the next save of the open note.
+- "Find in page", "This page has no headings", "A PDF that looks like the page on screen" and the sidebar-sections
+  help line still say "page".
 - Raw mode has no title-to-body caret placement and no way back to the title by key.
 - The Work default follows the data (call 23).
 - A type of the user's own named "Capture" turns the Work default on: the Capture type is found by its name, as
@@ -303,6 +500,31 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
 - `m24_acceptance.py` gives its fake agent run 3 seconds; on a loaded machine two of its checks can fail for that
   reason alone (see the results above).
 
+## Choices left for Gene
+
+Not built either way: each line says what happens now, then what the other choice would be.
+
+1. Opening a note from the palette or a list does not put the caret in its text; today's note and a new note do.
+   The other choice: every note opens with the caret in its text.
+2. Today's note opens as a pop-over (Gene's own request of 2026-11-09), also with "Open notes as a full page" on.
+   The other choice: it follows that setting and opens as a full page.
+3. A task's pane lists the system rows (Collections, Created at, Tags…) before Status, Priority and Date. The other
+   choice: Status, Priority and Date first.
+4. A type made from the gallery lands on its settings page. The other choice: on a first note of that type.
+5. Old notes that open with `# Title` show the title twice, and imports still add that line ("The title heading").
+   The other choice: the note page hides a first heading that repeats the title, and imports stop adding it.
+6. A task with only a deadline sits in Inbox, also when the deadline has passed (decision T1's rule). The other
+   choice: a deadline places the task as a date does (Upcoming, then Overdue).
+7. `> ` makes a toggle and `| ` a quote (call 1). The other choice: `> ` makes a quote, as Markdown has it.
+8. The property kinds read "Link" and "Link to a type" (call 39). The other choice: other words for the two.
+9. "No date" on a task writes `date: null`. The other choice: it removes the `date` line.
+10. Quick add ignores "yesterday" and "last week", and the global new task (Ctrl+Shift+T) reads no date words. The
+    other choice: past words date a task in the past, and the global new task reads date words as "Add a task" does.
+11. A mention's context shows the raw `[[…]]`, and a line naming the note twice is listed twice. The other choice:
+    the context shows the link's words, and such a line is listed once.
+12. Alt+N and Alt+Shift+N are the browser-tab keys for a new note and the New menu (call 6). The other choice: other
+    keys for the browser tab.
+
 ## Hand checks (Gene)
 
 On a copy of a space, or a new one, in the app. The groups follow the analysis's journeys.
@@ -311,27 +533,31 @@ On a copy of a space, or a new one, in the app. The groups follow the analysis's
 
 - [ ] "Create space" asks for a name and a folder only (plus "Import from…" and "Do I need a new space?"); no question about a starting point. Switching to it opens Home and nothing is asked.
 - [ ] Opening an empty folder as a space asks nothing, and no note or visible file is made until you make something (the hidden `.object/types/page.json` and `tag.json` are written, as before M32).
-- [ ] In the new space the sidebar reads Notes, Calendar, Tasks (no Work), and "New task" and "Add a task" work at once.
+- [ ] In the new space the sidebar reads All notes, Calendar, Tasks (no Work), and "New task" and "Add a task" work at once.
 
 **Landing on Home**
 
 - [ ] A new tab (`+` or Ctrl+T) and the first open show Home: "New note", "Today's note", "Recent" (the last 12 notes edited, newest first, daily notes included) and "Tasks" (overdue and today; a tick completes one; "Nothing due today." when there is none).
 - [ ] An empty space's Home says "Nothing here yet. Start a note, or open today." above the two buttons.
-- [ ] A `.md` file dropped into the space's folder by hand shows in Notes and in Home's Recent, placed by the file's date; the file itself is not changed by that.
+- [ ] A `.md` file dropped into the space's folder by hand shows in All notes and in Home's Recent, placed by the file's date; the file itself is not changed by that.
 - [ ] Settings > Editor > "When this space opens" offers Home, and "Where I left off" with nothing to restore lands on Home.
 
 **A new note, by mouse and by key**
 
 - [ ] "New" in the sidebar makes a Note at once with the title ready to type; the arrow beside it opens the type list (search, Suggested first).
-- [ ] Alt+N in a browser tab (Ctrl+N in the app window) makes a new note, also with the caret in a note's text or title; Alt+Shift+N (Ctrl+U) opens the New menu.
+- [ ] Alt+N in a browser tab (Ctrl+N in the app window) makes a new note, also with the caret in a note's text or title and on a task's page (on a type's own page it makes one more of that type); Alt+Shift+N (Ctrl+U) opens the New menu.
 - [ ] Type a title and press Enter: the caret is at the start of the text and the next words land there (ArrowDown and Tab too, and in the peek). ArrowUp or Shift+Tab at the very start of the text goes back to the title.
 - [ ] The title shows once: the new note's text does not open with the title as a heading.
+- [ ] Type a title, do not press Enter, and wait three seconds: the file is renamed, and the caret is still in the title.
+- [ ] Type a title and close the window at once. Open it again: the note has that title.
+- [ ] Rename a note whose text starts with its old title as a heading, then type a word in the text: the heading is the new title, and stays so after the save.
 
 **Saving**
 
 - [ ] Type a burst (a dozen sentences with short pauses) and close the window straight away. Open it again: every word is there.
 - [ ] While you type the toolbar says "Saving…", then a check and "Saved", and the mark stays visible while the rest of the toolbar fades.
 - [ ] Switch to another note or tab in the middle of a sentence and come back: nothing is lost.
+- [ ] In the app window (not a browser tab): type a burst in the text and close the window at once. Open it again: every word is there. (The review could not test the app window, where the server stops when the window closes.)
 
 **Markdown habits**
 
@@ -348,24 +574,27 @@ On a copy of a space, or a new one, in the app. The groups follow the analysis's
 
 **Notes in the sidebar**
 
-- [ ] "Notes" is the first sidebar entry: every note by last edited under Today / Yesterday / This week / Earlier, daily notes in, tasks and tags out. Edit an old note and it moves to Today.
+- [ ] "All notes" is the first sidebar entry (the Note type's row under Types reads "Notes"): every note by last edited under Today / Yesterday / This week / Earlier, daily notes in, tasks and tags out. Edit an old note and it moves to Today.
 
 **The plain Tasks page**
 
-- [ ] Tasks opens on Today: "Overdue (n)" then "Today (n)", each count shown once; the header reads "Search tasks" and "New task".
+- [ ] The sidebar's Tasks entry opens on Today, also after another list was open: "Overdue (n)" then "Today (n)", each count shown once; the header reads "Search tasks" and "New task".
 - [ ] Upcoming (a group per day for 14 days, then Later), Inbox (no date), All and Done list the right tasks; "More" holds Status, Deadline, Recurring, Reminders, Tags and Context.
-- [ ] "Add a task": type "Call the bank friday". A chip shows Friday; Enter adds the task, the field keeps the focus, the task is titled "Call the bank" with Friday's date, and its text is empty.
-- [ ] Backspace at the start of the field (or the chip's ×) removes the chip, and "friday" stays in the title.
+- [ ] "Add a task": type "Call the bank friday". A chip shows Friday, and a line under the field reads `Adds "Call the bank" on` with Friday's date; Enter adds the task, the field keeps the focus, the task is titled "Call the bank" with Friday's date, and its text is empty.
+- [ ] Backspace at the start of the field (or the chip's ×) removes the chip, and "friday" stays in the title. "Buy sun cream" shows no chip and keeps its words.
 - [ ] A row's date chip opens Today / Tomorrow / Next week / No date and "Pick a date"; a pick moves the task to its group.
 - [ ] A tick on the circle completes the task and strikes its title through; an overdue date is in the danger colour.
 - [ ] On a type whose status has no done option the circle offers "Add a Done status"; one click adds it and completes the task.
+- [ ] A task's own page has the tick beside its title.
+- [ ] Settings > Task management > "Hide Tasks in this space" takes the Tasks entry and page away; with Work on, the Work entry and page stay.
 
 **Work off, on, and off again**
 
 - [ ] In a new space: no "Work" entry, B opens no brain dump, a task's page shows no ticket fields (Ticket ID, Desk status, Requester…) and no work header, and Saved searches has no "Tickets".
-- [ ] Settings > Work > "Use the Work page in this space" on: "Work" appears under Tasks and opens the dashboard as it was, and a task shows the ticket fields. Give one task a Requester.
+- [ ] Settings > Work > "Use the Work page in this space" on: "Work" appears under Tasks and opens the dashboard as it was. A ticket field shows on a task once it holds a value (as before M32): give one task a Requester from the Task type's page or a table column.
 - [ ] Turn it off again: the Work entry goes, that task still shows its Requester, the empty ticket fields are gone, and no note changed (file dates, or git status).
 - [ ] A copy of your real work space opens with Work on by itself: the dashboard, "Tickets" and the ticket fields are as before, without touching the switch.
+- [ ] With Work on and a step queued for the agent, turn Work off: the agent does not run the step until Work is on again.
 
 **The note page**
 
@@ -373,11 +602,12 @@ On a copy of a space, or a new one, in the app. The groups follow the analysis's
 - [ ] A plain click on a note in a list opens it as a full page, with the way back on the breadcrumb; Alt+Shift+click still peeks; with "Open notes as a full page" off a click peeks as before.
 - [ ] The text area is tall (at least 60% of the window), and a click anywhere below the text puts the caret at its end.
 - [ ] An empty Backlinks, Related or Mentions section is one quiet line. A note whose title appears as plain text in another note still lists it under unlinked mentions, and "Link" still links it.
+- [ ] A note with backlinks or mentions says so beside its type chip ("2 backlinks · 1 mention"), and a click on the count jumps to them.
 
 **The type gallery**
 
 - [ ] "Add a type" opens with Personal (Idea, Goal, Habit, Recipe, Trip, Journal entry); IT operations is last and folded until opened. Recipe arrives with Cover image, Servings, Prep time, Source and Notes.
-- [ ] The gallery's starter sets (the basic set and IT operations) add their types to a space that already started and replace none of yours; the IT set turns Work on.
+- [ ] The gallery's starter sets ("Everyday set" and "IT operations set") ask first: "Add the IT operations set?" names the types the space lacks. "Add" then adds them to a space that already started and replaces none of yours; the IT set turns Work on, and the set reads "Added" after.
 
 **Wording**
 

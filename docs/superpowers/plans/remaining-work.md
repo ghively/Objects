@@ -1,6 +1,6 @@
 # Object: remaining work
 
-Status as of 2026-11-11: **M32 (notes first) is built and integrated** on top of M1-M31 (Gene's direction of 2026-11-11, now `CLAUDE.md`'s "Notes first" rule; analysis `notes-first-analysis-2026-11-11.md`, plan `2026-11-11-m32-notes-first.md`, hand checks `m32-acceptance.md`; see "Done on 2026-11-11" below); **its whole-milestone review, fix pass and full gate come next**, then Gene's hand checks. Earlier status, 2026-11-10: **M1-M31 are built, gated and on `master`** (M28-M30, the IT ops type model, and M31, completion: everything the audit listed as not built, all on 2026-11-10; `m31-acceptance.md`); a full milestone audit the same day is `milestone-audit-2026-11-10.md`, whose "Remaining work" is the current to-do list. Earlier status, 2026-11-09: **M1-M27 and everything built on 2026-11-08 and 2026-11-09 are on `master`**, the only live branch (`integrate/2026-11-08` was merged on 2026-11-09; Gene wants everything on `master`). That day: the sidebar redesign, the Tasks dashboard, git-backed spaces, the decisions memo (`decisions-memo-2026-11-08.md`, approved by Gene) built, live checks of the real CLI, OCR and MCP, and an automated run of all 435 acceptance boxes (`auto-acceptance-2026-11-08.md`). The current list is "What remains" below; the history follows it.
+Status as of 2026-11-11: **M1-M32 are built, gated and on `master`.** M32 (notes first; Gene's direction of 2026-11-11, now `CLAUDE.md`'s "Notes first" rule; analysis `notes-first-analysis-2026-11-11.md`, plan `2026-11-11-m32-notes-first.md`, record and hand checks `m32-acceptance.md`; see "Done on 2026-11-11" below) is built, reviewed (three reviewers), fixed in one pass and gated at `GATE_HEAD`. **Next: Gene's hand checks of M32 and his choices** (`m32-acceptance.md`, "Hand checks (Gene)" and "Choices left for Gene"). Earlier status, 2026-11-10: **M1-M31 are built, gated and on `master`** (M28-M30, the IT ops type model, and M31, completion: everything the audit listed as not built, all on 2026-11-10; `m31-acceptance.md`); a full milestone audit the same day is `milestone-audit-2026-11-10.md`, whose "Remaining work" is the current to-do list. Earlier status, 2026-11-09: **M1-M27 and everything built on 2026-11-08 and 2026-11-09 are on `master`**, the only live branch (`integrate/2026-11-08` was merged on 2026-11-09; Gene wants everything on `master`). That day: the sidebar redesign, the Tasks dashboard, git-backed spaces, the decisions memo (`decisions-memo-2026-11-08.md`, approved by Gene) built, live checks of the real CLI, OCR and MCP, and an automated run of all 435 acceptance boxes (`auto-acceptance-2026-11-08.md`). The current list is "What remains" below; the history follows it.
 
 **Gate on `integrate/2026-11-08` (Linux, 2026-11-09, after lanes A-F, G1-G5, H1-H3 and the acceptance fixes; vitest and pytest run one after the other):** back end 3391 passed, 16 skipped, 3 xpassed, 0 failed; front end 4074 passed, 1 skipped (537 files); lint 0 errors; `npm run build` clean. One frontend timing flake under load (`BrainDumpBar` "M23 seam") was fixed by waiting for the refusal text instead of one flush.
 
@@ -192,7 +192,8 @@ The history below is in the order it was written: the per-milestone sections new
 
 ### Done on 2026-11-11
 
-- **M32 built: notes first** (analysis `notes-first-analysis-2026-11-11.md`; plan `2026-11-11-m32-notes-first.md`; the
+- **M32 built, reviewed, fixed and gated: notes first** (analysis `notes-first-analysis-2026-11-11.md`;
+  plan `2026-11-11-m32-notes-first.md`; the
   contract `37f189c7` and `c5e8fdbe`, then lanes A, B, C, D, E, F1 and F2 by file ownership, merged at `ea0c2ebb`; two
   integrate steps, front end and back end). Gene, 2026-11-11: Object is a go-to notes app; the manual note-taking and
   task-tracking path comes first, AI is a helper, and the work dashboard and the IT types are things you turn on
@@ -203,7 +204,7 @@ The history below is in the order it was written: the per-milestone sections new
   can trust (at most 3 s after the first unsaved key, at once on closing, hiding or leaving, and a "Saving… / Saved"
   mark); title to body with Enter, ArrowDown or Tab; the new-note, New-menu, today's-note and line-to-task keys work
   while you type; Markdown habits (`- [ ] `, file names are not links, mixed lists, images at their own size); Home in
-  an empty tab (New note, Today's note, Recent, Tasks); Notes first in the sidebar, by last edited; "New" makes a Note
+  an empty tab (New note, Today's note, Recent, Tasks); All notes first in the sidebar, by last edited; "New" makes a Note
   at once; a new space asks for a name and a folder only and can make notes, daily notes and tasks from the first
   second (an older space gets the Task type with its first task; the built-in statuses include Done); a plain Tasks
   page (Today with Overdue, Upcoming, Inbox, All, Done; "Add a task" reads date words; a date chip on each row); Work
@@ -216,15 +217,33 @@ The history below is in the order it was written: the per-milestone sections new
   Getting started and Tasks guide rewritten. The back-end integrate step found that every note made with a title
   opened with `# <title>` and so showed its title twice, and changed the rule: a new note's body is empty unless a
   template or the caller gives it text (`m32-acceptance.md`, "The title heading"; older notes and imported pages keep
-  theirs). `scripts/m32_acceptance.py` RESULT: PASS (75 checks); the acceptance
+  theirs). At the integrate step: `scripts/m32_acceptance.py` RESULT: PASS (75 checks); the acceptance
   sweep 58 of 58 PASS (`m24` also alone, three times); the back-end suite 4205 passed, 19 skipped, 1 failed (a wait
   in `test_m24_loop.py` that could end before the loop's pass on a loaded machine: it passes alone and with its
-  file, and the test now waits for the pass). Next: the whole-milestone review (data safety of the new
-  save paths, never write on read, the Work switch both ways, the keyboard flow, unlinked mentions, a second walk of
-  the 14 journeys), one fix pass, the full gate, then Gene's hand checks (`m32-acceptance.md`, 45 boxes).
+  file, and the test now waits for the pass). **The review** (at `ebaee077`; three reviewers at once, read-only: the
+  back-end code, the front-end code, and a second hands-on walk of the 14 journeys) found one Critical (a typed title
+  was not saved until Enter, Tab or a click, so a close lost it) and ten Important (the Work agent kept running with
+  Work off; the ticket fields stayed on Task for good once its type file was written with Work on; an older basic
+  set's Project showed 25 of them with Work off; the Work default turned on from a `ticketId` on any note and missed
+  tasks with Steps only; a rename put an old `# title` heading back on the next save; the save on close was a plain
+  request whenever the window had the focus; quick add read everyday words as dates; a double click on New made two
+  notes; a starter set wrote up to 57 files with no confirmation; the new-note key made a Task on a task's page).
+  Checked and right: never write on read, no value lost with Work off, edits change only their own lines, nothing
+  stored was renamed, decision 1 held, unlinked mentions are always shown. Of the analysis's 15 findings the walk
+  found 9 gone, 5 partly and 1 unchanged by decision 1. **One fix pass** (three lanes by file ownership, merged at
+  `aeda6e71`; `m32-acceptance.md`, "The review and the fix pass", lists it lane by lane) fixed the Critical and the
+  Important ones and the minor ones listed there; the full back-end suite found one more on the way (a space
+  remodelled from a space where Work is on came out with Work off), fixed in the same pass. **The gate at
+  `GATE_HEAD`:** back end GATE_BACKEND; front end GATE_FRONTEND; `tsc`, lint and build clean; the acceptance sweep
+  GATE_SWEEP; `scripts/m32_acceptance.py` RESULT: PASS (94 checks). M32 is on `master`. Next: Gene's hand checks
+  (`m32-acceptance.md`, "Hand checks (Gene)", 54 boxes) and the twelve choices left for him (the same file, "Choices
+  left for Gene").
 
 ### Needs Gene
 
+0. **M32 first:** the hand checks in `m32-acceptance.md`, "Hand checks (Gene)" (54 boxes, by journey), and the twelve
+   choices in the same file, "Choices left for Gene" (each says what happens now and what the other choice would
+   be).
 1. **Hand-checks:** the list in `auto-acceptance-2026-11-08.md`, "What needs Gene by hand" (Windows and pywebview,
    Wacom, look and themes, real data and scale, live model wording, the file manager, decisions). Re-read the "Box
    texts that are out of date" table there before ticking. Boxes stay unticked in `mN-acceptance.md` until he does.

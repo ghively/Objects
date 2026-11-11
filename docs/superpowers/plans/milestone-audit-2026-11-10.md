@@ -5,8 +5,10 @@ that. Its method could not see what the default path feels like: what a person m
 note and track a task by hand. A hands-on walk the next day found that path broken or in the way in eleven places
 (a new space could not make tasks, typing could be lost on closing the window, Enter in the title threw the caret
 away, the Tasks page was the work dashboard) with AI, agents and IT types ahead of the page. The analysis is
-`notes-first-analysis-2026-11-11.md`; M32 (`2026-11-11-m32-notes-first.md`, `m32-acceptance.md`) is the answer. Read
-this audit for what is built, and the analysis for what the app is for.
+`notes-first-analysis-2026-11-11.md`; M32 (`2026-11-11-m32-notes-first.md`) is the answer, and it is finished: built,
+reviewed, fixed in one pass, gated and on `master` the same day. Its record is `m32-acceptance.md` (the review and
+the fix pass, our calls, the known limits, the choices left for Gene and his hand checks). Read this audit for what
+is built, and the analysis for what the app is for.
 
 Gene asked (2026-11-10) for one check of the whole app before relying on it: is everything built, is it
 functional, and what is left. This file is the answer and the current to-do list.
