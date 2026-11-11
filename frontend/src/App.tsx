@@ -54,7 +54,9 @@ import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
 import { HomePage } from '@/home/HomePage'
-import { TasksPage } from '@/tasks/TasksPage'
+import { TasksHidden } from '@/tasks/TasksHidden'
+import { TasksPage, tasksListForWorkView } from '@/tasks/TasksPage'
+import { useTasksHidden } from '@/tasks/tasksHidden'
 import { WorkPage } from '@/work/page/WorkPage'
 import { WorkOverlays } from '@/work/session/WorkOverlays'
 import { WorkToasts } from '@/work/state/WorkToasts.tsx'
@@ -118,10 +120,12 @@ interface PageCtx {
   open: (t: Target, o?: OpenOptions) => void
   /** M32: whether the Work page is on for this space (`useWorkOn`). */
   workOn: boolean
+  /** M32: "Hide Tasks in this space": the Tasks and Work pages give way to one quiet line. */
+  tasksHidden: boolean
 }
 
 /** The page a target shows, in the main panel or in a side-panel entry (`open` navigates that place). */
-function pageFor(target: Target, { types, space, open, workOn }: PageCtx): ReactNode {
+function pageFor(target: Target, { types, space, open, workOn, tasksHidden }: PageCtx): ReactNode {
   switch (target.kind) {
     case 'object':
       // M23: `work: true` (the item panel) shows the work header above the object's page.
@@ -161,7 +165,7 @@ function pageFor(target: Target, { types, space, open, workOn }: PageCtx): React
       )
     case 'tasks':
       // M32: the plain Tasks page; the dashboard is the Work page (`work`), when it is on.
-      return <TasksPage />
+      return tasksHidden ? <TasksHidden /> : <TasksPage />
     case 'graph':
       return (
         <Suspense fallback={null}>
@@ -176,8 +180,10 @@ function pageFor(target: Target, { types, space, open, workOn }: PageCtx): React
       return <AgentPage key={target.id} id={target.id} tab={target.tab} />
     case 'work':
       // M23's Work page (the dashboard), on its view. M32: only while Work is on for this space;
-      // off, a work target (a restored tab, an old link) shows the Tasks page.
-      return workOn ? <WorkPage view={target.view} /> : <TasksPage />
+      // off, a work target (a restored tab, an old link) shows the Tasks page, on the list that
+      // stands for the view it named (`{view: 'today'}` → Today, `inbox` → Inbox…).
+      if (tasksHidden) return <TasksHidden />
+      return workOn ? <WorkPage view={target.view} /> : <TasksPage list={tasksListForWorkView(target.view)} />
     case 'spaceHistory':
       // 2026-11-08: the space's git history and "Restore space to this point".
       return (
@@ -276,6 +282,8 @@ export default function App() {
   const types = useSpaceTypes(space)
   // M32: the Work page, its toasts and its overlays exist only while Work is on for this space.
   const workOn = useWorkOn()
+  // M32: "Hide Tasks in this space" hides the Tasks and Work entries, pages, toasts and overlays.
+  const tasksHidden = useTasksHidden()
 
   // Shortcuts (their keys are in `lib/shortcuts.ts`): the New menu (Ctrl+U, Alt+Shift+N), a new
   // note, or one more of the type in view (Ctrl+N, Alt+N), and Ctrl+Backspace "Delete this …?".
@@ -327,7 +335,7 @@ export default function App() {
   if (error) {
     content = <Centered title="Can't reach the Object back end." subtitle={error} />
   } else if (target) {
-    content = pageFor(target, { types, space, open, workOn })
+    content = pageFor(target, { types, space, open, workOn, tasksHidden })
   } else if (!tabsReady) {
     content = null
   } else {
@@ -351,7 +359,7 @@ export default function App() {
     if (t.kind === 'backlinks') return <BacklinksPanel path={target?.kind === 'object' ? target.path : null} />
     // M10: `SidePanelArea` shows the AI chat itself (it needs the entry).
     if (t.kind === 'aiChat') return null
-    return pageFor(t, { types, space, workOn, open: (x, o) => (o?.newTab ? open(x, o) : nav.open(x, o)) })
+    return pageFor(t, { types, space, workOn, tasksHidden, open: (x, o) => (o?.newTab ? open(x, o) : nav.open(x, o)) })
   }
 
   return (
@@ -420,8 +428,8 @@ export default function App() {
         <LinkPicker />
         {/* M23: the work toasts (problems and Undo) and the focus session / Make it smaller, once.
             M32: only while Work is on for this space. */}
-        {workOn && <WorkToasts />}
-        {workOn && <WorkOverlays />}
+        {workOn && !tasksHidden && <WorkToasts />}
+        {workOn && !tasksHidden && <WorkOverlays />}
         <NewObjectMenu open={newMenuOpen} onOpenChange={setNewMenuOpen} />
         <CreateTypeDialog
           open={createTypeOpen}

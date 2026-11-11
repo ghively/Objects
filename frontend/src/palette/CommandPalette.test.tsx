@@ -19,6 +19,7 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { useRecent } from '@/nav/recent'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { objectSummary, searchResult, typeDef } from '@/test/mockApi'
 import { ACTION_TEXT } from './actions'
 import { CommandPalette, paletteShortcut } from './CommandPalette'
@@ -518,6 +519,28 @@ describe('actions in the list', () => {
     await user.clear(input)
     await user.type(input, 'toggle')
     await waitFor(() => expect(actionLabels()).toEqual(['Toggle focus mode', 'Toggle left sidebar', 'Toggle right side panel']))
+  })
+
+  // M32: "Hide Tasks in this space" takes the task command off the palette; the other types stay.
+  test('test while the space hides Tasks the palette offers no Create Task', async () => {
+    useSpaceInfo.setState({ space: { name: 's', root: '/s', types: [], hideTaskManagement: true }, loaded: true })
+    try {
+      const { user } = setup()
+      const input = await openSearch(user)
+      await user.type(input, 'create')
+      await waitFor(() => expect(actionLabels()).toEqual(['Create Note', 'Create Person', 'Create Tag']))
+      await user.clear(input)
+      await user.type(input, 'task')
+      await waitFor(() => expect(mocked.search).toHaveBeenLastCalledWith('task', expect.anything()))
+      expect(actionLabels()).toEqual([])
+      // The switch off again: the command is back.
+      act(() => useSpaceInfo.setState({ space: { name: 's', root: '/s', types: [], hideTaskManagement: false }, loaded: true }))
+      await user.clear(input)
+      await user.type(input, 'create')
+      await waitFor(() => expect(actionLabels()).toEqual(['Create Note', 'Create Person', 'Create Tag', 'Create Task']))
+    } finally {
+      resetSpaceInfo()
+    }
   })
 
   test('a matching action keeps "No results" away; no match at all shows it', async () => {

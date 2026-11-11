@@ -86,7 +86,8 @@ export function useWorkKeys(): void {
         gAt = null
         if (fresh && key.length === 1) {
           const calm = useWorkUi.getState().calm
-          // Hide Task Management leaves the task lists out, so `g i` (Inbox) does nothing then.
+          // "Hide Tasks in this space" leaves the task lists out, so `g i` (Inbox) does nothing then
+          // (M32: the app does not show this page at all while Tasks are hidden).
           const hideTasks = useSpaceInfo.getState().space?.hideTaskManagement ?? false
           const view = workViews().find(
             (v) => v.key === key && (!calm || v.id === 'now') && !(hideTasks && isTaskListView(v.id)),

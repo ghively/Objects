@@ -1,7 +1,7 @@
 // M32: the Tasks entry opens the plain Tasks page (target `tasks`) and is active for it only. The
 // Work page (the dashboard) has its own entry directly under Tasks, shown only while Work is on for
-// the space (`useWorkOn`). Tasks stays while the space hides task management.
-import { render, screen, waitFor, within } from '@testing-library/react'
+// the space (`useWorkOn`). While the space hides Tasks ("Hide Tasks in this space") neither shows.
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -96,7 +96,7 @@ describe('Sidebar Tasks and Work entries (M32)', () => {
     expect(workButton()).not.toHaveAttribute('aria-current')
   })
 
-  test('test Tasks stays, and opens the Tasks page, while the space hides task management', async () => {
+  test('test while the space hides Tasks there is no Tasks entry and no Work entry, even with Work on', async () => {
     mocked.space.mockResolvedValue({
       name: 'space',
       root: '/space',
@@ -104,15 +104,19 @@ describe('Sidebar Tasks and Work entries (M32)', () => {
       icon: null,
       description: null,
       hideTaskManagement: true,
+      workEnabled: true,
+      workOn: true,
       revision: 's1',
     })
-    const onOpenTarget = vi.fn()
-    const user = userEvent.setup()
-    render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
+    render(<Sidebar types={[]} />)
     await waitFor(() => expect(useSpaceInfo.getState().space?.hideTaskManagement).toBe(true))
-    await user.click(tasksButton())
-    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'tasks' }, { newTab: false })
+    expect(within(main()).queryByRole('button', { name: 'Tasks' })).toBeNull()
     expect(workButton()).toBeNull()
+    // The rest of the main entries are untouched (decision 1: AI stays where it is).
+    expect(mainNames().slice(0, 3)).toEqual(['Notes', 'Calendar', 'Graph'])
+    // The switch off again: both are back, without a reload.
+    act(() => useSpaceInfo.setState((st) => ({ space: st.space && { ...st.space, hideTaskManagement: false } })))
+    expect(mainNames().slice(0, 5)).toEqual(['Notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
   })
 
   test('test Tasks shows while AI features are hidden', () => {

@@ -116,7 +116,9 @@ export function WorkPage({ view }: { view?: WorkViewId }): JSX.Element {
   // A new visit starts with no search.
   useEffect(() => () => clearWorkSearch(), [])
 
-  // Hide Task Management hides the task lists (the old Tasks page), not the work dashboard.
+  // "Hide Tasks in this space": M32, the app shows `tasks/TasksHidden` in place of this page then
+  // (`App.pageFor`), so this only matters where the page is rendered on its own: the task lists
+  // are left out, as before.
   const hideTasks = useSpaceInfo((s) => s.space?.hideTaskManagement ?? false)
   const all = hideTasks ? workViews().filter((v) => !isTaskListView(v.id)) : workViews()
   const shown = calm ? all.filter((v) => v.id === 'now') : all

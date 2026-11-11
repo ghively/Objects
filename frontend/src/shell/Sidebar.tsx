@@ -19,6 +19,7 @@ import { chipStyle } from './typeColor'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { typePlural } from '@/lib/typeLabel'
 import { NEW_TYPE, NOTES, SAVED_SEARCHES, TYPES, WORK } from '@/lib/words'
+import { useTasksHidden } from '@/tasks/tasksHidden'
 import { useWorkOn } from '@/work/useWorkOn'
 import { usePalette } from '@/palette/usePalette'
 import { useSettings } from '@/settings/useSettings'
@@ -260,6 +261,8 @@ export function Sidebar({
   }, [])
   // M32: the Work entry exists only while the Work page is on for this space.
   const workOn = useWorkOn()
+  // M32: "Hide Tasks in this space" takes the Tasks entry, and Work under it, off the sidebar.
+  const tasksHidden = useTasksHidden()
   // A type's collections sit under its row in the object types block.
   const { collections } = useCollections()
   const [collapsed, toggleCollapsed] = useCollapsedTypes()
@@ -487,14 +490,16 @@ export function Sidebar({
           active={calendarActive}
           onClick={(e) => onOpenTarget?.({ kind: 'calendar' }, { newTab: e.ctrlKey || e.metaKey })}
         />
-        {/* Always shown; active for the `tasks` target only. */}
-        <MainNavButton
-          icon="ph-check-circle"
-          label="Tasks"
-          active={tasksActive}
-          onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
-        />
-        {workOn && (
+        {/* Shown unless the space hides Tasks; active for the `tasks` target only. */}
+        {!tasksHidden && (
+          <MainNavButton
+            icon="ph-check-circle"
+            label="Tasks"
+            active={tasksActive}
+            onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
+          />
+        )}
+        {workOn && !tasksHidden && (
           <MainNavButton
             icon="ph-briefcase"
             label={WORK_LABEL}

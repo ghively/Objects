@@ -19,6 +19,7 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { M7_SHORTCUTS, registerShortcuts, useGlobalShortcut } from '@/lib/shortcuts'
 import { openTodaysNote } from '@/calendar/openTodaysNote'
 import { currentTarget, useTabs } from '@/nav/tabs'
+import { isTasksHidden } from '@/tasks/tasksHidden'
 import { useTabMenu } from '@/shell/TabMenu'
 
 export const TAB_SHORTCUT_IDS = ['closeTab', 'openNewTab', 'navigateTabs', 'openTabList', 'navigateBack', 'navigateForward'] as const
@@ -53,9 +54,11 @@ export const CREATE_TASK_FAILED = 'Could not create the task.'
 
 /**
  * "Create new task" (Ctrl+Shift+T): the New menu's flow for the Task type, outside editable
- * targets. A failure shows its message as a toast, as the New menu shows it.
+ * targets. A failure shows its message as a toast, as the New menu shows it. M32: nothing while
+ * the space hides Tasks ("Hide Tasks in this space").
  */
 export function createNewTask(): void {
+  if (isTasksHidden()) return
   const id = taskTypeId()
   if (!id) return
   void createAndOpen(id).catch((err: unknown) => showToast(err instanceof Error && err.message ? err.message : CREATE_TASK_FAILED))

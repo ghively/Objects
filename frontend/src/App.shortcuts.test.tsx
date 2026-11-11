@@ -17,6 +17,7 @@ import { setLastTypeSpace, useLastType } from '@/create/lastType'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { takeBodyFocus } from '@/nav/focusRequest'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import App from './App'
 
 const mocked = vi.mocked(api)
@@ -36,6 +37,7 @@ beforeEach(async () => {
   useTabs.getState().reset()
   usePeek.getState().close()
   resetLinkIndex()
+  resetSpaceInfo()
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
   mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE, PROJECT, TASK] } satisfies SpaceInfo)
   mocked.objects.mockResolvedValue([NOTES])
@@ -179,6 +181,22 @@ describe('app shortcuts', () => {
     fireEvent.keyDown(editor, { key: 'T', ctrlKey: true, shiftKey: true })
     await new Promise((r) => setTimeout(r, 50))
     expect(mocked.createObject).not.toHaveBeenCalled()
+  })
+
+  // M32, "Hide Tasks in this space": the task keys do nothing, in a note and outside one.
+  test('test while the space hides Tasks, Ctrl+Shift+T makes no task outside the editor and changes nothing inside it', async () => {
+    mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE, PROJECT, TASK], hideTaskManagement: true } satisfies SpaceInfo)
+    const { container } = await openObjectPage()
+    await waitFor(() => expect(useSpaceInfo.getState().space?.hideTaskManagement).toBe(true))
+    fireEvent.keyDown(document.body, { key: 'T', ctrlKey: true, shiftKey: true })
+    const pm = container.querySelector('.ProseMirror') as HTMLElement & { editor?: TiptapEditor }
+    const before = pm.editor!.getJSON()
+    fireEvent.keyDown(pm, { key: 'T', ctrlKey: true, shiftKey: true })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mocked.createObject).not.toHaveBeenCalled()
+    expect(pm.editor!.getJSON()).toEqual(before)
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: PATH })
+    expect(usePeek.getState().path).toBeNull()
   })
 
   // M32, "keys work while you type": with the caret in a note's text or title.
