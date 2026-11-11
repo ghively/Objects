@@ -66,8 +66,9 @@ describe('DaySections', () => {
     const { rerender } = render(<DayView day={TODAY} />)
     await within(await screen.findByTestId('section-tasks')).findByText('Late')
     const headers = within(tasksSection()).getAllByTestId('group-header').map((h) => h.textContent)
-    expect(headers[0]).toContain('Overdue (2)')
-    expect(headers[1]).toContain('Today')
+    // M32: the count shows once (it read "Overdue (2)2"); the other groups keep their own count.
+    expect(headers[0]).toBe('Overdue (2)')
+    expect(headers[1]).toBe('Today1')
     rerender(<DayView day="2026-10-24" />)
     await waitFor(() => expect(within(tasksSection()).queryByText('Late')).toBeNull())
     expect(within(tasksSection()).queryAllByTestId('group-header')).toHaveLength(0)
@@ -184,7 +185,7 @@ describe('DaySections', () => {
     render(<DayView day="2026-10-25" />)
     await screen.findByText('No tasks on this day')
     await user.click(screen.getByRole('button', { name: 'Add to tasks' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Create task' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'New task' }))
     expect(mocked.createObject).toHaveBeenCalledWith('task', { values: { date: day('2026-10-25') } })
   })
 

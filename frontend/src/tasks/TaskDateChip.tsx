@@ -172,6 +172,8 @@ export function TaskDateChip({
               void write(next)
               if (next === null) setOpen(false)
             }}
+            // M32: Enter in the date field, once the date is set, closes the chip's picker.
+            onClose={() => setOpen(false)}
           />
         ) : (
           <div role="menu" aria-label={TASK_DATE_TEXT.label} className="flex w-44 flex-col p-1.5">

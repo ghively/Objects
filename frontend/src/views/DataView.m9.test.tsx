@@ -162,12 +162,12 @@ describe('DataView multi-select (Task 18)', () => {
     await waitFor(() => expect(screen.queryByTestId('selection-bar')).toBeNull())
   })
 
-  test('test bulk delete of one object says "Delete 1 object"', async () => {
+  test('test bulk delete of one note says "Delete 1 note"', async () => {
     const user = userEvent.setup()
     render(<Harness />)
     await startSelecting(user, 'A')
     await user.click(screen.getByRole('button', { name: 'Delete' }))
-    expect(await screen.findByRole('button', { name: /^Delete 1 (object|note)$/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Delete 1 note' })).toBeInTheDocument()
   })
 
   test('test bulk change type', async () => {

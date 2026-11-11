@@ -479,7 +479,7 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   ),
   def('whiteboardFlipHorizontal', 'whiteboard', 'Flip horizontal', ['Shift-h'], 'whiteboard', false, false),
   def('whiteboardFlipVertical', 'whiteboard', 'Flip vertical', ['Shift-v'], 'whiteboard', false, false),
-  def('whiteboardCycle', 'whiteboard', 'Cycle selected objects', ['Tab'], 'whiteboard', false, false),
+  def('whiteboardCycle', 'whiteboard', 'Cycle selected items', ['Tab'], 'whiteboard', false, false),
   def('whiteboardCycleBack', 'whiteboard', 'Select the previous item', ['Shift-Tab'], 'whiteboard', false, false),
   def('whiteboardPan', 'whiteboard', 'Pan', ['Space'], 'whiteboard', false, false),
   // The catalog lists Undo and Redo under General: display-only, the editor (its history) and the
@@ -543,7 +543,7 @@ export const M8_SHORTCUTS: ShortcutDef[] = [
   def('turnIntoObject', 'block', 'Turn into a note', ['i'], 'editor', V, true),
   // No key: its only trigger is the markdown `()` + Space.
   def('turnIntoTask', 'block', 'Turn into task', [], 'editor', V, true),
-  def('turnBlockIntoTaskObject', 'block', 'Make this block a task', ['Mod-Shift-t'], 'editor', V, true),
+  def('turnBlockIntoTaskObject', 'block', 'Make this line a task', ['Mod-Shift-t'], 'editor', V, true),
   def('highlightText', 'text', 'Highlight the selected text', ['Mod-Shift-h'], 'editor', V, true),
   def('toggleFocusMode', 'global', 'Toggle focus mode', ['Mod-Shift-m'], 'global', V, true),
   // Ctrl+Alt+P on Windows, ⌃⌘P on macOS.

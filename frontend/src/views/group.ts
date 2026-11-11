@@ -105,6 +105,8 @@ export interface Group {
   color?: string | null
   icon?: Icon | null
   isOther?: boolean
+  /** M32: the label already says the count ("Overdue (1)"), so the header shows no second one. */
+  countInLabel?: boolean
 }
 
 export interface GroupCtx extends FilterCtx {

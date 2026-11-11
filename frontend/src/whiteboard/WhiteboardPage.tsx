@@ -431,7 +431,7 @@ export function WhiteboardPage({
             </div>
           )}
           {footer && <div className="absolute bottom-4 left-4 z-10">{footer}</div>}
-          <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} />
+          <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} title={title} />
         </div>
         {notes && (
           <BoardNotes

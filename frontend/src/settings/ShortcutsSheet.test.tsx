@@ -1,7 +1,10 @@
 import { act, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { CATEGORY_LABELS, CATEGORY_ORDER, allShortcuts, formatKeys } from '@/lib/shortcuts'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
+import { setWorkOn } from '@/test/workOn'
 import '@/theme/shortcuts'
+import '@/work/keys/workShortcuts'
 import { ShortcutsSheet } from './ShortcutsSheet'
 import { resetSettingsModal, useSettingsModal } from './useSettingsModal'
 import { settingsDefaults, useSettings } from './useSettings'
@@ -9,6 +12,9 @@ import { settingsDefaults, useSettings } from './useSettings'
 beforeEach(() => {
   resetSettingsModal()
   useSettings.setState({ settings: settingsDefaults, revision: 'r0', loaded: true })
+  // Work on, as in a space that uses it: the sheet lists every group (a test turns it off).
+  resetSpaceInfo()
+  setWorkOn(true)
 })
 
 describe('ShortcutsSheet', () => {
@@ -69,6 +75,37 @@ describe('ShortcutsSheet', () => {
     expect(headings.slice(0, 7)).toEqual(['General', 'Text editing', 'Block editing', 'Page', 'Navigation', 'Calendar', 'AI Assistant'])
     expect(headings.slice(7)).toContain('Whiteboard')
     expect(CATEGORY_ORDER).toEqual(['global', 'text', 'markdown', 'block', 'page', 'navigation', 'calendar', 'ai', 'table', 'date', 'pdf', 'weblink'])
+  })
+
+  // M32: the Work page is off until it is turned on for the space, and its keys with it.
+  test('test the Work group shows only while the Work page is on for the space', async () => {
+    render(<ShortcutsSheet />)
+    act(() => useSettingsModal.getState().openShortcuts())
+    const sheet = await screen.findByRole('dialog', { name: 'Shortcuts' })
+    const work = within(sheet).getByRole('region', { name: 'Work' })
+    expect(work.querySelectorAll('[data-shortcut]').length).toBeGreaterThan(0)
+    act(() => setWorkOn(false))
+    expect(within(sheet).queryByRole('region', { name: 'Work' })).toBeNull()
+    // Nothing else leaves: the task keys and the other groups stay.
+    expect(sheet.querySelector('[data-shortcut="createNewTask"]')).not.toBeNull()
+    expect(sheet.querySelector('[data-shortcut="turnBlockIntoTaskObject"]')).not.toBeNull()
+    expect(within(sheet).getByRole('region', { name: 'General' })).toBeInTheDocument()
+    act(() => setWorkOn(true))
+    expect(within(sheet).getByRole('region', { name: 'Work' })).toBeInTheDocument()
+  })
+
+  test('test while the space hides Tasks the task keys and the Work group are left out', async () => {
+    render(<ShortcutsSheet />)
+    act(() => useSettingsModal.getState().openShortcuts())
+    const sheet = await screen.findByRole('dialog', { name: 'Shortcuts' })
+    expect(sheet.querySelector('[data-shortcut="createNewTask"]')).not.toBeNull()
+    act(() => useSpaceInfo.setState((s) => ({ space: s.space && { ...s.space, hideTaskManagement: true } })))
+    expect(sheet.querySelector('[data-shortcut="createNewTask"]')).toBeNull()
+    expect(sheet.querySelector('[data-shortcut="turnBlockIntoTaskObject"]')).toBeNull()
+    expect(within(sheet).queryByRole('region', { name: 'Work' })).toBeNull()
+    // The rest of the two groups stays.
+    expect(sheet.querySelector('[data-shortcut="openSettings"]')).not.toBeNull()
+    expect(within(sheet).getByRole('region', { name: 'Block editing' })).toBeInTheDocument()
   })
 
   test('test the AI Assistant group is left out while AI features are hidden', async () => {

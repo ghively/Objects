@@ -103,6 +103,6 @@ describe('test M28 contract', () => {
 
   test('test the CounterpartRows stub exports', () => {
     expect(typeof CounterpartRows).toBe('function')
-    expect(COUNTERPART_TEXT.mixed).toBe('Pick an object of {types}.')
+    expect(COUNTERPART_TEXT.mixed).toBe('Pick one of {types}.')
   })
 })

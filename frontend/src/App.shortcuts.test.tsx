@@ -175,7 +175,7 @@ describe('app shortcuts', () => {
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'calendar' })
   })
 
-  test('Ctrl+Shift+T inside the editor keeps meaning "Make this block a task": no new task is created', async () => {
+  test('Ctrl+Shift+T inside the editor keeps meaning "Make this line a task": no new task is created', async () => {
     const { container } = await openObjectPage()
     const editor = container.querySelector('.ProseMirror')!
     fireEvent.keyDown(editor, { key: 'T', ctrlKey: true, shiftKey: true })

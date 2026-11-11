@@ -75,7 +75,7 @@ export function goToCalendar(): void {
 }
 
 /**
- * The General keys of the 2026-11-08 sweep. Inside the editor Ctrl+Shift+T stays "Make this block
+ * The General keys of the 2026-11-08 sweep. Inside the editor Ctrl+Shift+T stays "Make this line
  * a task"; Ctrl+Alt+H types nothing, so it works there too.
  */
 export function useGeneralShortcuts(): void {

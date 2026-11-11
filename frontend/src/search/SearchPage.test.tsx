@@ -125,7 +125,8 @@ describe('SearchPage', () => {
     const user = userEvent.setup()
     mocked.createQuery.mockResolvedValue(query({ id: 'q2', name: 'New Query' }))
     render(<SearchPage q="alpha page" />)
-    await user.click(await screen.findByRole('button', { name: 'Only search for type "Page"' }))
+    // M32: the built-in Page type reads "Note"; "page" still finds it (its stored name).
+    await user.click(await screen.findByRole('button', { name: 'Only search for type "Note"' }))
     await waitFor(() => expect(lastSearch()?.[1]).toMatchObject({ types: ['page'] }))
     expect(lastSearch()?.[0]).toBe('alpha')
     await user.click(screen.getByRole('button', { name: /Save search/ }))

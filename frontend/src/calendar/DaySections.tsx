@@ -55,7 +55,8 @@ export const SECTIONS_TEXT = {
   overdue: (n: number) => `Overdue (${n})`,
   /** The group after Overdue on today. */
   todayGroup: 'Today',
-  createTask: 'Create task',
+  /** M32 (the glossary): was "Create task". */
+  createTask: 'New task',
   moveAll: 'Move all open tasks to',
   today: 'Today',
   tomorrow: 'Tomorrow',
@@ -262,7 +263,8 @@ export function overduePipeline(badges: Map<string, TaskBadge[]>): Pipeline {
     const restGroups = state.groupBy ? g.groups : rest.length ? [{ id: 'today', label: SECTIONS_TEXT.todayGroup, rows: rest }] : []
     return {
       rows: [...overdue, ...rest],
-      groups: [{ id: 'overdue', label: SECTIONS_TEXT.overdue(overdue.length), rows: overdue }, ...restGroups],
+      // The label carries the count, so the header shows it once (M32: it read "Overdue (1) 1").
+      groups: [{ id: 'overdue', label: SECTIONS_TEXT.overdue(overdue.length), countInLabel: true, rows: overdue }, ...restGroups],
       hidden: g.hidden,
     }
   }

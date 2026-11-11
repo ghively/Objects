@@ -370,6 +370,8 @@ export function DataView(props: DataViewProps) {
   // One change-type dialog per row, in turn (the bulk action runs the one-object dialog per row).
   const [changing, setChanging] = useState<{ rows: Row[]; to: TypeDef } | null>(null)
   const [deleting, setDeleting] = useState<Row | null>(null)
+  // M32: the delete dialog names the note; kept past the close so the heading does not change on the way out.
+  const [deletingTitle, setDeletingTitle] = useState<string | undefined>(undefined)
   // The selected paths while selecting ("Select multiple"); null when not selecting.
   const [selected, setSelected] = useState<string[] | null>(null)
   const anchor = useRef<string | null>(null)
@@ -542,7 +544,8 @@ export function DataView(props: DataViewProps) {
     >
       <Icon name={closed(g) ? 'ph-caret-right' : 'ph-caret-down'} size={13} />
       <span className="truncate">{g.label}</span>
-      <span className="text-fg-muted">{count}</span>
+      {/* M32: a label that carries its own count ("Overdue (1)") is not counted twice. */}
+      {!g.countInLabel && <span className="text-fg-muted">{count}</span>}
     </button>
   )
 
@@ -674,7 +677,10 @@ export function DataView(props: DataViewProps) {
     types,
     selectMultiple: (row) => select([row.summary.path], row.summary.path),
     changeType: (row, to) => setChanging({ rows: [row], to }),
-    requestDelete: (row) => setDeleting(row),
+    requestDelete: (row) => {
+      setDeletingTitle(row.summary.title)
+      setDeleting(row)
+    },
   }
   const itemsFor = (row: Row): RowMenuItem[] => [
     ...(props.rowActions ? commonRowMenu(row, menuCtx) : []),
@@ -824,6 +830,7 @@ export function DataView(props: DataViewProps) {
         onConfirm={async () => {
           if (deleting) await api.deleteObject(deleting.summary.path, { baseVersion: deleting.version })
         }}
+        title={deletingTitle}
       />
     </section>
   )

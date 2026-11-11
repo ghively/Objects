@@ -92,6 +92,8 @@ describe('TaskDateChip', () => {
     await user.clear(field)
     await user.type(field, '2026-11-20{Enter}')
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/A.md', { date: day('2026-11-20') }, 'v1'))
+    // M32: Enter set the date, so the picker closes (the chip passes the picker its `onClose`).
+    await waitFor(() => expect(screen.queryByTestId('date-picker')).toBeNull())
   })
 
   test('a 409 reloads the row and reports the conflict; a read-only task has no picker', async () => {
