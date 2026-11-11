@@ -305,7 +305,7 @@ from .watcher import LINKED_KINDS, ChangeEvent, SpaceWatcher
 from .whiteboardapi import whiteboard_router
 from .whiteboardfile import sidecar_owner
 from .whiteboardstore import whiteboard_ui_problem
-from .workloop import WorkLoop, on_change_event
+from .workloop import WorkLoop, on_change_event, wake_for
 from .workseams import build_seams
 from .workservice import WorkService
 from .workview import TICKETS_ID
@@ -1154,6 +1154,7 @@ def create_app(
             # (Tickets) did too, in memory: the windows read both again.
             announce(ChangeEvent("types", "*", None))
             announce(ChangeEvent("queries", TICKETS_ID, None))
+            wake_for(space)  # what the Work agent left waiting while Work was off
         return info
 
     @api.get("/settings")
