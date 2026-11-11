@@ -42,7 +42,7 @@ describe('Sidebar Tasks and Work entries (M32)', () => {
     render(<Sidebar types={[]} />)
     await waitFor(() => expect(useSpaceInfo.getState().space).not.toBeNull())
     expect(workButton()).toBeNull()
-    expect(mainNames().slice(0, 4)).toEqual(['Notes', 'Calendar', 'Tasks', 'Graph'])
+    expect(mainNames().slice(0, 4)).toEqual(['All notes', 'Calendar', 'Tasks', 'Graph'])
   })
 
   test('test Work shows directly under Tasks while Work is on, and opens the work target', async () => {
@@ -51,7 +51,7 @@ describe('Sidebar Tasks and Work entries (M32)', () => {
     const user = userEvent.setup()
     render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
     await waitFor(() => expect(workButton()).not.toBeNull())
-    expect(mainNames().slice(0, 5)).toEqual(['Notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
+    expect(mainNames().slice(0, 5)).toEqual(['All notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
     await user.click(workButton()!)
     expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'work' }, { newTab: false })
     await user.keyboard('{Control>}')
@@ -113,10 +113,10 @@ describe('Sidebar Tasks and Work entries (M32)', () => {
     expect(within(main()).queryByRole('button', { name: 'Tasks' })).toBeNull()
     expect(workButton()).toBeNull()
     // The rest of the main entries are untouched (decision 1: AI stays where it is).
-    expect(mainNames().slice(0, 3)).toEqual(['Notes', 'Calendar', 'Graph'])
+    expect(mainNames().slice(0, 3)).toEqual(['All notes', 'Calendar', 'Graph'])
     // The switch off again: both are back, without a reload.
     act(() => useSpaceInfo.setState((st) => ({ space: st.space && { ...st.space, hideTaskManagement: false } })))
-    expect(mainNames().slice(0, 5)).toEqual(['Notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
+    expect(mainNames().slice(0, 5)).toEqual(['All notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
   })
 
   test('test Tasks shows while AI features are hidden', () => {

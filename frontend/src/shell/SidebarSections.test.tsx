@@ -172,13 +172,12 @@ describe('SidebarSections', () => {
     expect(onOpenTypeSettings).toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Saved searches' }))
     expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'queries' }, { newTab: false })
-    // M32: the main navigation is Notes, Calendar, Tasks, (Work while it is on,) Graph, Assistant.
-    expect(screen.queryByRole('button', { name: 'All notes' })).toBeNull()
+    // M32: the main navigation is All notes, Calendar, Tasks, (Work while it is on,) Graph, Assistant.
     const main = screen.getByRole('navigation', { name: 'Main' })
     const names = within(main)
       .getAllByRole('button')
       .map((b) => b.getAttribute('aria-label') ?? b.textContent)
     // The Assistant row carries its hover `…` menu (the way into its own page).
-    expect(names.filter((n) => n !== 'Work')).toEqual(['Notes', 'Calendar', 'Tasks', 'Graph', 'Assistant', 'Assistant actions'])
+    expect(names.filter((n) => n !== 'Work')).toEqual(['All notes', 'Calendar', 'Tasks', 'Graph', 'Assistant', 'Assistant actions'])
   })
 })

@@ -1,11 +1,11 @@
-// "Notes" (M32; was "All notes"): every note by when it was last edited, newest first, grouped
+// "All notes" (M32): every note by when it was last edited, newest first, grouped
 // Today / Yesterday / This week / Earlier. Daily notes are in; tasks, tags and templates are left
 // out (`notes.ts`). A sort or a grouping picked in the toolbar takes over for as long as it is set.
 // The layout is saved to `ui.allNotesLayout`.
 import { useCallback, useMemo, useState } from 'react'
 import type { Layout, Row, ViewState } from '@/api/types'
 import { Icon } from '@/components/Icon'
-import { NOTES } from '@/lib/words'
+import { ALL_NOTES } from '@/lib/words'
 import { useZonedToday } from '@/lib/zonedShell'
 import { useLinkIndex } from '@/links/linkIndex'
 import { usePinned, saveAllNotesLayout, useUiStore } from '@/shell/usePinned'
@@ -19,7 +19,7 @@ import { useRows } from '@/views/useRows'
 import { byEditedDesc, editedAt, editedDay, editedGroup, editedLabel, isListedNote, isListedType, NOTES_GROUPS } from './notes'
 
 export const ALL_NOTES_TEXT = {
-  heading: NOTES,
+  heading: ALL_NOTES,
   description: 'Every note, by when it was last edited.', // our string
   emptyTitle: 'No notes yet',
   emptyBody: 'New notes show up here.',

@@ -125,11 +125,12 @@ describe('Sidebar', () => {
     // Regression guard (green from the start).
     render(<Sidebar types={TYPES} />)
     const nav = screen.getByRole('navigation', { name: /main/i })
-    for (const name of ['Notes', 'Calendar', 'Tasks', 'Graph']) {
+    for (const name of ['All notes', 'Calendar', 'Tasks', 'Graph']) {
       expect(within(nav).getByRole('button', { name })).toBeEnabled()
     }
-    // M32: "Notes" (the all-notes view) is back, first; "Queries" reads "Saved searches".
-    expect(screen.queryByRole('button', { name: 'All notes' })).toBeNull()
+    // M32: the all-notes view is back, first, as "All notes" (the fix pass: it read "Notes", the
+    // same word as the Note type's row under Types); "Queries" reads "Saved searches".
+    expect(within(nav).queryByRole('button', { name: 'Notes' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Queries' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Saved searches' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Pinned' })).toBeInTheDocument()
@@ -168,7 +169,7 @@ describe('Sidebar', () => {
     render(<Sidebar types={TYPES} />)
     const nav = screen.getByRole('navigation', { name: /main/i })
     expect(within(nav).getByRole('button', { name: 'Calendar' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'All notes' })).toBeNull()
+    expect(within(nav).getByRole('button', { name: 'All notes' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Saved searches' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Pinned' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument()
@@ -307,9 +308,9 @@ describe('Sidebar theme button (M7)', () => {
   })
 })
 
-// M32: "Notes" leads the main navigation, and the sidebar speaks the glossary's words.
+// M32: "All notes" leads the main navigation, and the sidebar speaks the glossary's words.
 describe('Sidebar (M32: notes first)', () => {
-  it('test Notes is the first main entry, above Calendar, and opens the all-notes view', async () => {
+  it('test All notes is the first main entry, above Calendar, and opens the all-notes view', async () => {
     const user = userEvent.setup()
     const onOpenTarget = vi.fn()
     const { rerender } = render(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} />)
@@ -317,15 +318,25 @@ describe('Sidebar (M32: notes first)', () => {
     const names = within(nav)
       .getAllByRole('button')
       .map((b) => b.getAttribute('aria-label') ?? b.textContent?.trim())
-    expect(names.slice(0, 3)).toEqual(['Notes', 'Calendar', 'Tasks'])
-    const notes = within(nav).getByRole('button', { name: 'Notes' })
+    expect(names.slice(0, 3)).toEqual(['All notes', 'Calendar', 'Tasks'])
+    const notes = within(nav).getByRole('button', { name: 'All notes' })
     expect(notes).not.toHaveAttribute('aria-current')
     await user.click(notes)
     expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'allNotes' }, { newTab: false })
     fireEvent.click(notes, { ctrlKey: true })
     expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'allNotes' }, { newTab: true })
     rerender(<Sidebar types={TYPES} onOpenTarget={onOpenTarget} notesActive />)
-    expect(within(nav).getByRole('button', { name: 'Notes' })).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getByRole('button', { name: 'All notes' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  // The decision of the M32 fix pass (F11): two rows read "Notes". The top entry is "All notes";
+  // the Note type's row under Types keeps "Notes".
+  it('test the top entry reads All notes and the Note type\'s row reads Notes: no two rows share a name', () => {
+    const page = { ...typeDef('Page', 'Pages', 'ph-file-text', 'pink'), basic: true }
+    render(<Sidebar types={[page]} />)
+    expect(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('button', { name: 'All notes' })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Types' })).getByRole('button', { name: 'Notes' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Notes' })).toHaveLength(1)
   })
 
   it('test the type list is headed Types, its plus is New type, and no default text says object', () => {

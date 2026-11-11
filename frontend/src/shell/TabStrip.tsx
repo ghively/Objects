@@ -23,7 +23,7 @@ import { useTitleCtx } from '@/queries/QueryPage'
 import { TypeChip } from '@/shell/Sidebar'
 import { TabMenu } from '@/shell/TabMenu'
 import { typeLabel, typePlural } from '@/lib/typeLabel'
-import { HOME, NOTES, SAVED_SEARCH, SAVED_SEARCHES, TASKS, WORK } from '@/lib/words'
+import { ALL_NOTES, HOME, SAVED_SEARCH, SAVED_SEARCHES, TASKS, WORK } from '@/lib/words'
 import { useWorkOn } from '@/work/useWorkOn'
 import { useAgents } from '@/agents/useAgents'
 import { useDefinitions } from '@/types/useDefinitions'
@@ -62,7 +62,7 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null,
         case 'queries':
           return SAVED_SEARCHES
         case 'allNotes':
-          return NOTES
+          return ALL_NOTES
         case 'calendar':
           return 'Calendar'
         case 'tasks':

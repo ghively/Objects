@@ -50,7 +50,7 @@ describe('AllNotesView (M32: Notes)', () => {
       make('Daily/2026-10-26.md', 'dailynote', daysAgo(0)),
     ])
     render(<AllNotesView />)
-    expect(screen.getByRole('heading', { name: 'Notes' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'All notes' })).toBeInTheDocument()
     expect(screen.getByText('Every note, by when it was last edited.')).toBeInTheDocument()
     await screen.findByText('New')
     expect(screen.getByText('2026-10-26')).toBeInTheDocument()

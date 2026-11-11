@@ -362,15 +362,17 @@ Each starter template pre-fills the new type's properties.
   one. The two starter sets stay available after the start through the same call (`POST /api/space/setup` with
   `basic` or `itops`): each writes only the types the space lacks, by id and by name, and replaces nothing; `blank`
   is refused once the space has a start. The IT operations starter turns Work on for its space (M32).
-- Main navigation, always visible at the top (M32): Notes, Calendar, Tasks, Work (only while the Work page is on
+- Main navigation, always visible at the top (M32): All notes, Calendar, Tasks, Work (only while the Work page is on
   for the space; directly under Tasks; it opens the `work` target), Graph, Assistant. Tasks is the active entry for
   the `tasks` target only, Work for `work` (a `work` target shown while Work is off reads as Tasks). The Assistant
   and the Agents section stay exactly where they were (M32 decision 1). The Assistant is the built-in, always-on helper — a program
   feature, not an "agent" — shown with its own icon; a click opens its chat. Like an agent row it carries a
   hover `…` menu (Open chat, Settings, Memory & skills — no Duplicate/Delete: it is built in), the way into
   its own page (Profile, Instructions, Memory, Skills, Learning, Chats…).
-- **Notes** (M32; was "All notes", off the sidebar since 2026-11-08): the first main entry opens the all-notes
-  view, heading "Notes", "Every note, by when it was last edited.": every note by last edit (`lastUpdated`, else
+- **All notes** (M32; off the sidebar since 2026-11-08; the build first called it "Notes", the same word as the
+  Note type's row under Types, which keeps "Notes"): the first main entry opens the all-notes view; the entry,
+  its tab and the view's heading read "All notes", over "Every note, by when it was last edited.": every note by
+  last edit (`lastUpdated`, else
   the creation time), newest first, grouped Today / Yesterday / This week / Earlier (our call: "This week" is
   the five days before yesterday, so the list never empties on a Monday); daily notes are in, tasks, tags and
   templates are left out; a list row ends with when it was edited. A sort or grouping picked in the toolbar

@@ -228,18 +228,18 @@ describe('M32 contract wiring: Tasks, Work off, Home', () => {
   })
 
   // M32 lane B: the sidebar's Notes and Work entries.
-  test('test the sidebar Notes entry is first and opens the all-notes view, tab title Notes', async () => {
+  test('test the sidebar All notes entry is first and opens the all-notes view, tab title All notes', async () => {
     act(() => useTabs.getState().open({ kind: 'object', path: 'Pages/A.md' }))
     render(<App />)
     await screen.findByText('object page Pages/A.md plain')
     const main = screen.getByRole('navigation', { name: 'Main' })
     const notes = within(main).getAllByRole('button')[0]
-    expect(notes).toHaveTextContent('Notes')
+    expect(notes).toHaveTextContent('All notes')
     act(() => notes.click())
-    expect(await screen.findByRole('heading', { name: 'Notes', level: 1 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'All notes', level: 1 })).toBeInTheDocument()
     expect(useTabs.getState().tabs[0].history.at(-1)).toEqual({ kind: 'allNotes' })
-    expect(within(main).getByRole('button', { name: 'Notes' })).toHaveAttribute('aria-current', 'page')
-    expect(within(screen.getByRole('tablist', { name: 'Tabs' })).getByRole('tab')).toHaveTextContent('Notes')
+    expect(within(main).getByRole('button', { name: 'All notes' })).toHaveAttribute('aria-current', 'page')
+    expect(within(screen.getByRole('tablist', { name: 'Tabs' })).getByRole('tab')).toHaveTextContent('All notes')
   })
 
   test('test the sidebar Work entry opens the work target while Work is on', async () => {
