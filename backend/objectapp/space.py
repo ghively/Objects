@@ -5380,8 +5380,13 @@ class Space:
                 starter = basic_types(work=self.work_on())
                 retarget = {t.id: named[t.name.lower()] for t in starter
                             if t.id not in taken and t.name.lower() in named}  # fmt: skip
+                types_dir = self.root / ".object" / "types"
                 for t in starter:
                     if t.id in taken or t.id in retarget:
+                        continue
+                    if (types_dir / f"{t.id}.json").exists():
+                        # A type file put there since the space was opened (a sync, by hand)
+                        # and not loaded: never replaced, as `write_itops_types` leaves it.
                         continue
                     retarget_relations(t, retarget)
                     self._write_type_json(t, "")
@@ -5395,8 +5400,14 @@ class Space:
                     builtin = self.type_by_id(type_id)
                     if builtin is not None and builtin.basic:
                         self._persist_type(builtin)
-            marker = spaceconfig.read(self.root)[0].get("setup")
-            if not (setup == "basic" and marker == "itops"):
+            config = spaceconfig.read(self.root)[0]
+            marker = config.get("setup")
+            # A set asked for again finds its marker (and, for the IT operations set, a Work
+            # switch) already there: space.json is not written again.
+            settled = marker == setup and (
+                setup != "itops" or isinstance(config.get("workEnabled"), bool)
+            )
+            if not (setup == "basic" and marker == "itops") and not settled:
                 # M32: the IT operations starter turns Work on for its space (unless the user
                 # already set the switch), in the same write as the marker.
                 spaceconfig.set_internal(
