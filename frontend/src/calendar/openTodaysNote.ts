@@ -26,7 +26,8 @@ export async function openTodaysNote(day: string = todayYmd()): Promise<string |
     const path = await ensureDailyNote(day)
     void invalidateLinkIndex()
     requestBodyFocus(path, 'end')
-    usePeek.getState().peek(path)
+    // The pop-out is an explicit peek: it stays one while "Open notes as a full page" is on.
+    usePeek.getState().show(path)
     return path
   } catch {
     showToast(TODAYS_NOTE_TEXT.failed)

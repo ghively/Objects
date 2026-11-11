@@ -109,7 +109,7 @@ describe('useTabs', () => {
 describe('usePeek', () => {
   test('steps through the list and clamps at the ends', () => {
     const p = usePeek.getState
-    p().peek('b.md', ['a.md', 'b.md', 'c.md'])
+    p().show('b.md', ['a.md', 'b.md', 'c.md'])
     expect(p().path).toBe('b.md')
     expect(p().index).toBe(1)
     p().next()
@@ -124,7 +124,7 @@ describe('usePeek', () => {
   })
 
   test('peek without a list is a list of one', () => {
-    usePeek.getState().peek('x.md')
+    usePeek.getState().show('x.md')
     expect(usePeek.getState().list).toEqual(['x.md'])
     expect(usePeek.getState().index).toBe(0)
   })
@@ -137,7 +137,7 @@ describe('retarget', () => {
     s().open(typeT('page'))
     s().open(objT('Pages/Other.md'), { newTab: true })
     s().open(objT('Pages/Old.md'))
-    usePeek.getState().peek('Pages/Old.md', ['Pages/A.md', 'Pages/Old.md', 'Pages/B.md'])
+    usePeek.getState().show('Pages/Old.md', ['Pages/A.md', 'Pages/Old.md', 'Pages/B.md'])
 
     s().retarget('Pages/Old.md', 'Pages/New.md')
 
@@ -238,7 +238,7 @@ describe('useRecent', () => {
   test('objects opened in a tab or the peek are recorded, newest first, without duplicates', () => {
     useTabs.getState().open(objT('Tasks/A.md'))
     useTabs.getState().open(typeT('task'))
-    usePeek.getState().peek('Tasks/B.md')
+    usePeek.getState().show('Tasks/B.md')
     useTabs.getState().open(objT('Tasks/A.md'))
     expect(useRecent.getState().paths).toEqual(['Tasks/A.md', 'Tasks/B.md'])
   })

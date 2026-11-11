@@ -276,6 +276,13 @@ Each starter template pre-fills the new type's properties.
   in the active tab (our call: that tab starts over; a persistent or pinned tab keeps its page and an empty tab
   is used, a new one only when there is none); "Where I left off" with nothing to restore is Home.
 
+- **A click opens a full page (M32)**: while "Open notes as a full page" is on (it starts on), a plain click on a
+  note anywhere (a list, card or table row, a `[[link]]`, a tag or backlink chip, a graph node, the Calendar's
+  timeline, a new card or daily note made from a view) opens it in the current tab, with the page it came from on
+  the breadcrumb trail, and an open peek closes. The peek is still there when asked for: Alt+Shift+click, a menu's
+  "Open in peek" or "Expand", today's note pop-out, the collection peek and its stepper; Ctrl/Cmd+click is still a
+  new tab and Shift+click the side panel. With the setting off a plain click peeks, as before M32.
+
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
 - A space opened as a new or empty folder (`objectapp --space <folder>`: no `setup` in `space.json`, no basic

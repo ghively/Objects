@@ -1,6 +1,7 @@
 /**
- * Create an object and open it where the modifier keys say:
- * - plain: the current tab (a Task opens in the peek, unless "Open objects as a full page" is on),
+ * Create a note and open it where the modifier keys say:
+ * - plain: the current tab (a Task opens in the peek while "Open notes as a full page" is off; M32:
+ *   the setting starts on),
  * - Ctrl or Meta: a new tab,
  * - Alt+Shift: the peek,
  * - Shift: the side panel (area 1).
@@ -25,7 +26,7 @@ export interface OpenMods {
 export type OpenMode = 'current' | 'newTab' | 'peek' | 'sidepanel'
 
 /**
- * Tasks open in the peek by default; with "Open objects as a full page"
+ * With "Open notes as a full page" off, Tasks open in the peek; with it on (the default since M32)
  * they open as a page.
  */
 function opensInPeek(typeId: string | null | undefined): boolean {
@@ -44,7 +45,8 @@ export function openModeFor(mods: OpenMods = {}, typeId?: string | null): OpenMo
 /** Open an existing object as `mods` say. */
 export function openObject(path: string, mods: OpenMods = {}, typeId?: string | null): OpenMode {
   const mode = openModeFor(mods, typeId)
-  if (mode === 'peek') usePeek.getState().peek(path)
+  // An explicit ask (Alt+Shift, or a Task while tasks open in the peek): the peek whatever the setting.
+  if (mode === 'peek') usePeek.getState().show(path)
   else if (mode === 'sidepanel') useTabs.getState().openInSidepanel({ kind: 'object', path })
   else useTabs.getState().open({ kind: 'object', path }, { newTab: mode === 'newTab', via: mods.via })
   return mode

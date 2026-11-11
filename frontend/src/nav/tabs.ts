@@ -5,6 +5,7 @@
 import { create } from 'zustand'
 import type { WorkViewId } from '@/api/types'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { useSettings } from '@/settings/useSettings'
 import { useRecent } from './recent'
 import {
   activateEntry,
@@ -678,12 +679,51 @@ export interface PeekState {
   /** The list the peek was opened from; the pager steps through it. */
   list: string[]
   index: number
+  /**
+   * A plain click on a note (a list row, a link, a chip, a graph node). M32: while "Open notes as a
+   * full page" is on (`alwaysOpenAsFullPage`, the default) the note opens in the current tab and
+   * an open peek closes; with the setting off, or with Alt+Shift held on the click or key that
+   * asked (the peek's own modifier), it opens in the peek, stepping through `list`.
+   */
   peek(path: string, list?: string[]): void
+  /**
+   * M32: the peek whatever the setting says, for an explicit ask (a menu's "Open in peek" or
+   * "Expand", today's note pop-out, a Task made while tasks open in the peek).
+   */
+  show(path: string, list?: string[]): void
   close(): void
   next(): void
   prev(): void
   /** An object moved: replace `oldPath` in the peek and its pager list. */
   retarget(oldPath: string, newPath: string): void
+}
+
+/**
+ * Whether the pointer or key event being handled right now carries Alt+Shift, the modifier that
+ * asks for the peek (catalog §2 Navigation; `create/createAndOpen` `openModeFor`). Callers of
+ * `usePeek().peek` send plain and Alt+Shift clicks down the same path, so the store reads the
+ * modifier itself: noted in the capture phase, forgotten once the event has been dispatched.
+ */
+let peekAsked = false
+let forgetPeekAsked: ReturnType<typeof setTimeout> | null = null
+
+function notePeekModifier(e: Event): void {
+  const m = e as MouseEvent | KeyboardEvent
+  peekAsked = !!m.altKey && !!m.shiftKey
+  if (forgetPeekAsked) clearTimeout(forgetPeekAsked)
+  forgetPeekAsked = setTimeout(() => {
+    peekAsked = false
+    forgetPeekAsked = null
+  }, 0)
+}
+
+if (typeof window !== 'undefined') {
+  for (const type of ['mousedown', 'click', 'auxclick', 'keydown']) window.addEventListener(type, notePeekModifier, true)
+}
+
+/** M32: whether a plain click opens a note as a full page ("Open notes as a full page"). */
+export function opensAsFullPage(): boolean {
+  return useSettings.getState().settings.alwaysOpenAsFullPage !== false
 }
 
 export const usePeek = create<PeekState>()((set, get) => ({
@@ -692,6 +732,16 @@ export const usePeek = create<PeekState>()((set, get) => ({
   index: 0,
 
   peek(path, list) {
+    if (!opensAsFullPage() || peekAsked) {
+      get().show(path, list)
+      return
+    }
+    // A full page: the peek (today's note popped out, say) steps aside so the page is seen.
+    if (get().path !== null) set({ path: null, list: [], index: 0 })
+    useTabs.getState().open({ kind: 'object', path }, { via: 'link' })
+  },
+
+  show(path, list) {
     useRecent.getState().add(path)
     const l = list && list.includes(path) ? [...list] : [path]
     set({ path, list: l, index: l.indexOf(path) })

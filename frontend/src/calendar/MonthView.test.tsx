@@ -8,7 +8,8 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { DailyNoteExistsError } from '@/api/client'
-import { usePeek } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { objectSummary, row } from '@/test/mockApi'
 import { listeners, mocked, resetDayMocks, setDay, setRows, TODAY } from './dayFixtures'
 import { MonthView } from './MonthView'
@@ -18,6 +19,9 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 23, 10, 0))
   resetDayMocks()
+  useTabs.getState().reset()
+  usePeek.getState().close()
+  useSettings.setState({ settings: settingsDefaults })
 })
 
 const note = (day: string) => row({ summary: objectSummary({ path: `DailyNotes/${day}.md`, type: 'dailynote', title: day }) })
@@ -66,9 +70,14 @@ describe('MonthView', () => {
     await waitFor(() => expect(screen.getByTestId('grid').children).toHaveLength(2))
     expect(mocked.rows).toHaveBeenCalledTimes(1)
     expect(mocked.rows).toHaveBeenCalledWith({ paths: ['DailyNotes/2026-10-03.md', 'DailyNotes/2026-10-09.md'] })
-    // A card opens the note in the peek.
+    // M32: a card opens the note as a full page ("Open notes as a full page" starts on).
     await user.click(screen.getByText('2026-10-03'))
-    expect(usePeek.getState().path).toBe('DailyNotes/2026-10-03.md')
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'DailyNotes/2026-10-03.md' })
+    expect(usePeek.getState().path).toBeNull()
+    // With the setting off it opens in the peek, as before.
+    useSettings.setState({ settings: { ...settingsDefaults, alwaysOpenAsFullPage: false } })
+    await user.click(screen.getByText('2026-10-09'))
+    expect(usePeek.getState().path).toBe('DailyNotes/2026-10-09.md')
   })
 
   test('test month strip Jan to Dec highlights the month and jumps to a month', async () => {
@@ -98,7 +107,7 @@ describe('MonthView', () => {
     await user.click(row)
     // Today, when the month shown is this month.
     expect(mocked.createDailyNote).toHaveBeenCalledWith(TODAY)
-    await waitFor(() => expect(usePeek.getState().path).toBe(`DailyNotes/${TODAY}.md`))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: `DailyNotes/${TODAY}.md` }))
     await waitFor(() => expect(mocked.calendar.mock.calls.length).toBeGreaterThan(calls))
   })
 
@@ -109,7 +118,7 @@ describe('MonthView', () => {
     expect(await screen.findByText('This month has no daily notes yet.', { exact: false })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'New object' }))
     expect(mocked.createDailyNote).toHaveBeenCalledWith('2026-03-01')
-    await waitFor(() => expect(usePeek.getState().path).toBe('DailyNotes/2026-03-01.md'))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'DailyNotes/2026-03-01.md' }))
   })
 
   test('test views reload when a daily note is created elsewhere', async () => {

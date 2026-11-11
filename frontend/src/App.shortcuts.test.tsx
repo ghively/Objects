@@ -232,7 +232,7 @@ describe('app shortcuts', () => {
 
   test('test a new note made by key steps out from under a popped-out note', async () => {
     await openObjectPage()
-    usePeek.getState().peek('Projects/Other.md')
+    usePeek.getState().show('Projects/Other.md')
     ctrl(document.body, 'n')
     await waitFor(() => expect(mocked.createObject).toHaveBeenCalledTimes(1))
     expect(usePeek.getState().path).toBeNull()
