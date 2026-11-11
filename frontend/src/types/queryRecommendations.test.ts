@@ -43,6 +43,13 @@ describe('queryRecommendations', () => {
     expect(r[5].definition.filterGroup.elements[0]).toMatchObject({ option: 'isNotChecked' })
   })
 
+  test('test the built-in Page type is named Note in its suggestions; the definition still points at the type (M32)', () => {
+    const page = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true, propertyDefinitions: [DONE] })
+    const r = queryRecommendations(page)
+    expect(r.map((x) => x.title)).toEqual(['Note · Done · Checked', 'Note · Done · Unchecked'])
+    expect(r[0].definition.types).toEqual([{ id: 'page' }])
+  })
+
   test('a type with no label or boolean property has none', () => {
     expect(queryRecommendations(typeDef({ id: 'plain' }))).toEqual([])
   })

@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import type { Row, SmallCardViewConfig, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
+import { typeLabel } from '@/lib/typeLabel'
 import { cn } from '@/lib/utils'
 import { useTypeEditor, type TypeEditor } from '@/object/useTypeEditor'
 import { cardProperties, cardPropertyChoices, type CardProperty } from '@/views/cards/cardConfig'
@@ -15,7 +16,7 @@ import { SmallCard } from '@/views/cards/SmallCard'
 export const CARD_VIEW_TEXT = {
   group: 'Card view and linking',
   linkView: 'Default link view',
-  linkViewExplanation: 'The view used when an object of this type is linked or added as a block in your content.',
+  linkViewExplanation: 'The view used when a note of this type is linked or added as a block in your content.',
   cardView: 'Default card view',
   cardViewExplanation: 'The properties a small card of this type shows by default.',
   selected: 'Selected Properties',
@@ -85,7 +86,7 @@ function usePreviewRow(type: TypeDef | undefined): Row | null {
         id: null,
         path: `${type.folder}/${type.name}.md`,
         type: type.id,
-        title: type.name,
+        title: typeLabel(type),
         icon: null,
         iconColor: null,
         description: null,

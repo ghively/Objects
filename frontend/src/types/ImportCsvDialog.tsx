@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
 import { columnDecimalComma, parseCsvCells, type CsvCell } from '@/lib/csvParse'
+import { typePlural } from '@/lib/typeLabel'
 import { CHANGE_TYPE_TEXT } from '@/object/ChangeTypeDialog'
 import { parseDateInput } from '@/properties/DatePicker'
 import { fromPercent, parseNumberInput } from '@/properties/format'
@@ -28,12 +29,12 @@ import { isValidEmail, isValidPhone } from '@/properties/contact'
 export const IMPORT_CSV_TEXT = {
   menu: 'Import CSV',
   heading: 'Bulk import from CSV',
-  description: 'Upload a CSV file to turn it into a collection, one object per row.',
+  description: 'Upload a CSV file to turn it into a collection, one note per row.',
   chooseFile: 'Pick a file, or drag one here.',
   headerRow: 'Has a header row',
-  headerRowDescription: 'The first row has the column names, so it is not imported as an object.',
+  headerRowDescription: 'The first row has the column names, so it is not imported as a note.',
   warningHeading: 'Use this with caution',
-  warningText: 'Each row becomes its own object, so a large table can flood your space with new objects.',
+  warningText: 'Each row becomes its own note, so a large table can flood your space with new notes.',
   readingError: 'Parts of this file could not be read. Check that it is a valid CSV so the import comes out as expected.',
   notSupported: (rowLimit: number) => `This file can't be imported. CSV files of up to ${rowLimit} rows are supported.`,
   newCollection: (title: string) => `New collection "${title}"`,
@@ -346,7 +347,7 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
         {file && !tooMany && (
           <>
             <div className="flex flex-wrap items-center gap-2 text-[14px]">
-              <span>{IMPORT_CSV_TEXT.info(data.length, type.pluralName)}</span>
+              <span>{IMPORT_CSV_TEXT.info(data.length, typePlural(type))}</span>
               <select
                 aria-label="Import into"
                 value={into}
@@ -357,7 +358,7 @@ export function ImportCsvDialog({ type, open, onOpenChange }: { type: TypeDef; o
                 }}
                 className="h-8 min-w-0 rounded-md border border-line bg-raised px-2 text-[14px]"
               >
-                <option value="type">{type.pluralName}</option>
+                <option value="type">{typePlural(type)}</option>
                 <option value="newCollection">{IMPORT_CSV_TEXT.newCollection(collectionName)}</option>
               </select>
             </div>

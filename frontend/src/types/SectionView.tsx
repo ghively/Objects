@@ -294,7 +294,7 @@ export function SectionView({ type, section, search, heading, onCreateCollection
                   key={q.id}
                   icon={q.icon}
                   fallback={QUERY_ICON}
-                  name={queryTitle(q, titleCtx) || 'Query'}
+                  name={queryTitle(q, titleCtx) || SECTION_TEXT.untitledQuery}
                   description={q.description}
                   onClick={() => open({ kind: 'query', id: q.id })}
                 />

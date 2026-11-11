@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TypeDef } from '@/api/types'
@@ -11,6 +11,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api, ApiError } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { setWorkOn } from '@/test/workOn'
 import { BASIC_TYPE_INFO } from '@/properties/AddPropertyMenu'
 import { TypeSettings } from './TypeSettings'
 
@@ -33,6 +34,8 @@ function savedType(call = 0): TypeDef {
 
 beforeEach(() => {
   resetLinkIndex()
+  // M32: the Work section shows only while the Work page is on for the space.
+  setWorkOn(true)
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
   useLinkIndex.setState({ types: [PROJECT, PAGE], objects: [], loaded: true })
   mocked.templates.mockImplementation(async (typeId: string) =>
@@ -49,10 +52,11 @@ describe('TypeSettings', () => {
   test('test section headings render in order and no Calendar or Card view group', async () => {
     render(<TypeSettings typeId="project" />)
     const nav = screen.getByRole('navigation', { name: 'Breadcrumb' })
-    expect(nav).toHaveTextContent('Object Types')
+    expect(within(nav).getByText('Types')).toBeInTheDocument()
+    expect(nav).not.toHaveTextContent('Object Types')
     expect(nav).toHaveTextContent('Project')
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Properties', 'Templates', 'Name patterns', 'Work', 'Configuration', 'Delete object type'])
+    expect(headings).toEqual(['Properties', 'Templates', 'Name patterns', 'Work', 'Configuration', 'Delete type'])
     // The basics come first, in order.
     const labels = ['Type icon', 'Name', 'Plural of name', 'Color', 'Description']
     const nodes = labels.map((l) => screen.getByLabelText(l))
@@ -77,7 +81,7 @@ describe('TypeSettings', () => {
       'A plain, all-purpose layout.',
     )
     expect(
-      within(config).getByText("Settings for how this type's objects appear and act on pages, on cards and in the calendar."),
+      within(config).getByText("Settings for how this type's notes appear and act on pages, on cards and in the calendar."),
     ).toBeInTheDocument()
     expect(within(config).getByRole('option', { name: 'Sans Serif' })).toBeInTheDocument()
     // No Calendar settings group (M13's Calendar layout is only an option of the default list view).
@@ -105,8 +109,8 @@ describe('TypeSettings', () => {
     expect(screen.getByRole('note')).toHaveTextContent(BASIC_TYPE_INFO)
     expect(screen.getByRole('button', { name: 'Add Property' })).toBeDisabled()
     expect(screen.getByRole('textbox', { name: 'Name' })).toBeDisabled()
-    expect(screen.queryByRole('heading', { name: 'Delete object type' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Delete object type' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Delete type' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete type' })).not.toBeInTheDocument()
     // The description, colour and layout stay editable.
     expect(screen.getByRole('textbox', { name: 'Description' })).toBeEnabled()
     expect(screen.getByRole('combobox', { name: 'Font' })).toBeEnabled()
@@ -120,7 +124,7 @@ describe('TypeSettings', () => {
     expect(screen.getByText('The type file is not valid JSON.')).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Description' })).toBeDisabled()
     expect(screen.getByRole('combobox', { name: 'Font' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Delete object type' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete type' })).toBeDisabled()
   })
 
   test('a failed name-pattern save shows its error once (M29 review #10)', async () => {
@@ -217,5 +221,39 @@ describe('TypeSettings default list view', () => {
     useLinkIndex.setState({ types: [{ ...PROJECT, defaultDataViewLayout: 'wall' }, PAGE] })
     render(<TypeSettings typeId="project" />)
     expect(screen.getByRole('combobox', { name: 'Default list view' })).toHaveValue('wall')
+  })
+
+  test('test the Work section shows only while the Work page is on for the space (M32)', () => {
+    setWorkOn(false)
+    render(<TypeSettings typeId="project" />)
+    const headings = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(headings()).toEqual(['Properties', 'Templates', 'Name patterns', 'Configuration', 'Delete type'])
+    expect(screen.queryByRole('button', { name: 'Add work fields' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Work' })).toBeNull()
+    // Turned on in Settings: the section is back, in its place.
+    act(() => setWorkOn(true))
+    expect(headings()).toEqual(['Properties', 'Templates', 'Name patterns', 'Work', 'Configuration', 'Delete type'])
+    expect(within(screen.getByRole('region', { name: 'Work' })).getByRole('button', { name: 'Add work fields' })).toBeEnabled()
+  })
+
+  test('test the built-in Page type reads Note and Notes in its settings, and nothing is saved (M32)', async () => {
+    render(<TypeSettings typeId="page" />)
+    const nav = screen.getByRole('navigation', { name: 'Breadcrumb' })
+    expect(within(nav).getByRole('button', { name: 'Note' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Note')
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveAttribute('title', 'Basic types cannot be renamed.')
+    expect(screen.getByRole('textbox', { name: 'Plural of name' })).toHaveValue('Notes')
+    expect(screen.getByRole('textbox', { name: 'Plural of name' })).toBeDisabled()
+    // Display only: the type file keeps `Page` (no save of any kind).
+    await new Promise((r) => setTimeout(r, 500))
+    expect(mocked.saveType).not.toHaveBeenCalled()
+    expect(useLinkIndex.getState().types.find((t) => t.id === 'page')?.name).toBe('Page')
+  })
+
+  test('test no text of type settings says "object" (M32)', () => {
+    const { container } = render(<TypeSettings typeId="project" />)
+    expect(container.textContent ?? '').not.toMatch(/object/i)
+    expect(screen.getByText('A new note whose name matches one of these suggests this type.', { exact: false })).toBeInTheDocument()
   })
 })

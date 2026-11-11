@@ -67,7 +67,7 @@ describe('TemplateManager', () => {
 
   test('Tag still has no templates', () => {
     render(<TemplateManager typeId="tag" />)
-    expect(screen.getByText('Templates are not available for this object type.')).toBeInTheDocument()
+    expect(screen.getByText('Templates are not available for this type.')).toBeInTheDocument()
     expect(screen.queryByRole('listitem', { name: 'Empty Note' })).not.toBeInTheDocument()
   })
 

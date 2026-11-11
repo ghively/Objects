@@ -50,7 +50,7 @@ describe('Calendar settings', () => {
     expect(within(group).getByText('Calendar Settings')).toBeInTheDocument()
     expect(
       within(group).getByText(
-        'Because this type has a date property, its objects show up in the calendar. Set how below.',
+        'Because this type has a date property, its notes show up in the calendar. Set how below.',
       ),
     ).toBeInTheDocument()
     expect(within(group).getByText('Quick-create from the calendar')).toBeInTheDocument()

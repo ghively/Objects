@@ -12,6 +12,8 @@ import { createAndOpen, type OpenMods } from '@/create/createAndOpen'
 import { useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { useGlobalShortcut } from '@/lib/shortcuts'
+import { isBuiltInDailyNote, isBuiltInPage, typePlural } from '@/lib/typeLabel'
+import { DAILY_NOTE, NEW_NOTE, SAVED_SEARCH_LOWER, TYPE_SETTINGS } from '@/lib/words'
 import { templateName } from '@/object/UseTemplateMenu'
 import { cn } from '@/lib/utils'
 import { PinMenuItems } from '@/shell/PinToMenu'
@@ -22,7 +24,7 @@ import { useRows } from '@/views/useRows'
 import { DataView, ToolbarSlot } from '@/views/DataView'
 import { CreateCollectionDialog, DeleteCollectionDialog } from '@/collections/CollectionDialogs'
 import { removeQuery } from '@/queries/useQueries'
-import { DeleteTypeDialog } from './DeleteTypeDialog'
+import { DELETE_TYPE_TEXT, DeleteTypeDialog } from './DeleteTypeDialog'
 import { ImportCsvDialog, IMPORT_CSV_TEXT } from './ImportCsvDialog'
 import { isDailyNoteType } from '@/object/ObjectHeader'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
@@ -46,14 +48,28 @@ import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { editQueryDefinition, QUERY_TEXT, useTitleCtx } from '@/queries/QueryPage'
 import { isSingleTypeQuery, QueryBuilder } from '@/queries/QueryBuilder'
 
+/** Our strings (M32). */
+export const TYPE_PAGE_TEXT = {
+  /** The All tab's menu item: the view's filters become a saved search (was "Save as query"). */
+  saveAsQuery: `Save as a ${SAVED_SEARCH_LOWER}`,
+} as const
+
 function mods(e: MouseEvent): OpenMods {
   return { ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey }
 }
 
 /**
  * The type's "New" split button: "New {TypeName}" creates one (with the default template), and the
- * caret lists "New '{TemplateName}'" per template.
+ * caret lists "New '{TemplateName}'" per template. M32: the built-in Page type reads "New note"
+ * and the built-in DailyNote "New daily note" (`newLabel`).
  */
+/** The New button's words for a type: "New note", "New daily note", else "New {its name}". */
+export function newLabel(type: TypeDef): string {
+  if (isBuiltInPage(type)) return NEW_NOTE
+  if (isBuiltInDailyNote(type)) return `New ${DAILY_NOTE.toLowerCase()}`
+  return `New ${type.name}`
+}
+
 export function NewSplitButton({
   type,
   values,
@@ -101,7 +117,7 @@ export function NewSplitButton({
         className="flex items-center gap-1.5 px-2.5 hover:bg-hover"
       >
         <Icon name="ph-plus" size={14} />
-        {`New ${type.name}`}
+        {newLabel(type)}
       </button>
       {ordered.length > 0 && (
         <DropdownMenu>
@@ -305,7 +321,7 @@ function AllTab({
       state={views.all}
       onState={(s) => update((v) => ({ ...v, all: s }))}
       layouts={FULL_VIEW_LAYOUTS}
-      viewName={type.pluralName}
+      viewName={typePlural(type)}
       allowCreate
       onCreate={(values, typeId) =>
         void createAndOpen(typeId, { values }).catch((e: unknown) => console.warn('Could not create an object:', e))
@@ -447,7 +463,7 @@ export function TypePage({ type }: { type: TypeDef }) {
     <div className="w-full">
       <header className="flex flex-wrap items-center gap-2.5 border-b border-line px-4 pt-5 pb-3">
         <TypeChip type={type} size={32} />
-        <h1 className="dataview-heading text-[20px] font-bold md:text-[22px]">{type.pluralName}</h1>
+        <h1 className="dataview-heading text-[20px] font-bold md:text-[22px]">{typePlural(type)}</h1>
         <div className="flex-1" />
         {searchOpen || search ? (
           <input
@@ -495,7 +511,7 @@ export function TypePage({ type }: { type: TypeDef }) {
             <PinMenuItems pin={{ kind: 'type', id: type.id }} />
             <DropdownMenuItem data-type-setting="" onClick={() => useTabs.getState().open({ kind: 'typeSettings', typeId: type.id })}>
               <Icon name="ph-gear" size={14} />
-              Object type settings
+              {TYPE_SETTINGS}
             </DropdownMenuItem>
             {canImport && (
               <DropdownMenuItem onSelect={() => setImportOpen(true)}>
@@ -508,13 +524,13 @@ export function TypePage({ type }: { type: TypeDef }) {
                 onClick={() => void saveAsQuery().catch((e: unknown) => console.warn('Could not save the query:', e))}
               >
                 <Icon name={QUERY_ICON} size={14} />
-                Save as query
+                {TYPE_PAGE_TEXT.saveAsQuery}
               </DropdownMenuItem>
             )}
             {!type.basic && (
               <DropdownMenuItem onClick={() => setDeleteOpen(true)}>
                 <Icon name="ph-trash" size={14} />
-                Delete object type
+                {DELETE_TYPE_TEXT.action}
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>

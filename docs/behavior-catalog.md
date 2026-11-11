@@ -123,6 +123,12 @@ Object has no accounts.
   takes the sub-items and dependencies pairs (Parent item / Sub-items, Blocked by / Blocking; a table or
   timeline view's Customize › Sub-items and dependencies; decision AC-1). Field lists per built-in
   type are in audit item 28.
+  - (M32) Type settings on screen: the breadcrumb reads "Types"; "Delete type" ("Move this type to the Trash?":
+    "Moves the type, all its notes, its templates and the saved searches of only this type to the Trash; other saved
+    searches stop using it. You can restore them from there for 30 days."); the explanations say "notes" where they
+    said "objects". The built-in Page type shows "Note" / "Notes" and the built-in DailyNote "Daily note" / "Daily
+    notes" in the breadcrumb and in their (fixed) Name and Plural fields; the type file keeps `Page` / `DailyNote`.
+    The "Work" section ("Add work fields"; Object's own, M22) shows only while the Work page is on for the space.
   - Add Property › **Table** (M31, after Files; ours: "A small table: a header row of column names, then rows of
     text."): stored as a Markdown table in a `|-` block (header row first; a hand-written YAML list of rows reads the
     same; only line 2 is the separator, and a cell of dashes is written `\-`, `|` as `\|` and `\` as `\\`, read back
@@ -459,6 +465,12 @@ Each starter template pre-fills the new type's properties.
   - Type page header: type icon + plural name; search icon; `...` (New collection, Pin to sidebar, Pin to…,
     Object type settings, Import CSV, Save as query, Delete object type; "New from template" is in the sidebar's
     type menu); a split "New" button.
+    (M32) On screen: the heading of the built-in Page type reads "Notes" and of the built-in DailyNote "Daily
+    notes" (a renamed type keeps its own plural); the `...` items read "Type settings", "Save as a saved search" and
+    "Delete type"; the New button reads "New note" / "New daily note" for those two types, else "New {type}". On the
+    Overview, "Queries" is "Saved searches" ("No saved searches", "Searches you save show up here.", "New saved
+    search", "Saved searches & Views", "Suggested saved searches"), and the built-in sections' texts say "Notes"
+    ("Notes you open show up here.", "Notes that nothing else links to.").
 - **Filter editor** (decision C1; `views/FilterEditor.tsx`, `views/filter.ts`):
   - Popover body: rows that start "where", then the group operator (a menu "and | or" on the second row, plain
     text on the rest), Property, Operator, value editor and a `…` menu (Turn into group, Remove; Remove only, one

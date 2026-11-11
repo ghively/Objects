@@ -50,7 +50,8 @@ describe('WorkFieldsSection', () => {
     expect(isWorkType(REQUEST)).toBe(false)
     render(<WorkFieldsSection type={work} />)
     expect(screen.getByRole('button', { name: 'Add work fields' })).toBeDisabled()
-    expect(screen.getByText('Objects of this type are already work items.')).toBeInTheDocument()
+    expect(screen.getByText('Notes of this type are already work items.')).toBeInTheDocument()
+    expect(WORK_FIELDS_TEXT.explanation).toBe('Adds ticket fields, steps, lists and floor items, so notes of this type show up on the Work page.')
   })
 
   test('a basic type shows the M2 basic-type text', () => {

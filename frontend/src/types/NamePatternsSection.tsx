@@ -1,4 +1,4 @@
-// M29: a type's name patterns ("Name patterns" in type settings). A new object whose name matches
+// M29: a type's name patterns ("Name patterns" in type settings). A new note whose name matches
 // one suggests this type in every create row (`create/typeSuggest.ts`). One pattern per line,
 // saved on blur as the type's `namePatterns`; a line that isn't a pattern is flagged and nothing
 // is saved; the server's own check (422) shows its detail here, unless the page around it already
@@ -12,7 +12,7 @@ import type { TypeEditor } from '@/object/useTypeEditor'
 export const NAME_PATTERNS_TEXT = {
   title: 'Name patterns',
   description:
-    'New objects whose name matches one of these suggest this type. One per line: * any characters, ? one character, # a digit, @ a letter, or {ip}, {cidr}, {fqdn}, {version}.',
+    'A new note whose name matches one of these suggests this type. One per line: * any characters, ? one character, # a digit, @ a letter, or {ip}, {cidr}, {fqdn}, {version}.',
   invalid: (line: string) => `"${line}" isn't a name pattern.`,
 }
 

@@ -1,6 +1,7 @@
 // M22: the "Work" section of type settings (plan `2026-11-05-m22-work-model.md`, Contract
 // "Editors"): "Add work fields" puts the ticket fields, steps, lists and floor items on the type
-// (`POST /api/types/{id}/work-fields`), so its objects show up in Work. Disabled for a type that is
+// (`POST /api/types/{id}/work-fields`), so its notes show up on the Work page. M32: type settings
+// show the section only while the Work page is on for the space. Disabled for a type that is
 // already a work type (it has a `steps` property of kind `steps`) and, with the M2 basic-type text,
 // for the basic types. Afterwards a line lists the fields that were skipped (a property with that
 // key or name exists).
@@ -8,13 +9,14 @@ import { useState } from 'react'
 import { api } from '@/api/client'
 import type { AddWorkFieldsResult, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
+import { WORK } from '@/lib/words'
 import { BASIC_TYPE_INFO } from '@/properties/AddPropertyMenu'
 
 export const WORK_FIELDS_TEXT = {
-  heading: 'Work', // our string
+  heading: WORK, // our string
   add: 'Add work fields', // our label
-  explanation: 'Adds ticket fields, steps, lists and floor items, so objects of this type show up in Work.', // our string
-  already: 'Objects of this type are already work items.', // our string
+  explanation: 'Adds ticket fields, steps, lists and floor items, so notes of this type show up on the Work page.', // our string
+  already: 'Notes of this type are already work items.', // our string
   skipped: 'Skipped:', // our string
 } as const
 

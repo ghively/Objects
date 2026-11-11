@@ -234,14 +234,14 @@ describe('DeleteTypeDialog', () => {
     const onDeleted = vi.fn()
     const onOpenChange = vi.fn()
     render(<DeleteTypeDialog type={typeDef({ id: 'book', name: 'Book' })} open onOpenChange={onOpenChange} onDeleted={onDeleted} />)
-    expect(screen.getByRole('heading', { name: 'Move this object type to the Trash?' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Move this type to the Trash?' })).toBeInTheDocument()
     expect(
       screen.getByText(
-        'Moves the object type, all its objects, its templates and the saved queries of only this type to the Trash; other queries stop using it. You can restore them from there for 30 days.',
+        'Moves the type, all its notes, its templates and the saved searches of only this type to the Trash; other saved searches stop using it. You can restore them from there for 30 days.',
       ),
     ).toBeInTheDocument()
     expect(screen.queryByText(/can't be undone/i)).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Delete object type' }))
+    await user.click(screen.getByRole('button', { name: 'Delete type' }))
     await waitFor(() => expect(onDeleted).toHaveBeenCalledWith('trash-type-1'))
     expect(mocked.deleteType).toHaveBeenCalledWith('book', { confirm: true })
     expect(onOpenChange).toHaveBeenCalledWith(false)
