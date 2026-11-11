@@ -243,12 +243,19 @@ page | **Weblink** (not in Object: no Weblink viewer): search.
 ## 3. "Add new object type" gallery (the `+` next to "Object Types")
 
 A popover: "Add new object type", "Create your own", then template groups with a one-line description each.
+(M32) On screen the gallery is headed "Add a type"; its buttons read "Create type" and its form "Create your own
+type". The groups and their order are the gallery data's (`typetemplates.py`): "Create your own", then Personal,
+Use cases, Research, Media, Planning and reflection and the unsectioned row; a section the screen has no title for
+shows under its key as words. "IT operations" is always the last group and starts collapsed: its heading is a
+disclosure that shows its entries when opened, and the fold is not remembered (a reopened gallery has it collapsed
+again). "Starter sets" (the Everyday set and the IT operations set) are not in the gallery yet: no route applies a
+starting point to a space that already has one (`POST /api/space/setup` answers 409).
 - Meetings (who attended, and when), People, Projects (status, collaborators, meetings).
 - Research: Atomic notes, Definitions.
 - Media: Books (authors, rating, genre), Films, TV series, Podcasts.
 - Planning and reflection: Weeks, Months (for weekly and monthly reviews; the Calendar's daily notes already cover
   each day, so the gallery offers no Day type; removed 2026-11-09).
-- IT operations (Object's own, M28): Hosts, Software, Applications, Containers, Configurations, Locations,
+- IT operations (Object's own, M28; (M32) last and collapsed): Hosts, Software, Applications, Containers, Configurations, Locations,
   Networks, Vendors, Scripts, Commands, Runbooks, Prompts, Incidents — the IT ops starter's types that the groups
   above don't already offer (People, Meetings and Projects stay the entries above; Source isn't offered, imports
   make it). Each comes with its default template (the older entries add none) and one saved query; its relations

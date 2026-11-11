@@ -1,12 +1,19 @@
 /**
- * "Add new object type" (polish item 21): a gallery with "Create your
+ * "Add a type" (polish item 21; M32: was "Add new object type"): a gallery with "Create your
  * own" first, then the type templates by group. A template shows its description and properties
- * and "Create object type" (the server builds it, `POST /api/types {template}`); one the space
+ * and "Create type" (the server builds it, `POST /api/types {template}`); one the space
  * already has is "Added". "Create your own" is the form: name and plural (both required), an icon
  * and a random colour. The created type is put into the link index at once so its settings page
  * can show it before the next reload.
+ *
+ * M32 (item 12): the groups and their order are the gallery data's (`typetemplates.py`: Personal,
+ * Use cases, Research, Media, Planning and reflection…); no entry is named here. The one fixed
+ * rule is that "IT operations" comes last and starts collapsed, a disclosure the user opens; the
+ * fold lasts while the dialog is open and nothing remembers it. "Starter sets" (the Everyday set
+ * and the IT operations set) are not offered here yet: `POST /api/space/setup` answers 409 for a
+ * space that already has a starting point, so no route can add a set to an open space.
  */
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { Icon as IconValue, TypeDef, TypeTemplate } from '@/api/types'
 import { Icon, IconOrEmoji } from '@/components/Icon'
@@ -14,46 +21,89 @@ import { IconPicker } from '@/components/IconPicker'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ADD_A_TYPE } from '@/lib/words'
 import { useLinkIndex } from '@/links/linkIndex'
 import { KIND_META, kindIcon } from '@/properties/kinds'
 import { chipStyle, randomColor } from '@/theme/palette'
 
 export const CREATE_TYPE_TEXT = {
-  galleryTitle: 'Add new object type',
+  galleryTitle: ADD_A_TYPE,
   createYourOwn: 'Create your own',
   createYourOwnCard: 'Begin empty and add just the properties you want.',
-  // our choice: the heading of the gallery's first group
+  // M32: the back end's new first group (Idea, Goal, Habit, Recipe, Trip, Journal entry)
+  personal: 'Personal',
+  // our choice: the heading of the gallery's first group before M32
   useCases: 'Use cases',
   research: 'Research',
   media: 'Media',
   planningAndReflection: 'Planning and reflection',
-  // M28: the IT ops types (after Planning and reflection, before the unsectioned row)
+  // M28: the IT ops types. M32: the last group, collapsed until opened.
   itOperations: 'IT operations',
   added: 'Added',
   templateHint: "You can change a type's settings whenever you like.",
   properties: 'Properties',
   back: 'Back', // our string
-  title: 'Create your object type',
+  title: 'Create your own type',
   description: 'A type groups similar content, such as books, projects or meeting notes.',
   name: 'Name',
   pluralName: 'Plural of name',
   tipHeading: 'Do I need a new type?',
   tip: 'Make one only for a separate kind of note with its own details; often a label property is enough.',
   hint: 'Once the type exists, change its properties in its settings.',
-  action: 'Create object type',
+  action: 'Create type',
 }
 
-const SECTIONS: readonly (TypeTemplate['section'])[] = [
-  'useCases',
-  'research',
-  'media',
-  'planningAndReflection',
-  'itOperations',
-  null,
-]
+/** The titles of the section keys the gallery data is known to use. */
+const SECTION_TITLES: Record<string, string> = {
+  personal: CREATE_TYPE_TEXT.personal,
+  useCases: CREATE_TYPE_TEXT.useCases,
+  research: CREATE_TYPE_TEXT.research,
+  media: CREATE_TYPE_TEXT.media,
+  planningAndReflection: CREATE_TYPE_TEXT.planningAndReflection,
+  itOperations: CREATE_TYPE_TEXT.itOperations,
+}
 
-function sectionTitle(s: TypeTemplate['section']): string | null {
-  return s ? CREATE_TYPE_TEXT[s] : null
+/**
+ * A section's heading: its known title, else its key as words ("homeLife" → "Home life"), so a
+ * section the back end adds later still shows under a name. The unsectioned row has none.
+ */
+export function sectionTitle(key: string | null): string | null {
+  if (key === null || key === '') return null
+  if (key in SECTION_TITLES) return SECTION_TITLES[key]
+  const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim().toLowerCase()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+export interface GallerySection {
+  /** The data's section key (null: the unsectioned row). */
+  key: string | null
+  title: string | null
+  /** Starts folded, behind a disclosure: only "IT operations". */
+  collapsed: boolean
+  items: TypeTemplate[]
+}
+
+/**
+ * The gallery's groups: the data's sections in the order they first appear in it, each with its
+ * templates in the data's order; the section titled "IT operations" is moved to the end and
+ * starts collapsed.
+ */
+export function gallerySections(gallery: readonly TypeTemplate[]): GallerySection[] {
+  const groups: GallerySection[] = []
+  const byKey = new Map<string | null, GallerySection>()
+  for (const t of gallery) {
+    // The data's key, whatever it is (the API type lists only the keys known when it was written).
+    const key: string | null = (t.section as string | null) || null
+    let g = byKey.get(key)
+    if (!g) {
+      const title = sectionTitle(key)
+      g = { key, title, collapsed: title === CREATE_TYPE_TEXT.itOperations, items: [] }
+      byKey.set(key, g)
+      groups.push(g)
+    }
+    g.items.push(t)
+  }
+  return [...groups.filter((g) => !g.collapsed), ...groups.filter((g) => g.collapsed)]
 }
 
 export interface CreateTypeDialogProps {
@@ -100,10 +150,15 @@ export function CreateTypeDialog({ open, onOpenChange, onCreated }: CreateTypeDi
   const [iconOpen, setIconOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The keys of the collapsed groups the user opened (IT operations). Never stored.
+  const [opened, setOpened] = useState<readonly (string | null)[]>([])
+  const foldId = useId()
+  const sections = useMemo(() => gallerySections(gallery ?? []), [gallery])
 
   useEffect(() => {
     if (!open) return
     setStep({ kind: 'gallery' })
+    setOpened([])
     setName('')
     setPluralName('')
     setIcon(DEFAULT_ICON)
@@ -181,31 +236,52 @@ export function CreateTypeDialog({ open, onOpenChange, onCreated }: CreateTypeDi
               <span className="block text-[13px] text-fg-muted">{CREATE_TYPE_TEXT.createYourOwnCard}</span>
             </span>
           </Card>
-          {SECTIONS.map((s) => {
-            const items = (gallery ?? []).filter((t) => t.section === s)
-            if (items.length === 0) return null
-            const title = sectionTitle(s)
-            return (
-              <div key={s ?? 'more'} role="group" aria-label={title ?? undefined} className="flex flex-col gap-1.5">
-                {title && <h3 className="text-[12px] font-semibold text-fg-muted">{title}</h3>}
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  {items.map((t) => (
-                    <Card key={t.key} onClick={() => setStep({ kind: 'template', template: t })}>
-                      <TemplateIcon t={t} />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-1.5 text-[14px] font-semibold">
-                          {t.pluralName}
-                          {t.added && (
-                            <span className="rounded bg-hover px-1 text-[11px] font-medium text-fg-muted">
-                              {CREATE_TYPE_TEXT.added}
-                            </span>
-                          )}
-                        </span>
-                        <span className="line-clamp-2 block text-[12px] text-fg-muted">{t.description}</span>
+          {sections.map((g) => {
+            const cards = (
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {g.items.map((t) => (
+                  <Card key={t.key} onClick={() => setStep({ kind: 'template', template: t })}>
+                    <TemplateIcon t={t} />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5 text-[14px] font-semibold">
+                        {t.pluralName}
+                        {t.added && (
+                          <span className="rounded bg-hover px-1 text-[11px] font-medium text-fg-muted">
+                            {CREATE_TYPE_TEXT.added}
+                          </span>
+                        )}
                       </span>
-                    </Card>
-                  ))}
+                      <span className="line-clamp-2 block text-[12px] text-fg-muted">{t.description}</span>
+                    </span>
+                  </Card>
+                ))}
+              </div>
+            )
+            if (g.collapsed) {
+              const isOpen = opened.includes(g.key)
+              const panelId = `${foldId}-${g.key ?? 'more'}`
+              return (
+                <div key={g.key ?? 'more'} role="group" aria-label={g.title ?? undefined} data-gallery-fold={isOpen ? 'open' : 'closed'} className="flex flex-col gap-1.5">
+                  <h3 className="text-[12px] font-semibold text-fg-muted">
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-controls={panelId}
+                      onClick={() => setOpened((cur) => (cur.includes(g.key) ? cur.filter((k) => k !== g.key) : [...cur, g.key]))}
+                      className="-mx-1 flex items-center gap-1 rounded px-1 py-0.5 hover:bg-hover hover:text-fg"
+                    >
+                      <Icon name={isOpen ? 'ph-caret-down' : 'ph-caret-right'} size={12} />
+                      {g.title}
+                    </button>
+                  </h3>
+                  {isOpen && <div id={panelId}>{cards}</div>}
                 </div>
+              )
+            }
+            return (
+              <div key={g.key ?? 'more'} role="group" aria-label={g.title ?? undefined} className="flex flex-col gap-1.5">
+                {g.title && <h3 className="text-[12px] font-semibold text-fg-muted">{g.title}</h3>}
+                {cards}
               </div>
             )
           })}

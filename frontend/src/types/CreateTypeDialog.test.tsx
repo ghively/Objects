@@ -62,7 +62,7 @@ describe('CreateTypeDialog gallery (item 21)', () => {
   test('lists the templates under their sections; "Added" for one the space has', async () => {
     withGallery()
     render(<CreateTypeDialog open />)
-    expect(screen.getByRole('heading', { name: 'Add new object type' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Add a type' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Create your own/ })).toBeInTheDocument()
     const media = await screen.findByRole('group', { name: 'Media' })
     expect(within(media).getByRole('button', { name: /Film/ })).toBeInTheDocument()
@@ -70,35 +70,104 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     expect(within(useCases).getByRole('button', { name: /Meeting/ })).toHaveTextContent('Added')
   })
 
-  test('test the gallery shows an IT operations heading over its entries, after Planning and reflection (M28)', async () => {
-    const itops: TypeTemplate = {
-      key: 'host',
-      section: 'itOperations',
-      name: 'Host',
-      pluralName: 'Hosts',
-      description: 'Servers, workstations and network devices.',
-      icon: { type: 'iconify', val: 'ph-hard-drives' },
-      color: 'blue',
-      properties: [{ name: 'Category', type: 'label' }],
-      added: false,
-    }
-    const planning: TypeTemplate = { ...GALLERY[1], key: 'goal', section: 'planningAndReflection', name: 'Goal', pluralName: 'Goals' }
-    const more: TypeTemplate = { ...GALLERY[1], key: 'thing', section: null, name: 'Thing', pluralName: 'Things' }
+  // M32 (item 12). The back end decides the sections and their order; `personal` is its new
+  // section (the frontend names no Personal entry of its own).
+  const tpl = (key: string, section: string | null, name: string, pluralName: string): TypeTemplate => ({
+    ...GALLERY[1],
+    key,
+    section: section as TypeTemplate['section'],
+    name,
+    pluralName,
+  })
+  const M32_GALLERY: TypeTemplate[] = [
+    tpl('idea', 'personal', 'Idea', 'Ideas'),
+    tpl('recipe', 'personal', 'Recipe', 'Recipes'),
+    GALLERY[0], // useCases
+    // IT operations in the middle of the data: it still shows last.
+    tpl('host', 'itOperations', 'Host', 'Hosts'),
+    tpl('runbook', 'itOperations', 'Runbook', 'Runbooks'),
+    tpl('definition', 'research', 'Definition', 'Definitions'),
+    GALLERY[1], // media
+    tpl('week', 'planningAndReflection', 'Week', 'Weeks'),
+    tpl('thing', null, 'Thing', 'Things'),
+  ]
+  const withM32Gallery = () => {
+    ;(api as unknown as { typeGallery: () => Promise<TypeTemplate[]> }).typeGallery = vi.fn(async () => M32_GALLERY)
+  }
+
+  test("test the gallery shows the data's sections in the data's order, Personal first (M32)", async () => {
+    withM32Gallery()
+    render(<CreateTypeDialog open />)
+    const personal = await screen.findByRole('group', { name: 'Personal' })
+    expect(within(personal).getByRole('button', { name: /Ideas/ })).toBeInTheDocument()
+    expect(within(personal).getByRole('button', { name: /Recipes/ })).toBeInTheDocument()
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    expect(headings).toEqual(['Personal', 'Use cases', 'Research', 'Media', 'Planning and reflection', 'IT operations'])
+    // "Create your own" stays the first card.
+    expect(screen.getAllByRole('button')[0]).toHaveTextContent('Create your own')
+  })
+
+  test('test IT operations is last and collapsed until it is opened (M32)', async () => {
+    withM32Gallery()
+    const user = userEvent.setup()
+    render(<CreateTypeDialog open />)
+    const group = await screen.findByRole('group', { name: 'IT operations' })
+    const toggle = within(group).getByRole('button', { name: 'IT operations' })
+    expect(within(group).getByRole('heading', { name: 'IT operations' })).toContainElement(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: /Hosts/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Runbooks/ })).toBeNull()
+    // Last: after every other group, the unsectioned row included.
+    const things = screen.getByRole('button', { name: /Things/ })
+    expect(things.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(within(group).getByRole('button', { name: /Hosts/ })).toBeInTheDocument()
+    expect(within(group).getByRole('button', { name: /Runbooks/ })).toBeInTheDocument()
+    // A template of the group opens as any other.
+    await user.click(within(group).getByRole('button', { name: /Hosts/ }))
+    expect(screen.getByRole('heading', { name: 'Host' })).toBeInTheDocument()
+    // Back in the gallery the group is still open (the dialog was not closed).
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByRole('button', { name: 'IT operations' })).toHaveAttribute('aria-expanded', 'true')
+    await user.click(screen.getByRole('button', { name: 'IT operations' }))
+    expect(screen.queryByRole('button', { name: /Hosts/ })).toBeNull()
+  })
+
+  test('test the IT operations fold is not remembered: a reopened gallery has it collapsed again (M32)', async () => {
+    withM32Gallery()
+    const user = userEvent.setup()
+    const { rerender } = render(<CreateTypeDialog open />)
+    const toggle = await screen.findByRole('button', { name: 'IT operations' })
+    const stored = { ...localStorage }
+    await user.click(toggle)
+    expect(screen.getByRole('button', { name: /Hosts/ })).toBeInTheDocument()
+    rerender(<CreateTypeDialog open={false} />)
+    rerender(<CreateTypeDialog open />)
+    expect(await screen.findByRole('button', { name: 'IT operations' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: /Hosts/ })).toBeNull()
+    // Nothing was written anywhere for it.
+    expect({ ...localStorage }).toEqual(stored)
+  })
+
+  test('test a section the frontend has no title for still shows, named from its key (M32)', async () => {
     ;(api as unknown as { typeGallery: () => Promise<TypeTemplate[]> }).typeGallery = vi.fn(async () => [
-      more,
-      itops,
-      planning,
+      tpl('pet', 'homeLife', 'Pet', 'Pets'),
       ...GALLERY,
     ])
     render(<CreateTypeDialog open />)
-    const group = await screen.findByRole('group', { name: 'IT operations' })
-    expect(within(group).getByRole('heading', { name: 'IT operations' })).toBeInTheDocument()
-    expect(within(group).getByRole('button', { name: /Hosts/ })).toBeInTheDocument()
-    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Use cases', 'Media', 'Planning and reflection', 'IT operations'])
-    // The unsectioned row stays last.
-    const cards = screen.getAllByRole('button').map((b) => b.textContent ?? '')
-    expect(cards.findIndex((t) => t.startsWith('Things'))).toBeGreaterThan(cards.findIndex((t) => t.startsWith('Hosts')))
+    const group = await screen.findByRole('group', { name: 'Home life' })
+    expect(within(group).getByRole('button', { name: /Pets/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Home life', 'Use cases', 'Media'])
+  })
+
+  test('test the gallery offers no starter sets while no route applies one to an open space (M32)', async () => {
+    withM32Gallery()
+    render(<CreateTypeDialog open />)
+    await screen.findByRole('group', { name: 'Personal' })
+    expect(screen.queryByRole('group', { name: 'Starter sets' })).toBeNull()
+    expect(mocked.spaceSetup).not.toHaveBeenCalled()
   })
 
   test('a template shows its properties and creates the type from it', async () => {
@@ -111,7 +180,7 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     expect(screen.getByRole('heading', { name: 'Film' })).toBeInTheDocument()
     expect(screen.getByText('Films you have seen, with director, genre and a rating.')).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Properties' })).toHaveTextContent('Genre')
-    await user.click(screen.getByRole('button', { name: 'Create object type' }))
+    await user.click(screen.getByRole('button', { name: 'Create type' }))
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1))
     expect(mocked.createType.mock.calls[0][0]).toMatchObject({ template: 'film' })
     expect(useLinkIndex.getState().types.map((t) => t.id)).toEqual(['film'])
@@ -133,10 +202,10 @@ describe('CreateTypeDialog', () => {
     const onCreated = vi.fn((t: TypeDef) => useTabs.getState().open({ kind: 'typeSettings', typeId: t.id }))
     render(<CreateTypeDialog open onCreated={onCreated} />)
     await user.click(screen.getByRole('button', { name: /Create your own/ }))
-    expect(screen.getByRole('heading', { name: 'Create your object type' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Create your own type' })).toBeInTheDocument()
     expect(screen.getByText('Do I need a new type?')).toBeInTheDocument()
 
-    const create = screen.getByRole('button', { name: 'Create object type' })
+    const create = screen.getByRole('button', { name: 'Create type' })
     expect(create).toBeDisabled()
     await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Book')
     expect(create).toBeDisabled()
