@@ -64,10 +64,9 @@ describe('QueriesPage', () => {
         </main>
       </>,
     )
-    // The sidebar row sits between the types by name, with no count. The sidebar is lane B's (M32):
-    // its section and row read "Types" and "Saved searches" once that lane is merged.
-    const items = within(screen.getByRole('region', { name: /^(Object Types|Types)$/ })).getAllByRole('listitem')
-    expect(items.map((i) => i.textContent)).toEqual([expect.stringMatching(/^(Queries|Saved searches)$/), 'Servers'])
+    // The sidebar row sits between the types by name, with no count (M32: "Types", "Saved searches").
+    const items = within(screen.getByRole('region', { name: 'Types' })).getAllByRole('listitem')
+    expect(items.map((i) => i.textContent)).toEqual(['Saved searches', 'Servers'])
     await user.click(within(items[0]).getByRole('button'))
     expect(onOpenTarget).toHaveBeenCalledWith({ kind: 'queries' }, { newTab: false })
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'queries' })

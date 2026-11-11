@@ -164,7 +164,7 @@ describe('DefinitionHistoryDialog', () => {
     const ask = await screen.findByText('Apply changes?')
     const dialog = ask.closest('[role="alertdialog"]') as HTMLElement
     expect(within(dialog).getByText('This removes the values of Email.')).toBeInTheDocument()
-    expect(within(dialog).getByText(/^3 (objects|notes) will change\.$/)).toBeInTheDocument()
+    expect(within(dialog).getByText('3 notes will change.')).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(hist.restore).toHaveBeenLastCalledWith(PATH, 'a', 'rev-now', true))
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
