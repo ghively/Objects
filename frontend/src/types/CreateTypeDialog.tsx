@@ -9,9 +9,14 @@
  * M32 (item 12): the groups and their order are the gallery data's (`typetemplates.py`: Personal,
  * Use cases, Research, Media, Planning and reflection…); no entry is named here. The one fixed
  * rule is that "IT operations" comes last and starts collapsed, a disclosure the user opens; the
- * fold lasts while the dialog is open and nothing remembers it. "Starter sets" (the Everyday set
- * and the IT operations set) are not offered here yet: `POST /api/space/setup` answers 409 for a
- * space that already has a starting point, so no route can add a set to an open space.
+ * fold lasts while the dialog is open and nothing remembers it.
+ *
+ * "Starter sets" (M32, item 12) is the last group: the "Everyday set" (Person, Meeting, Project,
+ * Book) and the "IT operations set", the two starting points the space dialog offered before it
+ * stopped asking. One click adds the set (`POST /api/space/setup`: it writes only the types the
+ * space lacks, and the IT set also turns the Work page on unless the switch was set), a toast says
+ * what was added, and the gallery, the types and the space's info are read again. The dialog stays
+ * open, so the new types show as "Added".
  */
 import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { api } from '@/api/client'
@@ -21,9 +26,13 @@ import { IconPicker } from '@/components/IconPicker'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { showToast } from '@/editor/media/upload'
+import { typeLabel } from '@/lib/typeLabel'
 import { ADD_A_TYPE } from '@/lib/words'
-import { useLinkIndex } from '@/links/linkIndex'
+import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { KIND_META, kindIcon } from '@/properties/kinds'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
+import { CREATE_SPACE_TEXT, SETUPS } from '@/spaces/CreateSpaceDialog'
 import { chipStyle, randomColor } from '@/theme/palette'
 
 export const CREATE_TYPE_TEXT = {
@@ -51,7 +60,34 @@ export const CREATE_TYPE_TEXT = {
   tip: 'Make one only for a separate kind of note with its own details; often a label property is enough.',
   hint: 'Once the type exists, change its properties in its settings.',
   action: 'Create type',
+  // M32 (item 12): the last group. Our strings; the two descriptions are the space dialog's.
+  starterSets: 'Starter sets',
+  everydaySet: 'Everyday set',
+  everydaySetDescription: CREATE_SPACE_TEXT.basicDescription,
+  itopsSet: 'IT operations set',
+  itopsSetDescription: CREATE_SPACE_TEXT.itopsDescription,
+  /** The toast after a set was added: the types it wrote, by the names the screen shows. */
+  starterAdded: (names: readonly string[]) => `Added: ${names.join(', ')}.`,
+  starterNothing: 'This space already has every type in that set.',
+  /** Added to the toast when the set turned the Work page on (the IT operations set). */
+  starterWorkOn: 'The Work page is now on for this space.',
 }
+
+/** The two starter sets, in gallery order (the space dialog's `SETUPS` gives the icons). */
+export const STARTER_SETS: { setup: 'basic' | 'itops'; icon: string; label: string; description: string }[] = [
+  {
+    setup: 'basic',
+    icon: SETUPS.find((s) => s.value === 'basic')?.icon ?? 'ph-shapes',
+    label: CREATE_TYPE_TEXT.everydaySet,
+    description: CREATE_TYPE_TEXT.everydaySetDescription,
+  },
+  {
+    setup: 'itops',
+    icon: SETUPS.find((s) => s.value === 'itops')?.icon ?? 'ph-hard-drives',
+    label: CREATE_TYPE_TEXT.itopsSet,
+    description: CREATE_TYPE_TEXT.itopsSetDescription,
+  },
+]
 
 /** The titles of the section keys the gallery data is known to use. */
 const SECTION_TITLES: Record<string, string> = {
@@ -128,13 +164,14 @@ function TemplateIcon({ t, size = 18 }: { t: TypeTemplate; size?: number }) {
   )
 }
 
-function Card({ onClick, children, label }: { onClick(): void; children: ReactNode; label?: string }) {
+function Card({ onClick, children, label, disabled }: { onClick(): void; children: ReactNode; label?: string; disabled?: boolean }) {
   return (
     <button
       type="button"
       aria-label={label}
+      disabled={disabled}
       onClick={onClick}
-      className="flex items-start gap-2.5 rounded-lg border border-line p-2.5 text-left hover:bg-hover"
+      className="flex items-start gap-2.5 rounded-lg border border-line p-2.5 text-left hover:bg-hover disabled:opacity-60"
     >
       {children}
     </button>
@@ -186,6 +223,38 @@ export function CreateTypeDialog({ open, onOpenChange, onCreated }: CreateTypeDi
       }))
       onOpenChange?.(false)
       onCreated?.(type)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Add a starter set to the open space. The server writes only what the space lacks and answers
+   * with the fresh space info: the toast names the types that are new, then everything that lists
+   * types reads them again. The dialog stays on the gallery.
+   */
+  const addStarterSet = async (setup: 'basic' | 'itops') => {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const before = new Set(useLinkIndex.getState().types.map((t) => t.id))
+      const workBefore = useSpaceInfo.getState().space?.workOn ?? false
+      const info = await api.spaceSetup(setup)
+      const added = (info.types ?? []).filter((t) => !before.has(t.id)).map((t) => typeLabel(t))
+      const said = added.length > 0 ? CREATE_TYPE_TEXT.starterAdded(added) : CREATE_TYPE_TEXT.starterNothing
+      showToast(info.workOn && !workBefore ? `${said} ${CREATE_TYPE_TEXT.starterWorkOn}` : said)
+      // The types, at once (the sidebar, the New menu); the set's own notes (templates, tags) follow.
+      useLinkIndex.setState((s) => ({ types: info.types ?? s.types, revision: s.revision + 1 }))
+      useSpaceInfo.setState({ space: info, loaded: true })
+      void invalidateLinkIndex()
+      // The gallery again, so the set's types read "Added".
+      await api
+        .typeGallery()
+        .then(setGallery)
+        .catch(() => undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -285,6 +354,24 @@ export function CreateTypeDialog({ open, onOpenChange, onCreated }: CreateTypeDi
               </div>
             )
           })}
+          {/* M32: the starter sets, last. One click adds the set; the dialog stays open. */}
+          <div role="group" aria-label={CREATE_TYPE_TEXT.starterSets} data-starter-sets="" className="flex flex-col gap-1.5">
+            <h3 className="text-[12px] font-semibold text-fg-muted">{CREATE_TYPE_TEXT.starterSets}</h3>
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {STARTER_SETS.map((s) => (
+                <Card key={s.setup} disabled={busy} onClick={() => void addStarterSet(s.setup)}>
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-line">
+                    <Icon name={s.icon} size={16} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold">{s.label}</span>
+                    <span className="line-clamp-2 block text-[12px] text-fg-muted">{s.description}</span>
+                  </span>
+                </Card>
+              ))}
+            </div>
+            {errorEl}
+          </div>
         </div>
       </>
     )
