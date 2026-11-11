@@ -65,7 +65,7 @@ describe('navigation wiring', () => {
     const user = userEvent.setup()
     useTabs.getState().open({ kind: 'type', typeId: 'page' })
     render(<App />)
-    await screen.findByRole('heading', { name: /^(Pages|Notes)$/, level: 1 })
+    await screen.findByRole('heading', { name: 'Notes', level: 1 })
     await user.click(screen.getByRole('button', { name: 'More' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Pin to sidebar' }))
     await waitFor(() => expect(stored.pinned).toEqual([{ kind: 'type', id: 'page' }]))
