@@ -488,10 +488,11 @@ def test_a_new_object_gets_its_text_in_the_creating_write(root, monkeypatch, tmp
             assert split_object(s.text(path)).body == f"moved text {i}\n"
             assert fm(s, path)["tags"] == ["New tag"]
         assert len(s.runs(rule["id"])) == 5
-        # appendBody goes below the body the object would get (its heading here).
+        # appendBody goes below the body the object would get: none here (M32: a titled
+        # object's body no longer opens with "# Parent"), so it is the whole body.
         res = s.client.post("/api/objects", json={
             "typeId": "page", "title": "Parent", "templateId": "none", "appendBody": "- child"})  # fmt: skip
-        assert split_object(s.text(res.json()["path"])).body == "# Parent\n\n- child\n"
+        assert split_object(s.text(res.json()["path"])).body == "- child\n"
         res = s.client.post("/api/objects", json={"typeId": "page", "templateId": "none", "appendBody": "x"})
         assert split_object(s.text(res.json()["path"])).body == "x\n"
 

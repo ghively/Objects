@@ -3945,8 +3945,11 @@ class Space:
         """Create an object of the type in its folder; return (path, version).
 
         The frontmatter is ``id``, ``type: '<Name>'``, ``title`` (only when
-        non-empty), ``createdAt`` and ``lastUpdated``; the body is ``# <title>``
-        or empty. The file name is `safe_filename` of the title, made unique.
+        non-empty), ``createdAt`` and ``lastUpdated``; the body is empty. (M32: it was
+        ``# <title>`` for a titled object. The app shows the title above the body, so
+        that line showed every new note's title twice; the title is in the front matter
+        only. Notes that already open with the heading keep it, and a rename still keeps
+        such a line in step.) The file name is `safe_filename` of the title, made unique.
 
         ``template_id`` None applies the type's default template (if it still
         exists), ``"none"`` applies none, anything else that template (see
@@ -3962,7 +3965,7 @@ class Space:
         ``{date:FMT}`` and ``{creation:...}`` values are taken at (default: the clock);
         ``createdAt`` and ``lastUpdated`` are always the clock's.
 
-        ``body`` replaces the body the object would get (``# <title>`` or the template's);
+        ``body`` replaces the body the object would get (empty, or the template's);
         ``append_body`` is added below that body after one blank line (alone when it is
         empty). Both are written in the creating write, so the text is there before anything
         hears of the object (M14: a creation rule's write can't race a separate body save).
@@ -3998,7 +4001,7 @@ class Space:
             {**({"title": title} if title else {}), "createdAt": stamp, "lastUpdated": stamp},
             insert_first={"id": new_ulid()},
         )
-        of = ObjectFile(fm_src, f"# {title}\n" if title else "", True, None)
+        of = ObjectFile(fm_src, "", True, None)
         if tmpl is not None:
             of = self._template_edit(t, tmpl, created)(of, parse_fm(fm_src)) or of
         if body is not None:

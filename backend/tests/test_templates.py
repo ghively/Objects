@@ -126,7 +126,7 @@ def test_template_none_skips_default(space_dir: Path):
     path, _ = space.create_object("task", "Printer jams", "none")
     fm = _fm(space_dir, path)
     assert "status" not in fm
-    assert _body(space_dir, path) == "# Printer jams\n"
+    assert _body(space_dir, path) == ""  # M32: no "# Printer jams" line
 
 
 def test_title_date_placeholder(space_dir: Path):

@@ -35,9 +35,10 @@ def test_create_writes_minimal_frontmatter(space_dir: Path):
     assert path == "Tasks/Plan sprint.md"
     data = (space_dir / path).read_bytes()
     assert version == version_of(data)
+    # M32: the title is in the front matter only (the body was "# Plan sprint").
     assert _normalised(data) == (
         "---\nid: <ulid>\ntype: 'Task'\ntitle: Plan sprint\ncreatedAt: <t>\n"
-        "lastUpdated: <t>\n---\n# Plan sprint\n"
+        "lastUpdated: <t>\n---\n"
     )
     stamps = _STAMP_RE.findall(data.decode())
     assert stamps[0] == stamps[1]
@@ -120,7 +121,8 @@ def test_create_route_201_and_quotes_title(space_dir: Path):
     data = (space_dir / body["path"]).read_bytes()
     assert body["version"] == version_of(data)
     assert "title: 'a: b'\n" in data.decode()
-    assert data.decode().endswith("---\n# a: b\n")
+    # M32: the body is empty (it was "# a: b"): the file ends with the front matter.
+    assert data.decode().endswith("Z\n---\n") and "# a: b" not in data.decode()
 
 
 # -- delete ----------------------------------------------------------------------
