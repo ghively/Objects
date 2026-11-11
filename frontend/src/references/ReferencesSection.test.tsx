@@ -10,7 +10,8 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { usePeek, useTabs } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { objectSummary, propertyDef, references, typeDef } from '@/test/mockApi'
 import { ReferencesSection } from './ReferencesSection'
 import { referencesKey } from './referencesUi'
@@ -58,6 +59,7 @@ beforeEach(() => {
   useLinkIndex.setState({ types: [PERSON, typeDef({ id: 'page', name: 'Page' })], objects: [], loaded: true })
   useTabs.getState().reset()
   usePeek.getState().close()
+  resetOpenAsFullPage()
   listeners = []
   mocked.references.mockReset()
   mocked.references.mockResolvedValue(FULL)
@@ -254,7 +256,17 @@ describe('ReferencesSection', () => {
     expect(within(alpha).queryByText('Page')).toBeNull()
   })
 
-  test('backlink click peeks with the backlinks list; ctrl+click opens a tab', async () => {
+  test('backlink click opens the note as a full page (M32)', async () => {
+    const user = userEvent.setup()
+    await renderSection()
+    await user.click(tab(/^Backlinks/))
+    await user.click(screen.getByRole('button', { name: /Bea/ }))
+    expect(usePeek.getState().path).toBeNull()
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'People/Bea.md' })
+  })
+
+  test('with full pages off a backlink click peeks with the backlinks list; ctrl+click opens a tab', async () => {
+    setOpenAsFullPage(false)
     const user = userEvent.setup()
     await renderSection()
     await user.click(tab(/^Backlinks/))

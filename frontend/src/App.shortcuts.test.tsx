@@ -1,3 +1,4 @@
+import type { Editor as TiptapEditor } from '@tiptap/core'
 import { configure, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -129,7 +130,8 @@ describe('app shortcuts', () => {
     await openObjectPage()
     expect(ctrl(document.body, 'Backspace')).toBe(false)
     const dialog = await screen.findByRole('alertdialog')
-    expect(dialog).toHaveTextContent(/Delete this (object|note)\?/)
+    // M32: the dialog names the note (its title is "Notes").
+    expect(dialog).toHaveTextContent('Delete “Notes”?')
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(mocked.deleteObject).not.toHaveBeenCalled()
@@ -221,13 +223,24 @@ describe('app shortcuts', () => {
     expect(mocked.createObject).not.toHaveBeenCalled()
   })
 
-  test("test Ctrl+Shift+D with the caret in the note text opens today's note and asks for the caret at its end", async () => {
+  test("test Ctrl+Shift+D with the caret in the note text opens today's note with the caret at the end of its text", async () => {
     mocked.createDailyNote.mockResolvedValue({ path: 'DailyNotes/2026-11-11.md', version: 'v1', typeIds: [] })
     const { container } = await openObjectPage()
     const editor = container.querySelector('.ProseMirror')!
     expect(fireEvent.keyDown(editor, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true })).toBe(false)
     await waitFor(() => expect(usePeek.getState().path).toBe('DailyNotes/2026-11-11.md'))
-    expect(takeBodyFocus('DailyNotes/2026-11-11.md')).toBe('end')
+    // The shortcut asks for the caret at the end (`nav/focusRequest`) and the peek's editor takes
+    // the request when it is ready: the next key typed lands at the end of today's note.
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() => {
+      const pm = dialog.querySelector('.ProseMirror') as (HTMLElement & { editor?: TiptapEditor }) | null
+      if (!pm?.editor) throw new Error('editor not mounted')
+      expect(document.activeElement).toBe(pm)
+      expect(pm.editor.state.selection.empty).toBe(true)
+      expect(pm.editor.state.selection.from).toBe(pm.editor.state.doc.content.size - 1)
+    })
+    // Taken once: nothing is left to move the caret again.
+    expect(takeBodyFocus('DailyNotes/2026-11-11.md')).toBeNull()
   })
 
   test('test a new note made by key steps out from under a popped-out note', async () => {

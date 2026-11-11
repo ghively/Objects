@@ -12,7 +12,8 @@ vi.mock('graphology-layout-forceatlas2/worker', async () => (await import('./tes
 
 import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { usePeek } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { resetPinned, useUiStore } from '@/shell/usePinned'
 import { graphData, typeDef } from '@/test/mockApi'
 import { GraphPage } from './GraphPage'
@@ -49,6 +50,8 @@ beforeEach(() => {
   resetPinned()
   resetLinkIndex()
   usePeek.getState().close()
+  useTabs.getState().reset()
+  resetOpenAsFullPage()
   sigmaInstances.length = 0
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
   mocked.graph.mockImplementation(async () => DATA)
@@ -93,10 +96,17 @@ describe('GraphPage', () => {
     expect(screen.getByText('Nothing to show')).toBeInTheDocument()
   })
 
-  test('node click peeks with visible nodes; ctrl+click opens a tab', async () => {
+  test('node click opens the note (M32); with full pages off it peeks with visible nodes; ctrl+click opens a tab', async () => {
     const onOpenTarget = vi.fn()
     render(<GraphPage onOpenTarget={onOpenTarget} />)
     const sigma = await sigmaReady()
+    // M32: "Open notes as a full page" starts on, so a plain click opens the note in the tab.
+    act(() => sigma.emit('clickNode', { node: '1', event: { original: new MouseEvent('click') } }))
+    expect(usePeek.getState().path).toBeNull()
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Charles Babbage.md' })
+
+    // With the setting off: the peek, the visible nodes its pager list.
+    setOpenAsFullPage(false)
     act(() => sigma.emit('clickNode', { node: '1', event: { original: new MouseEvent('click') } }))
     expect(usePeek.getState().path).toBe('Charles Babbage.md')
     expect(usePeek.getState().list).toEqual(['Ada Lovelace.md', 'Charles Babbage.md', 'Analytical Engine.md'])

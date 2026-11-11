@@ -12,7 +12,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api, ConflictError } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
-import { usePeek } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { DataView } from '../DataView'
 import { emptyFilterGroup } from '../model'
 import { TimelineSettings } from './TimelineLayout'
@@ -85,6 +85,7 @@ function dragBy(el: HTMLElement, dx: number) {
 beforeEach(() => {
   resetLinkIndex()
   usePeek.getState().close()
+  useTabs.getState().reset()
   vi.clearAllMocks()
   lastState = null
 })
@@ -186,11 +187,13 @@ describe('TimelineLayout', () => {
 
   test('a click opens the object; a drag does not', async () => {
     render(<Harness rows={[story('A', { due: d('2026-11-03') })]} />)
+    // M32: a click opens the note as a full page.
     await userEvent.click(bar('A'))
-    expect(usePeek.getState().path).toBe('Stories/A.md')
-    usePeek.getState().close()
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Stories/A.md' })
+    useTabs.getState().reset()
     dragBy(bar('A'), 2 * DAY_PX.week)
     fireEvent.click(bar('A'))
+    expect(currentTarget(useTabs.getState())).toBeNull()
     expect(usePeek.getState().path).toBeFalsy()
   })
 
@@ -273,10 +276,9 @@ describe('TimelineLayout', () => {
     expect(a.tabIndex).toBe(0)
     a.focus()
     fireEvent.keyDown(a, { key: 'Enter' })
-    expect(usePeek.getState().path).toBe('Stories/A.md')
-    usePeek.getState().close()
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Stories/A.md' })
     fireEvent.keyDown(bar('B'), { key: ' ' })
-    expect(usePeek.getState().path).toBe('Stories/B.md')
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Stories/B.md' })
     const handle = within(a).getByTestId('timeline-link-handle')
     expect(handle.getAttribute('aria-hidden')).toBe('true')
     expect(handle.tabIndex).toBe(-1)

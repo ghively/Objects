@@ -2,6 +2,7 @@ import type { Editor as TiptapEditor } from '@tiptap/core'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ChangeEvent, ObjectDetail, ObjectSummary, SpaceInfo, TypeDef } from '@/api/types'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { objectDetail, objectSummary, propertyDef, typeDef as makeType } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -77,6 +78,7 @@ beforeEach(() => {
   localStorage.clear()
   useTabs.getState().reset()
   usePeek.getState().close()
+  resetOpenAsFullPage()
   useCalendar.setState({ view: 'month', anchor: '2020-01-01' })
   resetLinkIndex()
   listeners = []
@@ -102,7 +104,8 @@ beforeEach(() => {
 })
 
 async function openPeekAt(index: number) {
-  usePeek.getState().peek(LIST[index], LIST)
+  // The peek is the setup here, so it is asked for outright (M32: a plain click opens a page).
+  usePeek.getState().show(LIST[index], LIST)
   render(<ObjectPeek />)
   const dialog = await screen.findByRole('dialog')
   await within(dialog).findByRole('heading', { level: 1, name: OBJECTS[index].title })
@@ -153,7 +156,17 @@ describe('ObjectPeek', () => {
     expect(ada.title).toBe('Ada Lovelace')
   })
 
-  test('link click opens peek; ctrl+click opens new tab', async () => {
+  test('a link click in the peek opens the note as a full page and the peek steps aside (M32)', async () => {
+    const dialog = await openPeekAt(0)
+    const ada = await chip(dialog, 'Ada Lovelace')
+    await waitFor(() => expect(ada).toHaveAttribute('data-resolved-path'))
+    fireEvent.click(ada)
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'People/Ada Lovelace.md' })
+    expect(usePeek.getState().path).toBeNull()
+  })
+
+  test('with full pages off, link click opens peek; ctrl+click opens new tab', async () => {
+    setOpenAsFullPage(false)
     const dialog = await openPeekAt(0)
     const ada = await chip(dialog, 'Ada Lovelace')
     await waitFor(() => expect(ada).toHaveAttribute('data-resolved-path'))
@@ -176,7 +189,7 @@ describe('ObjectPeek', () => {
 
   // Catalog section 5: a daily note's peek adds a Reviewed checkbox and a "Calendar" button (jump to that day).
   test('a daily note peek shows Reviewed and Calendar; Calendar opens the calendar on that day', async () => {
-    usePeek.getState().peek(DAILY_PATH, [DAILY_PATH])
+    usePeek.getState().show(DAILY_PATH, [DAILY_PATH])
     render(<ObjectPeek />)
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByRole('heading', { level: 1, name: '2026-11-08' })
@@ -201,7 +214,7 @@ describe('ObjectPeek', () => {
   // carries a version the view does not know. Only the frontmatter changed, so the view adopts the
   // version and keeps the editor's document (no reload: selection, scroll and undo stay).
   test('after the Reviewed write, the change event does not reload the peek editor (only the frontmatter changed)', async () => {
-    usePeek.getState().peek(DAILY_PATH, [DAILY_PATH])
+    usePeek.getState().show(DAILY_PATH, [DAILY_PATH])
     render(<ObjectPeek />)
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByRole('heading', { level: 1, name: '2026-11-08' })

@@ -80,7 +80,7 @@ describe('whiteboard integration', () => {
     expect(screen.queryByTestId('whiteboard-page')).toBeNull()
 
     render(<ObjectPeek />)
-    act(() => usePeek.getState().peek(BOARD))
+    act(() => usePeek.getState().show(BOARD))
     await waitFor(() => expect(pageProps.at(-1)?.mode).toBe('peek'))
     expect(await screen.findByTestId('whiteboard-page')).toHaveAttribute('data-mode', 'peek')
     const last = pageProps.at(-1)

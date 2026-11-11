@@ -13,6 +13,7 @@ import { renderInline, TextBlockCell } from './TextBlockCell'
 import { BacklinksCell } from './SystemFieldCell'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { objectSummary } from '@/test/mockApi'
 
 function def(type: PropertyType, extra: Partial<PropertyDef> = {}): PropertyDef {
@@ -484,9 +485,10 @@ describe('BacklinksCell', () => {
   afterEach(() => {
     usePeek.getState().close()
     resetLinkIndex()
+    resetOpenAsFullPage()
   })
 
-  it('test backlinks cell shows chips and peeks; empty', async () => {
+  it('test backlinks cell shows chips and opens (M32) or peeks; empty', async () => {
     useLinkIndex.setState({
       objects: [objectSummary({ path: 'People/Ada.md', title: 'Ada Lovelace', type: 'person' })],
       types: [],
@@ -502,6 +504,12 @@ describe('BacklinksCell', () => {
     const { unmount } = render(<BacklinksCell def={d} value={refs} onChange={onChange} />)
     // The summary's title when known, else the link target.
     expect(screen.getAllByTestId('backlink-chip').map((c) => c.textContent)).toEqual(['Ada Lovelace', 'Bob'])
+    // M32: a plain click opens the note as a full page, by a link.
+    await userEvent.click(screen.getByText('Bob'))
+    expect(usePeek.getState().path).toBeNull()
+    expect(open).toHaveBeenLastCalledWith({ kind: 'object', path: 'People/Bob.md' }, { via: 'link' })
+    // With the setting off: the peek, the chips its pager list.
+    setOpenAsFullPage(false)
     await userEvent.click(screen.getByText('Bob'))
     expect(usePeek.getState().path).toBe('People/Bob.md')
     expect(usePeek.getState().list).toEqual(['People/Ada.md', 'People/Bob.md'])

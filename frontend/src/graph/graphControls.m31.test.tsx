@@ -16,8 +16,9 @@ vi.mock('graphology-layout-forceatlas2/worker', async () => (await import('./tes
 import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { useRecent } from '@/nav/recent'
-import { usePeek } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { resetPinned, useUiStore } from '@/shell/usePinned'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { graphData, typeDef } from '@/test/mockApi'
 import { GRAPH_CONTROLS_TEXT as T, nextZoom, ZOOM_STEPS } from './GraphControls'
 import { GraphPage } from './GraphPage'
@@ -48,6 +49,8 @@ beforeEach(() => {
   resetPinned()
   resetLinkIndex()
   usePeek.getState().close()
+  useTabs.getState().reset()
+  resetOpenAsFullPage()
   useRecent.getState().clear()
   sigmaInstances.length = 0
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
@@ -116,7 +119,7 @@ describe('graph controls', () => {
     await waitFor(() => expect(zoom).toHaveTextContent('100%'))
   })
 
-  test('Open as list lists the notes shown; a pick peeks it with them as the pager', async () => {
+  test('Open as list lists the notes shown; a pick opens it (M32), or peeks it with them as the pager', async () => {
     const user = userEvent.setup()
     const onOpenTarget = vi.fn()
     render(<GraphPage onOpenTarget={onOpenTarget} />)
@@ -125,10 +128,23 @@ describe('graph controls', () => {
     const list = await screen.findByRole('list', { name: T.listHeading })
     const names = within(list).getAllByRole('button').map((b) => b.textContent)
     expect(names).toEqual(['Ada Lovelace', 'Analytical Engine', 'Charles Babbage'])
+    // With "Open notes as a full page" off: the peek, the listed notes its pager.
+    setOpenAsFullPage(false)
     await user.click(within(list).getByRole('button', { name: 'Ada Lovelace' }))
     expect(usePeek.getState().path).toBe('Ada Lovelace.md')
     expect(usePeek.getState().list).toEqual(['Ada Lovelace.md', 'Analytical Engine.md', 'Charles Babbage.md'])
     expect(onOpenTarget).not.toHaveBeenCalled()
+  })
+
+  test('Open as list: a pick opens the note as a full page (M32)', async () => {
+    const user = userEvent.setup()
+    render(<GraphPage onOpenTarget={vi.fn()} />)
+    await sigmaReady()
+    await user.click(screen.getByRole('button', { name: T.openAsList }))
+    const list = await screen.findByRole('list', { name: T.listHeading })
+    await user.click(within(list).getByRole('button', { name: 'Ada Lovelace' }))
+    expect(usePeek.getState().path).toBeNull()
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Ada Lovelace.md' })
   })
 
   test('Recently opened lists the recent objects in this graph; a pick finds it on the graph', async () => {

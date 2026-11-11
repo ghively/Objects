@@ -10,7 +10,8 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api, ApiError, ConflictError } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { usePeek } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { objectSummary, references, typeDef } from '@/test/mockApi'
 import { ReferencesSection } from './ReferencesSection'
 
@@ -46,6 +47,8 @@ beforeEach(() => {
   resetLinkIndex()
   useLinkIndex.setState({ types: [typeDef({ id: 'page', name: 'Page' })], objects: [], loaded: true })
   usePeek.getState().close()
+  useTabs.getState().reset()
+  resetOpenAsFullPage()
   localStorage.setItem('object.references:ada', JSON.stringify({ tab: 'mentions', closed: false }))
   mocked.references.mockReset()
   mocked.references.mockResolvedValue(DATA)
@@ -144,7 +147,15 @@ describe('MentionsTab', () => {
     await waitFor(() => expect(mocked.references).toHaveBeenCalledTimes(1))
   })
 
-  test('a mention context click peeks with the mentions list', async () => {
+  test('a mention context click opens the note as a full page (M32)', async () => {
+    const user = await setup()
+    await user.click(document.querySelector('[data-mention="Pages/Log.md"] [data-occurrence] button') as HTMLElement)
+    expect(usePeek.getState().path).toBeNull()
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Pages/Log.md' })
+  })
+
+  test('with full pages off a mention context click peeks with the mentions list', async () => {
+    setOpenAsFullPage(false)
     const user = await setup()
     await user.click(document.querySelector('[data-mention="Pages/Log.md"] [data-occurrence] button') as HTMLElement)
     expect(usePeek.getState().path).toBe('Pages/Log.md')
