@@ -449,8 +449,19 @@ Each starter template pre-fills the new type's properties.
 
 ## 8. Search, New menu, view toolbar
 
-- **Search palette**: see audit backlog item 2 (placeholder text, Today/Earlier groups, type at the right).
-- **New menu**: popover with Search; types in recent-use order; footer hints.
+- **Search palette**: see audit backlog item 2 (placeholder text, Today/Earlier groups, type at the right). (M32)
+  The placeholder reads "Find notes and commands, or paste"; the empty state "Recently opened notes appear
+  here."; types read as the screen names them ("Note" for the built-in Page: the type at a row's right, "Create
+  Note", "Only search for type "Note"", and typing "note" finds the type); the clipboard offers read "Create
+  note" and "Make a new note from the clipboard". "Create new {type} with title "{q}"" makes a Note unless a type
+  filter is set, the page in view has a type (a type's page, a collection, a saved search) or a name pattern
+  matches: never one more of the type made last.
+- **New** (M32, "New means a note"): the sidebar's "New" button makes a Note at once and opens it with the title
+  focused (Ctrl/Cmd+click a new tab, Shift+click the side panel, as every create); a small arrow beside it,
+  "Choose a type", opens the New menu. Home's "New note" does the same.
+- **New menu** (the arrow beside "New", Ctrl+U): popover with Search ("Search types"; was "Search Object
+  Types"); types by the name the screen shows, the suggested type first, marked "Suggested" (the page in view's
+  type, else the type made last); footer hints.
 - **View toolbar** (type pages, `All` tab): count pill, Filter, Sort, Group by, a layout dropdown, Customize.
   - Layouts (`views/model.ts`): List, Wall, Kanban, Gallery, Table, Embed, Calendar, Timeline, Chart, Gallery strip.
     Chart export (the Customize page): **Export PNG** renders the frame at 2x; **Export SVG** saves the chart's own

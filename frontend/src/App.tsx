@@ -4,7 +4,7 @@ import { AiHost } from '@/ai/AiHost'
 import type { ChangeKind, ObjectSummary, SpaceInfo, TypeDef } from '@/api/types'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { createAndOpen } from '@/create/createAndOpen'
+import { newNote, noteTypeId } from '@/create/newNote'
 import { NewObjectMenu } from '@/create/NewObjectMenu'
 import { AllNotesView } from '@/allnotes/AllNotesView'
 import { AgentPage } from '@/agents/AgentPage'
@@ -30,6 +30,7 @@ import {
   type Target,
 } from '@/nav/tabs'
 import { useDeleteRequest } from '@/object/DeleteObjectDialog'
+import { isDailyNoteType } from '@/object/ObjectHeader'
 import { ObjectPage } from '@/object/ObjectPage'
 import { ObjectPeek } from '@/object/ObjectPeek'
 import { BacklinksPanel } from '@/references/BacklinksPanel'
@@ -98,15 +99,17 @@ function countsByType(s: { objects: ObjectSummary[]; loaded: boolean }): Record<
 /** Inputs, text areas, selects, contenteditable (the body editor) and CodeMirror (raw mode). */
 export { isEditableTarget }
 
-/** The type Ctrl+N creates: the open type, else the open object's type, else Page. */
+/**
+ * The type the new-note key makes: the open type, else the open note's type, else a Note (M32:
+ * never the last type made). A daily note is made by its date, so from one the key makes a Note.
+ */
 function currentTypeId(types: TypeDef[]): string {
   const target = currentTarget(useTabs.getState())
-  if (target?.kind === 'type' || target?.kind === 'typeSettings') return target.typeId
-  if (target?.kind === 'object') {
-    const t = useLinkIndex.getState().objects.find((o) => o.path === target.path)?.type
-    if (t && types.some((x) => x.id === t)) return t
-  }
-  return types.find((t) => t.name.toLowerCase() === 'page')?.id ?? 'page'
+  let id: string | undefined
+  if (target?.kind === 'type' || target?.kind === 'typeSettings') id = target.typeId
+  else if (target?.kind === 'object') id = useLinkIndex.getState().objects.find((o) => o.path === target.path)?.type
+  const type = id ? types.find((x) => x.id === id) : undefined
+  return type && !isDailyNoteType(type) ? type.id : noteTypeId(types)
 }
 
 interface PageCtx {
@@ -290,9 +293,7 @@ export default function App() {
         setNewMenuOpen(true)
       } else if (key === 'n') {
         e.preventDefault()
-        void createAndOpen(currentTypeId(typesRef.current)).catch((err: unknown) =>
-          console.warn('Could not create an object:', err),
-        )
+        void newNote({}, currentTypeId(typesRef.current))
       } else if (key === 'backspace') {
         const peekPath = usePeek.getState().path
         const target = currentTarget(useTabs.getState())
@@ -369,7 +370,10 @@ export default function App() {
                 activeTypeId={activeType?.id}
                 onOpenType={(t) => open({ kind: 'type', typeId: t.id })}
                 counts={counts}
-                onNew={() => setNewMenuOpen(true)}
+                onNew={(e) =>
+                  void newNote({ ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey }, noteTypeId(types))
+                }
+                onNewMenu={() => setNewMenuOpen(true)}
                 onCreateType={() => setCreateTypeOpen(true)}
                 onOpenTypeSettings={(t) => open({ kind: 'typeSettings', typeId: t.id })}
                 onDeleteType={setDeleting}

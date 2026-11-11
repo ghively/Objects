@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { configure, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { SpaceInfo } from '@/api/types'
@@ -12,11 +12,15 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import { todayYmd } from '@/calendar/dates'
 import { useCalendar } from '@/calendar/useCalendar'
-import { resetLinkIndex } from '@/links/linkIndex'
+import { setLastTypeSpace, useLastType } from '@/create/lastType'
+import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import App from './App'
 
 const mocked = vi.mocked(api)
+
+// The page's editor loads lazily: on a busy machine the first render can take longer than a second.
+configure({ asyncUtilTimeout: 10_000 })
 
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true, revision: 'r1' })
 const PROJECT = typeDef({ id: 'project', name: 'Project', pluralName: 'Projects', revision: 'r1' })
@@ -24,8 +28,9 @@ const TASK = typeDef({ id: 'task', name: 'Task', pluralName: 'Tasks', basic: tru
 const PATH = 'Projects/Notes.md'
 const NOTES = objectSummary({ path: PATH, type: 'project', title: 'Notes' })
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear()
+  await setLastTypeSpace(null)
   useTabs.getState().reset()
   usePeek.getState().close()
   resetLinkIndex()
@@ -71,7 +76,41 @@ describe('app shortcuts', () => {
     render(<App />)
     await waitFor(() => expect(mocked.space).toHaveBeenCalled())
     ctrl(document.body, 'u')
-    expect(await screen.findByRole('textbox', { name: 'Search Object Types' })).toBeInTheDocument()
+    expect(await screen.findByRole('textbox', { name: 'Search types' })).toBeInTheDocument()
+  })
+
+  // M32, "New means a note".
+  test('test the New button makes a Note at once and opens it; the arrow opens the type list', async () => {
+    const user = userEvent.setup()
+    // The last thing made was a task: New still makes a Note.
+    useLastType.getState().set('task')
+    useTabs.getState().open({ kind: 'trash' })
+    render(<App />)
+    await waitFor(() => expect(mocked.space).toHaveBeenCalled())
+    await user.click(await screen.findByRole('button', { name: 'New' }))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('page', {}))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'page/Untitled.md' }))
+    expect(screen.queryByRole('textbox', { name: 'Search types' })).toBeNull()
+    // The arrow: the type list, as before.
+    await user.click(screen.getByRole('button', { name: 'Choose a type' }))
+    expect(await screen.findByRole('textbox', { name: 'Search types' })).toBeInTheDocument()
+    expect(mocked.createObject).toHaveBeenCalledTimes(1)
+  })
+
+  test('test Ctrl+N with a daily note open makes a Note, not a daily note', async () => {
+    const DAILY = typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true, revision: 'r1' })
+    const day = objectSummary({ path: 'DailyNotes/2026-11-11.md', type: 'dailynote', title: '2026-11-11' })
+    mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE, PROJECT, TASK, DAILY] } satisfies SpaceInfo)
+    mocked.objects.mockResolvedValue([NOTES, day])
+    mocked.object.mockImplementation(async () =>
+      objectDetail({ summary: day, frontmatter: { type: 'DailyNote', title: '2026-11-11' }, body: '', version: 'v1' }),
+    )
+    useTabs.getState().open({ kind: 'object', path: day.path })
+    render(<App />)
+    await screen.findByRole('textbox', { name: 'Title' })
+    await waitFor(() => expect(useLinkIndex.getState().objects.length).toBe(2))
+    ctrl(document.body, 'n')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('page', {}))
   })
 
   test('test Ctrl+Backspace in the title input and in the editor does not open the delete dialog', async () => {
@@ -89,7 +128,7 @@ describe('app shortcuts', () => {
     await openObjectPage()
     expect(ctrl(document.body, 'Backspace')).toBe(false)
     const dialog = await screen.findByRole('alertdialog')
-    expect(dialog).toHaveTextContent('Delete this object?')
+    expect(dialog).toHaveTextContent(/Delete this (object|note)\?/)
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(mocked.deleteObject).not.toHaveBeenCalled()

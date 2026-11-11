@@ -2,6 +2,7 @@
  * The action palette's items. Pure: the caller supplies the effects.
  */
 import type { Icon, SpaceEntry, TypeDef } from '@/api/types'
+import { typeLabel } from '@/lib/typeLabel'
 import { nameMatches } from './searchOptions'
 
 /** The action rows' labels. */
@@ -24,14 +25,14 @@ export const ACTION_TEXT = {
 
 export interface ActionContext {
   types: readonly TypeDef[]
-  /** An object is the active target (offers "Open graph view"). */
+  /** A note is the active target (offers "Open graph view"). */
   hasObjectOpen: boolean
   createObject(typeId: string): void
   openCalendar(): void
   openToday(): void
   /** 2026-11-09: today's daily note in the peek (created when missing). */
   openTodaysNote?(): void
-  /** All notes: the sidebar doesn't list it (catalog §4), so the palette is its way in. */
+  /** The all-notes view (M32: the sidebar's "Notes" entry opens it too). */
   openAllNotes?(): void
   openGlobalGraph(): void
   openGraphView(): void
@@ -62,11 +63,12 @@ export interface Action {
 
 export function buildActions(ctx: ActionContext): Action[] {
   const out: Action[] = []
-  const types = [...ctx.types].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+  // By the name the screen shows (M32: the built-in Page is "Create Note").
+  const types = [...ctx.types].sort((a, b) => typeLabel(a).localeCompare(typeLabel(b), undefined, { sensitivity: 'base' }))
   for (const t of types) {
     out.push({
       id: `create:${t.id}`,
-      label: ACTION_TEXT.createNewEntity(t.name),
+      label: ACTION_TEXT.createNewEntity(typeLabel(t)),
       icon: t.icon,
       typeId: t.id,
       run: () => ctx.createObject(t.id),
@@ -103,7 +105,7 @@ export function buildActions(ctx: ActionContext): Action[] {
 
 /**
  * The actions whose label matches `query` (the palette's name match), in list order. None for an
- * empty query: the palette shows the recent objects then (our choice).
+ * empty query: the palette shows the recent notes then (our choice).
  */
 export function matchActions(actions: readonly Action[], query: string): Action[] {
   const q = query.trim()

@@ -62,7 +62,7 @@ describe('NewObjectMenu', () => {
   test('typing filters the types; Enter creates the first match', async () => {
     const user = userEvent.setup()
     render(<NewObjectMenu open onOpenChange={() => undefined} />)
-    expect(screen.getByRole('textbox', { name: 'Search Object Types' })).toHaveAttribute('placeholder', 'Search')
+    expect(screen.getByRole('textbox', { name: 'Search types' })).toHaveAttribute('placeholder', 'Search')
     await user.keyboard('proj')
     expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Project'])
     await user.keyboard('{Enter}')
@@ -75,7 +75,7 @@ describe('NewObjectMenu', () => {
     document.body.appendChild(btn)
     try {
       render(<NewObjectMenu open onOpenChange={() => undefined} />)
-      expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Page', 'Project', 'Task', 'Whiteboard'])
+      expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Note', 'Project', 'Task', 'Whiteboard'])
       expect(screen.getByRole('dialog')).toHaveAttribute('data-slot', 'popover-content')
     } finally {
       btn.remove()
@@ -107,7 +107,7 @@ describe('NewObjectMenu', () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
     render(<NewObjectMenu open onOpenChange={onOpenChange} />)
-    expect(screen.getByRole('textbox', { name: 'Search Object Types' })).toHaveFocus()
+    expect(screen.getByRole('textbox', { name: 'Search types' })).toHaveFocus()
     await user.keyboard('{ArrowDown}{Enter}')
     await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('project', {}))
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))

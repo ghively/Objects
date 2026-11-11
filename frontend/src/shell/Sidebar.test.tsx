@@ -344,4 +344,21 @@ describe('Sidebar (M32: notes first)', () => {
     expect(within(section).getByRole('button', { name: 'Journals' })).toBeInTheDocument()
     expect(within(section).queryByRole('button', { name: 'Notes' })).toBeNull()
   })
+
+  it('test New makes a note at once and the arrow beside it opens the type list', async () => {
+    const user = userEvent.setup()
+    const onNew = vi.fn()
+    const onNewMenu = vi.fn()
+    render(<Sidebar types={TYPES} onNew={onNew} onNewMenu={onNewMenu} />)
+    await user.click(screen.getByRole('button', { name: 'New' }))
+    expect(onNew).toHaveBeenCalledTimes(1)
+    expect(onNewMenu).not.toHaveBeenCalled()
+    const arrow = screen.getByRole('button', { name: 'Choose a type' })
+    expect(arrow).toHaveAttribute('title', 'Choose a type')
+    await user.click(arrow)
+    expect(onNewMenu).toHaveBeenCalledTimes(1)
+    expect(onNew).toHaveBeenCalledTimes(1)
+    // The two sit in the one control the New menu opens under.
+    expect(arrow.closest('[data-new-button]')).toBe(screen.getByRole('button', { name: 'New' }).closest('[data-new-button]'))
+  })
 })

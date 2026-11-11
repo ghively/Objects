@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { useCollections } from '@/collections/useCollections'
 import { Icon, IconOrEmoji, iconName } from '@/components/Icon'
 import { ContextMenu, ContextMenuTrigger } from '@/components/ui/context-menu'
@@ -53,8 +53,10 @@ export interface SidebarProps {
   onOpenType?: (type: TypeDef) => void
   /** Optional object counts per type id, shown muted at the row's end. */
   counts?: Record<string, number>
-  /** "+ New": create an object. */
-  onNew?: () => void
+  /** M32: "+ New" makes a Note at once (the click's modifier keys say where it opens). */
+  onNew?: (e: MouseEvent) => void
+  /** M32: the arrow beside "New" opens the type list (the New menu; also Ctrl+U). */
+  onNewMenu?: () => void
   /** The `+` beside "Types": create a type. */
   onCreateType?: () => void
   /** A type row's context menu › "Type settings". */
@@ -138,6 +140,9 @@ function ThemeButton() {
 export const SETTINGS_TOOLTIP = 'Settings'
 /** The footer's Shortcuts icon: opens the shortcuts sheet (catalog §4: settings gear, theme toggle, Shortcuts icon). */
 export const SHORTCUTS_TOOLTIP = 'Shortcuts'
+
+/** M32: the arrow beside "New": the list of types to make something else (our string). */
+export const NEW_MENU_LABEL = 'Choose a type'
 
 /** The square search button's tooltip. */
 export const SEARCH_THIS_SPACE = 'Search this space'
@@ -234,6 +239,7 @@ export function Sidebar({
   onOpenType,
   counts,
   onNew,
+  onNewMenu,
   onCreateType,
   onOpenTypeSettings,
   onDeleteType,
@@ -432,15 +438,28 @@ export function Sidebar({
   return (
     <aside className="flex h-full w-[358px] shrink-0 flex-col bg-app pr-3.5 pl-2.5 text-fg" aria-label="Sidebar">
       <div className="flex items-center gap-2 pt-3 pb-3">
-        <button
-          type="button"
-          onClick={() => onNew?.()}
+        {/* M32: "New" makes a Note at once; the arrow beside it opens the type list. The two read
+            as one control (`data-new-button` anchors the menu under it). */}
+        <div
           data-new-button=""
-          className="flex h-[42px] flex-1 items-center gap-2 rounded-xl border border-[var(--chrome-btn-border)] bg-raised px-3 text-[15px] font-medium hover:bg-hover"
+          className="flex h-[42px] min-w-0 flex-1 overflow-hidden rounded-xl border border-[var(--chrome-btn-border)] bg-raised text-[15px] font-medium"
         >
-          <Icon name="ph-plus" size={16} />
-          New
-        </button>
+          <button type="button" onClick={(e) => onNew?.(e)} data-new-note="" className="flex min-w-0 flex-1 items-center gap-2 px-3 hover:bg-hover">
+            <Icon name="ph-plus" size={16} />
+            New
+          </button>
+          <button
+            type="button"
+            aria-label={NEW_MENU_LABEL}
+            title={NEW_MENU_LABEL}
+            aria-haspopup="dialog"
+            data-new-menu=""
+            onClick={() => onNewMenu?.()}
+            className="flex w-9 shrink-0 items-center justify-center border-l border-[var(--chrome-btn-border)] text-fg-muted hover:bg-hover hover:text-fg"
+          >
+            <Icon name="ph-caret-down" size={13} />
+          </button>
+        </div>
         <button
           type="button"
           aria-label={SEARCH_THIS_SPACE}

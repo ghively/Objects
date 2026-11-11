@@ -19,7 +19,7 @@ import type { SpaceEntry } from '@/api/types'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { KeyHints } from '@/components/KeyHints'
 import { useCalendar } from '@/calendar/useCalendar'
-import { createAndOpen } from '@/create/createAndOpen'
+import { newNote } from '@/create/newNote'
 import { useLinkIndex } from '@/links/linkIndex'
 import { keysFor, matches } from '@/lib/shortcuts'
 import { currentTarget, usePeek, useTabs, type OpenOptions, type Target } from '@/nav/tabs'
@@ -121,7 +121,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
       types,
       hasObjectOpen,
       createObject: (typeId) => {
-        void createAndOpen(typeId).catch((err: unknown) => console.warn('Could not create an object:', err))
+        void newNote({}, typeId)
       },
       openCalendar: () => onOpenTarget({ kind: 'calendar' }),
       openToday: () => {

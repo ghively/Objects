@@ -102,14 +102,14 @@ describe('classifying', () => {
   test('offers by content kind', () => {
     expect(pasteActions({ kind: 'text', text: 'hello' }, TYPES).map((a) => a.label)).toEqual([
       "Paste into today's daily note",
-      'Make a new page from the clipboard',
+      'Make a new note from the clipboard',
     ])
     expect(pasteActions({ kind: 'text', text: '# T\n\nbody' }, TYPES).map((a) => a.label)).toEqual([
-      'Create page',
+      'Create note',
       "Paste into today's daily note",
-      'Make a new page from the clipboard',
+      'Make a new note from the clipboard',
     ])
-    expect(pasteActions({ kind: 'text', text: 'https://example.com' }, TYPES)[0].label).toBe('Create Page')
+    expect(pasteActions({ kind: 'text', text: 'https://example.com' }, TYPES)[0].label).toBe('Create Note')
     expect(pasteActions({ kind: 'files', files: [new File(['x'], 'a.png')] }, TYPES).map((a) => a.label)).toEqual(['Upload'])
     expect(byId(pasteActions({ kind: 'text', text: 'a\n\nb' }, TYPES))['paste:dailyNote'].preview).toBe('2 blocks')
     expect(byId(pasteActions({ kind: 'text', text: 'a' }, TYPES))['paste:dailyNote'].preview).toBe('1 block')

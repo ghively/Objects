@@ -10,14 +10,14 @@ import type { ObjectSummary, Row, TypeDef } from '@/api/types'
 import { isListedNote, recentNotes, editedAt, editedLabel } from '@/allnotes/notes'
 import { openTodaysNote } from '@/calendar/openTodaysNote'
 import { Icon } from '@/components/Icon'
-import { createAndOpen, openObject } from '@/create/createAndOpen'
+import { openObject } from '@/create/createAndOpen'
+import { newNote, noteTypeId } from '@/create/newNote'
 import { showToast } from '@/editor/media/upload'
 import { typeLabel } from '@/lib/typeLabel'
 import { HOME, NEW_NOTE, TASKS, TODAYS_NOTE } from '@/lib/words'
 import { useZonedToday } from '@/lib/zonedShell'
 import { useLinkIndex } from '@/links/linkIndex'
 import { ObjectIcon } from '@/object/ObjectHeader'
-import { pageType } from '@/palette/searchOptions'
 import { TypeChip } from '@/shell/Sidebar'
 import { isOpen } from '@/tasks/statusCategory'
 import { completionToast, type TaskOutcome } from '@/tasks/taskActions'
@@ -45,10 +45,7 @@ const BUTTON =
 const SECTION_HEADING = 'pb-1.5 text-[13px] font-semibold tracking-wide text-fg-muted uppercase'
 const ROW = 'flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 text-left hover:bg-hover'
 
-/** The type "New note" makes: the built-in Page (id `page`, else the type named Page). */
-export function noteTypeId(types: readonly TypeDef[]): string {
-  return pageType(types)?.id ?? 'page'
-}
+export { noteTypeId }
 
 const modsOf = (e: MouseEvent) => ({ ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey })
 
@@ -149,9 +146,7 @@ export function HomePage({ types }: { types: readonly TypeDef[] }) {
             <button
               type="button"
               className={BUTTON}
-              onClick={(e) =>
-                void createAndOpen(noteTypeId(types), {}, modsOf(e)).catch((err: unknown) => console.warn('Could not create a note:', err))
-              }
+              onClick={(e) => void newNote(modsOf(e), noteTypeId(types))}
             >
               <Icon name="ph-plus" size={16} />
               {HOME_TEXT.newNote}

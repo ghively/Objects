@@ -20,7 +20,7 @@ function ctx(partial: Partial<ActionContext> = {}): ActionContext {
 describe('buildActions', () => {
   test('lists a create action per type by name, then the fixed actions', () => {
     expect(buildActions(ctx()).map((a) => a.label)).toEqual([
-      'Create Page',
+      'Create Note',
       'Create Person',
       'Open calendar',
       'Open today',
@@ -67,7 +67,7 @@ describe('buildActions', () => {
     })
     const actions = buildActions(c)
     expect(actions.map((a) => a.label)).toEqual([
-      'Create Page',
+      'Create Note',
       'Create Person',
       'Open calendar',
       'Open today',
@@ -105,7 +105,7 @@ describe('matchActions', () => {
   })
 
   test('matches a label by prefix, word prefixes or a substring, in list order', () => {
-    expect(labels('create')).toEqual(['Create Page', 'Create Person'])
+    expect(labels('create')).toEqual(['Create Note', 'Create Person'])
     expect(labels('cr pe')).toEqual(['Create Person'])
     expect(labels('cal')).toEqual(['Open calendar'])
     expect(labels('Toggle')).toEqual(['Toggle left sidebar', 'Toggle right side panel'])
