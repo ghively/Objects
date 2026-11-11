@@ -15,13 +15,13 @@ export const DEV_INFO_TEXT = {
   none: 'None',
   copy: (label: string) => `Copy ${label}`,
   copied: 'Copied',
-  objectId: 'Object id',
+  objectId: 'Note id', // M32: was "Object id"
   filePath: 'File path',
   typeId: 'Type id',
   folder: 'Folder',
   propertyKey: 'Key',
   propertyId: 'Property id',
-  queryId: 'Query id',
+  queryId: 'Saved search id', // M32: was "Query id"
   collectionId: 'Collection id',
   view: 'View',
 } as const

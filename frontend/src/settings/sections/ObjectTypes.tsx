@@ -1,7 +1,10 @@
-// "Object Types": every type of the space, basic ones first; a row opens that type's Type
-// Settings tab and closes the modal.
+// "Types" (M32: was "Object Types"): every type of the space, basic ones first; a row opens that
+// type's Type Settings tab and closes the modal. The built-in Page and DailyNote rows read "Notes"
+// and "Daily notes" (`lib/typeLabel`).
 import { useEffect } from 'react'
 import type { TypeDef } from '@/api/types'
+import { typePlural } from '@/lib/typeLabel'
+import { TYPES } from '@/lib/words'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTabs } from '@/nav/tabs'
 import { TypeChip, byPluralName } from '@/shell/Sidebar'
@@ -11,12 +14,12 @@ import { Icon } from '@/components/Icon'
 import { SectionHeader, SettingGroup } from '../controls'
 
 export const OBJECT_TYPES_TEXT = {
-  heading: 'Object Types',
-  description: 'Edit the object types in this space.',
-  yourTypes: 'Your object types',
+  heading: TYPES,
+  description: 'Edit the types in this space.',
+  yourTypes: 'Your types',
   yourTypesDescription: 'Pick a type to edit it.',
-  basic: 'Basic object types',
-  custom: 'Custom object types',
+  basic: 'Basic types',
+  custom: 'Custom types',
 } as const
 
 const T = OBJECT_TYPES_TEXT
@@ -53,7 +56,7 @@ function TypeList({ label, types }: { label: string; types: TypeDef[] }) {
               className="flex h-[38px] w-full items-center gap-2 rounded-lg px-2 text-left text-[15px] font-medium text-fg hover:bg-hover"
             >
               <TypeChip type={t} size={22} />
-              <span className="min-w-0 flex-1 truncate">{t.pluralName}</span>
+              <span className="min-w-0 flex-1 truncate">{typePlural(t)}</span>
               <Icon name="ph-caret-right" size={14} className="text-fg-muted" />
             </button>
           </li>

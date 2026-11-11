@@ -123,6 +123,8 @@ Object has no accounts.
   takes the sub-items and dependencies pairs (Parent item / Sub-items, Blocked by / Blocking; a table or
   timeline view's Customize › Sub-items and dependencies; decision AC-1). Field lists per built-in
   type are in audit item 28.
+  - (M32) On screen the Settings section is "Types" ("Edit the types in this space.", "Your types", "Basic types",
+    "Custom types"); its rows for the built-in Page and DailyNote types read "Notes" and "Daily notes".
   - (M32) Type settings on screen: the breadcrumb reads "Types"; "Delete type" ("Move this type to the Trash?":
     "Moves the type, all its notes, its templates and the saved searches of only this type to the Trash; other saved
     searches stop using it. You can restore them from there for 30 days."); the explanations say "notes" where they
@@ -165,6 +167,9 @@ Object has no accounts.
   properties, a type's id, folder and each property's key in type settings, a property's key and id in property
   settings, a query's id on its page, and a collection's id and the open view's key on its page. Views have no
   ids of their own (they live inside their type, collection or query).
+  (M32) On screen the box's labels read "Note id" and "Saved search id" (were "Object id", "Query id"), and the
+  Settings texts say "notes" where they said "objects" (Automations, Full Export "Exported 4 notes…", Import
+  Content "12 notes", the API token scopes "Search, filter and read notes." / "Also create notes, …").
   A token's scope is "Read only", "Read and write" or "Synced facts only" (Object's own, M29: reads, and fills synced
   properties; section 10f).
 - Web Extension: Chrome, Edge, Safari, Firefox capture extension; Web Highlights.

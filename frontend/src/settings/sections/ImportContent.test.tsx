@@ -90,7 +90,7 @@ describe('Import Content', () => {
     act(() => useSettingsModal.getState().open('importContent'))
     render(<ImportContentSection />)
     const button = await screen.findByRole('button', { name: T.reviewLabel('Vault') })
-    expect(screen.getByText('2026-11-08 10:01 · 12 objects')).toBeInTheDocument()
+    expect(screen.getByText('2026-11-08 10:01 · 12 notes')).toBeInTheDocument()
     // A batch moved to the Trash has nothing left to review.
     expect(screen.queryByRole('button', { name: T.reviewLabel('old.zip') })).toBeNull()
     await user.click(button)

@@ -17,6 +17,7 @@ import { AGENT_TEXT } from '@/import/agent/text'
 import { BatchPanel } from '@/import/BatchPanel'
 import { useImportDialog } from '@/import/useImportDialog'
 import { useSettings } from '@/settings/useSettings'
+import { NOTE_LOWER, NOTES_LOWER } from '@/lib/words'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { useSettingsModal } from '../useSettingsModal'
 import { SaveError, SectionHeader, SettingGroup, errorText } from '../controls'
@@ -36,12 +37,12 @@ export const IMPORT_CONTENT_TEXT = {
   // our strings: how to make each export
   notionHelp: 'In Notion, open Settings, choose Export all workspace content and pick Markdown & CSV with subpages. Then choose the .zip it saves.',
   obsidianHelp: "A vault needs no export: choose the vault's folder. It is only read, never changed.",
-  anytypeHelp: 'In Anytype, export the space (or the objects you want) as Markdown with files included. Then choose the .zip or folder it saves.',
+  anytypeHelp: 'In Anytype, export the space (or the parts of it you want) as Markdown with files included. Then choose the .zip or folder it saves.',
   // our strings: earlier imports into this space, and the way back to their review
   history: 'Import history',
   historyHelp: 'Imports into this space, newest first. Review reopens the proposed schema, the trial and the Import inbox.',
   historyEmpty: 'Nothing has been imported into this space yet.',
-  historyObjects: (n: number) => `${n} ${n === 1 ? 'object' : 'objects'}`,
+  historyObjects: (n: number) => `${n} ${n === 1 ? NOTE_LOWER : NOTES_LOWER}`,
   review: AGENT_TEXT.continueButton,
   reviewLabel: (source: string) => `${AGENT_TEXT.continueButton}: ${source}`,
   // our strings: the OCR languages setting
@@ -52,7 +53,7 @@ export const IMPORT_CONTENT_TEXT = {
   remodel: 'Remodel this space…',
   remodelHeading: 'Remodel this space',
   remodelHelp:
-    "Import this space's objects into a new space, to sort them again with the import's rules and AI filing. This space is only read, never changed.",
+    "Import this space's notes into a new space, to sort them again with the import's rules and AI filing. This space is only read, never changed.",
   remodelName: (space: string) => `${space} (remodelled)`,
 } as const
 

@@ -126,7 +126,7 @@ describe('FullExportSection', () => {
         vi.advanceTimersByTime(JOB_POLL_MS + 10)
       })
       expect(await screen.findByText('/exports/Object export Lab 2026-11-10 1430')).toBeInTheDocument()
-      expect(screen.getByText(/Exported 4 objects and 1 media file to/)).toBeInTheDocument()
+      expect(screen.getByText(/Exported 4 notes and 1 media file to/)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled()
     } finally {
       vi.useRealTimers()

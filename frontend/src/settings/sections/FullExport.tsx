@@ -12,6 +12,7 @@ import { fullExportApi, type FullExportJob, type FullExportScope, type FullExpor
 import type { DeviceSettings } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Button } from '@/components/ui/button'
+import { NOTE_LOWER, NOTES_LOWER } from '@/lib/words'
 import { useSettings } from '@/settings/useSettings'
 import { formatWhen } from '@/vcs/vcsText'
 import { OptionCards, SaveError, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
@@ -19,7 +20,7 @@ import { OptionCards, SaveError, SectionHeader, SettingGroup, SwitchRow, errorTe
 export const FULL_EXPORT_TEXT = {
   heading: 'Full Export',
   // our string
-  description: 'Save your objects as Markdown files in a folder of your choice, to read or keep outside Object.',
+  description: 'Save your notes as Markdown files in a folder of your choice, to read or keep outside Object.',
   auto: 'Automated Full Exports',
   // our string
   autoHelp: 'Exports on a schedule, with the spaces, options and folder set below. Each run makes a new dated folder.',
@@ -31,7 +32,7 @@ export const FULL_EXPORT_TEXT = {
   never: 'Not yet', // our string
   manual: 'Manual Full Export',
   // our string
-  manualHelp: 'Each object becomes a Markdown file, in one folder per space, inside a new dated folder.',
+  manualHelp: 'Each note becomes a Markdown file, in one folder per space, inside a new dated folder.',
   spaces: 'Spaces',
   thisSpace: 'This space', // our string
   allSpaces: 'All Spaces',
@@ -49,7 +50,7 @@ export const FULL_EXPORT_TEXT = {
   exporting: (done: number, total: number) => `Exporting… ${done} of ${total} files`, // our string
   // our string
   exported: (objects: number, media: number) =>
-    `Exported ${objects} ${objects === 1 ? 'object' : 'objects'}${media ? ` and ${media} media ${media === 1 ? 'file' : 'files'}` : ''} to`,
+    `Exported ${objects} ${objects === 1 ? NOTE_LOWER : NOTES_LOWER}${media ? ` and ${media} media ${media === 1 ? 'file' : 'files'}` : ''} to`,
 } as const
 
 const T = FULL_EXPORT_TEXT

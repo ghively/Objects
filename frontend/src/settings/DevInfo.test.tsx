@@ -30,11 +30,11 @@ beforeEach(() => {
 
 describe('DevInfo', () => {
   test('test nothing shows while the setting is off', () => {
-    render(<DevInfo rows={[{ label: 'Object id', value: 'abc' }]} />)
+    render(<DevInfo rows={[{ label: 'Note id', value: 'abc' }]} />)
     expect(screen.queryByRole('region', { name: DEV_INFO_TEXT.heading })).toBeNull()
     act(() => devOn(true))
     const box = screen.getByRole('region', { name: DEV_INFO_TEXT.heading })
-    expect(within(box).getByText('Object id')).toBeInTheDocument()
+    expect(within(box).getByText('Note id')).toBeInTheDocument()
     expect(within(box).getByText('abc')).toBeInTheDocument()
   })
 
@@ -46,14 +46,14 @@ describe('DevInfo', () => {
       <DevInfo
         rows={[
           { label: 'File path', value: 'Pages/A.md' },
-          { label: 'Object id', value: null },
+          { label: 'Note id', value: null },
         ]}
       />,
     )
     await user.click(screen.getByRole('button', { name: 'Copy File path' }))
     expect(writeText).toHaveBeenCalledWith('Pages/A.md')
     expect(screen.getByText(DEV_INFO_TEXT.none)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Copy Object id' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Copy Note id' })).toBeNull()
   })
 
   test("test the properties panel shows the object's id and file path", () => {
