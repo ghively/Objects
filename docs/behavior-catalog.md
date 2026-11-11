@@ -315,7 +315,9 @@ Each starter template pre-fills the new type's properties.
   over the page, creating the note first when today has none (the same call as "+ Daily Note"). The page underneath
   stays as it was; Escape closes the peek. (M32) It opens with the caret at the end of its text, so the next key
   typed lands in the note, and the key works with the caret in a note's text or title. It stays a peek while
-  "Open notes as a full page" is on (an explicit pop-out).
+  "Open notes as a full page" is on (an explicit pop-out). Asked for while today's note is already popped out,
+  or is the page in view (with nothing popped out over it), the caret goes to the end of its text where it is
+  open, and nothing more opens.
 
 - **Home (M32)**: a tab with no page (a new empty tab, the first open of a space with nothing to restore, the
   start choice "Home") shows Home; it replaces the old start text "Pick an object type / Choose a type in the

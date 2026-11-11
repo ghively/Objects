@@ -345,6 +345,50 @@ describe('app shortcuts', () => {
     expect(takeBodyFocus('DailyNotes/2026-11-11.md')).toBeNull()
   })
 
+  // The M32 review, F5: asked for again while it is open, today's note did nothing and left a
+  // focus request behind (taken by the note the next time it was opened, whenever that was).
+  test("test Today's note asked for again while it is popped out puts the caret at the end of its text, and leaves no request", async () => {
+    mocked.createDailyNote.mockResolvedValue({ path: 'DailyNotes/2026-11-11.md', version: 'v1', typeIds: [] })
+    const day = objectSummary({ path: 'DailyNotes/2026-11-11.md', type: 'page', title: '2026-11-11' })
+    mocked.object.mockImplementation(async (path: string) =>
+      path === day.path
+        ? objectDetail({ summary: day, frontmatter: { type: 'Page', title: day.title }, body: 'Morning.\n', version: 'v1' })
+        : objectDetail({ summary: NOTES, frontmatter: { type: 'Project', title: 'Notes' }, body: 'Some text.\n', version: 'v1' }),
+    )
+    await openObjectPage()
+    fireEvent.keyDown(document.body, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true })
+    const dialog = await screen.findByRole('dialog')
+    const pm = await waitFor(() => {
+      const el = dialog.querySelector('.ProseMirror') as (HTMLElement & { editor?: TiptapEditor }) | null
+      if (!el?.editor) throw new Error('editor not mounted')
+      expect(document.activeElement).toBe(el)
+      return el as HTMLElement & { editor: TiptapEditor }
+    })
+    // The caret is moved to the start and the focus leaves the text.
+    pm.editor.commands.setTextSelection(1)
+    ;(dialog.querySelector('input[aria-label="Title"]') as HTMLElement | null)?.focus()
+    pm.blur()
+    expect(document.activeElement).not.toBe(pm)
+    fireEvent.keyDown(document.body, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true })
+    await waitFor(() => expect(document.activeElement).toBe(pm))
+    expect(pm.editor.state.selection.from).toBe(pm.editor.state.doc.content.size - 1)
+    expect(usePeek.getState().path).toBe('DailyNotes/2026-11-11.md')
+    expect(takeBodyFocus('DailyNotes/2026-11-11.md')).toBeNull()
+  })
+
+  test("test Today's note asked for while it is the open page puts the caret at the end of its text there, with no pop-out", async () => {
+    mocked.createDailyNote.mockResolvedValue({ path: PATH, version: 'v1', typeIds: [] })
+    const { container } = await openObjectPage()
+    const pm = container.querySelector('.ProseMirror') as HTMLElement & { editor: TiptapEditor }
+    await waitFor(() => expect(pm.editor.state.doc.textContent).toBe('Some text.'))
+    expect(document.activeElement).not.toBe(pm)
+    fireEvent.keyDown(document.body, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true })
+    await waitFor(() => expect(document.activeElement).toBe(pm))
+    expect(pm.editor.state.selection.from).toBe(pm.editor.state.doc.content.size - 1)
+    expect(usePeek.getState().path).toBeNull()
+    expect(takeBodyFocus(PATH)).toBeNull()
+  })
+
   test('test a new note made by key steps out from under a popped-out note', async () => {
     await openObjectPage()
     usePeek.getState().show('Projects/Other.md')
