@@ -271,7 +271,8 @@ from .runfence import RunFenceMiddleware
 from .uikey import LaunchKey, UiKeyMiddleware
 from .vcsservice import VcsService
 from .searchindex import SearchIndex
-from .settings import SettingsProblem, time_zone
+from .settings import ACTIVITY_NAME_FALLBACK, SettingsProblem, time_zone
+from .settings import activity_name as settings_activity_name
 from .settings import patch as patch_settings
 from .settings import read as read_settings
 from .space import (
@@ -1718,6 +1719,15 @@ def create_app(
             path, version = space.create_daily_note(req.date, req.templateId)
         except DailyNoteExists as exc:
             announce_template_ids(templates_before, req.clientId)
+            if exc.reason == "exists":
+                # M32: the day already has its note, so that note is the answer (200, nothing
+                # written, ``existing: true``), not an error. A file of another kind holding
+                # the note's name is still 409.
+                return JSONResponse(
+                    {"path": exc.path, "version": space.cached_version(exc.path),
+                     "typeIds": [], "existing": True},
+                    status_code=200,
+                )  # fmt: skip
             return JSONResponse(
                 {"detail": exc.detail, "path": exc.path, "reason": exc.reason}, status_code=409
             )
@@ -2470,11 +2480,11 @@ def create_app(
         return site if isinstance(site, str) and site else None
 
     def activity_name() -> str:
+        # M32: no name is built in; an empty ``activityName`` reads as "You".
         try:
-            name = read_settings()[0].get("activityName")
+            return settings_activity_name(read_settings()[0])
         except (ReadOnly, OSError, ValueError):
-            name = None
-        return name if isinstance(name, str) and name.strip() else "Gene"
+            return ACTIVITY_NAME_FALLBACK
 
     work = WorkService(space, jira_site=jira_site, user_name=activity_name)
     app.state.work = work

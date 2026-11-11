@@ -254,7 +254,7 @@ class QueueStore:
         entry: dict[str, Any] = {
             "id": new_ulid(), "kind": None, "state": "pending", "path": None, "objectId": None,
             "title": None, "stepId": None, "stepN": None, "stepKind": None, "stepText": None,
-            "text": None, "capturePath": None, "notBefore": None, "auto": False, "by": "Gene",
+            "text": None, "capturePath": None, "notBefore": None, "auto": False, "by": "You",
             "createdAt": _iso(now), "claimedAt": None, "finishedAt": None, "result": None,
             "reason": None, "chatId": None, "agentId": None, "purpose": None, "runner": None,
             "attempt": 1, "retryOf": None,

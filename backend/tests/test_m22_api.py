@@ -186,8 +186,8 @@ def _test_route_shapes(env: Env) -> None:
     assert res.status_code == 200, res.text
     out = res.json()
     assert set(out) == RESULT_KEYS
-    assert out["activity"].endswith('Gene APPROVED step 2 "Restart the print spooler on PRN-TEST-01"')
-    assert out["workNote"].startswith("[2026-11-05] Gene: approved step 2")
+    assert out["activity"].endswith('You APPROVED step 2 "Restart the print spooler on PRN-TEST-01"')
+    assert out["workNote"].startswith("[2026-11-05] You: approved step 2")
     assert out["item"]["steps"][1]["state"] == "approved"
     assert _changed(e) == [("changed", PRINTER, "win-1")]
     assert [ev for ev in e.published if ev.kind != "workQueue"][0].version == out["version"]
@@ -225,7 +225,7 @@ def _test_route_shapes(env: Env) -> None:
     })
     assert res.status_code == 200, res.text
     assert set(res.json()) == RESULT_KEYS
-    assert res.json()["activity"].endswith("Gene set Rank to 2")
+    assert res.json()["activity"].endswith("You set Rank to 2")
     assert _changed(e) == [("changed", BADGE, "win-2")]
     bad = e.c.post("/api/work/fields", json={
         "path": BADGE, "baseVersion": res.json()["version"], "set": {"status": "Done"},
@@ -237,7 +237,7 @@ def _test_route_shapes(env: Env) -> None:
     res = e.c.post("/api/work/note", json={"path": BADGE, "kind": "note", "text": "Checked the door",
                                            "clientId": "win-3"})
     assert res.status_code == 200, res.text
-    assert res.json()["activity"].endswith("Gene added a note: Checked the door")
+    assert res.json()["activity"].endswith("You added a note: Checked the door")
     assert _changed(e) == [("changed", BADGE, "win-3")]
     empty = e.c.post("/api/work/note", json={"path": BADGE, "text": "  "})
     assert empty.status_code == 422 and empty.json()["detail"] == "A note needs text."
@@ -395,7 +395,7 @@ def test_settings(env: Env) -> None:
     res = e.c.put("/api/settings", json={"patch": {"activityName": "Pat"},
                                          "baseRevision": settings["revision"]})
     assert res.status_code == 200, res.text
-    for value in ("", "a" * 61, "two\nlines", 3):
+    for value in ("   ", "a" * 61, "two\nlines", 3):
         bad = e.c.put("/api/settings", json={"patch": {"activityName": value},
                                              "baseRevision": res.json()["revision"]})
         assert bad.status_code == 422, value
@@ -409,3 +409,13 @@ def test_settings(env: Env) -> None:
     assert answered.status_code == 200, answered.text
     assert " Pat answered step 1 " in f" {answered.json()['activity']}"
     assert os.environ["OBJECT_STATE_DIR"]  # the settings file went to the temp state dir
+
+    # M32 (item 13): the name can be cleared (the empty string saves), and an empty name
+    # reads as "You" where it is shown.
+    cleared = e.c.put("/api/settings", json={"patch": {"activityName": ""},
+                                             "baseRevision": res.json()["revision"]})
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["settings"]["activityName"] == ""
+    noted = e.c.post("/api/work/note", json={"path": PARKED, "text": "Rang them"})
+    assert noted.status_code == 200, noted.text
+    assert noted.json()["activity"].endswith("You added a note: Rang them")

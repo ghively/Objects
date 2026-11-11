@@ -144,7 +144,10 @@ def work_guidance_contributor(scope: RunScope, parts: RunParts) -> None:
     """Order 57 ``work-guidance``: the work runs' guidance after M17's."""
     if scope.purpose not in WORK_PURPOSES:
         return
-    user = str(_settings().get("activityName") or "Gene")
+    from .settings import activity_name, prompt_name
+
+    # M32: no name is built in; without one the guidance says "the user".
+    user = prompt_name(activity_name(_settings()))
     parts.append_prompt.append(WORK_GUIDANCE.format(user=user))
     if scope.purpose == WORK_SYNC:
         parts.append_prompt.append(DESK_SYNC_GUIDANCE)

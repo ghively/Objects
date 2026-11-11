@@ -135,7 +135,8 @@ def test_concurrent_routes_one_file(calendar_space_dir: Path):
         th.start()
     for th in threads:
         th.join()
-    assert sorted(codes) == [201, 409]
+    # M32: the loser of the race is answered the note the winner made (200), not a 409.
+    assert sorted(codes) == [200, 201]
     assert [
         p.name for p in (calendar_space_dir / "DailyNotes").glob("2026-10-31*")
     ] == ["2026-10-31.md"]
@@ -340,7 +341,7 @@ def test_create_in_space_without_daily_note_type(tmp_path: Path):
     assert res.status_code == 201 and res.json()["typeIds"] == []
 
 
-def test_route_created_and_409(space: Space, calendar_space_dir: Path):
+def test_route_created_and_the_existing_note(space: Space, calendar_space_dir: Path):
     client = TestClient(create_app(space, None))
     res = client.post(
         "/api/daily-notes",
@@ -351,13 +352,24 @@ def test_route_created_and_409(space: Space, calendar_space_dir: Path):
     assert body["path"] == "DailyNotes/2026-10-27.md"
     assert body["version"] == space.read(body["path"])[2]
     assert body["typeIds"] == []
+    assert "existing" not in body
+    # M32 (item 13): a second create answers the day's note (200) instead of 409, and writes
+    # nothing.
+    before = _snapshot(calendar_space_dir)
     res = client.post("/api/daily-notes", json={"date": "2026-10-27"})
-    assert res.status_code == 409
+    assert res.status_code == 200
     assert res.json() == {
-        "detail": "There is already a daily note for this day.",
         "path": "DailyNotes/2026-10-27.md",
-        "reason": "exists",
+        "version": body["version"],
+        "typeIds": [],
+        "existing": True,
     }
+    # A note the space had already, whatever its file is called (this one has no `date`).
+    res = client.post("/api/daily-notes", json={"date": "2026-10-25", "templateId": "none"})
+    assert res.status_code == 200
+    assert res.json()["path"] == "DailyNotes/Odd name.md" and res.json()["existing"] is True
+    assert res.json()["version"] == space.read("DailyNotes/Odd name.md")[2]
+    assert _snapshot(calendar_space_dir) == before
     res = client.post(
         "/api/daily-notes", json={"date": "2026-10-29", "templateId": "nope"}
     )

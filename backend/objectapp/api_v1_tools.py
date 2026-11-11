@@ -808,7 +808,8 @@ def router(ctx: ApiContext, engine: AutomationEngine, imports: APIRouter) -> API
     def open_daily_note(req: DailyNoteRequest, request: Request):
         token = auth(request, write=True)
         status, body = app(request, "POST", "/api/daily-notes", {"date": req.date, "clientId": origin(token)})
-        if status == 409 and isinstance(body, dict) and body.get("reason") == "exists":
+        if status == 200 and isinstance(body, dict) and body.get("existing") is True:
+            # M32: the app route answers the day's existing note (200) instead of 409.
             rel = visible(str(body.get("path")))
             return {"path": rel, "version": space.cached_version(rel), "created": False}
         if status >= 400:

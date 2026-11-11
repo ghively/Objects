@@ -729,6 +729,8 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   (System from the Ticket ID, Completed on other work types) and the Work agent's loop is not told of edits. The
   work routes answer as before when called. **With Work on** everything is as before M32. Turning the switch
   changes no note and no type file.
+- **Your name in Activity (M32):** no name is built in. While "Your name in Activity" is empty (the default, and it
+  can be cleared again), Activity and Work notes lines say "You", and the Work agent's instructions say "the user".
 - **Agent page > Schedules**: each row's menu offers **Run now** (turned-on schedules only; one run outside the
   schedule, same guards as a due occurrence, through `POST /automations/{id}/run-now`), **Edit**, **Run log** and
   **Delete**. A turned-off schedule's summary reads "Off · Every weekday at 7:00 AM".
