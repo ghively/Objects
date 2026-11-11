@@ -258,7 +258,9 @@ class Registry:
             self._save(data)
 
 
-def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
+def create_space(
+    name: str, location: Path | str, setup: str = "blank", work: bool | None = None
+) -> Path:
     """Create ``<location>/<safe_filename(name)>`` holding ``.object/space.json`` and (M32) the
     types every space starts with: Page, Tag, Task and DailyNote (`typemodel.write_starting_types`).
 
@@ -267,6 +269,11 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     (``.object/types/{person,meeting,project,book}.json``, see `basicsetup`);
     ``'itops'`` (M28) writes the IT ops types, their default templates and the seed Tags
     (`basicsetup.write_itops_types`, `write_itops_tags`).
+
+    M32 (fix pass): `work` true or false stores the Work switch (``workEnabled``) in the
+    ``space.json`` the space is created with. An import that makes a new space from an Object
+    space passes the source's (`api_import`), so a space remodelled from one where Work is on
+    is one where Work is on; None stores no switch (the IT starter still stores its own).
 
     Raises `SpaceNameProblem` (422) for an empty or over-long name,
     `NotADirectoryError` (404) when `location` is not an existing folder,
@@ -297,6 +304,8 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     config: dict = {"name": name, "setup": setup}
     if setup == "itops":
         config["workEnabled"] = True
+    if work is not None:
+        config["workEnabled"] = bool(work)
     atomic_write(target / ".object" / "space.json", dump_json(config))
     # M32: every new space can make notes, daily notes and tasks from its first second.
     from .typemodel import write_starting_types

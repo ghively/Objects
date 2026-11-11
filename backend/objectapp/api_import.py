@@ -57,6 +57,7 @@ from .importers.readmodel import ReadResult
 from .importers.source import LimitExceeded, NotASource, SourceMissing, open_source
 from .importers.writer import WriteState, open_checked, write_import
 from .space import Space, safe_filename
+from . import spaceconfig
 from .spaceconfig import MAX_NAME_LENGTH
 from .spaces import Registry, create_space, normalize
 from .watcher import RESYNC_PATH, ChangeEvent
@@ -107,6 +108,35 @@ def _last_mapping(space, read) -> ImportMapping | None:
         return ImportMapping.model_validate(prior.mapping)
     except ValueError:
         return None
+
+
+def _source_work(read: ReadResult, open_space: Space) -> bool | None:
+    """M32 (fix pass): the Work switch a new space gets when the source of its import is an
+    Object space (a remodel), for `create_space`'s ``work``; None when the source is not a
+    space, or there is nothing to carry.
+
+    True when Work is on in the source: for the space that is open, its own answer
+    (`Space.work_on`: the stored switch, the IT starter's marker, or its data); for any other
+    space folder, what its ``space.json`` says (the stored switch or the marker; a default that
+    comes only from its notes arrives with the notes). False when the source stores the switch
+    off, so the ticket data its notes hold doesn't turn the new space's default on. The new
+    space stores ``workEnabled`` and keeps its own ``setup`` marker (``blank``: it was not
+    made by the starter). Reads the source's ``space.json`` and memory; writes nothing.
+    """
+    if read.space_types is None or read.container != "folder":
+        return None
+    source = Path(read.sourcePath)
+    data, _revision, error = spaceconfig.read(source)
+    if error is not None:
+        return None
+    if data.get("workEnabled") is False:
+        return False
+    try:
+        is_open = source.resolve() == Path(open_space.root).resolve()
+    except OSError:
+        is_open = False
+    on = open_space.work_on() if is_open else spaceconfig.work_on(data)
+    return True if on else None
 
 
 def _within(child: Path, parent: Path) -> bool:
@@ -294,6 +324,9 @@ def router(ctx: ApiContext) -> APIRouter:
         if req.target.kind in ("newSpace", "spaceCopy"):
             space_name, where = req.target.name.strip(), str(location)
             is_copy = req.target.kind == "spaceCopy"
+            # M32 (fix pass): a new space made from an Object space starts with that space's
+            # Work switch (read here, from the source; nothing is written to it).
+            source_work = None if is_copy else _source_work(read, ctx.space)
 
             def work(h: JobHandle) -> ImportResult:
                 src = open_checked(planned)  # before the space is made: a source gone leaves nothing
@@ -301,7 +334,7 @@ def router(ctx: ApiContext) -> APIRouter:
                     if is_copy:  # M25 "Try on a copy of this space"
                         folder = batches.copy_space(ctx.space.root, target_path)
                     else:
-                        folder = create_space(space_name, where, "blank")
+                        folder = create_space(space_name, where, "blank", work=source_work)
                 except BaseException:
                     src.close()
                     raise
