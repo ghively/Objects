@@ -292,3 +292,21 @@ def test_m31_settings_accept_their_values_and_refuse_others(state: Path, key, go
     assert merged[key] == good
     with pytest.raises(settings.SettingsProblem):
         settings.patch({key: bad}, rev)
+
+
+def test_m32_activity_name_can_be_empty_and_reads_as_you(state: Path) -> None:
+    """M32 (item 13): no name is built in. The empty string saves (the name can be cleared); an
+    empty name reads as "You" where it is shown and as "the user" in an agent's prompt."""
+    merged, rev = settings.read()
+    assert merged["activityName"] == ""
+    assert settings.activity_name(merged) == "You"
+    assert settings.prompt_name(settings.activity_name(merged)) == "the user"
+    merged, rev = settings.patch({"activityName": "Pat Example"}, rev)
+    assert settings.activity_name(merged) == "Pat Example"
+    assert settings.prompt_name(settings.activity_name(merged)) == "Pat Example"
+    merged, rev = settings.patch({"activityName": ""}, rev)
+    assert merged["activityName"] == "" and settings.activity_name(merged) == "You"
+    for bad in ("   ", "a" * 61, "two\nlines", None, 3):
+        with pytest.raises(settings.SettingsProblem):
+            settings.patch({"activityName": bad}, rev)
+    assert settings.activity_name({"activityName": 3}) == "You"

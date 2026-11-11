@@ -218,9 +218,12 @@ def test_create_space_setup_parameter(state: Path, tmp_path: Path):
     parent = tmp_path / "parent"
     parent.mkdir()
     made = create_space("Plain", parent, setup="blank")
+    # M32: a new space also holds the types every space starts with.
     assert sorted(p.relative_to(made).as_posix() for p in made.rglob("*")) == [
-        ".object", ".object/space.json",
-    ]
+        ".object", ".object/space.json", ".object/types",
+        ".object/types/dailynote.json", ".object/types/page.json",
+        ".object/types/tag.json", ".object/types/task.json",
+    ]  # fmt: skip
     # M8 Task 8 filled `basic` (see test_basicsetup.py); an unknown setup makes nothing.
     with pytest.raises(ValueError):
         create_space("Fancy", parent, setup="fancy")

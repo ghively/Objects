@@ -328,7 +328,9 @@ def check_spaces(run: Run, tmp: Path) -> None:
     code, res = run.http("POST", "/spaces", {"name": "M7 second space", "location": str(location)})
     folder = Path(res.get("path", "")) if isinstance(res, dict) else Path()
     inside = sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*") if p.is_file()) if code == 201 else []
-    run.report(code == 201 and folder.parent == location.resolve() and inside == [".object/space.json"],
+    # M32: a new space holds its config and the types every space starts with.
+    starting = [".object/space.json", *(f".object/types/{t}.json" for t in ("dailynote", "page", "tag", "task"))]
+    run.report(code == 201 and folder.parent == location.resolve() and inside == starting,
                f"create: {code} {folder}; holds {inside}")
     snap = snapshot(folder) if folder.is_dir() else {}
     code2, res2 = run.http("POST", "/spaces", {"name": "M7 second space", "location": str(location)})

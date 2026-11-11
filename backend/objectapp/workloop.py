@@ -399,6 +399,8 @@ class WorkLoop:
         path = change.path
         if change.kind != "object" or not path or in_work_write():
             return  # a work service write is heard as the `WorkNotice` that follows it
+        if not self.space.work_on():
+            return  # M32: with Work off for the space, an edit is none of the loop's business
         try:
             summary = self.space.get(path)
         except KeyError:
@@ -546,7 +548,7 @@ class WorkLoop:
             return live
         route = parsed.route
         full = self._item(item.get("path")) if item else None
-        fields: dict[str, Any] = {"capturePath": capture["path"], "by": "Gene"}
+        fields: dict[str, Any] = {"capturePath": capture["path"], "by": self.service.user_name()}
         step = None
         if route == "breakDown" and full is not None and parsed.step_n:
             steps = full.get("steps", [])
@@ -611,9 +613,14 @@ class WorkLoop:
         self.wake()
         return new
 
+    def _prompt_user(self) -> str:
+        """Your name as the agent's prompts say it: the activity name, or "the user" while none
+        is set (M32: no name is built in; `settings.prompt_name`)."""
+        return device_settings.prompt_name(self.service.user_name())
+
     def set_acts(self, on: bool) -> None:
         if on:
-            ensure_work_agent(self.registry(), self.read_settings(), user=self.service.user_name(),
+            ensure_work_agent(self.registry(), self.read_settings(), user=self._prompt_user(),
                               home=self.home())
         _data, revision = device_settings.read()
         device_settings.patch({"workAgentActs": bool(on)}, revision)
@@ -731,7 +738,7 @@ class WorkLoop:
         entry = self.store.update(eid, purpose=purpose, agentId=agent.id)
         with self._lock:
             self._current = entry
-        prompt = entry_prompt(entry, item, cap, user=self.service.user_name(),
+        prompt = entry_prompt(entry, item, cap, user=self._prompt_user(),
                               step_rev=(step or {}).get("rev"))
         timeout = run_timeout()
         started = time.monotonic()

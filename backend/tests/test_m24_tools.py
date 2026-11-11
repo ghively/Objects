@@ -158,6 +158,17 @@ def test_guidance(tmp_path: Path) -> None:
     assert guide not in chat.append and DESK_SYNC_GUIDANCE not in chat.append
 
 
+def test_guidance_without_a_name_says_the_user(tmp_path: Path) -> None:
+    """M32 (item 13): no name is built in. With "Your name in Activity" empty the guidance says
+    "the user", never "You" (which the agent would read as itself) and never a made-up name."""
+    scope, loop = _setup(tmp_path)
+    loop.settings["activityName"] = ""
+    work = _build(scope, "work")
+    assert WORK_GUIDANCE.format(user="the user") in work.append
+    assert "Gene" not in WORK_GUIDANCE.format(user="the user")
+    assert WORK_GUIDANCE.format(user="You") not in work.append
+
+
 def test_read_only_hint_never_marks(tmp_path: Path) -> None:
     scope, _loop = _setup(tmp_path, marked=[])
     cmd = _build(scope, "work-read")

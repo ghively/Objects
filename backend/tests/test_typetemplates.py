@@ -11,20 +11,27 @@ from fastapi.testclient import TestClient
 from objectapp.propvalues import InvalidValue
 from objectapp.server import create_app
 from objectapp.space import Space
+from objectapp.typemodel import THEME_COLORS
 from objectapp.typetemplates import (
+    COLLAPSED_SECTIONS,
+    SECTION_ORDER,
     TEMPLATE_KEYS,
     TEMPLATE_QUERIES,
+    build_template,
     template_catalog,
     template_query_fixture,
 )
 
+PERSONAL = ("idea", "goal", "habit", "recipe", "trip", "journalEntry")
 GALLERY = (
+    # M32: the Personal group comes first.
+    *PERSONAL,
     "meeting", "person", "project", "atomicNote", "definition", "book", "film", "tvSeries",
     "podcast", "week", "month",
-    # M28: the IT ops entries (`test_m28_gallery.py`).
+    "organization", "area",
+    # M28: the IT ops entries (`test_m28_gallery.py`). M32: the last group.
     "host", "software", "application", "container", "configuration", "location", "network",
     "vendor", "script", "command", "runbook", "prompt", "incident",
-    "organization", "area",
 )  # fmt: skip
 
 
@@ -35,7 +42,9 @@ def _stored(space_dir: Path, type_id: str) -> dict:
 def test_the_gallery_has_the_starter_templates_in_order():
     assert TEMPLATE_KEYS == GALLERY
     cat = template_catalog([])
-    assert [c["name"] for c in cat][:3] == ["Meeting", "Person", "Project"]
+    assert [c["name"] for c in cat][:9] == [
+        "Idea", "Goal", "Habit", "Recipe", "Trip", "Journal entry", "Meeting", "Person", "Project",
+    ]  # fmt: skip
     # Fix pass 2026-11-09: no Day template (the built-in daily note is the one note per day);
     # Week and Month are for periodic reviews.
     assert all(c["name"] != "Day" for c in cat)
@@ -47,8 +56,80 @@ def test_the_gallery_has_the_starter_templates_in_order():
     assert month["description"] == "One entry per month, for monthly reviews and plans."
     assert [p["name"] for p in month["properties"]] == ["Date", "Notes"]
     assert {c["section"] for c in cat} == {
-        "useCases", "research", "media", "planningAndReflection", "itOperations", None
+        "personal", "useCases", "research", "media", "planningAndReflection", "itOperations", None
     }
+
+
+def test_the_groups_are_in_order_with_it_operations_last_and_closed():
+    """M32: Personal, Use cases, Research, Media, Planning and reflection, the untitled row
+    (Organization, Area), then IT operations, the only group that starts closed."""
+    cat = template_catalog([])
+    order: list = []
+    for c in cat:
+        if c["section"] not in order:
+            order.append(c["section"])
+    assert tuple(order) == SECTION_ORDER == (
+        "personal", "useCases", "research", "media", "planningAndReflection", None, "itOperations",
+    )  # fmt: skip
+    # Each group's entries sit together.
+    assert [c["section"] for c in cat] == sorted((c["section"] for c in cat), key=order.index)
+    assert COLLAPSED_SECTIONS == {"itOperations"}
+    assert all(c["collapsed"] is (c["section"] == "itOperations") for c in cat)
+
+
+def test_the_personal_group_has_its_six_types():
+    cat = {c["key"]: c for c in template_catalog([])}
+    assert [k for k, c in cat.items() if c["section"] == "personal"] == list(PERSONAL)
+    props = {k: [(p["name"], p["type"]) for p in cat[k]["properties"]] for k in PERSONAL}
+    assert props == {
+        "idea": [("Status", "label"), ("Notes", "blocks")],
+        "goal": [("Status", "label"), ("Target date", "datetime"), ("Notes", "blocks")],
+        "habit": [("Frequency", "label"), ("Notes", "blocks")],
+        "recipe": [("Cover image", "coverImage"), ("Servings", "number"), ("Prep time", "text"),
+                   ("Source", "url"), ("Notes", "blocks")],
+        "trip": [("Start", "datetime"), ("End", "datetime"), ("Location", "text"), ("Notes", "blocks")],
+        "journalEntry": [("Date", "datetime"), ("Mood", "label"), ("Notes", "blocks")],
+    }  # fmt: skip
+    assert [(cat[k]["name"], cat[k]["pluralName"]) for k in PERSONAL] == [
+        ("Idea", "Ideas"), ("Goal", "Goals"), ("Habit", "Habits"), ("Recipe", "Recipes"),
+        ("Trip", "Trips"), ("Journal entry", "Journal entries"),
+    ]  # fmt: skip
+    for k in PERSONAL:
+        assert cat[k]["color"] in THEME_COLORS and cat[k]["icon"]["val"].startswith("ph-")
+        assert cat[k]["description"] and cat[k]["added"] is False
+    options = {
+        (k, p.key): [o["text"] for o in p.options["set"]]
+        for k in PERSONAL
+        for p in build_template(k, [])
+        if p.type == "label"
+    }
+    assert options == {
+        ("idea", "status"): ["New", "Exploring", "Kept", "Dropped"],
+        ("goal", "status"): ["Not started", "In progress", "Achieved", "Dropped"],
+        ("habit", "frequency"): ["Daily", "Weekly", "Monthly"],
+        ("journalEntry", "mood"): ["Great", "Good", "Okay", "Low"],
+    }
+    assert {k: TEMPLATE_QUERIES[k].name for k in PERSONAL} == {
+        "idea": "New ideas", "goal": "Goals in progress", "habit": "Daily habits",
+        "recipe": "All recipes A-Z", "trip": "This year's trips",
+        "journalEntry": "This month's entries",
+    }  # fmt: skip
+
+
+def test_a_personal_type_is_made_with_its_saved_search(tmp_path: Path):
+    space_dir = tmp_path / "empty"
+    space_dir.mkdir()
+    sp = Space(space_dir)
+    t = sp.create_type("", "", template="journalEntry")
+    assert (t.id, t.name, t.pluralName, t.folder) == (
+        "journal-entry", "Journal entry", "Journal entries", "Journal entries",
+    )  # fmt: skip
+    assert [q.name for q in sp.list_queries()] == ["This month's entries"]
+    path, _version = sp.create_object(
+        t.id, "A good day", values={"mood": ["Good"], "date": {"start": "2026-11-11"}}
+    )
+    _of, fm, _v = sp.read(path)
+    assert fm["mood"] == "Good" and str(fm["date"]).startswith("2026-11-11")
 
 
 def test_a_day_type_made_from_the_old_template_keeps_working(tmp_path: Path):
@@ -249,8 +330,8 @@ def test_a_template_query_with_a_missing_option_still_creates_the_type(
             time.sleep(0.01)
         assert ("types", type_id, "w1") in {(e.kind, e.path, e.origin) for e in published}
         assert any(t["id"] == type_id for t in c.get("/api/space").json()["types"])
-        # M22: only the built-in Tickets view (a Project is a work type) is listed.
-        assert [q["id"] for q in c.get("/api/queries").json()] == ["work-tickets"]
+        # M32: Work is off for this space: its Project has no ticket field and no Tickets view.
+        assert [q["id"] for q in c.get("/api/queries").json()] == []
     assert _stored(space_dir, type_id)["templateKey"] == "project"
     assert _queries(space_dir) == []
     assert "Lost projects" in caplog.text

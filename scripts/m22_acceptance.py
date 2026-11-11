@@ -238,8 +238,8 @@ class M22:
         self.run.report((removed | added) <= {"steps", "lastUpdated", "<body>"},
                         f"diff keys: removed {sorted(removed)}, added {sorted(added)}")
         new_lines = [ln for ln in after.splitlines() if ln not in before.splitlines()]
-        acts = [ln for ln in new_lines if ln.startswith("- 2026-11-05 10:00 Gene answered step 1")]
-        notes = [ln for ln in new_lines if ln.startswith("- [2026-11-05] Gene: answered step 1")]
+        acts = [ln for ln in new_lines if ln.startswith("- 2026-11-05 10:00 You answered step 1")]
+        notes = [ln for ln in new_lines if ln.startswith("- [2026-11-05] You: answered step 1")]
         bullets = [ln for ln in new_lines if ln.startswith("- ")]
         self.run.report(len(acts) == 1 and len(notes) == 1 and len(bullets) == 2,
                         f"one Activity and one Work notes line: {bullets}")

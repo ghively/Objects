@@ -294,8 +294,8 @@ def test_open_twice_writes_nothing(space_dir: Path):
             assert c.get(f"/api/views/{t.id}").status_code == 200
         assert c.get("/api/ui").status_code == 200
         assert c.get("/api/collections").json() == []
-        # M22: only the built-in Tickets view (virtual: no file) is listed.
-        assert [q["id"] for q in c.get("/api/queries").json()] == ["work-tickets"]
+        # M32: Work is off for this space (no work data), so not even the built-in Tickets view.
+        assert [q["id"] for q in c.get("/api/queries").json()] == []
         assert c.get("/api/calendar?from=2026-10-01&to=2026-11-11").status_code == 200
         # M5: the object route (with backlinks) and the rows (with backlinks values).
         for s in space.list():
@@ -308,7 +308,7 @@ def test_open_twice_writes_nothing(space_dir: Path):
             assert c2.get(f"/api/views/{t.id}").status_code == 200
         assert c2.get("/api/ui").status_code == 200
         assert c2.get("/api/collections").json() == []
-        assert [q["id"] for q in c2.get("/api/queries").json()] == ["work-tickets"]
+        assert [q["id"] for q in c2.get("/api/queries").json()] == []
         assert c2.get("/api/calendar?from=2026-10-01&to=2026-11-11").status_code == 200
         for s in space2.list():
             assert c2.get("/api/object", params={"path": s.path}).status_code == 200

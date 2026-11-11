@@ -46,13 +46,16 @@ def _tag_paths(space: Space, title: str) -> list[str]:
 def test_create_space_itops(tmp_path: Path):
     root = create_space("Ops", tmp_path, "itops")
     data = json.loads((root / ".object" / "space.json").read_text("utf-8"))
-    assert data == {"name": "Ops", "setup": "itops"}
+    # M32: the IT operations starter turns Work on for the space it makes.
+    assert data == {"name": "Ops", "setup": "itops", "workEnabled": True}
     files = _files(root)
     types = [r for r in files if r.startswith(".object/types/")]
     templates = [r for r in files if r.startswith("Templates/")]
     tags = [r for r in files if r.startswith("Tags/")]
-    assert sorted(types) == sorted(f".object/types/{tid}.json" for tid in ITOPS_TYPE_IDS)
-    assert len(types) == 17
+    # M32: beside the four types every new space starts with.
+    starting = ("page", "tag", "task", "dailynote")
+    assert sorted(types) == sorted(f".object/types/{tid}.json" for tid in (*ITOPS_TYPE_IDS, *starting))
+    assert len(types) == 21
     assert len(templates) == 16
     assert sorted(tags) == sorted(f"Tags/{name}.md" for name in ITOPS_TAGS)
     assert len(tags) == 30
@@ -119,7 +122,19 @@ def test_setup_route_announces_and_answers(tmp_path: Path):
         info = res.json()
         assert info["needsSetup"] is False
         assert set(ITOPS_TYPE_IDS) <= {t["id"] for t in info["types"]}
-        assert c.post("/api/space/setup", json={"setup": "basic"}).status_code == 409
+        assert info["workEnabled"] is True and info["workOn"] is True  # M32
+        # M32: the plain start is not offered twice; a starter can still be added later (the
+        # basic one here: its Book is new, the types the space has are left as they are).
+        assert c.post("/api/space/setup", json={"setup": "blank"}).status_code == 409
+        before = _files(root)
+        again = c.post("/api/space/setup", json={"setup": "basic"})
+        assert again.status_code == 200, again.text
+        after = _files(root)
+        assert set(after) - set(before) == {".object/types/book.json"}
+        assert {k: after[k] for k in before if k != ".object/space.json"} == {
+            k: v for k, v in before.items() if k != ".object/space.json"
+        }
+        assert json.loads(after[".object/space.json"])["setup"] == "itops"  # the marker stays
 
 
 _HAND_HOST = (
@@ -166,7 +181,13 @@ def test_itops_setup_keeps_what_exists(tmp_path: Path):
     assert needs_setup(root) is False
 
     with _client(space) as c:
+        # M32: adding the starter again is allowed and writes nothing that is there; only
+        # the plain start is refused once the space has one.
+        before = _files(root)
         res = c.post("/api/space/setup", json={"setup": "itops"})
+        assert res.status_code == 200, res.text
+        assert _files(root) == before
+        res = c.post("/api/space/setup", json={"setup": "blank"})
         assert res.status_code == 409
         assert res.json()["detail"] == "This space already has a starting point."
         res = c.post("/api/space/setup", json={"setup": "x"})
@@ -176,14 +197,25 @@ def test_itops_setup_keeps_what_exists(tmp_path: Path):
         assert (root / rel).read_bytes() == data, rel
 
 
-def test_itops_after_basic_is_refused(tmp_path: Path):
+def test_itops_after_basic_adds_what_is_missing(tmp_path: Path):
+    """M32: the starters are added from the type gallery, so IT operations can follow the
+    basic set: the types the space has (Person, Meeting, Project) stay as they are, the rest
+    are written, and Work is turned on."""
     root = tmp_path / "fresh"
     root.mkdir()
     with _client(Space(root)) as c:
         assert c.post("/api/space/setup", json={"setup": "basic"}).status_code == 200
         before = _files(root)
-        assert c.post("/api/space/setup", json={"setup": "itops"}).status_code == 409
-        assert _files(root) == before
+        res = c.post("/api/space/setup", json={"setup": "itops"})
+        assert res.status_code == 200, res.text
+        after = _files(root)
+        for rel in (".object/types/person.json", ".object/types/meeting.json",
+                    ".object/types/project.json", ".object/types/book.json"):
+            assert after[rel] == before[rel], rel
+        assert {f".object/types/{tid}.json" for tid in ITOPS_TYPE_IDS} <= set(after)
+        config = json.loads(after[".object/space.json"])
+        assert config["setup"] == "itops" and config["workEnabled"] is True
+        assert res.json()["workOn"] is True
 
 
 def test_needs_setup_with_itops_types(tmp_path: Path):

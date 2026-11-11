@@ -49,7 +49,9 @@ def test_basic_pick_writes_the_basic_types_and_the_marker(tmp_path: Path):
         assert c.post("/api/space/setup", json={"setup": "blank"}).status_code == 409
 
 
-def test_blank_pick_writes_only_the_marker(tmp_path: Path):
+def test_blank_pick_writes_the_marker_and_the_built_in_types(tmp_path: Path):
+    """M32: the plain start writes the marker and the space's own Task and DailyNote types
+    (Page and Tag were written when the folder was opened), and no starter type."""
     root = tmp_path / "fresh"
     root.mkdir()
     with _client(root) as c:
@@ -58,6 +60,9 @@ def test_blank_pick_writes_only_the_marker(tmp_path: Path):
         assert res.json()["needsSetup"] is False
         assert not (root / ".object" / "types" / "person.json").exists()
         assert json.loads((root / ".object" / "space.json").read_text())["setup"] == "blank"
+        assert sorted(p.stem for p in (root / ".object" / "types").glob("*.json")) == [
+            "dailynote", "page", "tag", "task",
+        ]  # fmt: skip
 
 
 def test_unknown_setup_is_refused(tmp_path: Path):
@@ -71,7 +76,20 @@ def test_unknown_setup_is_refused(tmp_path: Path):
 def test_a_space_with_notes_is_not_asked(blocks_space_dir: Path):
     with _client(blocks_space_dir) as c:
         assert c.get("/api/space").json()["needsSetup"] is False
-        assert c.post("/api/space/setup", json={"setup": "basic"}).status_code == 409
+        # The plain start is for a new or empty folder only.
+        assert c.post("/api/space/setup", json={"setup": "blank"}).status_code == 409
+        # M32: a starter can be added to a space that has notes (from the type gallery). It
+        # writes only the types the space lacks: this one has its own Person already, and it
+        # is not a new space, so no Task or DailyNote file is written for it either.
+        person = (blocks_space_dir / ".object" / "types" / "person.json").read_bytes()
+        before = _tree(blocks_space_dir)
+        res = c.post("/api/space/setup", json={"setup": "basic"})
+        assert res.status_code == 200, res.text
+        assert (blocks_space_dir / ".object" / "types" / "person.json").read_bytes() == person
+        assert _tree(blocks_space_dir) - before == {
+            ".object/space.json", ".object/types/book.json",
+            ".object/types/meeting.json", ".object/types/project.json",
+        }  # fmt: skip
 
 
 def test_create_space_records_the_pick(tmp_path: Path):

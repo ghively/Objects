@@ -378,7 +378,7 @@ def test_option_details():
 
 def test_basic_variants():
     types = _types()
-    basic = {t.id: t for t in basic_types()}
+    basic = {t.id: t for t in basic_types(work=True)}
 
     person = types["person"]
     base = [k for k in _own_keys(basic["person"]) if k != "notes"]

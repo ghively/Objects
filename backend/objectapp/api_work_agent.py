@@ -111,7 +111,9 @@ def router(ctx: ApiContext, loop: WorkLoop, service: WorkService) -> APIRouter:
             patch["workAgentActs"] = req.acts
         try:
             if req.acts and "agentId" not in given:
-                ensure_work_agent(registry(), merged, user=service.user_name(), home=loop.home())
+                # M32: no name is built in; without one the agent's prompts say "the user".
+                user = device_settings.prompt_name(service.user_name())
+                ensure_work_agent(registry(), merged, user=user, home=loop.home())
                 _merged, revision = device_settings.read()  # first use set workAgentId
             if patch:
                 device_settings.patch(patch, revision)
@@ -140,7 +142,7 @@ def router(ctx: ApiContext, loop: WorkLoop, service: WorkService) -> APIRouter:
         merged, _revision = device_settings.read()
         if work_agent(registry(), merged)[0] is not None:
             return _error(409, ALREADY_SET)
-        record = create_work_agent(registry(), user=service.user_name(),
+        record = create_work_agent(registry(), user=device_settings.prompt_name(service.user_name()),
                                    copy_change_reviewer=req.copyChangeReviewer, home=Path(loop.home()))
         ctx.announce(ChangeEvent("agents", record.id, None, origin=req.clientId))
         ctx.announce(ChangeEvent("workQueue", "settings", None, origin=req.clientId))

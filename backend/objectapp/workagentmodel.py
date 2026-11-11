@@ -108,7 +108,7 @@ class WorkQueueEntry(_Model):
     capturePath: str | None = None
     notBefore: str | None = None
     auto: bool = False
-    by: str = "Gene"
+    by: str = "You"
     createdAt: str
     claimedAt: str | None = None
     finishedAt: str | None = None

@@ -256,6 +256,14 @@ A popover: "Add new object type", "Create your own", then template groups with a
   point at the space's own types (Location's "Part of" at Location; Application's "Runs on" at Host once the space
   has one, any type before) and keep their named other side.
 - Organizations, Areas (areas of responsibility).
+- Personal (M32; Object's own, the first group): Ideas (Status: New, Exploring, Kept, Dropped), Goals (Status: Not
+  started, In progress, Achieved, Dropped; Target date), Habits (Frequency: Daily, Weekly, Monthly), Recipes (Cover
+  image, Servings, Prep time, Source link), Trips (Start, End, Location), Journal entries (Date; Mood: Great, Good,
+  Okay, Low); each also has Notes and one saved search (New ideas, Goals in progress, Daily habits, All recipes
+  A-Z, This year's trips, This month's entries).
+- Order of the groups (M32): Create your own, Personal, Use cases, Research, Media, Planning and reflection,
+  Organizations and Areas, then IT operations last, closed until it is opened (the gallery data's `collapsed`).
+  The Projects entry carries the ticket and work fields only while Work is on for the space (M32).
 Each starter template pre-fills the new type's properties.
 
 ## 4. Sidebar details
@@ -298,6 +306,15 @@ Each starter template pre-fills the new type's properties.
   fills, M31), a default template for each but Source, and 30 seed Tags; a type,
   template or Tag already there is kept as it is. A pick is recorded as `space.json` `setup` (`basic`, `itops` or
   `blank`; Create space records `blank`).
+- **Every space can make notes, daily notes and tasks (M32).** "Create space" writes the Note (`Page`), Tag, Task
+  and Daily note (`DailyNote`) types with the space; the plain start of an empty folder (`setup: blank`) writes Task
+  and Daily note too. A space without a Task or Daily note type (an older one) still lists the built-in one, held
+  in memory, so "New task" and "Today's note" always work; its file is written only with the first task or daily
+  note. Opening a space never writes for this. The built-in Task has Status (Not Started, Next Up, In Progress, On
+  Hold, Done; Done completes it), Priority, Date and Deadline. A type the user named "Task" themselves stays the only
+  one. The two starter sets stay available after the start through the same call (`POST /api/space/setup` with
+  `basic` or `itops`): each writes only the types the space lacks, by id and by name, and replaces nothing; `blank`
+  is refused once the space has a start. The IT operations starter turns Work on for its space (M32).
 - Main navigation, always visible at the top (M32): Notes, Calendar, Tasks, Work (only while the Work page is on
   for the space; directly under Tasks; it opens the `work` target), Graph, Assistant. Tasks is the active entry for
   the `tasks` target only, Work for `work` (a `work` target shown while Work is off reads as Tasks). The Assistant
@@ -823,6 +840,18 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
 - **Settings > Work**: **Create the Work agent** (shell warning; offers to copy your `change-reviewer`),
   **Read tools** (mark a server's read-only tools; no more than 500), **Set up Desk sync** (an off schedule at
   07:00 every weekday that updates ticket fields only; never writes to Jira or ServiceNow).
+- **The Work switch's default (M32).** Per space, `space.json` `workEnabled` (true or false) once it is set. Until
+  then Work reads as on when the space already holds work data (a Capture or an Alert type, a Ticket ID on any note,
+  or the IT operations starter) and as off otherwise; the default is worked out from what the space holds and is
+  never written by being read. **With Work off:** the built-in Task is not given the ticket and work fields, except
+  that a field (Steps and Project included) stays when it is saved in the Task type's file or any task holds a value
+  for it, so no value is ever hidden; the basic-setup and gallery Project is made without them (one that has them
+  keeps them); the built-in "Tickets" saved search is not listed; a plain property edit does not run the work hook
+  (System from the Ticket ID, Completed on other work types) and the Work agent's loop is not told of edits. The
+  work routes answer as before when called. **With Work on** everything is as before M32. Turning the switch
+  changes no note and no type file.
+- **Your name in Activity (M32):** no name is built in. While "Your name in Activity" is empty (the default, and it
+  can be cleared again), Activity and Work notes lines say "You", and the Work agent's instructions say "the user".
 - **Agent page > Schedules**: each row's menu offers **Run now** (turned-on schedules only; one run outside the
   schedule, same guards as a due occurrence, through `POST /automations/{id}/run-now`), **Edit**, **Run log** and
   **Delete**. A turned-off schedule's summary reads "Off · Every weekday at 7:00 AM".

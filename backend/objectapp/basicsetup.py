@@ -20,7 +20,8 @@ those are **our choice** (listed for Gene in the M8 plan, Task 8):
 M22: Project also has the ticket and work fields (``workfields.field_defs``, without the
 Project relation, which is on Tasks only) and a hidden ``completed`` (Task's), appended
 after Notes, so a new Project is a work type. Those keep ``id == key``; the properties
-above get fresh ids.
+above get fresh ids. M32: only while Work is on for the space (``basic_types(work=True)``);
+a Project made with Work off has none of them, and one that has them keeps them.
 
 "Notes" is each type's ``blocks`` property (the object's body). There is no
 Organization type in the basic setup, so "Organizations" relations allow any type.
@@ -108,6 +109,7 @@ __all__ = [
     "basic_types",
     "itops_template",
     "itops_types",
+    "retarget_relations",
     "source_type",
     "sources_property",
     "host_synced_properties",
@@ -216,8 +218,13 @@ def _type(
     )
 
 
-def basic_types() -> list[TypeDefinition]:
-    """Fresh Person, Meeting, Project and Book definitions (new property ids each call)."""
+def basic_types(work: bool = False) -> list[TypeDefinition]:
+    """Fresh Person, Meeting, Project and Book definitions (new property ids each call).
+
+    M32: Project ends with M22's ticket and work fields and the hidden ``completed`` only
+    with ``work`` (Work is on for the space the types are made for, `spaceconfig.work_on`; the
+    IT operations starter always passes it); a new space's Project has none of them.
+    """
     person = _type(
         "person", "Person", "People",
         "A page for each person you know or work with.",
@@ -268,8 +275,7 @@ def basic_types() -> list[TypeDefinition]:
             _relation("meetings", "Meetings", ["meeting"]),
             _cover(),
             _notes(),
-            *field_defs(task=False, project_type_ids=["project"]),
-            _completed(),
+            *([*field_defs(task=False, project_type_ids=["project"]), _completed()] if work else []),
         ],
     )
     book = _type(
@@ -293,10 +299,11 @@ def basic_types() -> list[TypeDefinition]:
     return [person, meeting, project, book]
 
 
-def write_basic_types(root: Path) -> list[Path]:
-    """Write the four types into the (new) space at `root`. Refuses to replace an existing file."""
+def write_basic_types(root: Path, work: bool = False) -> list[Path]:
+    """Write the four types into the (new) space at `root`. Refuses to replace an existing file.
+    ``work`` as `basic_types` (a new space has Work off: no ticket field on its Project)."""
     written: list[Path] = []
-    for t in basic_types():
+    for t in basic_types(work=work):
         # base revision "" = the file must not exist yet (RevisionConflict otherwise)
         write_type_json(Path(root), t, "")
         written.append(Path(root) / ".object" / "types" / f"{t.id}.json")
@@ -554,7 +561,7 @@ def _knowledge(
 
 def itops_types() -> list[TypeDefinition]:
     """Fresh definitions of the 17 IT ops types, in `ITOPS_TYPE_IDS` order (new ids each call)."""
-    basic = {t.id: t for t in basic_types()}
+    basic = {t.id: t for t in basic_types(work=True)}  # the starter turns Work on (M32)
     types = [
         _entity(
             "host", "Host", "Hosts",
@@ -741,21 +748,46 @@ def _place_new(path: Path, data: bytes) -> bool:
     return True
 
 
-def write_itops_types(root: Path, skip: Iterable[str] = ()) -> list[Path]:
+def retarget_relations(t: TypeDefinition, retarget: dict[str, str]) -> None:
+    """M32: point ``t``'s relations at the space's own types: each allowed type id that is a key
+    of `retarget` (a starter type left out because the space has a type of that name under
+    another id) becomes that type's id. In place; nothing else changes."""
+    if not retarget:
+        return
+    for p in t.propertyDefinitions:
+        allowed = p.options.get("allowedTypes") if p.type == "entity" else None
+        if isinstance(allowed, list):
+            p.options["allowedTypes"] = [retarget.get(a, a) for a in allowed]
+
+
+def write_itops_types(
+    root: Path, skip: Iterable[str] = (), named: dict[str, str] | None = None
+) -> list[Path]:
     """Write the IT ops types and their default templates into the space at `root`.
 
     Never replaces: a type whose ``.object/types/<id>.json`` exists, or whose id is in `skip`, is
     left out with its template; a template whose ``Templates/<folder>/<Name>.md`` exists is kept
     as it is and the type is written without one registered. A written template is the type's
     ``templates.ids[0]`` and ``defaultTemplateId``. Returns the written paths.
+
+    M32 (the starter added to a space that has types): `named` is the space's lower-cased type
+    names -> ids; a starter type whose name the space has under another id is left out too, and
+    the written types' relations point at the space's type instead (`retarget_relations`).
     """
     root = Path(root)
     skipped = set(skip)
     written: list[Path] = []
     types_dir = root / ".object" / "types"
-    for t in itops_types():
-        if t.id in skipped or (types_dir / f"{t.id}.json").exists():
+    starter = itops_types()
+    retarget = {
+        t.id: named[t.name.lower()]
+        for t in starter
+        if named and t.id not in skipped and named.get(t.name.lower(), t.id) != t.id
+    }
+    for t in starter:
+        if t.id in skipped or t.id in retarget or (types_dir / f"{t.id}.json").exists():
             continue
+        retarget_relations(t, retarget)
         if t.id in ITOPS_TEMPLATE_SECTIONS:
             name, body = itops_template(t.id)
             segment = PurePosixPath(t.folder.strip("/")).name or safe_filename(t.pluralName)

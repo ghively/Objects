@@ -40,6 +40,7 @@ __all__ = [
     "PropertyDefinition",
     "MAX_STALE_DAYS",
     "MAX_SYNC_SOURCE",
+    "ON_DEMAND_TYPES",
     "RevisionConflict",
     "SYNCABLE_KINDS",
     "SYNCED_STALE_DEFAULT",
@@ -49,11 +50,14 @@ __all__ = [
     "UnreadableType",
     "is_task_type",
     "load_types",
+    "on_demand_type",
+    "on_demand_types",
     "status_category",
     "synced_problems",
     "system_property_defs",
     "topup_task_type",
     "type_revision",
+    "write_starting_types",
     "write_type_json",
 ]
 
@@ -216,6 +220,38 @@ BUILTIN_TYPES: dict[str, dict[str, Any]] = {
         "propertyDefinitions": [],
     },
 }
+
+# M32: the built-in types every space can make from its first second. Unlike `BUILTIN_TYPES`
+# these are **not** written at load: a space that has none gets them in memory
+# (`on_demand_types`), so the app can always offer "New task" and "Today's note", and each is
+# written to ``.object/types/`` with its first object (`Space._persist_type`), by that user
+# action. A new space is made with them on disk (`write_starting_types`). The Task's fields
+# (Status with Not Started, Next Up, In Progress, On Hold and Done, Priority, Date, ...) are
+# `topup_task_type`'s; Task's colour is our choice.
+ON_DEMAND_TYPES: dict[str, dict[str, Any]] = {
+    "task": {
+        "id": "task",
+        "name": "Task",
+        "pluralName": "Tasks",
+        "folder": "Tasks",
+        "icon": "ph-check-circle",
+        "color": "green",
+        "propertyDefinitions": [],
+    },
+    "dailynote": {
+        "id": "dailynote",
+        "name": "DailyNote",
+        "pluralName": "DailyNotes",
+        "folder": "DailyNotes",
+        "icon": "ph-calendar-blank",
+        "color": "blue",
+        "propertyDefinitions": [
+            {"id": "date", "key": "date", "name": "Date", "type": "datetime", "isArray": False},
+            {"id": "reviewed", "key": "reviewed", "name": "Reviewed", "type": "boolean",
+             "isArray": False},
+        ],
+    },
+}  # fmt: skip
 
 _STATUS_CATEGORIES = {
     "not started": "not-started",
@@ -1036,6 +1072,47 @@ def load_types(
         write_type_json(root, t, type_revision(root, t.id))
         loaded.append(t)
     return _sorted(loaded), unreadable
+
+
+def on_demand_type(type_id: str) -> TypeDefinition:
+    """A fresh built-in Task or DailyNote (`ON_DEMAND_TYPES`), the Task with its fields."""
+    return topup_task_type(TypeDefinition.from_json(ON_DEMAND_TYPES[type_id]))
+
+
+def on_demand_types(
+    known_ids: Iterable[str], known_names: Iterable[str]
+) -> list[TypeDefinition]:
+    """M32: the built-in Task and DailyNote a space lacks, for its in-memory type list.
+
+    A type is left out when its id is in `known_ids` (a loaded, inferred or unreadable type, or
+    a type file on disk) or its name is, case-insensitively, in `known_names` (the user's own
+    "Task" stays the only one). Never writes.
+    """
+    ids = set(known_ids)
+    names = {n.lower() for n in known_names}
+    return [
+        on_demand_type(tid)
+        for tid, seed in ON_DEMAND_TYPES.items()
+        if tid not in ids and seed["name"].lower() not in names
+    ]
+
+
+def write_starting_types(root: Path) -> list[Path]:
+    """M32: write the types a **new** space starts with (Page, Tag, Task, DailyNote) into
+    ``<root>/.object/types/``; return the written paths.
+
+    Called only when a space is made (`spaces.create_space`), never by opening one. Nothing is
+    replaced: a type whose file exists is left as it is.
+    """
+    root = Path(root)
+    written: list[Path] = []
+    for tid, seed in (*BUILTIN_TYPES.items(), *ON_DEMAND_TYPES.items()):
+        path = _types_dir(root) / f"{tid}.json"
+        if path.exists():
+            continue
+        write_type_json(root, topup_task_type(TypeDefinition.from_json(seed)), "")
+        written.append(path)
+    return written
 
 
 # -- the Task fields (M4) ----------------------------------------------------------

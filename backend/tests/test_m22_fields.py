@@ -231,7 +231,7 @@ def test_with_work_fields_on_a_custom_type(space: Path):
 
 
 def test_project_from_basic_setup_and_gallery(space: Path):
-    project = next(t for t in basic_types() if t.id == "project")
+    project = next(t for t in basic_types(work=True) if t.id == "project")
     keys = [p.key for p in project.propertyDefinitions]
     work = [k for k, _, _ in TICKET_TABLE + WORK_TABLE if k != "project"]
     assert keys[keys.index("notes") + 1:] == [*work, "completed"]
@@ -241,7 +241,7 @@ def test_project_from_basic_setup_and_gallery(space: Path):
     data = project.to_json()
     assert TypeDefinition.from_json(json.loads(json.dumps(data))).to_json() == data
 
-    gallery = build_template("project", [])
+    gallery = build_template("project", [], work=True)
     gkeys = [p.key for p in gallery]
     assert gkeys[gkeys.index("notes") + 1:] == [*work, "completed"]
     assert "project" not in gkeys

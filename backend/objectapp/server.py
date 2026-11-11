@@ -271,7 +271,8 @@ from .runfence import RunFenceMiddleware
 from .uikey import LaunchKey, UiKeyMiddleware
 from .vcsservice import VcsService
 from .searchindex import SearchIndex
-from .settings import SettingsProblem, time_zone
+from .settings import ACTIVITY_NAME_FALLBACK, SettingsProblem, time_zone
+from .settings import activity_name as settings_activity_name
 from .settings import patch as patch_settings
 from .settings import read as read_settings
 from .space import (
@@ -307,6 +308,7 @@ from .whiteboardstore import whiteboard_ui_problem
 from .workloop import WorkLoop, on_change_event
 from .workseams import build_seams
 from .workservice import WorkService
+from .workview import TICKETS_ID
 from .workview import api_extra as query_api_extra
 
 __all__ = ["EventHub", "create_app"]
@@ -1091,6 +1093,10 @@ def create_app(
 
     def space_info() -> dict[str, Any]:
         fields = space_fields(space.root)
+        # M32: the effective Work switch is the open space's own answer (the stored value, else
+        # the default from its index); asked before the types are listed, so the Task type's
+        # fields already follow it. Reading it writes nothing.
+        work_on = space.work_on()
         return {
             "name": fields["name"],
             "root": str(space.root),
@@ -1101,7 +1107,7 @@ def create_app(
             "jiraSite": fields["jiraSite"],
             # M32: the Work switch as stored (true / false / null) and the effective value.
             "workEnabled": fields["workEnabled"],
-            "workOn": fields["workOn"],
+            "workOn": work_on,
             "revision": fields["revision"],
             "needsSetup": needs_setup(space.root),
         }
@@ -1113,23 +1119,27 @@ def create_app(
     @api.post("/space/setup")
     def post_space_setup(req: SpaceSetupRequest):
         # Fix pass H2: "Pick a starting point" for a space opened as a new or empty folder.
+        # M32: the app no longer asks. ``blank`` is the plain start of a new or empty folder
+        # (refused once the space has a start); the starter sets ``basic`` and ``itops`` are
+        # also added later, from the type gallery: they write only what the space lacks.
         if req.setup not in ("basic", "itops", "blank"):
             return _error(422, "Pick \"basic\", \"itops\" or \"blank\" as the starting point.")
-        if not needs_setup(space.root):
+        if req.setup == "blank" and not needs_setup(space.root):
             return _error(409, "This space already has a starting point.")
         try:
             created = space.apply_setup(req.setup)
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
-        if req.setup == "itops":
-            # M28: the IT ops types, then the templates and seed Tags as created objects.
-            announce(ChangeEvent("types", "*", None))
-            for rel in created:
-                announce(ChangeEvent("created", rel, space.cached_version(rel)))
+        # The types written (the starter's, a new space's Task and DailyNote), then M28's
+        # templates and seed Tags as created objects.
+        announce(ChangeEvent("types", "*", None))
+        for rel in created:
+            announce(ChangeEvent("created", rel, space.cached_version(rel)))
         return space_info()
 
     @api.put("/space")
     def put_space(req: PatchSpaceRequest):
+        work_before = space.work_on()
         try:
             patch_space_config(space.root, req.patch, req.baseRevision)
         except SpaceConfigProblem as exc:
@@ -1138,7 +1148,13 @@ def create_app(
             return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
-        return space_info()
+        info = space_info()
+        if info["workOn"] != work_before:
+            # M32: the Work switch moved, so the Task type's fields and the saved searches
+            # (Tickets) did too, in memory: the windows read both again.
+            announce(ChangeEvent("types", "*", None))
+            announce(ChangeEvent("queries", TICKETS_ID, None))
+        return info
 
     @api.get("/settings")
     def get_settings():
@@ -1318,8 +1334,11 @@ def create_app(
         """Decision S3 (fix pass 2026-11-09): Gene's own edit of a work item, a body save or a
         property set from his window (the event's origin is its client id), starts the item's
         auto-run count again (`workloop.on_change_event`). Only the object he edited: the
-        relation-synced, relinked or retyped objects other routes announce are not his action."""
+        relation-synced, relinked or retyped objects other routes announce are not his action.
+        M32: only while Work is on for the space; with Work off the loop is told nothing."""
         try:
+            if not space.work_on():
+                return
             on_change_event(space, event)
         except Exception:  # the write is done; the loop's bookkeeping must not fail the request
             logging.getLogger(__name__).exception("Telling the Work loop about an edit of %s failed", event.path)
@@ -1700,6 +1719,15 @@ def create_app(
             path, version = space.create_daily_note(req.date, req.templateId)
         except DailyNoteExists as exc:
             announce_template_ids(templates_before, req.clientId)
+            if exc.reason == "exists":
+                # M32: the day already has its note, so that note is the answer (200, nothing
+                # written, ``existing: true``), not an error. A file of another kind holding
+                # the note's name is still 409.
+                return JSONResponse(
+                    {"path": exc.path, "version": space.cached_version(exc.path),
+                     "typeIds": [], "existing": True},
+                    status_code=200,
+                )  # fmt: skip
             return JSONResponse(
                 {"detail": exc.detail, "path": exc.path, "reason": exc.reason}, status_code=409
             )
@@ -2025,7 +2053,7 @@ def create_app(
     def type_gallery():
         from .typetemplates import template_catalog
 
-        return template_catalog(list(space.types))
+        return template_catalog(list(space.types), work=space.work_on())
 
     @api.post("/types", status_code=201)
     def create_type(req: CreateTypeRequest):
@@ -2452,11 +2480,11 @@ def create_app(
         return site if isinstance(site, str) and site else None
 
     def activity_name() -> str:
+        # M32: no name is built in; an empty ``activityName`` reads as "You".
         try:
-            name = read_settings()[0].get("activityName")
+            return settings_activity_name(read_settings()[0])
         except (ReadOnly, OSError, ValueError):
-            name = None
-        return name if isinstance(name, str) and name.strip() else "Gene"
+            return ACTIVITY_NAME_FALLBACK
 
     work = WorkService(space, jira_site=jira_site, user_name=activity_name)
     app.state.work = work

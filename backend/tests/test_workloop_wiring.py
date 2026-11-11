@@ -3,6 +3,7 @@
 is seen by the loop that holds it; other routes' announces (a rename's relinked objects, a
 relation sync) don't reach it. The loop's own behaviour is tested in ``test_m24_loop.py``."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -14,9 +15,17 @@ from objectapp.watcher import ChangeEvent
 LOOSE = "Tasks/Loose task.md"
 
 
+def _work_on(root: Path) -> None:
+    """M32: the loop is told of edits only while Work is on for the space; this fixture holds no
+    work data, so the switch is set (``test_m32_work_switch.py`` covers Work off)."""
+    (root / ".object").mkdir(exist_ok=True)
+    (root / ".object" / "space.json").write_text(json.dumps({"workEnabled": True}), "utf-8")
+
+
 def test_announce_hands_every_change_event_to_the_work_loop(links_space_dir: Path, monkeypatch: pytest.MonkeyPatch):
     seen: list[tuple[Space, ChangeEvent]] = []
     monkeypatch.setattr(server, "on_change_event", lambda space, event: seen.append((space, event)))
+    _work_on(links_space_dir)
     space = Space(links_space_dir)
     app = server.create_app(space, None)
     with TestClient(app) as c:
@@ -36,6 +45,7 @@ def test_a_rename_does_not_reach_the_work_loop(links_space_dir: Path, monkeypatc
     origin but are not Gene's action on them (review finding 2)."""
     seen: list[ChangeEvent] = []
     monkeypatch.setattr(server, "on_change_event", lambda space, event: seen.append(event))
+    _work_on(links_space_dir)
     space = Space(links_space_dir)
     app = server.create_app(space, None)
     with TestClient(app) as c:

@@ -18,7 +18,7 @@ the Task 6 test hooks set:
     for today;
  2. ``POST /api/daily-notes`` for today creates exactly ``DailyNotes/<today>.md``
     with the Task 4 shape (plus the DailyNote type JSON when it was only
-    inferred); a second call is 409 with its path;
+    inferred); a second call is 200 with the existing note (M32);
  3. a Task's ``date``, ``repeat: every week`` and ``remind: 1 day before at
     09:00`` set through ``PUT /api/object/properties`` give one line per key
     plus ``lastUpdated`` (and ``id``);
@@ -240,7 +240,9 @@ class M4:
         before = snapshot(self.root)
         c2, r2 = self.http("POST", "/daily-notes", {"date": day_s(self.note_day)})
         diff2 = changed_paths(before, snapshot(self.root))
-        self.run.report(c2 == 409 and isinstance(r2, dict) and r2.get("path") == want and not diff2,
+        # M32 (item 13): the day's existing note is the answer (200, ``existing``), not a 409.
+        self.run.report(c2 == 200 and isinstance(r2, dict) and r2.get("path") == want
+                        and r2.get("existing") is True and not diff2,
                         f"a second POST is {c2} with path {r2.get('path') if isinstance(r2, dict) else r2!r}, nothing written")
         return want
 

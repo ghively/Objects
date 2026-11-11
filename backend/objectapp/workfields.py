@@ -9,7 +9,9 @@ them directly.
   relation to the space's Project types) is on Tasks only.
 - ``topup_work_fields``: the basic Task type gains the missing fields **in memory** (as
   ``typemodel.topup_task_type`` does for the Task fields); they reach ``task.json`` the
-  first time the type is saved. Never writes.
+  first time the type is saved. Never writes. M32: only while Work is on for the space
+  (``spaceconfig.work_on``); with Work off, only the fields some Task holds a value for
+  (``only``), beside the ones its file already has.
 - ``with_work_fields``: "Add work fields" on another type: a copy with the missing fields,
   plus a Status (Task's five options, not a status label) when the type has none and a
   hidden ``completed`` on every work type but Task.
@@ -213,14 +215,24 @@ def _merge(
     return added, skipped
 
 
-def topup_work_fields(t: TypeDefinition, types: Sequence[TypeDefinition]) -> TypeDefinition:
+def topup_work_fields(
+    t: TypeDefinition, types: Sequence[TypeDefinition], only: Iterable[str] | None = None
+) -> TypeDefinition:
     """Give the basic Task type the ticket and work fields it lacks, in memory; return ``t``.
 
     Any other type comes back untouched. Never writes.
+
+    M32: ``only`` (Work is off for the space, `Space._top_up`) limits the fields added to those
+    keys: the ones some Task holds a value for. The fields ``t`` already defines (those saved in
+    its file) are kept either way.
     """
     if not is_task_type(t):
         return t
-    _merge(t, field_defs(task=True, project_type_ids=project_type_ids(types)))
+    defs = field_defs(task=True, project_type_ids=project_type_ids(types))
+    if only is not None:
+        wanted = set(only)
+        defs = [d for d in defs if d.key in wanted]
+    _merge(t, defs)
     return t
 
 

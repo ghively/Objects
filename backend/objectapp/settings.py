@@ -2,7 +2,8 @@
 
 The keys are the M7 contract's ``DeviceSettings`` plus M8's (language, decimal
 separator, time zone, backlink defaults, presentation), M22's ``activityName`` (your
-name in a work item's Activity, 1-60 characters, one line) and M23's ``workAlertFolder``
+name in a work item's Activity, 1-60 characters, one line; M32: or empty, the default, which
+reads as "You", `activity_name`) and M23's ``workAlertFolder``
 and ``workAlertIntervals`` (the Work section's monitoring folder watch) and ``ocrLanguages`` (the
 import's OCR languages, 2026-11-09); `read` merges the file over
 `DEFAULTS` (a missing file reads as the defaults, revision ``''``, and is not
@@ -31,14 +32,24 @@ from .textfile import atomic_write
 from .typemodel import RevisionConflict
 
 __all__ = [
+    "ACTIVITY_NAME_FALLBACK",
     "DEFAULTS",
+    "PROMPT_NAME_FALLBACK",
     "SettingsProblem",
+    "activity_name",
     "patch",
+    "prompt_name",
     "read",
     "settings_path",
     "time_zone",
     "valid_time_zone",
 ]
+
+ACTIVITY_NAME_FALLBACK = "You"
+"""M32: what a work item's Activity and Work notes lines call you while ``activityName`` is
+empty (no name is built in)."""
+PROMPT_NAME_FALLBACK = "the user"
+"""...and what an agent's prompt calls you then ("You" there would read as the agent itself)."""
 
 DEFAULTS: dict[str, Any] = {
     "themeMode": "dark",
@@ -96,7 +107,7 @@ DEFAULTS: dict[str, Any] = {
     "claudePath": None,
     "aiModel": None,
     # M22: who "you" are in a work item's Activity and Work notes lines. M32: no name is built in;
-    # the readers (`server.activity_name`, `worktools`) put their own fallback for an empty one.
+    # an empty one reads as "You" (`activity_name`), and "the user" in an agent's prompt.
     "activityName": "",
     # M23: the monitoring folder the Work section's folder watch reads (absolute path or
     # None: off), and per-source staleness intervals in minutes.
@@ -239,12 +250,16 @@ def _valid(key: str, value: Any) -> bool:
     if key == "aiModel":
         return value is None or (isinstance(value, str) and _AI_MODEL.fullmatch(value) is not None)
     if key == "activityName":
-        return (
-            isinstance(value, str)
-            and 1 <= len(value) <= 60
-            and value.strip() != ""
-            and "\n" not in value
-            and "\r" not in value
+        # M32: the empty string is "no name" (shown as `ACTIVITY_NAME_FALLBACK`); a name is one
+        # line of 1-60 characters that isn't only blanks.
+        return isinstance(value, str) and (
+            value == ""
+            or (
+                len(value) <= 60
+                and value.strip() != ""
+                and "\n" not in value
+                and "\r" not in value
+            )
         )
     if key in ("workAlertFolder", "fullExportFolder"):
         return value is None or (
@@ -379,6 +394,19 @@ def patch(patch: dict[str, Any], base_revision: str | None) -> tuple[dict[str, A
         path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write(path, payload)
         return _merged(data), hashlib.sha256(payload).hexdigest()
+
+
+def activity_name(merged: dict[str, Any]) -> str:
+    """M32: your name for a work item's Activity and Work notes lines: the ``activityName``
+    setting, else "You" (`ACTIVITY_NAME_FALLBACK`) while it is empty or not a text."""
+    name = merged.get("activityName")
+    return name if isinstance(name, str) and name.strip() else ACTIVITY_NAME_FALLBACK
+
+
+def prompt_name(name: str) -> str:
+    """M32: `name` as an agent's prompt says it: "the user" while it is the "You" fallback (an
+    agent told "You approved this step" would take the approval for its own)."""
+    return PROMPT_NAME_FALLBACK if name.strip() == ACTIVITY_NAME_FALLBACK else name
 
 
 def time_zone(merged: dict[str, Any]) -> zoneinfo.ZoneInfo | None:
