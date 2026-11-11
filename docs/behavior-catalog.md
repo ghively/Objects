@@ -55,15 +55,18 @@ Object has no accounts.
   `appIcon`), each showing the bolt in its colour; the choice recolours the browser tab's icon at once and the
   app window's from the next start (the window takes an icon only when it opens).
 - AI Assistant: "Hide AI features" switch.
-- Editor: Disable spellcheck; Spellcheck language (Experimental); Open objects as a full page (Alt+Shift click
-  opens the preview instead); Show properties by default (ours, 2026-11-09; on by default; off: objects open with
-  the properties panel hidden, and the properties button shows it for that object by saving `hideProperties:
+- Editor: Disable spellcheck; Spellcheck language (Experimental); Open notes as a full page (M32: was "Open objects
+  as a full page"; on by default now; Alt+Shift click opens the preview instead); Show properties by default (ours,
+  2026-11-09; on by default; (M32) it applies to types that have properties of their own: a plain Note or Daily
+  note starts with the panel closed; off: every note opens with the properties panel hidden, and the properties
+  button shows it for that note by saving `hideProperties:
   false`, hiding again removes the key); Insert links inline by default; Type icons on inline links;
   Turn off automatic numbered lists (so `1. ` at block start converts by default); How nested backlinks
   show at first (Just the linking block | Full path above); Keep type settings inside Settings only;
   Hide outliner lines; Toggle style (Toggle | Bullet); Hide App Menu; When Object
   starts (Space on this device: Last opened space | Specific space; When this space opens, per space and per
-  device: Where I left off | Calendar | Calendar today | Specific object); Highlight Style (Default with a
+  device: Where I left off | Home (M32) | Calendar | Calendar today | Specific note (M32: was "Specific object",
+  its picker "Select a note")); Highlight Style (Default with a
   rail and notes section | Minimal); Backlink sections start as (Backlinks Open | Closed; Unlinked
   Mentions Open | Closed | Hidden); Backlink content view (Embed default).
   (M31) "Hide App Menu" (a switch after "Hide outliner lines"; device setting `hideAppMenu`, off by default): Object's

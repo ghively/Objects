@@ -34,12 +34,12 @@ describe('EditorSection', () => {
     await user.click(within(toggle).getByRole('radio', { name: 'Bullet' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ toggleStyle: 'bullet' }, expect.anything())
 
-    // Each switch starts at its default and a click saves the other value. M32: "Open objects as
-    // a full page" starts on.
+    // Each switch starts at its default and a click saves the other value. M32: "Open notes as a
+    // full page" starts on.
     for (const [label, key, start] of [
       ['Turn off automatic numbered lists', 'disableNumberedListTransformation', false],
       ['Disable spellcheck', 'disableSpellcheck', false],
-      ['Open objects as a full page', 'alwaysOpenAsFullPage', true],
+      ['Open notes as a full page', 'alwaysOpenAsFullPage', true],
       ['Hide outliner lines', 'hideOutlinerLines', false],
     ] as const) {
       const sw = screen.getByRole('switch', { name: label })
@@ -56,16 +56,17 @@ describe('EditorSection', () => {
     expect(icons).toHaveAttribute('aria-checked', 'false')
   })
 
-  test('test when this space opens is stored per space root, with a specific object', async () => {
+  test('test when this space opens is stored per space root, with a specific note', async () => {
     const user = userEvent.setup()
     useLinkIndex.setState({ objects: [objectSummary({ path: 'Pages/Runbook.md', title: 'Runbook' })], loaded: true })
     render(<EditorSection />)
     const group = screen.getByRole('radiogroup', { name: 'When this space opens' })
     expect(within(group).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
       'Where I left off',
+      'Home',
       'Calendar',
       'Calendar today',
-      'Specific object',
+      'Specific note',
     ])
     await waitFor(() => expect(useSpaceInfo.getState().space?.root).toBe('/space'))
     // The mock space's root is "/space".
@@ -73,8 +74,15 @@ describe('EditorSection', () => {
     await user.click(within(group).getByRole('radio', { name: 'Calendar today' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ openOnStart: { '/space': { mode: 'today' } } }, expect.anything())
 
-    await user.click(within(group).getByRole('radio', { name: 'Specific object' }))
-    await user.click(screen.getByRole('button', { name: 'Select object' }))
+    // M32: Home (the Home tab) is a choice of its own.
+    await user.click(within(group).getByRole('radio', { name: 'Home' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ openOnStart: { '/space': { mode: 'home' } } }, expect.anything())
+    expect(within(group).getByRole('radio', { name: 'Home' })).toHaveAttribute('aria-checked', 'true')
+    expect(EDITOR_SEARCH).toContain('Home')
+
+    await user.click(within(group).getByRole('radio', { name: 'Specific note' }))
+    expect(screen.getByText('The note shown when the app starts or you switch to this space.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Select a note' }))
     await user.click(await screen.findByRole('option', { name: 'Runbook' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith(
       { openOnStart: { '/space': { mode: 'specificObject', path: 'Pages/Runbook.md' } } },
@@ -130,7 +138,7 @@ describe('EditorSection', () => {
     render(<EditorSection />)
     expect(screen.getByRole('heading', { name: 'Backlink sections start as' })).toBeInTheDocument()
     expect(
-      screen.getByText('Whether each section is expanded or collapsed when an object page opens. Each object can still override it.'),
+      screen.getByText('Whether each section is expanded or collapsed when a note opens. Each note can still override it.'),
     ).toBeInTheDocument()
     // Only Unlinked Mentions can be hidden from here (catalog: Backlinks Open | Closed; Unlinked Mentions Open | Closed | Hidden).
     for (const name of ['Backlinks', 'Related Content']) {
@@ -199,7 +207,7 @@ describe('EditorSection', () => {
       expect(mocked.patchSettings).toHaveBeenLastCalledWith({ [key]: true }, expect.anything())
     }
     expect(
-      screen.getByText('Linking to an object always makes an inline link, even at the start of an empty block.'),
+      screen.getByText('Linking to a note always makes an inline link, even at the start of an empty block.'),
     ).toBeInTheDocument()
   })
 
@@ -246,5 +254,32 @@ describe('EditorSection', () => {
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ hideAppMenu: true }, expect.anything())
     expect(EDITOR_SEARCH).toContain('Hide App Menu')
   })
-})
 
+  test('test the note switches say what they do in notes-first words (M32)', () => {
+    const { container } = render(<EditorSection />)
+    const full = screen.getByRole('region', { name: 'Open notes as a full page' })
+    expect(full).toHaveTextContent('Clicking a note opens it as a full page.')
+    const props = screen.getByRole('region', { name: 'Show properties by default' })
+    // It applies to types with properties of their own; a plain note starts with the panel closed.
+    expect(props).toHaveTextContent(
+      'Notes of a type that has properties of its own open with the properties panel showing. A plain Note or Daily note has none, so its panel starts closed. Off: the panel starts hidden for every type; the properties button shows it for that note.',
+    )
+    expect(screen.getByRole('switch', { name: 'Show properties by default' })).toHaveAttribute('aria-checked', 'true')
+    // No default text of the section says "object" (the app's name aside).
+    expect((container.textContent ?? '').replace(/\bObject\b/g, '')).not.toMatch(/object/i)
+  })
+
+  test('test the types without related content show Notes and Daily notes for the built-in types (M32)', () => {
+    useLinkIndex.setState({
+      types: [
+        typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true }),
+        typeDef({ id: 'dailynote', name: 'DailyNote', pluralName: 'DailyNotes', basic: true }),
+        typeDef({ id: 'Book', name: 'Book', pluralName: 'Books' }),
+      ],
+      loaded: true,
+    })
+    render(<EditorSection />)
+    const group = screen.getByRole('group', { name: 'Types without related content' })
+    expect(within(group).getAllByRole('checkbox').map((c) => c.getAttribute('aria-label'))).toEqual(['Notes', 'Daily notes', 'Books'])
+  })
+})
