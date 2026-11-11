@@ -750,7 +750,7 @@ export function ObjectView({
       publishTitle()
       return done
     },
-    [renameTo, publishTitle],
+    [renameTo, publishTitle, path],
   )
   const onTitleDraft = useCallback(
     (title: string | null) => {
