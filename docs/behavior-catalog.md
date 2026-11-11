@@ -69,6 +69,10 @@ Object has no accounts.
   its picker "Select a note")); Highlight Style (Default with a
   rail and notes section | Minimal); Backlink sections start as (Backlinks Open | Closed; Unlinked
   Mentions Open | Closed | Hidden); Backlink content view (Embed default).
+  (M32 fix pass) On screen: "Keep type settings inside Settings only" explains "Removes the controls for editing
+  properties and type settings from notes. …"; the second "Backlink sections start as" row reads "Related" (was
+  "Related Content"), as the note page's tab does ("All", "Backlinks", "Related", "Mentions", "Related tags"), and
+  "Types without related content" explains "Notes of the types picked here leave out the Related section.".
   (M31) "Hide App Menu" (a switch after "Hide outliner lines"; device setting `hideAppMenu`, off by default): Object's
   window has no menu bar, so its app menu is the top bar's space menu (spaces, Space settings, Space history, Create
   space, Open folder…). On, that button is hidden (the sidebar toggle stays); a lone Alt tap shows it, focused, and
@@ -86,7 +90,9 @@ Object has no accounts.
   Local rows (M31): "Local Storage" lists the space folder, its cache (`.object-cache`) and Object's data for the
   space in the state folder (saved versions and the per-space files), and the total (`GET /api/storage`, read
   only). "Media loading" (device setting `mediaLoading`): "Required only" shows images, video, audio and PDF
-  as a placeholder with "Load" until clicked, wherever they show: blocks in pages, cover images (and the
+  as a placeholder with "Load" until clicked, wherever they show ((M32 fix pass) the setting's text says "in notes,
+  cover images, …", "Media loads as soon as a note opens." and, for the cache, "Media loads again from your
+  files."): blocks in pages, cover images (and the
   profile picture and a presentation's title slide), card and gallery pictures (the Page link view card
   too), image property cells and whiteboard media; small pictures get a compact "Load" in the picture's box
   (our call); the image picker shows its thumbnails, as opening it asks for them (our call). "Everything" loads
@@ -131,6 +137,10 @@ Object has no accounts.
     said "objects". The built-in Page type shows "Note" / "Notes" and the built-in DailyNote "Daily note" / "Daily
     notes" in the breadcrumb and in their (fixed) Name and Plural fields; the type file keeps `Page` / `DailyNote`.
     The "Work" section ("Add work fields"; Object's own, M22) shows only while the Work page is on for the space.
+    (M32 fix pass) Configuration's first group is headed "Layout" (was "Page", over a row "Page layout"): the four
+    layout cards under "How notes of this type are laid out.", then Font ("The typeface that notes of this type
+    use."), Wide layout, the cover image rows and Default list view. The "Default link view" option "Page" keeps
+    its name: it shows the linked note as a whole page.
   - Add Property › **Table** (M31, after Files; ours: "A small table: a header row of column names, then rows of
     text."): stored as a Markdown table in a `|-` block (header row first; a hand-written YAML list of rows reads the
     same; only line 2 is the separator, and a cell of dashes is written `\-`, `|` as `\|` and `\` as `\\`, read back
@@ -224,6 +234,10 @@ Ctrl+A | Extend to clicked block Shift+Click | Move selected blocks Alt+Up/Down 
 Tick or untick the to-do in this block Ctrl+Enter | Open or close all toggles on the page Ctrl+O | Open toggles Right, close Left |
 Code block: leave downwards or upwards (Ctrl+Shift+Down/Up) | Math block likewise | Merge text blocks
 Ctrl+Shift+G.
+
+(M32 fix pass) On screen this group is headed **Note** and its rows name the note: "Pin or unpin this note",
+"Export this note", "Delete this note"; and General's "Add new content" (Ctrl+U or Alt+Shift+N, the New menu)
+reads "New". The catalogued names below are the ones they had.
 
 **Page**: Pin or unpin this page Ctrl+Shift+* (M32: was "Favorite or unfavorite this page") | Import, Export this page (Ctrl+E), Share menu Ctrl+S (not in Object) |
 Start presentation mode Ctrl+Alt+P; back one slide / next presentation slide; exit presentation mode Esc | Find in page Ctrl+F | Select all top-level blocks |
@@ -644,7 +658,8 @@ Each starter template pre-fills the new type's properties.
   completely. Types and collections cannot be restored completely. …"; a row's second line names the kind "Type",
   "Collection", "Saved search" or "Automation" with "N notes" where it takes notes with it, and for a deleted note
   its type and where it was, both as the screen names the type ("Daily note · Daily notes/2026-11-11.md", "Note ·
-  Notes/Plan.md"; the path as it is on disk is the line's tooltip). "Delete permanently?" asks about "1 note",
+  Notes/Plan.md", "Recipe · Recipes/Lentil soup.md": (M32 fix pass) the type's name, not its id; a type that no
+  longer exists shows as the entry holds it; the path as it is on disk is the line's tooltip). "Delete permanently?" asks about "1 note",
   "this type and its 3 notes" or "this saved search".
 - **Explore** as a side panel: tabs "Explore" with two cards (AI Chat, Search), "Relevant Content"
   (objects related to the page you are on) with "Find More". Toggled with Ctrl+Shift+Right; the tooltip reads
@@ -653,8 +668,12 @@ Each starter template pre-fills the new type's properties.
   Tab") shows the tabs "Explore" (first) and "Relevant Content". Explore: the cards "AI Chat" (hidden with "Hide AI
   features") and "Search" (the Search page, in the entry), then Graph View and Backlinks as small buttons (Object's
   own: kept so neither is lost). Relevant Content: up to 20 objects related to the main view's object (the same
-  list as the AI chat's), and "Find More" (the search palette); "Open a page to see content related to it." when the
-  main view shows no object.
+  list as the AI chat's), and "Find More" (the search palette); "Open a note to see content related to it." when the
+  main view shows no object. (M32 fix pass, wording only; nothing in the AI area moved) The AI Chat panel says
+  "notes" where it said "pages": "Ask about your notes…", "Ask a question about the notes in the context, or about
+  anything in your space.", "Add a note to the context", "Find a note", "Append to note", and its first-use notice
+  "AI Chat sends the notes in its context, … Notes tagged "Exclude from AI" are never sent." (a remote agent's
+  notice likewise).
 - **Help & Resources** (sidebar): First Steps, Ask a Question, Documentation, What's New, Feedback. Object's own
   section is local only: Keyboard shortcuts, Getting started, Markdown reference and **How-to guides** (Gene's
   decision D1). How-to guides opens a read-only list (People, Meetings, Projects, Books — one per basic-setup type —

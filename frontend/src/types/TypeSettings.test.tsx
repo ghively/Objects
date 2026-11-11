@@ -65,13 +65,21 @@ describe('TypeSettings', () => {
     }
     const config = screen.getByRole('region', { name: 'Configuration' })
     expect(within(config).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'Page',
+      'Layout',
       'Card view and linking',
     ])
-    for (const l of ['Page layout', 'Font', 'Wide layout', 'Cover image mode', 'Display of cover image']) {
+    for (const l of ['Font', 'Wide layout', 'Cover image mode', 'Display of cover image']) {
       expect(within(config).getAllByText(l).length).toBeGreaterThan(0)
     }
-    expect(within(within(config).getByRole('region', { name: 'Page' })).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
+    // M32 fix pass (W16): the group was "Page" over a first row "Page layout". It is one "Layout"
+    // heading now, with the layout cards under their explanation, and it says "notes".
+    const layout = within(config).getByRole('region', { name: 'Layout' })
+    expect(within(layout).getAllByText('Layout')).toHaveLength(1)
+    expect(within(config).queryByText('Page layout')).toBeNull()
+    expect(within(layout).getByText('How notes of this type are laid out.')).toBeInTheDocument()
+    expect(within(layout).getByRole('radiogroup', { name: 'Layout' })).toBeInTheDocument()
+    expect(within(layout).getByText('The typeface that notes of this type use.')).toBeInTheDocument()
+    expect(within(layout).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual([
       'Standard',
       'Index card',
       'Profile',
@@ -81,7 +89,7 @@ describe('TypeSettings', () => {
       'A plain, all-purpose layout.',
     )
     expect(
-      within(config).getByText("Settings for how this type's notes appear and act on pages, on cards and in the calendar."),
+      within(config).getByText("Settings for how this type's notes are laid out and how they appear on cards and in the calendar."),
     ).toBeInTheDocument()
     expect(within(config).getByRole('option', { name: 'Sans Serif' })).toBeInTheDocument()
     // No Calendar settings group (M13's Calendar layout is only an option of the default list view).

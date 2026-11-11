@@ -75,14 +75,14 @@ export const EDITOR_TEXT = {
     'Whether each section is expanded or collapsed when a note opens. Each note can still override it.',
   sections: {
     backlinks: 'Backlinks',
-    relatedContent: 'Related Content',
+    relatedContent: 'Related',
     unlinkedMentions: 'Unlinked Mentions',
   },
   tri: { open: 'Open', closed: 'Closed', hidden: 'Hidden' },
   backlinkContentView: 'Backlink content view',
   backlinkContentViewDescription: 'How backlink content shows at first. With nothing picked, it is embedded.',
   hiddenTypes: 'Types without related content',
-  hiddenTypesDescription: 'Notes of the types picked here leave out the related content section.',
+  hiddenTypesDescription: 'Notes of the types picked here leave out the Related section.',
   clearAll: 'Clear all',
   // M8
   nestedBacklinks: 'How nested backlinks show at first',
@@ -105,7 +105,7 @@ export const EDITOR_TEXT = {
     'Linking to a note always makes an inline link, even at the start of an empty block.',
   hideType: 'Keep type settings inside Settings only',
   hideTypeDescription:
-    'Removes the controls for editing properties and type settings from pages. Settings is still where you change them.',
+    'Removes the controls for editing properties and type settings from notes. Settings is still where you change them.',
   highlightStyle: 'Highlight Style',
   highlightStyleDescription:
     'How highlight blocks and their notes look: with a colored rail and a separate notes area, or as plain text.',

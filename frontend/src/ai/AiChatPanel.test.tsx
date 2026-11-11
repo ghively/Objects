@@ -211,7 +211,7 @@ describe('AiChatPanel', () => {
     const { user } = setup()
     const note = await screen.findByRole('note')
     expect(note).toHaveTextContent(
-      'AI Chat sends the pages in its context, and anything it reads with Object\'s search tools, to Anthropic through your Claude Code. Pages tagged "Exclude from AI" are never sent.',
+      'AI Chat sends the notes in its context, and anything it reads with Object\'s search tools, to Anthropic through your Claude Code. Notes tagged "Exclude from AI" are never sent.',
     )
     await waitFor(() => expect(mocked.aiStatus).toHaveBeenCalled())
     expect(mocked.aiChat).not.toHaveBeenCalled()
@@ -1173,7 +1173,7 @@ describe('AiChatPanel', () => {
     await user.type(input(), 'Plan it{Enter}')
     const dialog = await notice()
     expect(dialog).toHaveTextContent(
-      'Fake Planner is a remote agent. The context pages you send go to 127.0.0.1, outside this computer. Pages excluded from AI are never sent.',
+      'Fake Planner is a remote agent. The context notes you send go to 127.0.0.1, outside this computer. Notes excluded from AI are never sent.',
     )
     expect(mocked.aiChat).not.toHaveBeenCalled()
     await user.click(within(dialog).getByRole('button', { name: R.noticeSend }))

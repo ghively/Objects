@@ -72,7 +72,7 @@ describe('ShortcutsSheet', () => {
     act(() => useSettingsModal.getState().openShortcuts())
     const sheet = await screen.findByRole('dialog', { name: 'Shortcuts' })
     const headings = within(sheet).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    expect(headings.slice(0, 7)).toEqual(['General', 'Text editing', 'Block editing', 'Page', 'Navigation', 'Calendar', 'AI Assistant'])
+    expect(headings.slice(0, 7)).toEqual(['General', 'Text editing', 'Block editing', 'Note', 'Navigation', 'Calendar', 'AI Assistant'])
     expect(headings.slice(7)).toContain('Whiteboard')
     expect(CATEGORY_ORDER).toEqual(['global', 'text', 'markdown', 'block', 'page', 'navigation', 'calendar', 'ai', 'table', 'date', 'pdf', 'weblink'])
   })
