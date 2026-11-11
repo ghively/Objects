@@ -344,6 +344,8 @@ Each starter template pre-fills the new type's properties.
     colored chips each with a checkbox (multi-select). Two tag objects with the same title are different
     objects with their own colors.
   - Text, number, checkbox, label: not specified yet.
+  - Label, a new status (M32): "Create" in an empty status section makes "New status" and opens "Edit label"
+    with that name selected, so typing replaces it.
 - **Property name** (a property label's menu, and "Name" in Property settings): Enter or leaving the field commits
   the new name; Escape goes back only to the last committed name, so Enter then Escape keeps the new one (Escape
   in Property settings closes the dialog).
