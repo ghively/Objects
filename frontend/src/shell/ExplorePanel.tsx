@@ -34,11 +34,11 @@ export const EXPLORE_TEXT = {
   /** our strings */
   description: 'Chat with AI, open relevant content or view the graph view to expand the context of your work.',
   aiChatHelp: AI_CHAT_TEXT.exploreCardHelp,
-  searchHelp: 'Find objects by title and text.',
+  searchHelp: 'Find notes by title and text.',
   more: 'More',
   graph: 'Graph View',
   backlinks: REFERENCES_TEXT.backlinksPanelTitle,
-  backlinksTooltip: 'Backlinks & Mentions\n\nShows the backlinks and mentions of the object in the main window.',
+  backlinksTooltip: 'Backlinks & Mentions\n\nShows the backlinks and mentions of the note in the main window.',
   relevantNone: AI_CHAT_TEXT.relevantNone,
   relevantEmpty: AI_CHAT_TEXT.relevantEmpty,
 } as const

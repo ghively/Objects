@@ -540,7 +540,7 @@ export const M8_SHORTCUTS: ShortcutDef[] = [
   // Ctrl+Alt+L on Windows, ⌃⌘L on macOS.
   def('copyBlockReference', 'block', 'Copy block reference', ['Mod-AltCtrl-l'], 'editor', V, true),
   // `I` with blocks selected (typing `i` in text stays typing).
-  def('turnIntoObject', 'block', 'Turn into object', ['i'], 'editor', V, true),
+  def('turnIntoObject', 'block', 'Turn into a note', ['i'], 'editor', V, true),
   // No key: its only trigger is the markdown `()` + Space.
   def('turnIntoTask', 'block', 'Turn into task', [], 'editor', V, true),
   def('turnBlockIntoTaskObject', 'block', 'Make this block a task', ['Mod-Shift-t'], 'editor', V, true),
@@ -605,15 +605,15 @@ export const POLISH_SHORTCUTS: ShortcutDef[] = [
 ]
 
 /**
- * The object `…` menu's page keys (ids, names and keys from the shortcut
- * table). Handled by `object/ObjectView.tsx` for the active view, outside editable targets for
+ * The note `…` menu's page keys (ids and keys from the shortcut table; M32: "Favorite" reads "Pin",
+ * as the sidebar's "Pinned"). Handled by `object/ObjectView.tsx` for the active view, outside editable targets for
  * Mod-e and Mod-i (in the editor they stay code and italic).
  */
 export const OBJECT_MENU_SHORTCUTS: ShortcutDef[] = [
   def('openExportMenu', 'page', 'Export this page', ['Mod-e'], 'global', V, false),
   // "Import": on a type page Ctrl+I opens the type's CSV import, not a page's.
   def('openImportMenu', 'page', 'Import', ['Mod-i'], 'global', V, false),
-  def('toggleFavorite', 'page', 'Favorite or unfavorite this page', ['Mod-Shift-*'], 'global', V, false),
+  def('toggleFavorite', 'page', 'Pin or unpin this page', ['Mod-Shift-*'], 'global', V, false),
 ]
 
 /**

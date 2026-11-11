@@ -198,7 +198,7 @@ Tick or untick the to-do in this block Ctrl+Enter | Open or close all toggles on
 Code block: leave downwards or upwards (Ctrl+Shift+Down/Up) | Math block likewise | Merge text blocks
 Ctrl+Shift+G.
 
-**Page**: Favorite or unfavorite this page Ctrl+Shift+* | Import, Export this page (Ctrl+E), Share menu Ctrl+S (not in Object) |
+**Page**: Pin or unpin this page Ctrl+Shift+* (M32: was "Favorite or unfavorite this page") | Import, Export this page (Ctrl+E), Share menu Ctrl+S (not in Object) |
 Start presentation mode Ctrl+Alt+P; back one slide / next presentation slide; exit presentation mode Esc | Find in page Ctrl+F | Select all top-level blocks |
 Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down) | Scroll to top Home, bottom End,
 page up/down.
@@ -629,8 +629,11 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
 - **Month view**: header "Nov 2026" at the left, the view switcher (Month, Week, Three days, Day) centered,
   "< Today >" at the right; below, a strip Jan to Dec with the current month highlighted; then one card per
   existing daily note of that month (type label, title, Reviewed checkbox, Tags row, then the note's content:
-  to-dos, bullets, code/time rows), and a "+ New object" row. An empty month shows a short
-  empty-state line saying the month has no daily notes yet. Clicking a month in the strip jumps there; the tab
+  to-dos, bullets, code/time rows), and a "+ New daily note" row (M32: was "+ New object"; it makes the month's
+  daily note). An empty month shows a short empty-state line saying the month has no daily notes yet, with
+  "Create a note to see it here." (M32). The Day view's dated section reads "Notes with this date" and the
+  quick-create row's tooltips "Makes a note dated this day…" / "Show buttons that create notes on this day."
+  (M32; chips name types as the screen does). Clicking a month in the strip jumps there; the tab
   title becomes the month's first day.
 - **Week view**: a single column of days. Each day: the weekday name colored by weekday (Sunday red, Monday amber
   with a red "Today" pill, Tuesday pink, Wednesday green, Thursday orange, Friday blue), the date as a large

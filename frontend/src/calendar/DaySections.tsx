@@ -41,13 +41,14 @@ export const SECTIONS_TEXT = {
   all: 'All',
   dailyNote: 'Daily note',
   tasks: 'Tasks',
-  /** Our short tab label for "Objects with this date". */
+  /** Our short tab label for "Notes with this date". */
   datesTab: 'Dates',
-  dated: 'Objects with this date',
+  /** M32: was "Objects with this date". */
+  dated: 'Notes with this date',
   noTasksToday: 'No tasks today',
   noTasksOnDay: 'No tasks on this day',
   /** M3's empty state line. */
-  emptyHint: 'Create an object to see it here.',
+  emptyHint: 'Create a note to see it here.',
   statsToday: (open: number, done: number) => `${open} open, ${done} done`,
   statsFuture: (n: number) => `${n} open`,
   statsPast: (n: number) => `${n} done`,
