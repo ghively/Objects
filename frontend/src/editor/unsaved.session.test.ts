@@ -154,3 +154,35 @@ describe('text the file already holds', () => {
     expect(read).not.toHaveBeenCalled()
   })
 })
+
+// The walk's W1: a title committed as the window closed moves the file after the page is gone.
+describe('a rename sent as the window was going', () => {
+  test('test the next page finds the note by its id under its new path, once', async () => {
+    const first = await import('./unsaved')
+    first.setUnsavedSpace('/spaces/a')
+    first.keepRenaming('Pages/Untitled.md', 'id-1')
+    first.keepRenaming('Pages/Stayed.md', 'id-2') // its rename never landed
+    first.keepRenaming('Pages/Deleted.md', 'id-3')
+    vi.resetModules()
+    const next = await import('./unsaved')
+    const notes = [
+      { id: 'id-1', path: 'Pages/Plans.md' },
+      { id: 'id-2', path: 'Pages/Stayed.md' },
+      { id: 'id-9', path: 'Pages/Other.md' },
+    ]
+    next.setUnsavedSpace('/spaces/b')
+    expect(next.takeRenamedAway(notes)).toEqual([]) // another space's notes are not followed
+    next.setUnsavedSpace('/spaces/a')
+    expect(next.takeRenamedAway(notes)).toEqual([['Pages/Untitled.md', 'Pages/Plans.md']])
+    expect(next.takeRenamedAway(notes)).toEqual([])
+    expect(localStorage.length).toBe(0)
+  })
+
+  test('test a page that lived to read the answer leaves nothing to follow', async () => {
+    const m = await import('./unsaved')
+    m.setUnsavedSpace('/spaces/a')
+    m.keepRenaming('Pages/Untitled.md', 'id-1')
+    m.dropRenaming('Pages/Untitled.md')
+    expect(m.takeRenamedAway([{ id: 'id-1', path: 'Pages/Plans.md' }])).toEqual([])
+  })
+})

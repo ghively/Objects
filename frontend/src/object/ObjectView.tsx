@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Editor } from '@/editor/Editor'
 import { RecoveryDialog } from '@/editor/RecoveryDialog'
-import { dropUnsaved, keepUnsaved, keptUnsaved } from '@/editor/unsaved'
+import { dropRenaming, dropUnsaved, keepRenaming, keepUnsaved, keptUnsaved } from '@/editor/unsaved'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { FindBar } from '@/find/FindBar'
 import { useFind } from '@/find/useFind'
@@ -80,10 +80,11 @@ import {
   focusBodyEnd,
   focusedBodyCaret,
 } from './bodyCaret'
-import { claimHandover, dropHandover, handOver, peekHandover } from './renameHandover'
+import { claimHandover, dropHandover, focusedTitle, handOver, peekHandover } from './renameHandover'
 import { retitledBody } from './titleHeading'
 import { typeHasOwnProperties } from './ownProperties'
 import { PropertyPanel } from './PropertyPanel'
+import { clearTitleSaveState, setTitleSaveState } from '@/editor/saveStateStore'
 import { SaveMark } from './SaveMark'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
@@ -222,6 +223,8 @@ export const OBJECT_VIEW_TEXT = {
   fileGone: `This ${NOTE_LOWER}'s file was deleted or moved on disk. Edits here aren't saved.`,
   readOnly: (reason: string) => `This ${NOTE_LOWER} opens read-only: ${reason}. Fix the file to edit it.`,
   readOnlyFrontmatter: `This ${NOTE_LOWER}'s frontmatter couldn't be read, so it opens read-only. Fix the file to edit it.`,
+  /** M32 (W1): a typed title the server refused, when it gave no reason of its own. */
+  titleNotSaved: 'The title could not be saved.',
 } as const
 
 /** Write `text` to the clipboard, then toast `done`. */
@@ -450,6 +453,8 @@ export function ObjectView({
       caret: focusedBodyCaret(viewRootRef.current),
       unsaved: shown !== null && shown !== onDisk ? shown : null,
       slot: viewRootRef.current?.parentElement ?? null,
+      // W1: a title is committed while the person is still in its field: the field goes over too.
+      title: focusedTitle(viewRootRef.current),
     })
     // This editor is leaving: what it holds is handed over, and it must not write to the old path.
     if (then !== null && then !== before) h.reload(then, res.version)
@@ -666,6 +671,9 @@ export function ObjectView({
       if (typeHas(typeIdRef.current, (k) => COMPUTED_KINDS.has(k))) refreshComputed()
     },
     onWorkError: (err: unknown) => showToast(err instanceof Error ? err.message : String(err)),
+    // W1: a title is now also committed without the person asking (after a pause), so a refusal
+    // is said on screen, once (the header does not send that title again by itself).
+    onRenameRefused: (err: unknown) => showToast(err instanceof Error && err.message ? err.message : OBJECT_VIEW_TEXT.titleNotSaved),
     onRenamed: (res: RenameResult, oldPath: string, title: string) => {
       // The note as it was before the rename (its old title decides whether the text changed).
       const was = detailRef.current
@@ -683,6 +691,11 @@ export function ObjectView({
       if (res.path !== oldPath) {
         handOverTo(res, title, was)
         renamedToRef.current = res.path
+        // The view on the new path takes over: this one's title is done here (it commits nothing
+        // when it unmounts), and the save mark there starts from a save that was running.
+        replacedRef.current = true
+        clearTitleSaveState(oldPath)
+        setTitleSaveState(res.path, 'saving')
         useTabs.getState().retarget(oldPath, res.path)
       } else if (was) {
         // The file kept its name, so this view and its editor stay. When the rename rewrote the
@@ -694,6 +707,93 @@ export function ObjectView({
       }
     },
   })
+
+  // W1 (the M32 walk): the title is kept like the text. The header commits a typed title after a
+  // pause and on blur; this view commits it when the note is left (the window going, the view
+  // closing), and says where it stands for the save mark. A rename is one write in this note's
+  // queue: the text is flushed first, and the handover carries what is typed meanwhile.
+  /** The title typed and not yet committed (the header reports it), or null. */
+  const pendingTitleRef = useRef<string | null>(null)
+  /** The title being renamed to right now, and its answer. */
+  const titleFlightRef = useRef<{ title: string; done: Promise<boolean> } | null>(null)
+  /** The title the server last refused: not sent again when the note is left. */
+  const refusedTitleRef = useRef<string | null>(null)
+  /** Our own rename moved the file: the view on the new path has taken this one's place. */
+  const replacedRef = useRef(false)
+  const publishTitle = useCallback(() => {
+    if (replacedRef.current || mode === 'inline') return
+    const waiting = pendingTitleRef.current
+    setTitleSaveState(
+      path,
+      titleFlightRef.current ? 'saving' : waiting === null ? 'saved' : waiting === refusedTitleRef.current ? 'error' : 'unsaved',
+    )
+  }, [path, mode])
+  const renameTo = writes.rename
+  const commitTitle = useCallback(
+    (title: string): Promise<boolean> => {
+      const flight = titleFlightRef.current
+      if (flight?.title === title) return flight.done
+      const done = renameTo(title).then((res) => {
+        if (titleFlightRef.current?.done === done) titleFlightRef.current = null
+        // Answered while the page lives: its tabs have followed the file (`keepRenaming`).
+        dropRenaming(path)
+        refusedTitleRef.current = res === null ? title : null
+        publishTitle()
+        return res !== null
+      })
+      titleFlightRef.current = { title, done }
+      publishTitle()
+      return done
+    },
+    [renameTo, publishTitle],
+  )
+  const onTitleDraft = useCallback(
+    (title: string | null) => {
+      pendingTitleRef.current = title
+      publishTitle()
+    },
+    [publishTitle],
+  )
+  /**
+   * The note is being left: commit the title that waits (not one just refused: it would be
+   * again). `going`: the window may be gone before the answer says where the file moved to, so
+   * the note's id is left for the next page to find it by (`keepRenaming`).
+   */
+  const commitWaitingTitle = useCallback(
+    (going = false) => {
+      const title = pendingTitleRef.current
+      if (title === null || title === refusedTitleRef.current || replacedRef.current) return
+      const id = detailRef.current?.summary.id
+      if (going && id) keepRenaming(path, id)
+      void commitTitle(title)
+    },
+    [commitTitle, path],
+  )
+  useEffect(() => {
+    // The window is going, or hidden: commit now. With nothing of the text to save first, the
+    // request leaves while the event is handled (a keepalive request, as the text's).
+    const onGoing = () => commitWaitingTitle(true)
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') commitWaitingTitle(true)
+    }
+    window.addEventListener('pagehide', onGoing)
+    document.addEventListener('visibilitychange', onHidden)
+    return () => {
+      window.removeEventListener('pagehide', onGoing)
+      document.removeEventListener('visibilitychange', onHidden)
+    }
+  }, [commitWaitingTitle])
+  // The view closes (a tab or note switch, the peek closed) with a title typed: commit it. In the
+  // layout phase, while the editor's handle is still there, so the text is flushed before the rename.
+  const commitWaitingTitleRef = useRef(commitWaitingTitle)
+  commitWaitingTitleRef.current = commitWaitingTitle
+  useLayoutEffect(
+    () => () => {
+      commitWaitingTitleRef.current()
+      if (!replacedRef.current) clearTitleSaveState(path)
+    },
+    [path],
+  )
 
   /** The conflict is resolved: property writes queued behind it are sent on the new version. */
   const replay = writes.replay
@@ -1525,6 +1625,9 @@ export function ObjectView({
     // goes once every view of this update has had its turn.
     const claim = handed ? claimHandover(path, viewRootRef.current?.parentElement ?? null) : null
     if (handed) setTimeout(() => dropHandover(path), 0)
+    // The rename that brought this view here has answered: the title is saved, unless the field
+    // was handed over with more typed in it (the header has reported that by now).
+    if (handed) publishTitle()
     const h = editorRef.current
     const text = claim?.unsaved
     if (h && text != null) {
@@ -1554,7 +1657,7 @@ export function ObjectView({
     }
     const at = claim?.caret ?? takeBodyFocus(path)
     if (at) focusBody(viewRootRef.current, at)
-  }, [mode, hasDetail, path, handed, adoptVersion])
+  }, [mode, hasDetail, path, handed, adoptVersion, publishTitle])
 
   /** M32, item 2: Enter, ArrowDown or Tab in the title: the caret goes to the start of the body. */
   const enterBody = useCallback(() => focusBody(viewRootRef.current, 'start'), [])
@@ -1773,7 +1876,8 @@ export function ObjectView({
               summary={summary}
               type={type}
               readOnly={propsReadOnly}
-              onRename={(title) => void writes.rename(title)}
+              onRename={commitTitle}
+              onDraft={onTitleDraft}
               onPropertiesChange={writeProperties}
               onOpenTag={onOpenTag}
               onEnterBody={enterBody}

@@ -146,6 +146,9 @@ describe('api client v2 writes', () => {
       baseVersion: 'v1',
       clientId: CLIENT_ID,
     })
+    // M32 (W1): a title typed just before the window closes is committed on `pagehide`, so the
+    // request must be one the browser finishes after the page is gone.
+    expect((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].keepalive).toBe(true)
     expect(seen).toEqual([
       {
         kind: 'renamed',

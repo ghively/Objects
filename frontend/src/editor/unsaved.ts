@@ -174,13 +174,69 @@ export async function forgetSaved(readNote: (path: string) => Promise<{ body: st
   }
 }
 
+// ---- a rename sent while the window was going (M32, the walk's W1) ----
+//
+// A title typed just before the window closes is committed on `pagehide`. The rename moves the
+// file, and the page is gone before the answer says where to: its tabs still name the old path.
+// So the note's id is left here with the path it had, and the next page looks the note up by its
+// id and moves the tabs along (`takeRenamedAway`). A page that lives to read the answer clears it.
+const RENAMING = 'object.renaming:'
+
+/** A rename of the note `id` at `path` was sent as the window was going. */
+export function keepRenaming(path: string, id: string): void {
+  if (space === null) return
+  try {
+    localStorage.setItem(`${RENAMING}${space}\n${path}`, id)
+  } catch {
+    // blocked: the next page shows the old path as gone, as before
+  }
+}
+
+/** The rename of the note at `path` was answered here (its tabs have followed), or was not sent. */
+export function dropRenaming(path: string): void {
+  if (space === null) return
+  try {
+    localStorage.removeItem(`${RENAMING}${space}\n${path}`)
+  } catch {
+    // nothing to remove
+  }
+}
+
+/**
+ * The notes of the open space that were renamed as an earlier window went: `[oldPath, path]` for
+ * each one `notes` (the space's notes, with their ids) now lists under another path. Every record
+ * is used up, also one whose rename never landed.
+ */
+export function takeRenamedAway(notes: readonly { id?: string | null; path: string }[]): [string, string][] {
+  const out: [string, string][] = []
+  if (space === null) return out
+  const prefix = `${RENAMING}${space}\n`
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k?.startsWith(prefix)) keys.push(k)
+    }
+    for (const k of keys) {
+      const oldPath = k.slice(prefix.length)
+      const id = localStorage.getItem(k)
+      localStorage.removeItem(k)
+      const now = id ? notes.find((n) => n.id === id) : undefined
+      if (now && now.path !== oldPath) out.push([oldPath, now.path])
+    }
+  } catch {
+    // unreadable: nothing to follow
+  }
+  return out
+}
+
 /** Tests: forget everything. */
 export function resetUnsaved(): void {
   unstored.clear()
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i)
-      if (k?.startsWith(KEY)) localStorage.removeItem(k)
+      if (k?.startsWith(KEY) || k?.startsWith(RENAMING)) localStorage.removeItem(k)
     }
   } catch {
     // unreadable storage holds nothing

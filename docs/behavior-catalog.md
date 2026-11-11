@@ -484,8 +484,16 @@ Each starter template pre-fills the new type's properties.
   first), and the typed title is committed as the caret leaves; ArrowUp, or Shift+Tab, with the caret at the
   body's very first position goes back to the end of the title (Shift+Tab in a list item or an indented block
   still unindents). Words typed in the body while the rename runs are kept: they are saved under the note's new
-  file name and the caret stays where it was. A note opened with a request for its body (Today's note: the end of
-  its text) takes the caret there once its editor is ready. Renaming an object (its title, a
+  file name and the caret stays where it was. A typed title is kept like the text (M32): it is committed 2 s
+  after the last key in the title (no Enter needed; not on every key, since a commit renames the file), and at
+  once when the window is hidden or closing and when the note is left (a tab or note switch, the peek closed).
+  A timed commit leaves the field alone: the focus, the caret and the selection stay, keys typed while the
+  rename runs stay in the field and are committed after the next pause, and the save mark says "Saving…", then
+  "Saved". An emptied title is not committed (it reverts on leaving the field, as before); a title the server
+  refuses is said once in a notice, stays in the field, and is not sent again until it changes. A note whose
+  text opens with `# Old title` keeps that heading in step with the title through a rename (the editor shows the
+  new heading at once, and its next save keeps it). A note opened with a request for its body (Today's note:
+  the end of its text) takes the caret there once its editor is ready. Renaming an object (its title, a
   table's title cell, a whiteboard's name) rewrites the links to it in other objects and then says so with a short
   notice, "Updated links in 3 notes" ("1 note"; M32: was "objects"); nothing is shown when no other object linked
   to it.

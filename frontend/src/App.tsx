@@ -12,8 +12,8 @@ import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage } from '@/queries/QueryPage'
 import { LinkPicker } from '@/links/LinkPicker'
-import { invalidateLinkIndex, refreshLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { forgetSaved, moveUnsaved, setUnsavedSpace } from '@/editor/unsaved'
+import { ensureLinkIndex, invalidateLinkIndex, refreshLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { forgetSaved, moveUnsaved, setUnsavedSpace, takeRenamedAway } from '@/editor/unsaved'
 import { setLastTypeSpace } from '@/create/lastType'
 import { setRecentSpace } from '@/nav/recent'
 import { isSidepanelShown } from '@/nav/sidepanel'
@@ -234,6 +234,16 @@ export default function App() {
         })
         await Promise.all([setTabsSpace(s.root), setRecentSpace(s.root), setLastTypeSpace(s.root), settingsReady])
         if (!live) return
+        // A title committed as the last window closed moved its note's file after that page was
+        // gone: the tabs it left still name the old path. They follow the note, found by its id.
+        void ensureLinkIndex()
+          .then(() => {
+            for (const [oldPath, path] of takeRenamedAway(useLinkIndex.getState().objects)) {
+              useTabs.getState().retarget(oldPath, path)
+              moveUnsaved(oldPath, path)
+            }
+          })
+          .catch(() => undefined)
         // "When this space opens" (per space, on this device).
         applyOpenOnStart(useSettings.getState().settings.openOnStart?.[s.root])
         // "Show the sidebar when Object opens" (Appearance); off starts with it collapsed.

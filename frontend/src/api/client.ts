@@ -716,7 +716,12 @@ export const api = {
 
   /** Retitle an object: renames its file and relinks every `[[link]]` to it. */
   async renameObject(path: string, title: string, baseVersion: string): Promise<RenameResult> {
-    const res = await request<RenameResult>('/object/rename', json('POST', { path, title, baseVersion, clientId: CLIENT_ID }))
+    // M32 (W1): a keepalive request, as a body save's: a title typed just before the window
+    // closes is committed on `pagehide`, and the browser finishes the request after the page.
+    const res = await request<RenameResult>('/object/rename', {
+      ...json('POST', { path, title, baseVersion, clientId: CLIENT_ID }),
+      keepalive: true,
+    })
     emitLocal([movedOrChanged(path, res.path, res.version), ...(res.relinked ?? []).map((p) => changed(p))])
     return res
   },

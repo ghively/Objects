@@ -4,7 +4,7 @@
  * and "Add aliases" for whichever is empty. Every edit writes through `onPropertiesChange` (the
  * view's serialized `updateProperties`); the title commits through `onRename`.
  */
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { api } from '@/api/client'
 import type { Icon as IconValue, ObjectSummary, PropertyDef, TypeDef } from '@/api/types'
 import { ColorPicker } from '@/components/ColorPicker'
@@ -21,6 +21,19 @@ import { TagsCell } from '@/properties/cells/TagsCell'
 import { TagPicker } from '@/properties/TagPicker'
 import { chipStyle, lineColor } from '@/theme/palette'
 import { decodeIcon } from './PropertyPanel'
+import { claimTitle, peekTitleDraft } from './renameHandover'
+
+/**
+ * M32 (the walk's W1): how long after the last key in the title its text is committed. Not on
+ * every key and with no cap while typing goes on: a commit renames the file, so one per pause.
+ */
+export const TITLE_COMMIT_MS = 2000
+
+/** The title `draft` would commit: trimmed, not empty and not the title the note has; else null. */
+function titleToCommit(draft: string, saved: string): string | null {
+  const t = draft.trim()
+  return t && t !== saved ? t : null
+}
 
 /** An object's icon: an Iconify id (`ph-…`, `vscode-icons-…`) renders as an icon; anything else (emoji) as text. */
 export function ObjectIcon({ icon, size }: { icon: IconValue | string | null; size: number }) {
@@ -64,8 +77,16 @@ export interface ObjectHeaderProps {
   summary: ObjectSummary
   type?: TypeDef
   readOnly?: boolean
-  /** Commit a new title (trimmed, changed, not empty). */
-  onRename?(title: string): void
+  /**
+   * Commit a new title (trimmed, changed, not empty). A promise that resolves false says the
+   * title was refused: it is not sent again by the timer until the text changes.
+   */
+  onRename?(title: string): void | Promise<boolean>
+  /**
+   * M32 (W1): the title typed and not yet committed (as `onRename` would get it), or null. The
+   * view commits it when the note is left (the window going, the view closing).
+   */
+  onDraft?(title: string | null): void
   /** Write frontmatter properties (API values). */
   onPropertiesChange?(updates: Record<string, unknown>): void
   /** Open a tag's page; default: `openTag`. */
@@ -104,24 +125,92 @@ function PickerPopover({ trigger, children }: { trigger: ReactNode; children: (c
   )
 }
 
-export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesChange, onOpenTag, onEnterBody }: ObjectHeaderProps) {
+export function ObjectHeader({ summary, type, readOnly, onRename, onDraft, onPropertiesChange, onOpenTag, onEnterBody }: ObjectHeaderProps) {
   const color = type?.color ?? 'gray'
   const editable = !readOnly && !!onPropertiesChange
   const titleEditable = !readOnly && !!onRename && !isDailyNoteType(type, summary.type)
   const icon = decodeIcon(summary.icon, summary.iconColor)
   const tagObject = isTagType(type, summary.type)
 
-  const [draft, setDraft] = useState(summary.title)
+  // After a rename that moved the file while the person was still in the title, the field shows
+  // its own text from the first render (`renameHandover.ts`), not the title the server answered.
+  const [draft, setDraft] = useState(() => peekTitleDraft(summary.path) ?? summary.title)
   const focusedRef = useRef(false)
   const titleRef = useRef<HTMLInputElement | null>(null)
+  /** An IME composition is running in the title: its text is not final. */
+  const [composing, setComposing] = useState(false)
+  /** The title sent and not yet answered: the same text is not sent twice. */
+  const sentRef = useRef<string | null>(null)
+  /** The title the server last refused: the timer leaves it alone until the text changes. */
+  const [refused, setRefused] = useState<string | null>(null)
+  const aliveRef = useRef(true)
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+    }
+  }, [])
   /** The `#query` being typed in the title: where the `#` is, and the text after it. */
   const [hash, setHash] = useState<{ start: number; end: number; query: string } | null>(null)
   const [addingDescription, setAddingDescription] = useState(false)
   const [addingAliases, setAddingAliases] = useState(false)
 
   useEffect(() => {
+    sentRef.current = null
     if (!focusedRef.current && hash === null) setDraft(summary.title)
   }, [summary.title, hash])
+
+  const onRenameRef = useRef(onRename)
+  onRenameRef.current = onRename
+  /** Send `t` as the new title, once: the same text is not sent again while it is on its way. */
+  const send = (t: string) => {
+    if (sentRef.current === t) return
+    sentRef.current = t
+    const answer = onRenameRef.current?.(t)
+    if (!answer) return
+    void answer.then((ok) => {
+      if (sentRef.current === t) sentRef.current = null
+      if (!ok && aliveRef.current) setRefused(t)
+    })
+  }
+  const sendRef = useRef(send)
+  sendRef.current = send
+
+  // M32 (W1): the title is kept like the text. A typed title that differs from the note's is
+  // committed 2 s after the last key; the field is not touched (its text, the focus and the
+  // selection stay; keys typed while the rename runs stay too, and the next pause commits them).
+  // An emptied title waits (the person may be retyping), as does a `#tag` being picked, an IME
+  // composition, and a title the server just refused.
+  const waiting = titleEditable ? titleToCommit(draft, summary.title) : null
+  const onDraftRef = useRef(onDraft)
+  onDraftRef.current = onDraft
+  useEffect(() => {
+    onDraftRef.current?.(waiting)
+  }, [waiting])
+  useEffect(() => {
+    if (waiting === null || hash !== null || composing || waiting === refused) return
+    const timer = setTimeout(() => sendRef.current(waiting), TITLE_COMMIT_MS)
+    return () => clearTimeout(timer)
+    // `draft`: every key starts the wait again, also one that leaves the trimmed title as it was.
+  }, [waiting, draft, hash, composing, refused])
+
+  // The view our own rename replaced left the title field for this one: the focus and the
+  // selection are put back before the first paint, so no key lands anywhere else. A view of the
+  // same note in another place does not take them, and shows the note's title.
+  const handedDraftRef = useRef(draft !== summary.title)
+  useLayoutEffect(() => {
+    const el = titleRef.current
+    const field = el ? claimTitle(summary.path, el.closest('[data-object-view]')?.parentElement ?? null) : null
+    if (field && el && titleEditable) {
+      focusedRef.current = true
+      el.focus({ preventScroll: true })
+      if (field.start !== null && field.end !== null) el.setSelectionRange(field.start, field.end, field.direction ?? undefined)
+    } else if (handedDraftRef.current) {
+      setDraft(summary.title)
+    }
+    // Once, at mount: a handover is for the view that takes the leaving one's place.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // A freshly created object ("+ New" and friends) starts with its title focused and selected, so
   // typing names it at once (acceptance M2#3). The mark is taken once, by the first header to show it.
@@ -151,7 +240,7 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesCh
       return
     }
     setDraft(t)
-    onRename?.(t)
+    send(t)
   }
 
   const onTitleChange = (value: string, caret: number | null) => {
@@ -302,6 +391,8 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesCh
               readOnly={!titleEditable}
               onFocus={() => (focusedRef.current = true)}
               onChange={(e) => onTitleChange(e.target.value, e.target.selectionStart)}
+              onCompositionStart={() => setComposing(true)}
+              onCompositionEnd={() => setComposing(false)}
               onKeyDown={(e) => {
                 // Keys that confirm or cancel an IME composition belong to the IME.
                 if (e.nativeEvent.isComposing || e.keyCode === 229) return
