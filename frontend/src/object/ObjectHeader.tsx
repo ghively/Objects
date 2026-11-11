@@ -98,6 +98,8 @@ export interface ObjectHeaderProps {
   onEnterBody?(): boolean
   /** Shown after the type chip, on its row (the note page's count of backlinks and mentions). */
   beside?: ReactNode
+  /** Shown before the title, on its row (a task's tick). */
+  beforeTitle?: ReactNode
 }
 
 /** A hover action. Used as a popover trigger (`asChild`), so it passes the trigger's ref and props on. */
@@ -127,7 +129,18 @@ function PickerPopover({ trigger, children }: { trigger: ReactNode; children: (c
   )
 }
 
-export function ObjectHeader({ summary, type, readOnly, onRename, onDraft, onPropertiesChange, onOpenTag, onEnterBody, beside }: ObjectHeaderProps) {
+export function ObjectHeader({
+  summary,
+  type,
+  readOnly,
+  onRename,
+  onDraft,
+  onPropertiesChange,
+  onOpenTag,
+  onEnterBody,
+  beside,
+  beforeTitle,
+}: ObjectHeaderProps) {
   const color = type?.color ?? 'gray'
   const editable = !readOnly && !!onPropertiesChange
   const titleEditable = !readOnly && !!onRename && !isDailyNoteType(type, summary.type)
@@ -337,6 +350,7 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onDraft, onPro
       )}
 
       <div className="mt-3 flex items-center gap-3">
+        {beforeTitle}
         {icon &&
           (editable ? (
             <PickerPopover

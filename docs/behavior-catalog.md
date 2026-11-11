@@ -487,6 +487,11 @@ Each starter template pre-fills the new type's properties.
   the Trash.", "This note opens read-only: …", "This note's file was deleted or moved on disk. Edits here aren't
   saved.", "3 notes will change.", "A template fills in new notes for you."; the reference tabs' tooltips are
   "Links to this note" and "Similar notes".
+- **A task's own page has the tick (M32)**: on the page and the peek of a Task, the circle the task rows have
+  sits beside the title. A click completes the task (the first Done status, `completed` stamped, the same write
+  the rows make) or reopens a done one; Ctrl-click or its caret opens Status; a recurring task moves on and says
+  "Moved to …"; on a Task type with no Done status it offers "Add a Done status", as in the rows. Other types,
+  also ones with a status of their own, have no tick.
 - **Save mark** (M32): in a note's toolbar (page and peek), left of its buttons: "Saving…" while typed text waits
   for its save or a save runs, then a check and "Saved", which fades to the check alone after two seconds. A note
   nobody typed in shows nothing. A failed save keeps the editor's "Changes not saved. Retrying…" and adds nothing.

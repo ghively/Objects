@@ -84,7 +84,7 @@ import {
 import { claimHandover, dropHandover, focusedTitle, handOver, peekHandover } from './renameHandover'
 import { retitledBody } from './titleHeading'
 import { typeHasOwnProperties } from './ownProperties'
-import { PropertyPanel } from './PropertyPanel'
+import { cellValue, PropertyPanel } from './PropertyPanel'
 import { clearTitleSaveState, setTitleSaveState } from '@/editor/saveStateStore'
 import { SaveMark } from './SaveMark'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
@@ -96,6 +96,8 @@ import { useVersionHistory } from '@/history/useVersionHistory'
 import { useMerge } from '@/merge/useMerge'
 import { usePresentation } from '@/present/usePresentation'
 import { CompletionLog } from '@/tasks/CompletionLog'
+import { TaskCheckbox } from '@/tasks/TaskCheckbox'
+import { completionToast, DEFAULT_TASK_API, type TaskApi } from '@/tasks/taskActions'
 import { TaskStatsSection } from '@/tasks/TaskStatsSection'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 import { isWorkType } from '@/types/WorkFieldsSection'
@@ -226,6 +228,8 @@ export const OBJECT_VIEW_TEXT = {
   readOnlyFrontmatter: `This ${NOTE_LOWER}'s frontmatter couldn't be read, so it opens read-only. Fix the file to edit it.`,
   /** M32 (W1): a typed title the server refused, when it gave no reason of its own. */
   titleNotSaved: 'The title could not be saved.',
+  /** M32 (W11): the tick on a task's page could not be written. */
+  taskNotSaved: 'Could not save.',
 } as const
 
 /** Write `text` to the clipboard, then toast `done`. */
@@ -796,6 +800,10 @@ export function ObjectView({
     [path],
   )
 
+  /** The view's writes for callbacks made once (the task tick's). */
+  const writesRef = useRef(writes)
+  writesRef.current = writes
+
   /** The conflict is resolved: property writes queued behind it are sent on the new version. */
   const replay = writes.replay
   const unblock = useCallback(() => {
@@ -1213,6 +1221,47 @@ export function ObjectView({
   const canTemplate = !!type && !isTemplate && templatesAllowed(type)
   const isTag = !!summary && isTagType(type, summary.type)
   const isTask = !!summary && !isTemplate && isTaskRoleType(type, summary.type)
+  // The walk's W11: a task's own page has the circle its rows have, beside the title. The circle
+  // reads the note as a row (its values as the lists hold them), and writes through this view's
+  // own queue: the text is flushed first and the answer's version is the view's, as for any
+  // property edit here (the same `updateProperties` call the rows make). The page shows the note
+  // itself, so there is no row to reload.
+  const taskTickApi = useMemo<TaskApi>(
+    () => ({
+      ...DEFAULT_TASK_API,
+      updateProperties: async (_path, updates) => {
+        const res = await writesRef.current.updateProperties(updates)
+        if (!res) throw new Error(OBJECT_VIEW_TEXT.taskNotSaved)
+        return res
+      },
+      // Skip, Excuse and a catch-up choice write through the task route: on what is on disk now.
+      occurrence: async (p, action, opts) => {
+        await bodyControl.flush()
+        return DEFAULT_TASK_API.occurrence!(p, action, { ...opts, baseVersion: versionRef.current })
+      },
+      rows: async () => [],
+    }),
+    [bodyControl],
+  )
+  const taskTick =
+    isTask && detail && summary && mode !== 'inline' ? (
+      <TaskCheckbox
+        row={{
+          summary,
+          version,
+          values: Object.fromEntries((type?.propertyDefinitions ?? []).map((d) => [d.key, cellValue(d, detail.frontmatter, detail.links, summary)])),
+          links: detail.links ?? {},
+          preview: '',
+        }}
+        type={type}
+        taskApi={taskTickApi}
+        onResult={(outcome) => {
+          const said = completionToast(outcome)
+          if (said) showToast(said)
+        }}
+        className="[&>[role=checkbox]]:size-6"
+      />
+    ) : null
   // M32: with the Work page off for this space a work type's page is a plain note page: no work
   // header, no resolution note, no empty work rows (`PropertyPanel`) and no work fetch. A work
   // value the note already holds still shows (no value is hidden by the Work switch), and only
@@ -1884,6 +1933,7 @@ export function ObjectView({
               onEnterBody={enterBody}
               // W10: what the references section under the text holds, said above the fold.
               beside={<ReferenceCounts path={path} />}
+              beforeTitle={taskTick}
             />
           </>
         }
