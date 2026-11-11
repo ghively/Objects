@@ -287,15 +287,16 @@ Each starter template pre-fills the new type's properties.
 
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
-- A space opened as a new or empty folder (`objectapp --space <folder>`: no `setup` in `space.json`, no basic
-  types, no files) asks "Pick a starting point" once — the same three choices as "Create new space"
-  (`POST /api/space/setup`): "Start with basic setup", "IT operations" ("Includes hosts, software, applications,
-  runbooks and incidents."; Object's own, M28) and "Empty space". IT operations writes the 17 IT ops types (Host,
+- **A new space just starts (M32)**: "Create new space" asks for a name and a folder only (plus "Import from…" and
+  "Do I need a new space?"); it makes the space with the plain start (`setup: blank`) and offers to switch. A
+  space opened as a new or empty folder asks nothing: the "Pick a starting point" dialog is gone, and nothing is
+  written by opening. The starter sets ("Start with basic setup", "IT operations"; `POST /api/space/setup`) are
+  offered from the type gallery instead. What the IT operations set writes is unchanged: the 17 IT ops types (Host,
   Software, Application, Container, Configuration, Location, Network, Person, Vendor, Script, Command, Runbook,
   Prompt, Source, Project, Incident, Meeting; an Incident has one Resolved, its own date and time, which Desk sync
   fills, M31), a default template for each but Source, and 30 seed Tags; a type,
-  template or Tag already there is kept as it is. Nothing is written before a pick; closing asks again next
-  time. The pick is recorded as `space.json` `setup` (`basic`, `itops` or `blank`; Create space records it too).
+  template or Tag already there is kept as it is. A pick is recorded as `space.json` `setup` (`basic`, `itops` or
+  `blank`; Create space records `blank`).
 - Main navigation, always visible at the top (M32): Notes, Calendar, Tasks, Work (only while the Work page is on
   for the space; directly under Tasks; it opens the `work` target), Graph, Assistant. Tasks is the active entry for
   the `tasks` target only, Work for `work` (a `work` target shown while Work is off reads as Tasks). The Assistant
