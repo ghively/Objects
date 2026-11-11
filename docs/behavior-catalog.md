@@ -381,9 +381,26 @@ Each starter template pre-fills the new type's properties.
     heading, icon, quote, list, toggle. Two marks of one kind (two lists, two headings) stay text.
   - A single bullet, number or heading mark is StarterKit's own rule. `> ` makes a toggle, not a quote; `[] ` makes
     a to-do list like the menus.
+  - (M32) The GitHub way of writing a to-do works too: `- [ ] ` and `* [ ] ` make an unchecked to-do, `- [x] ` (or
+    `[X]`) a checked one, and `[ ] ` / `[x] ` do the same at the start of a text line. In a bullet list that has
+    other lines only the typed line becomes a to-do. In a numbered list, a heading or a to-do the characters stay
+    text. `> ` is still a toggle and `| ` a quote (M32, our call 1).
   - `()` always gives the same icon (Object keeps no last-used icon).
   - "Turn off automatic numbered lists" removes `1.` as a mark, alone and combined.
 - **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).
+- **Markdown habits (M32)**:
+  - A bare word ending in a file extension (`notes.md`, `config.py`, `run.sh`, `main.rs`, `archive.zip`,
+    `clip.mov`; the list is `editor/extensions/autoLink.ts`) is a file name, not a web link, typed or pasted. A real
+    address still links: `example.com`, `https://…`, `www.…`, one with a path (`docs.rs/serde`), a mail address.
+  - A list that mixes bullets and to-dos (typed or pasted as `- a` / `- [ ] b`) is one list: each bullet has its
+    dot, each to-do its box in the dot's place with the text beside it; a bullet nested under a to-do keeps its dot.
+  - An image with no width set (pasted, dropped or written as `![](…)`) is shown at its own size and never
+    stretched; one wider than the text is held to the text's width. A width the user drags is kept as before
+    (`width=`). A narrow image's hover toolbar stands beside it instead of covering it.
+  - The block toolbar (the bar shown while blocks are selected, e.g. after Esc in a block) is centred under the
+    text and moved just enough to stay 16 px inside the window at any width.
+  - Ctrl+Home and Ctrl+End put the caret at the start and the end of the note (with Shift: selecting), also when
+    the note starts with a to-do (the browser's own key did nothing there).
 - **Saving (M32)**: a note is saved 1 s after the last key and, while typing continues, at most 3 s after the
   first unsaved key. It is also saved at once when the text or the window loses focus, when the window is hidden
   or closing (`pagehide`: a request the browser finishes after the page is gone, for a note up to 60 KB; the text

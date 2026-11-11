@@ -14,7 +14,7 @@ import { addDays, todayYmd } from '@/calendar/dates'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { blockSelectionRange, selectBlocks } from '../extensions/blockSelection'
 import { setEditorObject } from '../nodes/blockRef'
-import { BLOCK_BAR_ITEMS, BLOCK_BAR_TEXT, BlockSelectionBar } from './BlockSelectionBar'
+import { BAR_EDGE_GAP, BLOCK_BAR_ITEMS, BLOCK_BAR_TEXT, BlockSelectionBar, barCentre } from './BlockSelectionBar'
 
 const editors: TiptapEditor[] = []
 afterEach(() => {
@@ -322,6 +322,54 @@ describe('<BlockSelectionBar>', () => {
       expect(within(bar()).queryByRole('button', { name: 'AI' })).toBeNull()
     } finally {
       useSettings.setState({ settings: settingsDefaults })
+    }
+  })
+})
+
+// M32 item 4: the bar stays inside the window at 1440 px and narrower.
+describe('the block toolbar stays inside the window (M32)', () => {
+  test('test the centre is the text column\'s while the bar fits there', () => {
+    expect(barCentre(700, 800, 1440)).toBe(700)
+  })
+
+  test('test the centre moves left when the bar would pass the right edge', () => {
+    // A text column on the right (sidebar open, properties closed): centred there, 1000 px would end at 1500.
+    expect(barCentre(1000, 1000, 1440)).toBe(1440 - BAR_EDGE_GAP - 500)
+    expect(barCentre(700, 900, 1024)).toBe(1024 - BAR_EDGE_GAP - 450)
+  })
+
+  test('test the centre moves right when the bar would pass the left edge', () => {
+    expect(barCentre(300, 900, 1440)).toBe(BAR_EDGE_GAP + 450)
+  })
+
+  test('test a bar as wide as the window allows sits in the middle', () => {
+    expect(barCentre(900, 1024 - 2 * BAR_EDGE_GAP, 1024)).toBe(512)
+    expect(barCentre(900, 2000, 1024)).toBe(512) // wider than the window: its own scroll takes over
+  })
+
+  test('test the bar is placed by its measured width at 1440 px and at 1024 px', () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('block-selection-bar') ? 1000 : 0
+    })
+    const inner = window.innerWidth
+    try {
+      const editor = mounted(BODY)
+      // The text column: from 760 to 1440 (its centre 1100).
+      editor.view.dom.getBoundingClientRect = () => ({ left: 760, width: 680, top: 0, height: 400, right: 1440, bottom: 400, x: 760, y: 0, toJSON: () => ({}) })
+      Object.defineProperty(window, 'innerWidth', { value: 1440, configurable: true })
+      render(<BlockSelectionBar editor={editor} />)
+      select(editor, 0)
+      // 1100 would put its right end at 1600: it is moved to end 16 px inside the window.
+      expect(bar().style.left).toBe(`${1440 - BAR_EDGE_GAP - 500}px`)
+      Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true })
+      act(() => {
+        window.dispatchEvent(new Event('resize'))
+      })
+      // 1000 px no longer fit between the gaps (the CSS caps the bar at 992): it sits in the middle.
+      expect(bar().style.left).toBe('512px')
+    } finally {
+      width.mockRestore()
+      Object.defineProperty(window, 'innerWidth', { value: inner, configurable: true })
     }
   })
 })

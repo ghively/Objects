@@ -175,6 +175,9 @@ export function MediaView({ node, editor, getPos, selected }: NodeViewProps) {
 
   const [failed, setFailed] = useState(false)
   useEffect(() => setFailed(false), [url])
+  // M32: an image's own width, known once it has loaded: with no width set it is shown at that size.
+  const [naturalWidth, setNaturalWidth] = useState<number | null>(null)
+  useEffect(() => setNaturalWidth(null), [url])
 
   const menuItems: EmbedMenuItem[] = []
   if (kind === 'file' && path && !missing) {
@@ -207,9 +210,16 @@ export function MediaView({ node, editor, getPos, selected }: NodeViewProps) {
           {IMAGE_ERROR}
         </div>
       ) : (
-        <img className="media-image" src={url} alt={attrs.alt ?? attrs.label ?? ''} draggable={false} onError={() => setFailed(true)} />
+        <img
+          className="media-image"
+          src={url}
+          alt={attrs.alt ?? attrs.label ?? ''}
+          draggable={false}
+          onError={() => setFailed(true)}
+          onLoad={(e) => setNaturalWidth(e.currentTarget.naturalWidth || null)}
+        />
       ),
-      { resizeWidth: true, alignable: true, captionable: true },
+      { resizeWidth: true, alignable: true, captionable: true, naturalWidth: failed ? null : naturalWidth },
     )
   } else if (kind === 'pdf') {
     content = frame(

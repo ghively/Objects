@@ -26,6 +26,9 @@ export function optionOf(options: readonly Option[] | null | undefined, key: str
   return (options ?? []).find((o) => o.key === key)?.value
 }
 
+/** M32: a frame narrower than this has its hover toolbar beside it (over it, the toolbar would cover a small picture). */
+export const NARROW_EMBED_WIDTH = 180
+
 /** A positive integer option (`width`, `height`), or undefined. */
 export function sizeOption(options: readonly Option[] | null | undefined, key: string): number | undefined {
   const v = optionOf(options, key)
@@ -54,6 +57,12 @@ export interface ResizableEmbedProps {
   resizeHeight?: number
   /** Extra toolbar content (the `…` menu). */
   menu?: ReactNode
+  /**
+   * M32: the content's own width in CSS pixels (an image's, once it has loaded). With no `width`
+   * option the frame takes it, so a small picture is not stretched to the text column; the column
+   * still caps a wide one. Never written to the file.
+   */
+  naturalWidth?: number | null
   /** The frame's body; a function gets the live height while a bottom drag is under way. */
   children: ReactNode | ((size: { height?: number }) => ReactNode)
   className?: string
@@ -68,6 +77,7 @@ export function ResizableEmbed({
   captionable,
   resizeHeight,
   menu,
+  naturalWidth,
   children,
   className,
 }: ResizableEmbedProps) {
@@ -106,6 +116,9 @@ export function ResizableEmbed({
   const showCaption = captionable && (caption !== null || captionOpen)
   const w = liveWidth ?? width
   const h = liveHeight ?? height
+  // M32: with no width set, the content's own (never upscaled).
+  const natural = w === undefined && naturalWidth && naturalWidth > 0 ? Math.round(naturalWidth) : undefined
+  const shown = w ?? natural
 
   return (
     <div
@@ -116,8 +129,10 @@ export function ResizableEmbed({
       <div
         ref={frameRef}
         className="resizable-embed-frame"
-        style={w ? { width: `${w}px`, maxWidth: '100%' } : undefined}
+        style={shown ? { width: `${shown}px`, maxWidth: '100%' } : undefined}
         data-width={w ?? undefined}
+        data-natural={natural ? '' : undefined}
+        data-narrow={shown && shown < NARROW_EMBED_WIDTH ? '' : undefined}
       >
         {typeof children === 'function' ? children({ height: h }) : children}
         {editable && (alignable || captionable || menu) && (
@@ -177,7 +192,8 @@ export function ResizableEmbed({
             className="resizable-embed-handle-x"
             contentEditable={false}
             onPointerDownCapture={() => {
-              startWidth.current = width ?? Math.round(frameRef.current?.getBoundingClientRect().width ?? 0)
+              // The width on screen (a wide picture is capped by the column), else the content's own.
+              startWidth.current = width ?? (Math.round(frameRef.current?.getBoundingClientRect().width ?? 0) || natural || 0)
             }}
           >
             <Resizer
