@@ -399,6 +399,8 @@ class WorkLoop:
         path = change.path
         if change.kind != "object" or not path or in_work_write():
             return  # a work service write is heard as the `WorkNotice` that follows it
+        if not self.space.work_on():
+            return  # M32: with Work off for the space, an edit is none of the loop's business
         try:
             summary = self.space.get(path)
         except KeyError:

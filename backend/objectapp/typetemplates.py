@@ -87,12 +87,20 @@ def _b():
     return basicsetup
 
 
-def _from_basic(tid: str) -> Callable[[], list[PropertyDefinition]]:
+def _from_basic(tid: str, work: bool = False) -> Callable[[], list[PropertyDefinition]]:
     def props() -> list[PropertyDefinition]:
-        t = next(x for x in _b().basic_types() if x.id == tid)
+        t = next(x for x in _b().basic_types(work=work) if x.id == tid)
         return [p for p in t.propertyDefinitions if not p.type.startswith("entity_")]
 
     return props
+
+
+def _props(tpl: TypeTemplate, work: bool) -> list[PropertyDefinition]:
+    """The entry's fresh properties. M32: the Project entry carries M22's ticket and work fields
+    only with ``work`` (Work is on for the space, as `basicsetup.basic_types`)."""
+    if work and tpl.key == "project":
+        return _from_basic("project", work=True)()
+    return tpl.props()
 
 
 def _from_itops(tid: str) -> Callable[[], list[PropertyDefinition]]:
@@ -440,15 +448,18 @@ def template_query_fixture() -> dict[str, Any]:
     return out
 
 
-def build_template(key: str, types: list[TypeDefinition]) -> list[PropertyDefinition]:
-    """Fresh custom properties for template ``key``, relations resolved against ``types``."""
+def build_template(
+    key: str, types: list[TypeDefinition], work: bool = False
+) -> list[PropertyDefinition]:
+    """Fresh custom properties for template ``key``, relations resolved against ``types``.
+    ``work`` (M32): whether Work is on for the space (`_props`)."""
     tpl = _BY_KEY[key]
     by_template: dict[str, str] = {}
     for t in types:
         k = template_for(t)
         if k is not None:
             by_template.setdefault(k, t.id)
-    props = tpl.props()
+    props = _props(tpl, work)
     for p in props:
         if p.type == "entity":
             allowed = p.options.get("allowedTypes") or []
@@ -475,8 +486,9 @@ def _target(
     )
 
 
-def template_catalog(types: list[TypeDefinition]) -> list[dict[str, Any]]:
-    """The gallery, in order: each template with its properties and whether the space has it."""
+def template_catalog(types: list[TypeDefinition], work: bool = False) -> list[dict[str, Any]]:
+    """The gallery, in order: each template with its properties and whether the space has it.
+    ``work`` (M32): whether Work is on for the space (Project's ticket fields, `_props`)."""
     have = {k for k in (template_for(t) for t in types) if k}
     out = []
     for tpl in _TEMPLATES:
@@ -489,7 +501,7 @@ def template_catalog(types: list[TypeDefinition]) -> list[dict[str, Any]]:
                 "description": tpl.description,
                 "icon": {"type": "iconify", "val": tpl.icon},
                 "color": tpl.color,
-                "properties": [{"name": p.name, "type": p.type} for p in tpl.props()],
+                "properties": [{"name": p.name, "type": p.type} for p in _props(tpl, work)],
                 "added": tpl.key in have,
             }
         )

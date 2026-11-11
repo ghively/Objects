@@ -68,11 +68,18 @@ def test_basic_setup_writes_four_types(tmp_path: Path, state: Path):
         ("Date", "datetime"), ("Type", "label"), ("Attendees", "entity"), ("Project", "entity"),
         ("Reviewed", "boolean"), ("Cover image", "coverImage"), ("Notes", "blocks"),
     ]
+    # M32: a new space has Work off, so its Project ends with Notes (no ticket field).
     assert custom["project"] == [
         ("Status", "label"), ("Type", "label"), ("Timeframe", "datetime"),
         ("Collaborators", "entity"), ("Organizations", "entity"), ("Meetings", "entity"),
         ("Cover image", "coverImage"), ("Notes", "blocks"),
-        # M22: the ticket and work fields (no Project relation), then the hidden Completed
+    ]
+    with_work = next(t for t in basic_types(work=True) if t.id == "project")
+    assert [(p.name, p.type) for p in with_work.propertyDefinitions
+            if not p.type.startswith("entity_")] == [
+        *custom["project"],
+        # M22: the ticket and work fields (no Project relation), then the hidden Completed;
+        # M32: only while Work is on for the space.
         ("Ticket ID", "text"), ("System", "label"), ("Ticket link", "url"),
         ("Desk status", "label"), ("Desk priority", "label"), ("Requester", "text"),
         ("Group", "text"), ("Location", "text"), ("Opened", "datetime"),

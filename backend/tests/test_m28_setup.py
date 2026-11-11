@@ -46,7 +46,8 @@ def _tag_paths(space: Space, title: str) -> list[str]:
 def test_create_space_itops(tmp_path: Path):
     root = create_space("Ops", tmp_path, "itops")
     data = json.loads((root / ".object" / "space.json").read_text("utf-8"))
-    assert data == {"name": "Ops", "setup": "itops"}
+    # M32: the IT operations starter turns Work on for the space it makes.
+    assert data == {"name": "Ops", "setup": "itops", "workEnabled": True}
     files = _files(root)
     types = [r for r in files if r.startswith(".object/types/")]
     templates = [r for r in files if r.startswith("Templates/")]
@@ -121,6 +122,7 @@ def test_setup_route_announces_and_answers(tmp_path: Path):
         info = res.json()
         assert info["needsSetup"] is False
         assert set(ITOPS_TYPE_IDS) <= {t["id"] for t in info["types"]}
+        assert info["workEnabled"] is True and info["workOn"] is True  # M32
         # M32: the plain start is not offered twice; a starter can still be added later (the
         # basic one here: its Book is new, the types the space has are left as they are).
         assert c.post("/api/space/setup", json={"setup": "blank"}).status_code == 409
@@ -198,7 +200,7 @@ def test_itops_setup_keeps_what_exists(tmp_path: Path):
 def test_itops_after_basic_adds_what_is_missing(tmp_path: Path):
     """M32: the starters are added from the type gallery, so IT operations can follow the
     basic set: the types the space has (Person, Meeting, Project) stay as they are, the rest
-    are written."""
+    are written, and Work is turned on."""
     root = tmp_path / "fresh"
     root.mkdir()
     with _client(Space(root)) as c:
@@ -211,7 +213,9 @@ def test_itops_after_basic_adds_what_is_missing(tmp_path: Path):
                     ".object/types/project.json", ".object/types/book.json"):
             assert after[rel] == before[rel], rel
         assert {f".object/types/{tid}.json" for tid in ITOPS_TYPE_IDS} <= set(after)
-        assert json.loads(after[".object/space.json"])["setup"] == "itops"
+        config = json.loads(after[".object/space.json"])
+        assert config["setup"] == "itops" and config["workEnabled"] is True
+        assert res.json()["workOn"] is True
 
 
 def test_needs_setup_with_itops_types(tmp_path: Path):

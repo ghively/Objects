@@ -200,14 +200,15 @@ class M28:
         created = Path(res["path"])
         types, templates, tags = setup_files(created)
         space_json = json.loads((created / ".object" / "space.json").read_text("utf-8"))
-        # M32: beside the four types every new space starts with.
+        # M32: beside the four types every new space starts with, and with Work turned on.
         starting = {"page", "tag", "task", "dailynote"}
         self.run.report(
             types == want_types | starting and len(templates) == 16 and tags == want_tags
-            and space_json.get("setup") == "itops",
+            and space_json.get("setup") == "itops" and space_json.get("workEnabled") is True,
             "the new space has the 17 IT ops types (and Page, Tag, Task, DailyNote), 16 templates and 30 seed "
-            "tags, setup itops",
-            f"types {len(types)}, templates {len(templates)}, tags {len(tags)}, setup {space_json.get('setup')!r}",
+            "tags, setup itops, Work on",
+            f"types {len(types)}, templates {len(templates)}, tags {len(tags)}, setup {space_json.get('setup')!r}, "
+            f"workEnabled {space_json.get('workEnabled')!r}",
         )
 
         empty = self.tmp / "empty-space"

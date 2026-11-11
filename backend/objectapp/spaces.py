@@ -292,7 +292,12 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     target.mkdir()  # FileExistsError when anything is already there
     (target / ".object").mkdir()
     # `setup` records the pick, so the space never asks again on open (spaceconfig.needs_setup).
-    atomic_write(target / ".object" / "space.json", dump_json({"name": name, "setup": setup}))
+    # M32: the IT operations starter turns Work on for the space it makes; any other new space
+    # has no switch stored (Work reads as off until the space holds work data).
+    config: dict = {"name": name, "setup": setup}
+    if setup == "itops":
+        config["workEnabled"] = True
+    atomic_write(target / ".object" / "space.json", dump_json(config))
     # M32: every new space can make notes, daily notes and tasks from its first second.
     from .typemodel import write_starting_types
 

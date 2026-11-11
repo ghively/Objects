@@ -249,8 +249,8 @@ def test_a_template_query_with_a_missing_option_still_creates_the_type(
             time.sleep(0.01)
         assert ("types", type_id, "w1") in {(e.kind, e.path, e.origin) for e in published}
         assert any(t["id"] == type_id for t in c.get("/api/space").json()["types"])
-        # M22: only the built-in Tickets view (a Project is a work type) is listed.
-        assert [q["id"] for q in c.get("/api/queries").json()] == ["work-tickets"]
+        # M32: Work is off for this space: its Project has no ticket field and no Tickets view.
+        assert [q["id"] for q in c.get("/api/queries").json()] == []
     assert _stored(space_dir, type_id)["templateKey"] == "project"
     assert _queries(space_dir) == []
     assert "Lost projects" in caplog.text

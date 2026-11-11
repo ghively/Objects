@@ -307,6 +307,7 @@ from .whiteboardstore import whiteboard_ui_problem
 from .workloop import WorkLoop, on_change_event
 from .workseams import build_seams
 from .workservice import WorkService
+from .workview import TICKETS_ID
 from .workview import api_extra as query_api_extra
 
 __all__ = ["EventHub", "create_app"]
@@ -1091,6 +1092,10 @@ def create_app(
 
     def space_info() -> dict[str, Any]:
         fields = space_fields(space.root)
+        # M32: the effective Work switch is the open space's own answer (the stored value, else
+        # the default from its index); asked before the types are listed, so the Task type's
+        # fields already follow it. Reading it writes nothing.
+        work_on = space.work_on()
         return {
             "name": fields["name"],
             "root": str(space.root),
@@ -1101,7 +1106,7 @@ def create_app(
             "jiraSite": fields["jiraSite"],
             # M32: the Work switch as stored (true / false / null) and the effective value.
             "workEnabled": fields["workEnabled"],
-            "workOn": fields["workOn"],
+            "workOn": work_on,
             "revision": fields["revision"],
             "needsSetup": needs_setup(space.root),
         }
@@ -1133,6 +1138,7 @@ def create_app(
 
     @api.put("/space")
     def put_space(req: PatchSpaceRequest):
+        work_before = space.work_on()
         try:
             patch_space_config(space.root, req.patch, req.baseRevision)
         except SpaceConfigProblem as exc:
@@ -1141,7 +1147,13 @@ def create_app(
             return JSONResponse({"currentRevision": exc.current_revision}, status_code=409)
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
-        return space_info()
+        info = space_info()
+        if info["workOn"] != work_before:
+            # M32: the Work switch moved, so the Task type's fields and the saved searches
+            # (Tickets) did too, in memory: the windows read both again.
+            announce(ChangeEvent("types", "*", None))
+            announce(ChangeEvent("queries", TICKETS_ID, None))
+        return info
 
     @api.get("/settings")
     def get_settings():
@@ -1321,8 +1333,11 @@ def create_app(
         """Decision S3 (fix pass 2026-11-09): Gene's own edit of a work item, a body save or a
         property set from his window (the event's origin is its client id), starts the item's
         auto-run count again (`workloop.on_change_event`). Only the object he edited: the
-        relation-synced, relinked or retyped objects other routes announce are not his action."""
+        relation-synced, relinked or retyped objects other routes announce are not his action.
+        M32: only while Work is on for the space; with Work off the loop is told nothing."""
         try:
+            if not space.work_on():
+                return
             on_change_event(space, event)
         except Exception:  # the write is done; the loop's bookkeeping must not fail the request
             logging.getLogger(__name__).exception("Telling the Work loop about an edit of %s failed", event.path)
@@ -2028,7 +2043,7 @@ def create_app(
     def type_gallery():
         from .typetemplates import template_catalog
 
-        return template_catalog(list(space.types))
+        return template_catalog(list(space.types), work=space.work_on())
 
     @api.post("/types", status_code=201)
     def create_type(req: CreateTypeRequest):

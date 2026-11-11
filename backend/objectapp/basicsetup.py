@@ -20,7 +20,8 @@ those are **our choice** (listed for Gene in the M8 plan, Task 8):
 M22: Project also has the ticket and work fields (``workfields.field_defs``, without the
 Project relation, which is on Tasks only) and a hidden ``completed`` (Task's), appended
 after Notes, so a new Project is a work type. Those keep ``id == key``; the properties
-above get fresh ids.
+above get fresh ids. M32: only while Work is on for the space (``basic_types(work=True)``);
+a Project made with Work off has none of them, and one that has them keeps them.
 
 "Notes" is each type's ``blocks`` property (the object's body). There is no
 Organization type in the basic setup, so "Organizations" relations allow any type.
@@ -217,8 +218,13 @@ def _type(
     )
 
 
-def basic_types() -> list[TypeDefinition]:
-    """Fresh Person, Meeting, Project and Book definitions (new property ids each call)."""
+def basic_types(work: bool = False) -> list[TypeDefinition]:
+    """Fresh Person, Meeting, Project and Book definitions (new property ids each call).
+
+    M32: Project ends with M22's ticket and work fields and the hidden ``completed`` only
+    with ``work`` (Work is on for the space the types are made for, `spaceconfig.work_on`; the
+    IT operations starter always passes it); a new space's Project has none of them.
+    """
     person = _type(
         "person", "Person", "People",
         "A page for each person you know or work with.",
@@ -269,8 +275,7 @@ def basic_types() -> list[TypeDefinition]:
             _relation("meetings", "Meetings", ["meeting"]),
             _cover(),
             _notes(),
-            *field_defs(task=False, project_type_ids=["project"]),
-            _completed(),
+            *([*field_defs(task=False, project_type_ids=["project"]), _completed()] if work else []),
         ],
     )
     book = _type(
@@ -294,10 +299,11 @@ def basic_types() -> list[TypeDefinition]:
     return [person, meeting, project, book]
 
 
-def write_basic_types(root: Path) -> list[Path]:
-    """Write the four types into the (new) space at `root`. Refuses to replace an existing file."""
+def write_basic_types(root: Path, work: bool = False) -> list[Path]:
+    """Write the four types into the (new) space at `root`. Refuses to replace an existing file.
+    ``work`` as `basic_types` (a new space has Work off: no ticket field on its Project)."""
     written: list[Path] = []
-    for t in basic_types():
+    for t in basic_types(work=work):
         # base revision "" = the file must not exist yet (RevisionConflict otherwise)
         write_type_json(Path(root), t, "")
         written.append(Path(root) / ".object" / "types" / f"{t.id}.json")
@@ -555,7 +561,7 @@ def _knowledge(
 
 def itops_types() -> list[TypeDefinition]:
     """Fresh definitions of the 17 IT ops types, in `ITOPS_TYPE_IDS` order (new ids each call)."""
-    basic = {t.id: t for t in basic_types()}
+    basic = {t.id: t for t in basic_types(work=True)}  # the starter turns Work on (M32)
     types = [
         _entity(
             "host", "Host", "Hosts",

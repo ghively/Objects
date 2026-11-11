@@ -91,17 +91,26 @@ def read(root: Path) -> tuple[dict[str, Any], str, str | None]:
         return {}, revision, f"space.json is not a valid JSON object: {exc}"
 
 
-def work_on(data: dict[str, Any]) -> bool:
-    """M32: whether the Work page is on for the space whose ``space.json`` holds `data`: the
-    stored ``workEnabled`` when it is true or false, else off. Reads only what it is given."""
+def work_on(data: dict[str, Any], has_work_data: bool = False) -> bool:
+    """M32: whether the Work page is on for the space whose ``space.json`` holds `data`.
+
+    The stored ``workEnabled`` when it is true or false. Else the default: on when the space
+    already holds work data, which is the IT operations starter's marker (``setup: "itops"``)
+    here, or `has_work_data`, what only the open space knows from its index (a Capture or an
+    Alert type, a Ticket ID on any note: `Space.work_on` passes it); off otherwise. Reads only
+    what it is given, so the default is never stored by reading it.
+    """
     stored = data.get("workEnabled")
-    return stored if isinstance(stored, bool) else False
+    if isinstance(stored, bool):
+        return stored
+    return data.get("setup") == "itops" or bool(has_work_data)
 
 
 def space_fields(root: Path) -> dict[str, Any]:
     """The ``SpaceInfo`` fields from ``space.json``: name, icon, description, hideTaskManagement,
     jiraSite (null when absent or not a web address), workEnabled (the stored switch: true,
-    false, or null when absent), workOn (the effective one, `work_on`), revision."""
+    false, or null when absent), workOn (the effective one as far as the file tells, `work_on`;
+    the open space's own answer, with its index, is `Space.work_on`), revision."""
     data, revision, _error = read(root)
     name = data.get("name")
     icon = data.get("icon")
@@ -187,10 +196,13 @@ def patch(root: Path, patch: dict[str, Any], base_revision: str | None) -> tuple
         return data, hashlib.sha256(payload).hexdigest()
 
 
-def set_internal(root: Path, key: str, value: str) -> str:
+def set_internal(root: Path, key: str, value: str, work_default: bool | None = None) -> str:
     """Set one internal key (`INTERNAL_KEYS`) in ``space.json``, keeping every other key; return the
     new revision. Atomic. Raises `ValueError` for another key and `ReadOnly` (423) for an
-    unreadable file, which is left as it is."""
+    unreadable file, which is left as it is.
+
+    M32: `work_default` (the IT operations starter passes True) also stores ``workEnabled`` in
+    the same write, unless the file already holds a switch the user set (true or false)."""
     from .space import ReadOnly  # space imports this module
 
     if key not in INTERNAL_KEYS:
@@ -201,6 +213,8 @@ def set_internal(root: Path, key: str, value: str) -> str:
         if error is not None:
             raise ReadOnly(error)
         data = {**data, key: value}
+        if work_default is not None and not isinstance(data.get("workEnabled"), bool):
+            data["workEnabled"] = work_default
         payload = dump_json(data)
         path.parent.mkdir(parents=True, exist_ok=True)
 
