@@ -6,6 +6,7 @@ vi.mock('./turnInto', () => ({
   turnIntoObject: vi.fn(async () => true),
   turnIntoTask: vi.fn(async () => true),
   turnTodoIntoTask: vi.fn(async () => true),
+  turnLineIntoTask: vi.fn(async () => true),
 }))
 
 import { allShortcuts, keysFor } from '@/lib/shortcuts'
@@ -13,7 +14,7 @@ import { editorExtensions, loadBody, serializeBody } from './document'
 import { BLOCK_REFERENCE_COPIED, setEditorObject } from './nodes/blockRef'
 import { setHighlightTextHandler } from './nodes/textStyle'
 import { M8_EDITOR_SHORTCUT_IDS, M8_EDITOR_SHORTCUTS } from './shortcuts'
-import { turnIntoObject, turnIntoTask, turnTodoIntoTask } from './turnInto'
+import { turnIntoObject, turnIntoTask, turnLineIntoTask, turnTodoIntoTask } from './turnInto'
 
 const editors: TiptapEditor[] = []
 afterEach(() => {
@@ -156,7 +157,13 @@ describe('m8 editor shortcuts', () => {
     press(editor, keysFor('turnBlockIntoTaskObject')[0])
     await Promise.resolve()
     expect(turnIntoObject).toHaveBeenCalledWith(editor)
-    expect(turnTodoIntoTask).toHaveBeenCalledWith(editor)
+    // M32: the key makes the line at the caret a task, whatever kind of line it is.
+    expect(turnLineIntoTask).toHaveBeenCalledWith(editor)
+    expect(turnTodoIntoTask).not.toHaveBeenCalled()
+    cursorIn(editor, 'A quotable line')
+    expect(press(editor, keysFor('turnBlockIntoTaskObject')[0])).toBe(true)
+    await Promise.resolve()
+    expect(turnLineIntoTask).toHaveBeenCalledTimes(2)
     // Turn into task has no key (the markdown `()` + Space only); the old one is inert.
     press(editor, 'Mod-Alt-k')
     press(editor, 'Mod-Alt-o')

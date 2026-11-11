@@ -390,6 +390,11 @@ Each starter template pre-fills the new type's properties.
   is also kept for a reload until the save lands), on a note or tab switch and when the editor closes. Nothing is
   sent when nothing changed, and never two saves at once: a save asked for while one runs follows it with the
   latest text. Conflicts, read-only files and "Changes not saved. Retrying…" are as before.
+- **Make this line a task (M32)**, Ctrl+Shift+T with the caret in a note: the line holding the caret becomes a
+  Task titled with its text and is replaced by the task's link card, whatever the line is: a paragraph, a heading,
+  a list line (the list is split around it; nested lines become the task's body) or a to-do (a ticked one is made
+  Done). With blocks selected: every to-do in them, or the first block when they hold none. A line without text
+  and a code block are left alone, and a task that can't be made changes nothing.
 - **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves.
 - **Edited lines are written in the editor's standard Markdown form**: the line of a block you edit is rewritten
   that way (`_b_` becomes `*b*`, `[X]` becomes `[x]`, a setext heading becomes ATX `#`, a bare URL becomes

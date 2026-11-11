@@ -9,6 +9,10 @@
  * - `turnTodoIntoTask` ("Turn into task object"): a
  *   to-do becomes a Task titled with its text, status Done when it was checked; with a block
  *   selection, every to-do in it (our choice). Not a to-do: nothing happens.
+ * - `turnLineIntoTask` (M32, "Make this line a task", Ctrl+Shift+T): the line holding the caret,
+ *   whatever it is (a paragraph, a heading, a list line, a to-do), becomes a Task titled with its
+ *   text, as a to-do does. With a block selection: every to-do in it, or its first block when it
+ *   holds none.
  * - `turnIntoWhiteboard` ("Turn into whiteboard"): the selected
  *   blocks become a new board (`whiteboard/turnInto.ts`' `turnBlocksIntoWhiteboard`), titled with
  *   the first block's text (our choice), and are replaced by an embed of it.
@@ -282,6 +286,17 @@ export async function turnIntoTask(editor: Editor, opts: TurnIntoOptions = {}): 
 
 export async function turnTodoIntoTask(editor: Editor, opts: TurnIntoOptions = {}): Promise<boolean> {
   return turnWith(editor, todosAt(editor, opts.pos), (x) => ({ typeId: taskTypeId(), values: taskValues(x) }))
+}
+
+/**
+ * M32, "Make this line a task": the to-dos at the selection as `turnTodoIntoTask` does; with none
+ * there, the text line at the caret (`turnIntoTask`). A line without text, a code block and a
+ * read-only editor are left alone; a failed create (a space with no Task type) changes nothing.
+ */
+export async function turnLineIntoTask(editor: Editor, opts: TurnIntoOptions = {}): Promise<boolean> {
+  const todos = todosAt(editor, opts.pos)
+  if (todos.length > 0) return turnWith(editor, todos, (x) => ({ typeId: taskTypeId(), values: taskValues(x) }))
+  return turnIntoTask(editor, opts)
 }
 
 /** Is there a to-do at the selection (the block menu shows "Turn into task object" then)? */
