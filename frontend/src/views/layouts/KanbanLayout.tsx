@@ -6,6 +6,7 @@ import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSe
 import { api, ConflictError } from '@/api/client'
 import type { GroupBy, Row } from '@/api/types'
 import { Icon } from '@/components/Icon'
+import { markFresh } from '@/create/freshObjects'
 import { usePeek } from '@/nav/tabs'
 import { LabelPill } from '@/properties/LabelMenu'
 import { isSynced } from '@/properties/synced'
@@ -220,6 +221,9 @@ export function KanbanLayout(props: LayoutProps) {
     if (change && !isSynced(type.propertyDefinitions.find((d) => d.key === change.key))) values[change.key] = change.value
     try {
       const created = await api.createObject(type.id, { values })
+      // M32: a new card opens as any new note does, its title ready for typing: a full page while
+      // "Open notes as a full page" is on; with it off, the peek, so the board stays in view.
+      markFresh(created.path)
       usePeek.getState().peek(created.path)
     } catch (err) {
       say(err instanceof Error ? err.message : 'Could not create.')

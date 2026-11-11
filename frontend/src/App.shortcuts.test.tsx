@@ -1,3 +1,4 @@
+import type { Editor as TiptapEditor } from '@tiptap/core'
 import { configure, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -16,6 +17,7 @@ import { setLastTypeSpace, useLastType } from '@/create/lastType'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { takeBodyFocus } from '@/nav/focusRequest'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import App from './App'
 
 const mocked = vi.mocked(api)
@@ -35,6 +37,7 @@ beforeEach(async () => {
   useTabs.getState().reset()
   usePeek.getState().close()
   resetLinkIndex()
+  resetSpaceInfo()
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
   mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE, PROJECT, TASK] } satisfies SpaceInfo)
   mocked.objects.mockResolvedValue([NOTES])
@@ -129,7 +132,8 @@ describe('app shortcuts', () => {
     await openObjectPage()
     expect(ctrl(document.body, 'Backspace')).toBe(false)
     const dialog = await screen.findByRole('alertdialog')
-    expect(dialog).toHaveTextContent(/Delete this (object|note)\?/)
+    // M32: the dialog names the note (its title is "Notes").
+    expect(dialog).toHaveTextContent('Delete “Notes”?')
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
     expect(mocked.deleteObject).not.toHaveBeenCalled()
@@ -171,12 +175,28 @@ describe('app shortcuts', () => {
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'calendar' })
   })
 
-  test('Ctrl+Shift+T inside the editor keeps meaning "Make this block a task": no new task is created', async () => {
+  test('Ctrl+Shift+T inside the editor keeps meaning "Make this line a task": no new task is created', async () => {
     const { container } = await openObjectPage()
     const editor = container.querySelector('.ProseMirror')!
     fireEvent.keyDown(editor, { key: 'T', ctrlKey: true, shiftKey: true })
     await new Promise((r) => setTimeout(r, 50))
     expect(mocked.createObject).not.toHaveBeenCalled()
+  })
+
+  // M32, "Hide Tasks in this space": the task keys do nothing, in a note and outside one.
+  test('test while the space hides Tasks, Ctrl+Shift+T makes no task outside the editor and changes nothing inside it', async () => {
+    mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE, PROJECT, TASK], hideTaskManagement: true } satisfies SpaceInfo)
+    const { container } = await openObjectPage()
+    await waitFor(() => expect(useSpaceInfo.getState().space?.hideTaskManagement).toBe(true))
+    fireEvent.keyDown(document.body, { key: 'T', ctrlKey: true, shiftKey: true })
+    const pm = container.querySelector('.ProseMirror') as HTMLElement & { editor?: TiptapEditor }
+    const before = pm.editor!.getJSON()
+    fireEvent.keyDown(pm, { key: 'T', ctrlKey: true, shiftKey: true })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mocked.createObject).not.toHaveBeenCalled()
+    expect(pm.editor!.getJSON()).toEqual(before)
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: PATH })
+    expect(usePeek.getState().path).toBeNull()
   })
 
   // M32, "keys work while you type": with the caret in a note's text or title.
@@ -221,13 +241,24 @@ describe('app shortcuts', () => {
     expect(mocked.createObject).not.toHaveBeenCalled()
   })
 
-  test("test Ctrl+Shift+D with the caret in the note text opens today's note and asks for the caret at its end", async () => {
+  test("test Ctrl+Shift+D with the caret in the note text opens today's note with the caret at the end of its text", async () => {
     mocked.createDailyNote.mockResolvedValue({ path: 'DailyNotes/2026-11-11.md', version: 'v1', typeIds: [] })
     const { container } = await openObjectPage()
     const editor = container.querySelector('.ProseMirror')!
     expect(fireEvent.keyDown(editor, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true })).toBe(false)
     await waitFor(() => expect(usePeek.getState().path).toBe('DailyNotes/2026-11-11.md'))
-    expect(takeBodyFocus('DailyNotes/2026-11-11.md')).toBe('end')
+    // The shortcut asks for the caret at the end (`nav/focusRequest`) and the peek's editor takes
+    // the request when it is ready: the next key typed lands at the end of today's note.
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() => {
+      const pm = dialog.querySelector('.ProseMirror') as (HTMLElement & { editor?: TiptapEditor }) | null
+      if (!pm?.editor) throw new Error('editor not mounted')
+      expect(document.activeElement).toBe(pm)
+      expect(pm.editor.state.selection.empty).toBe(true)
+      expect(pm.editor.state.selection.from).toBe(pm.editor.state.doc.content.size - 1)
+    })
+    // Taken once: nothing is left to move the caret again.
+    expect(takeBodyFocus('DailyNotes/2026-11-11.md')).toBeNull()
   })
 
   test('test a new note made by key steps out from under a popped-out note', async () => {

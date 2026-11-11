@@ -6,7 +6,7 @@ vi.mock('@/api/client', async (orig) => ({
 }))
 
 import { api } from '@/api/client'
-import { usePeek, useTabs, type Target } from '@/nav/tabs'
+import { tabCrumbs, usePeek, useTabs, type Target } from '@/nav/tabs'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { objectSummary, typeDef } from '@/test/mockApi'
 import { resetLinkIndex } from './linkIndex'
@@ -54,12 +54,26 @@ function icon(dom: HTMLElement) {
 }
 
 describe('wikilink presenter', () => {
+  test('test a plain click opens the note in the current tab, as a link (M32)', async () => {
+    s().open(objT('Pages/Alpha.md'))
+    const { dom, cleanup } = await chip()
+    dom.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    expect(usePeek.getState().path).toBeNull()
+    expect(s().tabs).toHaveLength(1)
+    const tab = s().tabs[0]
+    expect(tab.history[tab.index]).toEqual(objT('Pages/Beta.md'))
+    // It came by a link, so the trail reads Alpha › Beta.
+    expect(tabCrumbs(tab)).toEqual([objT('Pages/Alpha.md')])
+    cleanup?.()
+  })
+
   test('test wikilink new-tab opens and peek open-as-page go via link', async () => {
+    useSettings.setState({ settings: { ...settingsDefaults, alwaysOpenAsFullPage: false } })
     s().open(objT('Pages/Alpha.md'))
     const { dom, cleanup } = await chip()
     const open = vi.spyOn(useTabs.getState(), 'open')
 
-    // A plain click keeps M1's peek.
+    // With "Open notes as a full page" off, a plain click keeps M1's peek.
     dom.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     expect(usePeek.getState().path).toBe('Pages/Beta.md')
     expect(open).not.toHaveBeenCalled()

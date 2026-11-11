@@ -4,6 +4,7 @@ import { createElement } from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { resetSettingsModal, useSettingsModal } from '@/settings/useSettingsModal'
 import { ShortcutsSheet } from '@/settings/ShortcutsSheet'
+import { setWorkOn } from '@/test/workOn'
 import { WORK_SHORTCUTS } from '@/work/keys/useWorkKeys'
 import { CATEGORY_LABELS, formatKeys, isSequence, matches, parseKeys, shortcutsByCategory } from './shortcuts'
 
@@ -42,7 +43,8 @@ describe('M23 shortcuts', () => {
     expect(WORK_SHORTCUTS.find((d) => d.keys[0] === 'g c')?.name).toBe('Go to Captures')
   })
 
-  test('the Shortcuts sheet lists the Work group', () => {
+  test('the Shortcuts sheet lists the Work group (M32: while Work is on for the space)', () => {
+    setWorkOn(true)
     useSettingsModal.getState().openShortcuts()
     render(createElement(ShortcutsSheet))
     const section = screen.getByRole('region', { name: 'Work' })

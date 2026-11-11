@@ -15,7 +15,8 @@ vi.mock('./markdown', async (orig) => {
 import { api } from '@/api/client'
 import { loadGrammar } from '@/editor/code/highlight'
 import { resetLinkIndex } from '@/links/linkIndex'
-import { usePeek, useTabs } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { ChatMarkdown, STREAM_RENDER_MS } from './ChatMarkdown'
 import { renderChatMarkdown } from './markdown'
 
@@ -35,6 +36,8 @@ afterEach(() => {
   cleanup()
   vi.useRealTimers()
   usePeek.getState().close()
+  useTabs.getState().reset()
+  resetOpenAsFullPage()
 })
 
 describe('ChatMarkdown (M16)', () => {
@@ -44,6 +47,12 @@ describe('ChatMarkdown (M16)', () => {
     const chips = [...container.querySelectorAll<HTMLElement>('[data-wikilink]')]
     expect(chips).toHaveLength(2)
     for (const chip of chips) await waitFor(() => expect(chip.getAttribute('data-resolved-path')).toBe(ALPHA.path))
+    // M32: a plain click opens the note as a full page ("Open notes as a full page" starts on).
+    fireEvent.click(chips[0])
+    expect(usePeek.getState().path).toBeNull()
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: ALPHA.path })
+    // With the setting off it opens in the peek.
+    setOpenAsFullPage(false)
     fireEvent.click(chips[0])
     expect(usePeek.getState().path).toBe(ALPHA.path)
     const open = vi.spyOn(useTabs.getState(), 'open')

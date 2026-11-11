@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import type { Row, TypeDef } from '@/api/types'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { collection, objectSummary, propertyDef, row, typeDef } from '@/test/mockApi'
-import { GROUP_OPTIONS, GROUP_SORT_OPTIONS, canDropRow, groupRows, isGroupable, valueForGroup, type GroupCtx } from './group'
+import { GROUP_OPTIONS, GROUP_SORT_OPTIONS, UNGROUPED_LABEL, canDropRow, groupRows, isGroupable, valueForGroup, type GroupCtx } from './group'
 
 const now = new Date(2026, 9, 23, 12, 0) // Friday
 
@@ -51,6 +51,15 @@ describe('group options', () => {
 })
 
 describe('groupRows', () => {
+  // M32 (the glossary): an ungrouped view's one group reads "Notes" (it read "Objects"); a board
+  // shows it as its column's title.
+  test('test an ungrouped view has one group labelled Notes', () => {
+    const { groups, hidden } = groupRows([R('a', {}), R('b', {})], null, undefined, ctx())
+    expect(groups.map((g) => [g.id, g.label, g.rows.length])).toEqual([['other', 'Notes', 2]])
+    expect(UNGROUPED_LABEL).toBe('Notes')
+    expect(hidden).toEqual([])
+  })
+
   test('label groups in option order with Other last', () => {
     const rows = [R('a', { flavor: ['Sour'] }), R('b', { flavor: ['Sweet'] }), R('c', {})]
     const { groups } = groupRows(rows, by('flavor'), undefined, ctx())

@@ -207,7 +207,8 @@ function ReferenceActions({ path, list }: { path: string; list: string[] }) {
       aria-label={REFERENCE_ACTIONS}
       className="flex shrink-0 items-center gap-0.5 opacity-0 focus-within:opacity-100 group-hover/ref:opacity-100"
     >
-      {action('Expand', 'ph-arrows-out-simple', () => usePeek.getState().peek(path, list))}
+      {/* M32: "Expand" asks for the peek, whatever "Open notes as a full page" says. */}
+      {action('Expand', 'ph-arrows-out-simple', () => usePeek.getState().show(path, list))}
       {action('Open in new tab', 'ph-arrow-square-out', () => useTabs.getState().open({ kind: 'object', path }, { newTab: true }))}
       {action('Open in side panel', 'ph-sidebar-simple', () => useTabs.getState().openInSidepanel({ kind: 'object', path }))}
     </div>

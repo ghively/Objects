@@ -125,10 +125,10 @@ describe('Import Content', () => {
     for (const row of rows) expect(within(row).getByRole('button', { name: 'Move batch to Trash' })).toBeInTheDocument()
     const notes = rows[0]
     await user.click(within(notes).getByRole('button', { name: 'Move batch to Trash' }))
-    expect(within(notes).getByText('Move the 4 objects this import created to the Trash?')).toBeInTheDocument()
+    expect(within(notes).getByText('Move the 4 notes this import created to the Trash?')).toBeInTheDocument()
     await user.click(within(notes).getByRole('button', { name: 'Move to Trash' }))
     expect(mocked.trashImportBatch).toHaveBeenCalledWith('b3')
-    expect(await within(notes).findByText('4 objects were moved to the Trash.')).toBeInTheDocument()
+    expect(await within(notes).findByText('4 notes were moved to the Trash.')).toBeInTheDocument()
     // Once in the Trash there is nothing left to review.
     expect(within(notes).queryByRole('button', { name: T.reviewLabel('Notes') })).toBeNull()
     expect(within(rows[1]).getByRole('button', { name: T.reviewLabel('Vault') })).toBeInTheDocument()

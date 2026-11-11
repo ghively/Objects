@@ -50,7 +50,7 @@ describe('WinsView', () => {
     const kpi = (label: string) => screen.getByText(label).closest('[data-work-kpi]') as HTMLElement
     expect(within(kpi('Steps done in 14 days')).getByText('17')).toBeInTheDocument()
     expect(within(kpi('Items closed in 14 days')).getByText('2')).toBeInTheDocument()
-    expect(within(kpi('Objects changed in 14 days')).getByText('21')).toBeInTheDocument()
+    expect(within(kpi('Notes changed in 14 days')).getByText('21')).toBeInTheDocument()
     expect(within(kpi('Changed today')).getByText('4')).toBeInTheDocument()
   })
 

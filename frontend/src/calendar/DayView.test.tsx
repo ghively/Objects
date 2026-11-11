@@ -9,7 +9,9 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { taskRow } from '@/tasks/taskFixtures'
 import { currentTarget, useTabs } from '@/nav/tabs'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { taskEntry } from '@/test/mockApi'
+import { setWorkOn } from '@/test/workOn'
 import { mocked, pageRow, resetDayMocks, setDay, setRows, TODAY } from './dayFixtures'
 import { DayView } from './DayView'
 
@@ -17,6 +19,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 23, 10, 0))
   resetDayMocks()
+  resetSpaceInfo()
 })
 
 const tabLabels = () => screen.getAllByRole('tab').map((t) => t.textContent)
@@ -121,14 +124,38 @@ describe('DayView', () => {
     expect(screen.getByTestId('day-view').className).toContain('max-w-[50rem]')
   })
 
-  test('T1: on today the header links to the Tasks dashboard’s Today; other days have no link', async () => {
+  // M32: the link reads "Open Tasks" (it read "Tasks dashboard") and opens today's list: the `work`
+  // target on `today`, which the app shows as the Tasks page's Today list while Work is off.
+  test('T1: on today the header links to Tasks › Today; other days have no link', async () => {
     const user = userEvent.setup()
+    setWorkOn(false)
     useTabs.getState().open({ kind: 'calendar' })
     const { rerender } = render(<DayView day={TODAY} />)
     const header = screen.getByTestId('day-header')
-    await user.click(within(header).getByRole('button', { name: 'Tasks dashboard' }))
+    expect(within(header).queryByRole('button', { name: 'Tasks dashboard' })).toBeNull()
+    expect(within(header).queryByRole('button', { name: 'Open Work' })).toBeNull()
+    await user.click(within(header).getByRole('button', { name: 'Open Tasks' }))
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'work', view: 'today' })
     rerender(<DayView day="2026-10-24" />)
-    expect(within(screen.getByTestId('day-header')).queryByRole('button', { name: 'Tasks dashboard' })).toBeNull()
+    expect(within(screen.getByTestId('day-header')).queryByRole('button', { name: 'Open Tasks' })).toBeNull()
+  })
+
+  test('test with Work on the link reads Open Work and opens the Work page’s Today (M32)', async () => {
+    const user = userEvent.setup()
+    setWorkOn(true)
+    useTabs.getState().open({ kind: 'calendar' })
+    render(<DayView day={TODAY} />)
+    const header = screen.getByTestId('day-header')
+    expect(within(header).queryByRole('button', { name: 'Open Tasks' })).toBeNull()
+    await user.click(within(header).getByRole('button', { name: 'Open Work' }))
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'work', view: 'today' })
+  })
+
+  test('test while the space hides Tasks the header has no task link (M32)', () => {
+    setWorkOn(true)
+    useSpaceInfo.setState((s) => ({ space: s.space && { ...s.space, hideTaskManagement: true } }))
+    render(<DayView day={TODAY} />)
+    const header = screen.getByTestId('day-header')
+    expect(within(header).queryByRole('button', { name: /^Open (Tasks|Work)$/ })).toBeNull()
   })
 })

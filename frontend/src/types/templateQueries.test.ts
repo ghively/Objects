@@ -94,6 +94,34 @@ const CASES: Record<string, { hit: [string, Values, Summary?][]; miss: [string, 
     ],
     miss: [['Fixed', { status: ['Resolved'] }], ['Calmer', { status: ['Mitigated'] }]],
   },
+  // M32: the Personal entries.
+  idea: {
+    hit: [
+      ['Newer', { status: ['New'] }, { lastUpdated: '2026-11-03T10:00:00Z' }],
+      ['Older', { status: ['New'] }, { lastUpdated: '2026-11-01T10:00:00Z' }],
+    ],
+    miss: [['Shelved', { status: ['Dropped'] }], ['Bare', {}]],
+  },
+  goal: {
+    hit: [
+      ['Run 10k', { status: ['In progress'], targetDate: day('2026-12-01') }],
+      ['Learn Spanish', { status: ['In progress'], targetDate: day('2027-06-01') }],
+    ],
+    miss: [['Reached', { status: ['Achieved'] }], ['Bare', {}]],
+  },
+  habit: {
+    hit: [['Read', { frequency: ['Daily'] }], ['Stretch', { frequency: ['Daily'] }]],
+    miss: [['Review', { frequency: ['Weekly'] }]],
+  },
+  recipe: { hit: [['Bread', {}], ['Soup', {}]], miss: [] },
+  trip: {
+    hit: [['Lisbon', { startDate: day('2026-03-10') }], ['Oslo', { startDate: day('2026-12-20') }]],
+    miss: [['Last year', { startDate: day('2025-07-01') }], ['Undated', {}]],
+  },
+  journalEntry: {
+    hit: [['Tuesday', { date: day('2026-11-03') }], ['Sunday', { date: day('2026-11-01') }]],
+    miss: [['October', { date: day('2026-10-20') }]],
+  },
 }
 
 const NOW = new Date(2026, 10, 4, 12, 0) // Wednesday 2026-11-04
@@ -101,7 +129,7 @@ const NOW = new Date(2026, 10, 4, 12, 0) // Wednesday 2026-11-04
 describe('the starter templates’ saved queries', () => {
   test('every gallery template has a query and a case here', () => {
     expect(Object.keys(TEMPLATES).sort()).toEqual(Object.keys(CASES).sort())
-    expect(Object.keys(TEMPLATES)).toHaveLength(26)
+    expect(Object.keys(TEMPLATES)).toHaveLength(32)
   })
 
   test.each(Object.keys(CASES))('%s: the query picks its objects', (key) => {

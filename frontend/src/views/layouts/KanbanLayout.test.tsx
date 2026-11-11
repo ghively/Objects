@@ -23,7 +23,9 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
-import { usePeek } from '@/nav/tabs'
+import { resetFresh, takeFresh } from '@/create/freshObjects'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { DataView } from '../DataView'
 import { emptyFilterGroup } from '../model'
 
@@ -92,6 +94,9 @@ const columns = () => screen.getAllByTestId('kanban-column')
 beforeEach(() => {
   resetLinkIndex()
   usePeek.getState().close()
+  useTabs.getState().reset()
+  resetOpenAsFullPage()
+  resetFresh()
   vi.clearAllMocks()
   dragEnd = undefined
 })
@@ -266,6 +271,26 @@ describe('KanbanLayout', () => {
     const done = columns().find((c) => within(c).queryByText('Done'))!
     await user.click(within(done).getByRole('button', { name: /Add to Done/ }))
     await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', { values: { done: true, status: ['Done'] } }))
+  })
+
+  // M32: a new card opens as any new note does (a full page, its title ready for typing); with
+  // "Open notes as a full page" off it opens in the peek and the board stays in view.
+  test('a new card opens as a full page with its title ready; with full pages off, in the peek', async () => {
+    const user = userEvent.setup()
+    mocked.createObject.mockResolvedValue({ path: 'Tasks/New.md', version: 'v1' })
+    render(<Harness init={kanban()} />)
+    await user.click(within(columns()[0]).getByRole('button', { name: /^Add to / }))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Tasks/New.md' }))
+    expect(usePeek.getState().path).toBeNull()
+    expect(takeFresh('Tasks/New.md')).toBe(true)
+
+    useTabs.getState().reset()
+    setOpenAsFullPage(false)
+    mocked.createObject.mockResolvedValue({ path: 'Tasks/Newer.md', version: 'v1' })
+    await user.click(within(columns()[0]).getByRole('button', { name: /^Add to / }))
+    await waitFor(() => expect(usePeek.getState().path).toBe('Tasks/Newer.md'))
+    expect(currentTarget(useTabs.getState())).toBeNull()
+    expect(takeFresh('Tasks/Newer.md')).toBe(true)
   })
 
   test('a board grouped by a counterpart takes no drops and its "+" creates without it (M28 review #2)', async () => {

@@ -266,10 +266,11 @@ describe('WhiteboardPage', () => {
     expect(host.requestDelete).toHaveBeenCalledWith(PATH, 'page')
     // A request for another board or the peek is not ours.
     act(() => useDeleteRequest.getState().requestDelete(PATH, 'peek'))
-    expect(screen.queryByText(/^Delete this (object|note)\?$/)).toBeNull()
+    expect(screen.queryByRole('alertdialog')).toBeNull()
     act(() => useDeleteRequest.getState().requestDelete(PATH, 'page'))
-    expect(await screen.findByText(/^Delete this (object|note)\?$/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /^Delete 1 (object|note)$/ }))
+    // M32: the dialog names the board.
+    expect(await screen.findByText('Delete “Board”?')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete 1 note' }))
     await waitFor(() => expect(api.deleteObject).toHaveBeenCalledWith(PATH, { baseVersion: 'v1' }))
     expect(await screen.findByText('Deleted content')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Undo Delete' }))

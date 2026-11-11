@@ -12,7 +12,8 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import { installLinkPicker, LinkPicker, useLinkPicker } from '@/links/LinkPicker'
 import { resetLinkIndex } from '@/links/linkIndex'
-import { usePeek } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { TextBlockCell } from './TextBlockCell'
 
 const mocked = vi.mocked(api)
@@ -42,6 +43,8 @@ afterEach(() => {
   cleanup()
   useLinkPicker.getState().hide()
   usePeek.getState().close()
+  useTabs.getState().reset()
+  resetOpenAsFullPage()
 })
 
 async function startEditing(value: string | null) {
@@ -75,6 +78,11 @@ describe('TextBlockCell (M9)', () => {
     expect(chip).toHaveTextContent('Ada')
     expect(chip.getAttribute('data-target')).toBe('Ada Lovelace')
     await waitFor(() => expect(chip.getAttribute('data-resolved-path')).toBe(ADA.path))
+    // M32: a plain click opens the note as a full page; with the setting off, in the peek.
+    fireEvent.click(chip)
+    expect(usePeek.getState().path).toBeNull()
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: ADA.path })
+    setOpenAsFullPage(false)
     fireEvent.click(chip)
     expect(usePeek.getState().path).toBe(ADA.path)
     // Following the link does not open the editor.

@@ -11,7 +11,8 @@
  * block too, unless the `alwaysCreateInlineLinks` setting is on.
  *
  * M29: with a query typed, the matching objects are followed by a create row "New '<q>'" of the
- * suggested type (`create/suggestContext.suggestFor`; Page when there is none), then "Other types",
+ * suggested type (M32: the type whose name patterns match, `create/typeSuggest.suggestType`, never
+ * the type made last; Page, shown as Note, when there is none), then "Other types",
  * which lists every other writable type. Picking one creates `<q>` of it (no `templateId`, so the
  * type's default template applies), links (or embeds) it as an existing object would be, and sets
  * the space's last type.
@@ -32,8 +33,7 @@ import { setObjectEmbedPicker } from '@/editor/nodes/objectEmbed'
 import { showToast } from '@/editor/media/upload'
 import { useLastType } from '@/create/lastType'
 import { NEW_OBJECT_TEXT } from '@/create/NewObjectMenu'
-import { suggestFor } from '@/create/suggestContext'
-import { SUGGEST_TEXT } from '@/create/typeSuggest'
+import { SUGGEST_TEXT, suggestType } from '@/create/typeSuggest'
 import { useRecent } from '@/nav/recent'
 import { isDailyNoteType } from '@/object/ObjectHeader'
 import { pageType } from '@/palette/searchOptions'
@@ -212,7 +212,10 @@ export function LinkPicker() {
     const q = query.trim()
     if (q) {
       const offered = creatableTypes(types, mode)
-      const suggestedId = suggestFor(q, offered)[0]
+      // M32 ("new means a note"): only a type whose name patterns match the title is suggested. The
+      // type made last, and the list the tab shows, are no suggestion here, so "New 'x'" is a Note
+      // unless a type is picked under "Other types".
+      const suggestedId = suggestType(q, { types: offered })[0]
       const main = (suggestedId ? offered.find((t) => t.id === suggestedId) : undefined) ?? pageType(offered)
       const others = offered.filter((t) => t.id !== main?.id)
       if (otherTypes) return others.map((t) => ({ kind: 'create' as const, t, suggested: false }))

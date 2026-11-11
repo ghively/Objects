@@ -12,7 +12,8 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api, ConflictError } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { usePeek } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { cardProperties } from './cards/cardConfig'
 import { DataView } from './DataView'
@@ -95,6 +96,8 @@ const titles = () => screen.getAllByRole('listitem').map((li) => li.textContent)
 beforeEach(() => {
   resetLinkIndex()
   usePeek.getState().close()
+  useTabs.getState().reset()
+  resetOpenAsFullPage()
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
 })
 
@@ -207,7 +210,16 @@ describe('DataView', () => {
     expect(screen.getByText('Loading results…')).toBeInTheDocument()
   })
 
-  test('test click peeks with view order as pager list', async () => {
+  test('test click opens the note as a full page (M32)', async () => {
+    const user = userEvent.setup()
+    render(<Harness init={base()} />)
+    await user.click(screen.getByText('Beta'))
+    expect(usePeek.getState().path).toBeNull()
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Pages/Beta.md' })
+  })
+
+  test('test with full pages off a click peeks with view order as pager list', async () => {
+    setOpenAsFullPage(false)
     const user = userEvent.setup()
     const init = { ...base(), sorts: [{ propertyId: 'title', option: 'descending' as const }] }
     render(<Harness init={init} />)

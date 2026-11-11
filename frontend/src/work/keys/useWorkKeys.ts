@@ -86,7 +86,8 @@ export function useWorkKeys(): void {
         gAt = null
         if (fresh && key.length === 1) {
           const calm = useWorkUi.getState().calm
-          // Hide Task Management leaves the task lists out, so `g i` (Inbox) does nothing then.
+          // "Hide Tasks in this space" leaves the task lists out, so `g i` (Inbox) does nothing then
+          // (M32: the app does not show this page at all while Tasks are hidden).
           const hideTasks = useSpaceInfo.getState().space?.hideTaskManagement ?? false
           const view = workViews().find(
             (v) => v.key === key && (!calm || v.id === 'now') && !(hideTasks && isTaskListView(v.id)),
@@ -129,7 +130,8 @@ export function useWorkKeys(): void {
         case ' ': {
           const path = selection.selected()
           if (onControl(e) || path === null) return
-          return act(() => usePeek.getState().peek(path, useWorkSelection.getState().list))
+          // Space is the peek key: it peeks whatever "Open notes as a full page" says (M32).
+          return act(() => usePeek.getState().show(path, useWorkSelection.getState().list))
         }
         case '[':
         case ']':

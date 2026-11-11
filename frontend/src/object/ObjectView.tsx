@@ -1098,7 +1098,9 @@ export function ObjectView({
   const isTag = !!summary && isTagType(type, summary.type)
   const isTask = !!summary && !isTemplate && isTaskRoleType(type, summary.type)
   // M32: with the Work page off for this space a work type's page is a plain note page: no work
-  // header, no resolution note, no work rows (`PropertyPanel`) and no work fetch.
+  // header, no resolution note, no empty work rows (`PropertyPanel`) and no work fetch. A work
+  // value the note already holds still shows (no value is hidden by the Work switch), and only
+  // such a note reads its decoded steps.
   const workOn = useWorkOn()
   /** M22: a work item with a Ticket ID shows its resolution note. */
   const ticketId = detail?.frontmatter.ticketId
@@ -1108,7 +1110,13 @@ export function ObjectView({
   // M22: a work item's steps and floor items are shown as the server decodes them (each with its
   // id and rev, which step actions send back): read once per stored value (a load, an external
   // change), taken from a work write's result otherwise. Reading never writes.
-  const workKeys = workOn ? workKeysOf(type) : NO_KEYS
+  const typeWorkKeys = workKeysOf(type)
+  const storedWork = detail?.frontmatter
+  const workKeys = workOn
+    ? typeWorkKeys
+    : storedWork
+      ? typeWorkKeys.filter((k) => Array.isArray(storedWork[k]) && (storedWork[k] as unknown[]).length > 0)
+      : NO_KEYS
   const workRaw = detail && workKeys.length > 0 ? rawWorkValues(detail.frontmatter, workKeys) : null
   const decodedNow = decoded && workRaw !== null && decoded.path === path && decoded.raw === workRaw ? decoded : null
   useEffect(() => {

@@ -215,19 +215,20 @@ describe('App', () => {
     const objects = [summary('Pages/A.md', 'A'), summary('Pages/B.md', 'B'), summary('People/Ada.md', 'Ada', 'person')]
     mocked.objects.mockResolvedValue(objects)
     render(<App />)
-    const types = await screen.findByRole('region', { name: 'Object Types' })
+    // M32: the section reads "Types" and the built-in Page type's row "Notes".
+    const types = await screen.findByRole('region', { name: 'Types' })
     const row = (name: string) => within(types).getByRole('button', { name: new RegExp(`^${name}`) })
-    await waitFor(() => expect(row('Pages')).toHaveTextContent('Pages2'))
+    await waitFor(() => expect(row('Notes')).toHaveTextContent('Notes2'))
     expect(row('People')).toHaveTextContent('People1')
     await waitFor(() => expect(listeners.length).toBeGreaterThan(0))
 
     mocked.objects.mockResolvedValue([...objects, summary('Pages/C.md', 'C')])
     emit({ kind: 'created', path: 'Pages/C.md', version: 'c1' })
-    await waitFor(() => expect(row('Pages')).toHaveTextContent('Pages3'))
+    await waitFor(() => expect(row('Notes')).toHaveTextContent('Notes3'))
 
     mocked.objects.mockResolvedValue([summary('Pages/A.md', 'A'), summary('Pages/C.md', 'C')])
     emit({ kind: 'deleted', path: 'People/Ada.md', version: null })
     await waitFor(() => expect(row('People')).toHaveTextContent('People0'))
-    expect(row('Pages')).toHaveTextContent('Pages2')
+    expect(row('Notes')).toHaveTextContent('Notes2')
   })
 })

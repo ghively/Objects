@@ -62,9 +62,9 @@ describe('TypePage row menu (Task 17)', () => {
       'Open in side panel',
       'Open in new tab',
       'Change type',
-      'Copy object reference',
+      'Copy reference',
       'Duplicate',
-      'Delete object',
+      'Delete',
     ])
   })
 
@@ -72,10 +72,11 @@ describe('TypePage row menu (Task 17)', () => {
     const user = userEvent.setup()
     render(<TypePage type={BOOK} />)
     await user.pointer({ keys: '[MouseRight]', target: await rowEl('Beta') })
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete object' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
     const dialog = await screen.findByRole('alertdialog')
-    expect(within(dialog).getByText('Delete this object?')).toBeInTheDocument()
-    await user.click(within(dialog).getByRole('button', { name: 'Delete 1 object' }))
+    // M32: the dialog names the note, and its button says "note".
+    expect(within(dialog).getByText('Delete “Beta”?')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Delete 1 note' }))
     await waitFor(() => expect(mocked.deleteObject).toHaveBeenCalledWith('Books/Beta.md', { baseVersion: 'v-Beta' }))
   })
 
@@ -85,8 +86,8 @@ describe('TypePage row menu (Task 17)', () => {
     render(<TypePage type={BOOK} />)
     await user.pointer({ keys: '[MouseRight]', target: await rowEl('Alpha') })
     await user.click(await screen.findByRole('menuitem', { name: 'Change type' }))
-    await user.click(await screen.findByRole('menuitem', { name: 'Page' }))
-    expect(await screen.findByText('Change object type?')).toBeInTheDocument()
+    await user.click(await screen.findByRole('menuitem', { name: 'Note' }))
+    expect(await screen.findByText('Change type?')).toBeInTheDocument()
     await waitFor(() => expect(mocked.suggestMapping).toHaveBeenCalledWith('Books/Alpha.md', 'page'))
   })
 })

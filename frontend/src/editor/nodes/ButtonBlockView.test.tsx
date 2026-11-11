@@ -64,7 +64,7 @@ describe('ButtonBlockView', () => {
     await mount(BODY, { template: true })
     const button = await screen.findByRole('button', { name: 'Start review' })
     expect(button).toBeDisabled()
-    expect(button).toHaveAttribute('title', 'Buttons run in objects made from this template.')
+    expect(button).toHaveAttribute('title', 'Buttons run in notes made from this template.')
   })
 
   test('a missing or turned-off rule disables it', async () => {

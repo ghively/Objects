@@ -53,7 +53,10 @@ const CORE_KEYS = new Set([
   ...LAYOUT_KEYS,
 ])
 
-/** M22's work kinds: their rows belong to the Work page (M32: shown only while it is on). */
+/**
+ * M22's work kinds: their rows belong to the Work page. M32: with Work off for the space an empty
+ * one is left out; one that holds a value still shows (no value is hidden by the Work switch).
+ */
 const WORK_KINDS: ReadonlySet<PropertyType> = new Set<PropertyType>(['steps', 'textList', 'floorItems'])
 
 function isEmpty(v: unknown): boolean {
@@ -493,10 +496,14 @@ export function PropertyPanel({
   const canEditType = !!type && !!onTypeChange && !type.readOnlyReason
   const deleting = deleteFor ? type?.propertyDefinitions.find((d) => d.id === deleteFor) : undefined
   const typed = (type?.propertyDefinitions.length ?? 0) > 0
-  // M32: the work kinds' rows (steps, lists, floor items) show only while the Work page is on for
-  // the space; off, they are left out of the panel (their values stay in the file).
+  // M32: the work kinds' rows (steps, lists, floor items) belong to the Work page. With Work off
+  // for the space the empty ones are left out of the panel; a row that holds a value still shows,
+  // so the switch never hides a value (the back end keeps such a field on the type for the same
+  // reason).
   const workOn = useWorkOn()
-  const rows = propertyRows(type, frontmatter).filter((d) => d.type !== 'entity_title' && (workOn || !WORK_KINDS.has(d.type)))
+  const rows = propertyRows(type, frontmatter).filter(
+    (d) => d.type !== 'entity_title' && (workOn || !WORK_KINDS.has(d.type) || !isEmpty(cellValue(d, frontmatter, links, summary))),
+  )
   const visible: PropertyDef[] = []
   const hidden: PropertyDef[] = []
   for (const d of rows) {
@@ -693,7 +700,7 @@ export function PropertyPanel({
             <DialogHeader>
               <DialogTitle className="text-[17px]">{`Delete "${deleting.name}"?`}</DialogTitle>
               <DialogDescription className="text-[13px] text-fg-muted">
-                The property and its values are removed from every object of this type.
+                The property and its values are removed from every note of this type.
               </DialogDescription>
             </DialogHeader>
             <DeletePropertySection

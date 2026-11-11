@@ -10,6 +10,7 @@ vi.mock('./turnInto', () => ({
 }))
 
 import { allShortcuts, keysFor } from '@/lib/shortcuts'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { editorExtensions, loadBody, serializeBody } from './document'
 import { BLOCK_REFERENCE_COPIED, setEditorObject } from './nodes/blockRef'
 import { setHighlightTextHandler } from './nodes/textStyle'
@@ -85,7 +86,7 @@ describe('m8 editor shortcuts', () => {
     // the catalogued names
     expect(registered.get('copyBlockReference')!.name).toBe('Copy block reference')
     expect(registered.get('highlightText')!.name).toBe('Highlight the selected text')
-    expect(registered.get('turnBlockIntoTaskObject')!.name).toBe('Make this block a task')
+    expect(registered.get('turnBlockIntoTaskObject')!.name).toBe('Make this line a task')
   })
 
   test('tab indents any block', () => {
@@ -171,5 +172,27 @@ describe('m8 editor shortcuts', () => {
     await Promise.resolve()
     expect(turnIntoTask).not.toHaveBeenCalled()
     expect(turnIntoObject).toHaveBeenCalledTimes(1)
+  })
+
+  // M32, "Hide Tasks in this space": the key is taken and makes no task.
+  test('test while the space hides Tasks, the make-this-line-a-task key does nothing', async () => {
+    vi.mocked(turnLineIntoTask).mockClear()
+    const editor = headless('A plain line\n')
+    cursorIn(editor, 'A plain line')
+    useSpaceInfo.setState({ space: { name: 's', root: '/s', types: [], hideTaskManagement: true }, loaded: true })
+    try {
+      // Taken (true), so the browser's own Ctrl+Shift+T does not run either.
+      expect(press(editor, keysFor('turnBlockIntoTaskObject')[0])).toBe(true)
+      await Promise.resolve()
+      expect(turnLineIntoTask).not.toHaveBeenCalled()
+      expect(serializeBody(editor)).toBe('A plain line\n')
+      // The switch off again: the key works.
+      useSpaceInfo.setState({ space: { name: 's', root: '/s', types: [], hideTaskManagement: false }, loaded: true })
+      expect(press(editor, keysFor('turnBlockIntoTaskObject')[0])).toBe(true)
+      await Promise.resolve()
+      expect(turnLineIntoTask).toHaveBeenCalledWith(editor)
+    } finally {
+      resetSpaceInfo()
+    }
   })
 })

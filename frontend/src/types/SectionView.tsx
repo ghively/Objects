@@ -12,6 +12,7 @@ import { useRecent } from '@/nav/recent'
 import { useCollectionPeek, useTabs } from '@/nav/tabs'
 import { DataView, type Pipeline } from '@/views/DataView'
 import { applyFilters } from '@/views/filter'
+import { UNGROUPED_LABEL } from '@/views/group'
 import { FULL_VIEW_LAYOUTS, defaultViewState, emptyFilterGroup } from '@/views/model'
 import { useRows } from '@/views/useRows'
 import { createAndOpen } from '@/create/createAndOpen'
@@ -56,7 +57,7 @@ function recentPipeline(order: string[]): Pipeline {
   return (rows, state, ctx) => {
     const kept = applyFilters(rows, state.filterGroup, ctx)
     const sorted = [...kept].sort((a, b) => order.indexOf(a.summary.path) - order.indexOf(b.summary.path))
-    return { rows: sorted, groups: [{ id: 'other', label: 'Objects', rows: sorted }] }
+    return { rows: sorted, groups: [{ id: 'other', label: UNGROUPED_LABEL, rows: sorted }] }
   }
 }
 

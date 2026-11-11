@@ -12,6 +12,7 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, useTabs } from '@/nav/tabs'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { THEME_COLORS } from '@/theme/palette'
 import { CreateTypeDialog } from './CreateTypeDialog'
 import { DeleteTypeDialog } from './DeleteTypeDialog'
@@ -23,7 +24,12 @@ beforeEach(() => {
   useTabs.getState().reset()
   resetLinkIndex()
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
+  // The starter-set tests answer these two themselves: back to the shared mock's defaults.
+  mocked.space.mockReset()
+  mocked.spaceSetup.mockReset()
   useLinkIndex.setState({ types: [], objects: [], loaded: true })
+  useSpaceInfo.setState({ space: null, loaded: false })
+  document.querySelectorAll('.editor-toast').forEach((t) => t.remove())
 })
 
 const GALLERY: TypeTemplate[] = [
@@ -102,12 +108,12 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     expect(within(personal).getByRole('button', { name: /Ideas/ })).toBeInTheDocument()
     expect(within(personal).getByRole('button', { name: /Recipes/ })).toBeInTheDocument()
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Personal', 'Use cases', 'Research', 'Media', 'Planning and reflection', 'IT operations'])
+    expect(headings).toEqual(['Personal', 'Use cases', 'Research', 'Media', 'Planning and reflection', 'IT operations', 'Starter sets'])
     // "Create your own" stays the first card.
     expect(screen.getAllByRole('button')[0]).toHaveTextContent('Create your own')
   })
 
-  test('test IT operations is last and collapsed until it is opened (M32)', async () => {
+  test('test IT operations is the last type group and collapsed until it is opened (M32)', async () => {
     withM32Gallery()
     const user = userEvent.setup()
     render(<CreateTypeDialog open />)
@@ -117,7 +123,7 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('button', { name: /Hosts/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /Runbooks/ })).toBeNull()
-    // Last: after every other group, the unsectioned row included.
+    // Last of the type groups: after every other one, the unsectioned row included.
     const things = screen.getByRole('button', { name: /Things/ })
     expect(things.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
@@ -159,15 +165,99 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     render(<CreateTypeDialog open />)
     const group = await screen.findByRole('group', { name: 'Home life' })
     expect(within(group).getByRole('button', { name: /Pets/ })).toBeInTheDocument()
-    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Home life', 'Use cases', 'Media'])
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Home life', 'Use cases', 'Media', 'Starter sets'])
   })
 
-  test('test the gallery offers no starter sets while no route applies one to an open space (M32)', async () => {
+  // M32 (item 12): the two starting points the space dialog used to ask about, offered here.
+  const toasts = () => [...document.querySelectorAll('.editor-toast')].map((t) => t.textContent)
+  const NOTE_TYPE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true })
+  const EVERYDAY = [
+    typeDef({ id: 'person', name: 'Person', pluralName: 'People' }),
+    typeDef({ id: 'meeting', name: 'Meeting', pluralName: 'Meetings' }),
+    typeDef({ id: 'project', name: 'Project', pluralName: 'Projects' }),
+    typeDef({ id: 'book', name: 'Book', pluralName: 'Books' }),
+  ]
+
+  test('test Starter sets is the last group: the Everyday set and the IT operations set, each with a line (M32)', async () => {
     withM32Gallery()
     render(<CreateTypeDialog open />)
-    await screen.findByRole('group', { name: 'Personal' })
-    expect(screen.queryByRole('group', { name: 'Starter sets' })).toBeNull()
+    const group = await screen.findByRole('group', { name: 'Starter sets' })
+    expect(within(group).getByRole('heading', { level: 3, name: 'Starter sets' })).toBeInTheDocument()
+    const sets = within(group).getAllByRole('button')
+    expect(sets.map((b) => b.textContent)).toEqual([
+      'Everyday setComes with types for people, meetings, projects and books.',
+      'IT operations setIncludes hosts, software, applications, runbooks and incidents.',
+    ])
+    // Under every type group, the collapsed IT operations included.
+    const it = screen.getByRole('group', { name: 'IT operations' })
+    expect(it.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // Showing it adds nothing.
     expect(mocked.spaceSetup).not.toHaveBeenCalled()
+  })
+
+  test('test one click adds the Everyday set, says what was added and reads the gallery and types again (M32)', async () => {
+    const user = userEvent.setup()
+    const gallery = vi.fn(async () => M32_GALLERY)
+    ;(api as unknown as { typeGallery: () => Promise<TypeTemplate[]> }).typeGallery = gallery
+    useLinkIndex.setState({ types: [NOTE_TYPE, EVERYDAY[2]], objects: [], loaded: true })
+    useSpaceInfo.setState({ space: { name: 's', root: '/s', types: [NOTE_TYPE, EVERYDAY[2]], workOn: false }, loaded: true })
+    const after = { name: 's', root: '/s', types: [NOTE_TYPE, ...EVERYDAY], workOn: false }
+    mocked.spaceSetup.mockResolvedValueOnce(after)
+    // What the app reads again afterwards (the link index's own fetch of the space).
+    mocked.space.mockResolvedValue(after)
+    const onOpenChange = vi.fn()
+    const onCreated = vi.fn()
+    render(<CreateTypeDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
+    const group = await screen.findByRole('group', { name: 'Starter sets' })
+    expect(gallery).toHaveBeenCalledTimes(1)
+    await user.click(within(group).getByRole('button', { name: /Everyday set/ }))
+    await waitFor(() => expect(mocked.spaceSetup).toHaveBeenCalledWith('basic'))
+    // Only the types the space did not have (it had Project already).
+    await waitFor(() => expect(toasts()).toEqual(['Added: Person, Meeting, Book.']))
+    await waitFor(() => expect(gallery).toHaveBeenCalledTimes(2))
+    expect(useLinkIndex.getState().types.map((t) => t.id)).toEqual(['page', 'person', 'meeting', 'project', 'book'])
+    expect(useSpaceInfo.getState().space?.types.map((t) => t.id)).toEqual(['page', 'person', 'meeting', 'project', 'book'])
+    // The dialog stays on the gallery; no type's settings open.
+    expect(onOpenChange).not.toHaveBeenCalled()
+    expect(onCreated).not.toHaveBeenCalled()
+    expect(screen.getByRole('group', { name: 'Starter sets' })).toBeInTheDocument()
+    expect(mocked.createType).not.toHaveBeenCalled()
+  })
+
+  test('test a set the space already has says so; the IT operations set says when it turns Work on (M32)', async () => {
+    const user = userEvent.setup()
+    withM32Gallery()
+    const HOST = typeDef({ id: 'host', name: 'Host', pluralName: 'Hosts' })
+    useLinkIndex.setState({ types: [NOTE_TYPE, ...EVERYDAY], objects: [], loaded: true })
+    useSpaceInfo.setState({ space: { name: 's', root: '/s', types: [NOTE_TYPE, ...EVERYDAY], workOn: false }, loaded: true })
+    const same = { name: 's', root: '/s', types: [NOTE_TYPE, ...EVERYDAY], workOn: false }
+    mocked.spaceSetup.mockResolvedValueOnce(same)
+    mocked.space.mockResolvedValue(same)
+    render(<CreateTypeDialog open />)
+    const group = await screen.findByRole('group', { name: 'Starter sets' })
+    await user.click(within(group).getByRole('button', { name: /Everyday set/ }))
+    await waitFor(() => expect(toasts()).toEqual(['This space already has every type in that set.']))
+
+    const withIt = { name: 's', root: '/s', types: [NOTE_TYPE, ...EVERYDAY, HOST], workEnabled: true, workOn: true }
+    mocked.spaceSetup.mockResolvedValueOnce(withIt)
+    mocked.space.mockResolvedValue(withIt)
+    await user.click(within(screen.getByRole('group', { name: 'Starter sets' })).getByRole('button', { name: /IT operations set/ }))
+    await waitFor(() => expect(mocked.spaceSetup).toHaveBeenLastCalledWith('itops'))
+    await waitFor(() => expect(toasts()).toContain('Added: Host. The Work page is now on for this space.'))
+    expect(useSpaceInfo.getState().space?.workOn).toBe(true)
+  })
+
+  test('test a set that cannot be added shows the error and no toast (M32)', async () => {
+    const user = userEvent.setup()
+    withM32Gallery()
+    mocked.spaceSetup.mockRejectedValueOnce(new Error('This space is read-only.'))
+    render(<CreateTypeDialog open />)
+    const group = await screen.findByRole('group', { name: 'Starter sets' })
+    await user.click(within(group).getByRole('button', { name: /Everyday set/ }))
+    expect(await within(screen.getByRole('group', { name: 'Starter sets' })).findByRole('alert')).toHaveTextContent('This space is read-only.')
+    expect(toasts()).toEqual([])
+    // The set can be tried again.
+    expect(within(screen.getByRole('group', { name: 'Starter sets' })).getByRole('button', { name: /Everyday set/ })).toBeEnabled()
   })
 
   test('a template shows its properties and creates the type from it', async () => {

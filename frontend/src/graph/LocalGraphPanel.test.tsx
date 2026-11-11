@@ -14,6 +14,7 @@ import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
 import { resetPinned, useUiStore } from '@/shell/usePinned'
+import { resetOpenAsFullPage, setOpenAsFullPage } from '@/test/fullPage'
 import { graphData, typeDef } from '@/test/mockApi'
 import { HOPS_KEY, LocalGraphPanel } from './LocalGraphPanel'
 import { latestPaths, sigmaInstances } from './testSigma'
@@ -58,6 +59,7 @@ beforeEach(() => {
   resetLinkIndex()
   usePeek.getState().close()
   useTabs.setState({ tabs: [], activeId: null })
+  resetOpenAsFullPage()
   localStorage.clear()
   sigmaInstances.length = 0
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockClear()
@@ -183,7 +185,19 @@ describe('LocalGraphPanel', () => {
     expect(screen.queryByTestId('graph-canvas')).toBeNull()
   })
 
-  test('node click peeks; ctrl+click opens a tab', async () => {
+  test('node click opens the note in the tab (M32)', async () => {
+    render(<LocalGraphPanel path="Charles.md" />)
+    const sigma = await sigmaReady()
+    await waitFor(() => expect(latestPaths()).toHaveLength(3))
+    act(() => sigma.emit('clickNode', { node: '2', event: { original: new MouseEvent('click') } }))
+    expect(usePeek.getState().path).toBeNull()
+    const tabs = useTabs.getState().tabs
+    expect(tabs).toHaveLength(1)
+    expect(tabs[0].history[tabs[0].index]).toEqual({ kind: 'object', path: 'Engine.md' })
+  })
+
+  test('with full pages off a node click peeks; ctrl+click opens a tab', async () => {
+    setOpenAsFullPage(false)
     render(<LocalGraphPanel path="Charles.md" />)
     const sigma = await sigmaReady()
     await waitFor(() => expect(latestPaths()).toHaveLength(3))

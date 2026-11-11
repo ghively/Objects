@@ -51,7 +51,11 @@ export function canDuplicate(row: Row, type: TypeDef | undefined): boolean {
   return !s.readOnly && s.template == null && !isDailyNoteType(type, s.type) && !isWhiteboardType(type)
 }
 
-/** Duplicate the row's object, then show the copy in the peek (our choice: the view stays put). */
+/**
+ * Duplicate the row's note, then open the copy as a plain click on it would (M32): a full page
+ * while "Open notes as a full page" is on (the default); with it off, the peek, so the view stays
+ * put as it did before.
+ */
 export async function duplicateRow(row: Row): Promise<void> {
   const res = await api.duplicateObject(row.summary.path)
   usePeek.getState().peek(res.path)

@@ -398,7 +398,7 @@ describe('M5 mounts', () => {
 
     // A peek is open: the page is no longer the active view, the peek is.
     const OTHER = 'Projects/Other.md'
-    act(() => usePeek.getState().peek(OTHER))
+    act(() => usePeek.getState().show(OTHER))
     render(<ObjectView path={OTHER} mode="peek" onDismiss={vi.fn()} />)
     await waitFor(() => expect(screen.getAllByTestId('find-bar')).toHaveLength(2))
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true })

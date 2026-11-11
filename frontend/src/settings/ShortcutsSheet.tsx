@@ -1,10 +1,14 @@
 // The Shortcuts sheet ("Shortcuts"): every registered shortcut, grouped by category, with its
 // name and keys. An id with no key is left out: the sheet only shows rows with keys. Provisional
 // keys (ours, with no table key to check against) carry a small "unverified" tag. M10: the AI
-// Assistant group is left out while "Hide AI features" is on.
+// Assistant group is left out while "Hide AI features" is on. M32: the Work group shows only while
+// the Work page is on for the space, and while the space hides Tasks the task keys are left out
+// too (they do nothing then).
 import { useAiHidden } from '@/ai/store'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { CATEGORY_LABELS, formatKeys, shortcutsByCategory, sortCategories, type ShortcutDef } from '@/lib/shortcuts'
+import { useTasksHidden } from '@/tasks/tasksHidden'
+import { useWorkOn } from '@/work/useWorkOn'
 import { useSettingsModal } from './useSettingsModal'
 
 export const SHORTCUTS_TEXT = {
@@ -34,15 +38,23 @@ function Keys({ def }: { def: ShortcutDef }) {
   )
 }
 
+/** The keys that make a task: not listed while the space hides Tasks. */
+const TASK_SHORTCUT_IDS: readonly string[] = ['createNewTask', 'turnBlockIntoTaskObject']
+
 export function ShortcutsSheet() {
   const open = useSettingsModal((s) => s.shortcutsOpen)
   const close = useSettingsModal((s) => s.closeShortcuts)
   const aiHidden = useAiHidden()
+  const tasksHidden = useTasksHidden()
+  const workShown = useWorkOn() && !tasksHidden
   // The groups in the catalog's order (`CATEGORY_ORDER`), the uncatalogued ones after.
   const byCategory = open ? shortcutsByCategory() : new Map<string, ShortcutDef[]>()
   const groups = sortCategories([...byCategory.keys()])
-    .filter((c) => !(aiHidden && c === 'ai'))
-    .map((c) => [c, (byCategory.get(c) ?? []).filter((d) => d.keys.length > 0)] as const)
+    .filter((c) => !(aiHidden && c === 'ai') && !(c === 'work' && !workShown))
+    .map(
+      (c) =>
+        [c, (byCategory.get(c) ?? []).filter((d) => d.keys.length > 0 && !(tasksHidden && TASK_SHORTCUT_IDS.includes(d.id)))] as const,
+    )
     .filter(([, defs]) => defs.length > 0)
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>

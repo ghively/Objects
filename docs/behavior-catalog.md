@@ -147,7 +147,12 @@ Object has no accounts.
     or Enter opens the object.
 - Task management: "Hide Tasks in this space" per space (M32; was "Hide Task Management", key `hideTaskManagement`
   unchanged): "Hides the Tasks page, its entry in the sidebar and the task features in this space. Other spaces are
-  not changed." Tasks already made are kept.
+  not changed." Tasks already made are kept. (M32) While it is on: the sidebar has no Tasks entry and no Work entry
+  under it; a Tasks or Work tab (a restored one, a pinned link) shows one quiet line, "Tasks are hidden in this
+  space.", with "Open Task management settings"; Home leaves its Tasks block out; the work toasts and overlays do
+  not show; the palette offers no "Create Task"; Ctrl+Shift+T makes no task (outside a note and in one); the
+  Shortcuts sheet leaves the task keys and the Work group out; the Calendar's day header has no task link. The Task
+  type, the tasks and the Calendar's own Tasks section stay; the switch off brings everything back at once.
 - Work (Object's own; M32): the first row is the switch "Use the Work page in this space" (`workEnabled` in
   `.object/space.json`; "Adds a Work page under Tasks: the Now view, queues, captures, alerts and tickets, and ticket
   fields on tasks and projects. Off: Tasks is a plain task list."). Off: the rest of the section (Your name in
@@ -197,7 +202,8 @@ or Ctrl+Y | Go to Calendar Ctrl+Alt+H (press twice to jump to today) | Open Expl
 side panel Ctrl+Shift+J (not in Object) | Multi-select blocks and objects Ctrl+Shift+Click | Show or hide the shortcuts list Ctrl+Shift+B |
 Show/hide the getting-started checklist Ctrl+Shift+A (not in Object).
 
-**Text editing**: Cut, copy, paste Ctrl+X/C/V | Paste as plain text Ctrl+Shift+V | Make this block a task
+**Text editing**: Cut, copy, paste Ctrl+X/C/V | Paste as plain text Ctrl+Shift+V | Make this line a task ((M32) it
+read "Make this block a task"; any text line, not only a to-do)
 Ctrl+Shift+T | Format as code Ctrl+E | Format as TeX formula Ctrl+M | Insert/format as link Ctrl+K (not bound: Ctrl+K is Search this space, taken first; decision D3) | Format bold Ctrl+B |
 Italicize Ctrl+I | Strikethrough Ctrl+Shift+S | Underline (unbound) | Highlight the selected text Ctrl+Shift+H | Move active block up or
 down Alt+Up/Down | Move this block up or down among its siblings Alt+Shift+Up/Down | Tick or untick the to-do in this block Ctrl+Enter | Expand or collapse the toggle in this block
@@ -252,7 +258,8 @@ Brain dump B | Go to Now, Flow, Projects map, Today, On the floor, Your queues, 
 Alerts, Everything, Inbox, Captures: G then N, W, P, T, O, Q, H, S, Y, L, E, I, C (I and C: decision D3; the other task
 lists and Tickets have no key; G then I does nothing while task management is hidden; within 1.5 s; in Just one thing only G then N) |
 Next row J | Previous row K | Open Enter | Peek Space | Previous item [ | Next item ] | Close Esc (the work item
-panel first, else the focus line and the search) | Shortcuts ?.
+panel first, else the focus line and the search) | Shortcuts ?. (M32) The Shortcuts sheet lists this group only
+while the Work page is on for the space; Space still peeks while "Open notes as a full page" is on.
 
 **Table** (not in Object; decision D3: these groups stay unbound): expand selection in four directions (Shift+arrows) | fill selected cells Ctrl+resize | insert
 rows below / columns after | delete rows/columns Ctrl+Shift+Backspace-style | move row/column Alt+arrows |
@@ -270,8 +277,12 @@ type". The groups and their order are the gallery data's (`typetemplates.py`): "
 Use cases, Research, Media, Planning and reflection and the unsectioned row; a section the screen has no title for
 shows under its key as words. "IT operations" is always the last group and starts collapsed: its heading is a
 disclosure that shows its entries when opened, and the fold is not remembered (a reopened gallery has it collapsed
-again). "Starter sets" (the Everyday set and the IT operations set) are not in the gallery yet: no route applies a
-starting point to a space that already has one (`POST /api/space/setup` answers 409).
+again). (M32) "Starter sets" is the last group, under IT operations: "Everyday set" ("Comes with types for people,
+meetings, projects and books.") and "IT operations set" ("Includes hosts, software, applications, runbooks and
+incidents."). One click adds the set (`POST /api/space/setup` with `basic` or `itops`; it writes only the types the
+space lacks), a toast says what was added ("Added: Person, Meeting, Book.", or "This space already has every type
+in that set."; the IT set adds "The Work page is now on for this space." when it turned Work on), the gallery and
+the types are read again and the gallery stays open, the set's types now marked "Added".
 - Meetings (who attended, and when), People, Projects (status, collaborators, meetings).
 - Research: Atomic notes, Definitions.
 - Media: Books (authors, rating, genre), Films, TV series, Podcasts.
@@ -319,8 +330,11 @@ Each starter template pre-fills the new type's properties.
   note anywhere (a list, card or table row, a `[[link]]`, a tag or backlink chip, a graph node, the Calendar's
   timeline, a new card or daily note made from a view) opens it in the current tab, with the page it came from on
   the breadcrumb trail, and an open peek closes. The peek is still there when asked for: Alt+Shift+click, a menu's
-  "Open in peek" or "Expand", today's note pop-out, the collection peek and its stepper; Ctrl/Cmd+click is still a
-  new tab and Shift+click the side panel. With the setting off a plain click peeks, as before M32.
+  "Open in peek" or "Expand" (a backlink's hover action), Space on the Work page, today's note pop-out, the
+  collection peek and its stepper; Ctrl/Cmd+click is still a new tab and Shift+click the side panel. With the
+  setting off a plain click peeks, as before M32. A card made with a board's "+" and a row's "Duplicate" open as a
+  plain click on them would (a full page; with the setting off, the peek, so the list stays in view), and the new
+  card's title is ready for typing.
 
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
@@ -405,7 +419,8 @@ Each starter template pre-fills the new type's properties.
   Move all open tasks to); "Open in Calendar" under it opens the Calendar's Day view on today. Today's badge
   counts that list's open tasks, Inbox's counts the inbox. While the space hides task management ("Hide Task
   Management"), the Work page leaves out the task lists (the list views and Today's tasks); the work views and
-  the timeline stay. On
+  the timeline stay. (M32) "Hide Tasks in this space" now hides the Work page too: its sidebar entry goes and a
+  Work tab shows "Tasks are hidden in this space." (section 2, Task management). On
   Today's timeline a block too short for its label and time (the 24-minute Morning brief) shows the two on
   one line under the track (the next row down when two would meet; the tooltip stays). The Task rows load
   once for the page. (M32) The plain Tasks page is its own page again (above); the task lists stay views of the
@@ -450,7 +465,8 @@ Each starter template pre-fills the new type's properties.
   object"), Copy > "Copy reference" with the toast "Link copied", "Delete" (was "Delete object"); "Change type",
   "Open as page" and the two AI rows are unchanged and stay where they were. The delete dialog names the note:
   'Delete “Title”?' ("Delete this note?" without a title), over "Moves it to the Trash, where it can be restored
-  for 30 days." Change type asks "Change type?". Notices say "note": "Couldn't open this note.", "This note is in
+  for 30 days." (M32) A row's "Delete" in a view and a whiteboard's name it the same way, and every delete button
+  counts notes: "Delete 1 note" / "Delete 3 notes" (it read "Delete 1 object"). Change type asks "Change type?". Notices say "note": "Couldn't open this note.", "This note is in
   the Trash.", "This note opens read-only: …", "This note's file was deleted or moved on disk. Edits here aren't
   saved.", "3 notes will change.", "A template fills in new notes for you."; the reference tabs' tooltips are
   "Links to this note" and "Similar notes".
@@ -512,8 +528,10 @@ Each starter template pre-fills the new type's properties.
   In views a counterpart filters, sorts and groups like a relation; its table column is read-only and a board
   grouped by it refuses drops.
 - **Work off** (M32): while "Use the Work page in this space" is off, the page of a Task, a Project or any type
-  with work fields is a plain note page: no work header, no Resolution note, no Steps, list or Floor items rows,
-  and nothing is read from the Work API. Their values stay in the file and show again when Work is turned on.
+  with work fields is a plain note page: no work header, no Resolution note, no empty Steps, list or Floor items
+  rows, and a note without such a value reads nothing from the Work API. (M32) No value is hidden by the switch: a
+  Steps, list or Floor items row that holds a value still shows (and works: such a note reads its decoded steps);
+  only the empty ones are left out.
 
 ## 6. Editor chrome and menus
 
@@ -844,7 +862,10 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   DailyNote default template, if any) and the typing goes into its own paragraph after the template content (or
   into the template's first empty paragraph) — never onto the end of the template's last heading.
 - **Day view** on today: the header's right side has a "Tasks dashboard" link to Tasks › Today, which lists the
-  same tasks as the Day view's Tasks section (decision T1); other days have no link.
+  same tasks as the Day view's Tasks section (decision T1); other days have no link. (M32) The link reads "Open
+  Tasks" and opens the Tasks page on its Today list; while the Work page is on for the space it reads "Open Work"
+  and opens Work's Today. In the Tasks section the `+` menu's first row reads "New task" (was "Create task"), and
+  the "Overdue (n)" group shows its count once (it read "Overdue (1) 1").
 - **Backlinks** (bottom of an object, a "Backlinks" pill with a count and a collapse toggle): each backlink is an
   embedded reference, not a link list. A task shows as a task row (circle checkbox, title, status chip with a
   dropdown, date icon, priority pill) plus the line that links here ("Parent project: <object chip>"); other
@@ -1252,7 +1273,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   picker lists "Create '<q>'" once per allowed type (all writable types when any type is allowed), the suggested
   one first, when no candidate matches exactly (the Tag picker's own "Create 'x'" stays); "+ New object" without
   a type lists the suggested type first; the palette's single create row ("Create new {type} with title "{q}"")
-  uses it unless a type filter is set; Turn into object lists it first and `I` uses it. Picking a type applies
+  uses it unless a type filter is set; Turn into object lists it first and `I` uses it. (M32, "new means a note")
+  In `[[` / `@` and a relation picker the type used last is no suggestion: "New '<q>'" is a Note unless a name
+  pattern matches or a type is picked under "Other types", and a relation that allows any type lists the Note
+  first (unmarked) when nothing is suggested, so Enter makes a note. Picking a type applies
   its default template. Nothing is sent anywhere: no AI, no server round trip per keystroke.
   (M32, "new means a note") In a note's text the type used last and the tab's list are no suggestion: "New
   '<q>'" in the `[[` / `@` menu, Turn into object and `I` make a Note unless a type's name patterns match the

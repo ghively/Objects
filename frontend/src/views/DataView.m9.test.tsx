@@ -13,7 +13,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
-import { usePeek, useTabs } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import { DataView, type Pipeline } from './DataView'
 import { emptyFilterGroup } from './model'
 
@@ -70,8 +70,9 @@ describe('DataView multi-select (Task 18)', () => {
     expect(selectedTitles()).toEqual(['B', 'D'])
     await user.click(screen.getByText('B'))
     expect(selectedTitles()).toEqual(['D'])
-    // Clicking selects; it does not open the peek.
+    // Clicking selects; it does not open the note (as a page, M32, or in the peek).
     expect(usePeek.getState().path).toBeNull()
+    expect(currentTarget(useTabs.getState())).toBeNull()
   })
 
   test('test shift click selects range', async () => {
@@ -161,12 +162,12 @@ describe('DataView multi-select (Task 18)', () => {
     await waitFor(() => expect(screen.queryByTestId('selection-bar')).toBeNull())
   })
 
-  test('test bulk delete of one object says "Delete 1 object"', async () => {
+  test('test bulk delete of one note says "Delete 1 note"', async () => {
     const user = userEvent.setup()
     render(<Harness />)
     await startSelecting(user, 'A')
     await user.click(screen.getByRole('button', { name: 'Delete' }))
-    expect(await screen.findByRole('button', { name: /^Delete 1 (object|note)$/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Delete 1 note' })).toBeInTheDocument()
   })
 
   test('test bulk change type', async () => {
@@ -225,9 +226,9 @@ describe('DataView multi-select (Task 18)', () => {
     await startSelecting(user, 'B')
     await user.click(screen.getByText('B'))
     expect(screen.queryByTestId('selection-bar')).toBeNull()
-    // A click opens the peek again.
+    // A click opens the note again (M32: as a full page).
     await user.click(screen.getByText('C'))
-    expect(usePeek.getState().path).toBe('Pages/C.md')
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Pages/C.md' })
   })
 
   test('bulk delete goes past a failing row, reports the count and keeps only the failed rows selected', async () => {

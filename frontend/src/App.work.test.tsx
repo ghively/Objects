@@ -18,7 +18,7 @@ vi.mock('@/work/page/WorkPage', () => ({
 }))
 vi.mock('@/tasks/TasksPage', async (orig) => ({
   ...(await orig<typeof import('@/tasks/TasksPage')>()),
-  TasksPage: () => <div data-testid="tasks-page">tasks page</div>,
+  TasksPage: ({ list }: { list?: string }) => <div data-testid="tasks-page">tasks page {list ?? 'remembered'}</div>,
 }))
 vi.mock('@/object/ObjectPage', () => ({
   ObjectPage: ({ path, workHeader }: { path: string; workHeader?: boolean }) => (
@@ -33,7 +33,8 @@ vi.mock('@/work/session/WorkOverlays', () => ({ WorkOverlays: () => <div data-te
 import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
-import { resetSpaceInfo } from '@/settings/useSpaceInfo'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
+import { resetSettingsModal, useSettingsModal } from '@/settings/useSettingsModal'
 import { resetPinned } from '@/shell/usePinned'
 import { useDefs } from '@/types/useDefinitions'
 import App from './App'
@@ -59,6 +60,7 @@ beforeEach(() => {
   useDefs.setState({ collections: [], queries: [], loaded: false })
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
   resetSpaceInfo()
+  resetSettingsModal()
   mocked.space.mockResolvedValue(SPACE_WORK_ON)
   mocked.collections.mockResolvedValue([])
   mocked.queries.mockResolvedValue([])
@@ -153,12 +155,54 @@ describe('M32 contract wiring: Tasks, Work off, Home', () => {
     expect(within(main).queryByRole('button', { name: 'Work' })).toBeNull()
   })
 
+  test('test with Work off a work target opens the Tasks list that stands for its view', async () => {
+    mocked.space.mockResolvedValue(SPACE_WORK_OFF)
+    act(() => useTabs.getState().open({ kind: 'work', view: 'today' }))
+    render(<App />)
+    expect(await screen.findByTestId('tasks-page')).toHaveTextContent('tasks page today')
+    act(() => useTabs.getState().open({ kind: 'work', view: 'list-inbox' }))
+    expect(await screen.findByText('tasks page inbox')).toBeInTheDocument()
+    // A dashboard view with no plain list (Flow), and a bare work target: the list last shown.
+    act(() => useTabs.getState().open({ kind: 'work', view: 'flow' }))
+    expect(await screen.findByText('tasks page remembered')).toBeInTheDocument()
+    // The Tasks page itself is not told a list.
+    act(() => useTabs.getState().open({ kind: 'tasks' }))
+    expect(await screen.findByText('tasks page remembered')).toBeInTheDocument()
+  })
+
   test('test a space that does not say (an older answer) reads as Work off', async () => {
     mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE] } satisfies SpaceInfo)
     act(() => useTabs.getState().open({ kind: 'work' }))
     render(<App />)
     expect(await screen.findByTestId('tasks-page')).toBeInTheDocument()
     expect(screen.queryByTestId('work-toasts')).toBeNull()
+  })
+
+  // "Hide Tasks in this space": the Tasks and Work pages give way to one quiet line.
+  test('test while the space hides Tasks, tasks and work targets show one quiet line and no Work extras mount', async () => {
+    mocked.space.mockResolvedValue({ ...SPACE_WORK_ON, hideTaskManagement: true })
+    act(() => useTabs.getState().open({ kind: 'tasks' }))
+    render(<App />)
+    expect(await screen.findByText('Tasks are hidden in this space.')).toBeInTheDocument()
+    expect(screen.queryByTestId('tasks-page')).toBeNull()
+    act(() => useTabs.getState().open({ kind: 'work', view: 'today' }))
+    await waitFor(() => expect(useTabs.getState().tabs[0].history.at(-1)).toEqual({ kind: 'work', view: 'today' }))
+    expect(screen.getByText('Tasks are hidden in this space.')).toBeInTheDocument()
+    expect(screen.queryByTestId('work-page')).toBeNull()
+    expect(screen.queryByTestId('tasks-page')).toBeNull()
+    expect(screen.queryByTestId('work-toasts')).toBeNull()
+    expect(screen.queryByTestId('work-overlays')).toBeNull()
+    // No entry for either in the sidebar.
+    const main = screen.getByRole('navigation', { name: 'Main' })
+    expect(within(main).queryByRole('button', { name: 'Tasks' })).toBeNull()
+    expect(within(main).queryByRole('button', { name: 'Work' })).toBeNull()
+    // The line leads to the setting, and the switch off brings the page back in place.
+    act(() => screen.getByRole('button', { name: 'Open Task management settings' }).click())
+    expect(useSettingsModal.getState().section).toBe('taskManagement')
+    act(() => useSettingsModal.getState().close())
+    act(() => useSpaceInfo.setState((st) => ({ space: st.space && { ...st.space, hideTaskManagement: false } })))
+    expect(await screen.findByTestId('work-page')).toHaveTextContent('work page today')
+    expect(screen.getAllByTestId('work-toasts')).toHaveLength(1)
   })
 
   test('test the sidebar Tasks entry opens the tasks target', async () => {

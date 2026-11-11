@@ -31,6 +31,8 @@ import { usePalette, type PaletteMode } from './usePalette'
 import { useSettingsModal } from '@/settings/useSettingsModal'
 import { switchSpace } from '@/spaces/switchSpace'
 import { openTodaysNote } from '@/calendar/openTodaysNote'
+import { useTasksHidden } from '@/tasks/tasksHidden'
+import { findTaskType } from '@/tasks/useTaskRows'
 
 interface FocusStore {
   getState(): { toggle(): void }
@@ -118,9 +120,16 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
     openExtendedSearch(q)
   }, [])
 
+  // M32: while the space hides Tasks the palette offers no task command ("Create Task").
+  const tasksHidden = useTasksHidden()
+  const actionTypes = useMemo(() => {
+    const task = tasksHidden ? findTaskType(types) : undefined
+    return task ? types.filter((t) => t.id !== task.id) : types
+  }, [types, tasksHidden])
+
   const context: ActionContext = useMemo(
     () => ({
-      types,
+      types: actionTypes,
       hasObjectOpen,
       createObject: (typeId) => {
         void newNote({}, typeId)
@@ -148,7 +157,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
         void switchSpace(path)
       },
     }),
-    [types, hasObjectOpen, onOpenTarget, onShowRightPanel, onToggleSidebar, onToggleRightPanel, spaces],
+    [actionTypes, hasObjectOpen, onOpenTarget, onShowRightPanel, onToggleSidebar, onToggleRightPanel, spaces],
   )
 
   // The keys of an object row (the footer); an action row runs on any Enter.
