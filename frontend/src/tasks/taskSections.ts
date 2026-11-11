@@ -80,7 +80,11 @@ export function coveredDays(v: DateValue): { first: string; last: string } | nul
  * today (Overdue). Recurring occurrences are only ever future days, so never today.
  */
 export function isTodayTask(row: Row, type: TypeDef | undefined, now: Date): boolean {
-  const today = zonedParts(now).date
+  return isTaskOfDay(row, type, zonedParts(now).date)
+}
+
+/** `isTodayTask` for the day `today` (`YYYY-MM-DD`). */
+export function isTaskOfDay(row: Row, type: TypeDef | undefined, today: string): boolean {
   const date = asDate(row.values.date)
   const span = date ? coveredDays(date) : null
   if (span && span.first <= today && today <= span.last) return true
@@ -173,9 +177,9 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
   },
   source: {
     title: 'Context',
-    description: 'Tasks grouped by the object that mentions them.',
+    description: 'Tasks grouped by the note that mentions them.',
     icon: 'ph-line-segment',
-    // Grouped by the live backlinks: one group per object linking to the task, "Other" for none.
+    // Grouped by the live backlinks: one group per note linking to the task, "Other" for none.
     preset: () => view('list', { groupBy: { groups: [{ propertyId: 'backlinks', option: 'default' }] } }),
     match: (row, type) => isOpen(row, type),
   },
@@ -188,7 +192,7 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
   },
   all: {
     title: 'All',
-    description: 'Every object of this type, ready to filter and sort.',
+    description: 'Every task, ready to filter and sort.',
     icon: 'ph-list-bullets',
     preset: () => view('list'),
     match: () => true,
