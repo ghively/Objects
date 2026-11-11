@@ -4224,7 +4224,6 @@ class Space:
         data = join_object(of).encode("utf-8")
         version = version_of(data)
         with self._lock:
-            self._persist_type(t)
             folder = t.folder.strip("/")
             (self.root / folder).mkdir(parents=True, exist_ok=True)
             free = unique_path
@@ -4238,6 +4237,9 @@ class Space:
                     break
             else:
                 raise OSError(f"Could not find a free file name for {stem!r}")
+            # A type used for the first time is written once its object is (M32 fix pass: a
+            # create that fails leaves no type file behind).
+            self._persist_type(t)
         self._call_after_write(self._created_notice(rel))
         return rel, version
 
@@ -4523,10 +4525,11 @@ class Space:
             data = join_object(of).encode("utf-8")
             folder = t.folder.strip("/") or "DailyNotes"
             rel = f"{folder}/{day}.md"
-            self._persist_type(t)
             placed = self._place(rel, data)
             if not placed:
-                self._daily_note_taken(rel, day)
+                self._daily_note_taken(rel, day)  # raises: a refused note writes nothing
+            # The on-demand type is written once its first note is (M32 fix pass).
+            self._persist_type(t)
         self._call_after_write(self._created_notice(rel))
         return rel, version_of(data)
 
