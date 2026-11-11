@@ -18,7 +18,7 @@ import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { useTabs } from '@/nav/tabs'
 import { editorExtensions, loadBody } from './document'
 import { BlockMenu } from './handles/BlockMenu'
-import { turnIntoObject } from './turnInto'
+import { suggestedTurnType, turnIntoObject } from './turnInto'
 
 const mocked = vi.mocked(api)
 const editors: TiptapEditor[] = []
@@ -84,7 +84,51 @@ describe('Turn into object (M29)', () => {
     const names = within(sub)
       .getAllByRole('menuitem')
       .map((m) => m.textContent)
-    expect(names.slice(0, 4)).toEqual(['SoftwareSuggested', 'Page', 'Host', 'Network'])
+    expect(names.slice(0, 4)).toEqual(['SoftwareSuggested', 'Note', 'Host', 'Network']) // M32: the Page type reads "Note"
+  })
+
+  // M32 item 7, "new means a note": the type made last is not a suggestion in the editor.
+  test('test I on "Shopping list" makes a Note even when another type was made last (M32)', async () => {
+    useLastType.getState().set('host')
+    const editor = headless('Shopping list\n')
+    await act(async () => {
+      await turnIntoObject(editor)
+    })
+    expect(mocked.createObject).toHaveBeenCalledTimes(1)
+    expect(mocked.createObject).toHaveBeenCalledWith('page', { title: 'Shopping list' })
+  })
+
+  test('test a name pattern still chooses the type, whatever was made last (M32)', async () => {
+    useLastType.getState().set('host')
+    expect(suggestedTurnType('10.20.0.0/24')).toBe('network')
+    const editor = headless('10.20.0.0/24\n')
+    await act(async () => {
+      await turnIntoObject(editor)
+    })
+    expect(mocked.createObject).toHaveBeenCalledWith('network', { title: '10.20.0.0/24' })
+  })
+
+  test('test the type made last is not marked Suggested in the Turn into list (M32)', async () => {
+    useLastType.getState().set('host')
+    expect(suggestedTurnType('Shopping list')).toBeNull()
+    const editor = headless('Shopping list\n')
+    render(
+      createElement(BlockMenu, {
+        editor,
+        open: true,
+        onOpenChange: () => undefined,
+        anchor: { left: 0, top: 0, width: 10, height: 10 },
+      }),
+    )
+    const [menu] = await screen.findAllByRole('menu')
+    const trigger = within(menu).getByRole('menuitem', { name: /^Turn into\.\.\./ })
+    fireEvent.click(trigger)
+    const sub = await screen.findByRole('menu', { name: (_, el) => el.id === trigger.getAttribute('aria-controls') })
+    const names = within(sub)
+      .getAllByRole('menuitem')
+      .map((m) => m.textContent)
+    // The built-in Page type reads "Note" (the glossary); nothing is marked Suggested.
+    expect(names.slice(0, 4)).toEqual(['Note', 'Host', 'Network', 'Software'])
   })
 
   test('createAndOpen sets the last type', async () => {

@@ -40,6 +40,7 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { useAiHidden } from '@/ai/store'
 import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
 import { formatKeys, keysFor } from '@/lib/shortcuts'
+import { typeLabel } from '@/lib/typeLabel'
 import { TypeChip } from '@/shell/Sidebar'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 import {
@@ -156,7 +157,7 @@ export function TurnIntoObjectItems({ editor, todo }: { editor: Editor; todo: bo
           onSelect={() => run(() => (isWhiteboardType(t) ? turnIntoWhiteboard(editor) : turnIntoObject(editor, t.id)))}
         >
           <TypeChip type={t} size={18} />
-          {t.name}
+          {typeLabel(t)}
           {t === top && (
             <span className="ml-auto rounded bg-hover px-1.5 text-[12px] text-fg-muted">{SUGGEST_TEXT.suggested}</span>
           )}

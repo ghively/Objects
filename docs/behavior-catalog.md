@@ -1011,6 +1011,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   a type lists the suggested type first; the palette's single create row ("Create new {type} with title "{q}"")
   uses it unless a type filter is set; Turn into object lists it first and `I` uses it. Picking a type applies
   its default template. Nothing is sent anywhere: no AI, no server round trip per keystroke.
+  (M32, "new means a note") In a note's text the type used last and the tab's list are no suggestion: "New
+  '<q>'" in the `[[` / `@` menu, Turn into object and `I` make a Note unless a type's name patterns match the
+  name or a type is picked ("Other types", the Turn into list). The built-in Page type reads "Note" there.
 - **Name patterns** (Object type settings, "Name patterns", one per line): `*` any characters but spaces, `?` one
   character, `#` a digit, `@` a letter, `\` makes the next character literal, or exactly one of `{ip}`, `{cidr}`,
   `{fqdn}` (three or more labels), `{version}` (a name, a space, a version number); the whole name must match,

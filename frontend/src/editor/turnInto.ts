@@ -3,7 +3,8 @@
  *
  * - `turnIntoObject` ("Turn into object"): the block's text
  *   becomes the title of a new object of type `typeId` (default, M29: the suggested type of the
- *   title, else the Page type, our choice), its children the body, and the block becomes
+ *   title, since M32 by its name patterns only, else the Page type, our choice), its children the
+ *   body, and the block becomes
  *   `![[Title]]` shown as a Link block (`view=inline`, our choice).
  * - `turnIntoTask` ("Turn into task"): the same with the Task type.
  * - `turnTodoIntoTask` ("Turn into task object"): a
@@ -28,7 +29,7 @@ import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { api } from '@/api/client'
 import type { TypeDef } from '@/api/types'
 import { useLastType } from '@/create/lastType'
-import { suggestFor } from '@/create/suggestContext'
+import { suggestType } from '@/create/typeSuggest'
 import { invalidateLinkIndex, stemOf, summaryOf, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { suggestableTypes } from '@/palette/searchOptions'
 import { turnBlocksIntoWhiteboard } from '@/whiteboard/turnInto'
@@ -252,10 +253,14 @@ export function turnTitleAt(editor: Editor, pos?: number): string {
   return turnableAt(editor, pos)?.title ?? ''
 }
 
-/** M29: the suggested type id for turning a block titled `title` (null: none). */
+/**
+ * M29: the suggested type id for turning a block titled `title` (null: none). M32 ("new means a
+ * note"): only a type whose name patterns match the title. The type made last, and the list the
+ * tab shows, are no suggestion here, so a block turned without picking a type is a Note.
+ */
 export function suggestedTurnType(title: string): string | null {
   if (!title) return null
-  return suggestFor(title, suggestableTypes(useLinkIndex.getState().types))[0] ?? null
+  return suggestType(title, { types: suggestableTypes(useLinkIndex.getState().types) })[0] ?? null
 }
 
 export async function turnIntoObject(editor: Editor, typeId?: string | null, opts: TurnIntoOptions = {}): Promise<boolean> {
