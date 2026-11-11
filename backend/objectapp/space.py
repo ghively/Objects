@@ -155,6 +155,8 @@ from .typemodel import (
     UnreadableType,
     load_types,
     is_task_type,
+    on_demand_type,
+    on_demand_types,
     system_property_defs,
     topup_task_type,
     type_revision,
@@ -1081,6 +1083,7 @@ class Space:
         self.unreadable_types: list[UnreadableType] = list(unreadable)
         self._add_placeholders(inferred)
         self._merge_types(inferred)
+        self._add_on_demand_types()
         for t in self.types:
             topup_task_type(t)
             topup_work_fields(t, self.types)
@@ -1132,6 +1135,27 @@ class Space:
                 added = True
         if added:
             self._types_changed()
+
+    def _add_on_demand_types(self) -> list[TypeDefinition]:
+        """M32: give a space that has no Task or DailyNote type the built-in one, in memory.
+
+        The types API lists it from the first open, so the app can always offer "New task" and
+        "Today's note"; its file is written with the type's first object (`_persist_type`).
+        A type of that id, name or former name (the user's own "Task", a renamed built-in)
+        stays the only one. Never writes. Returns the types added.
+
+        Called while the space loads only, so no listener is told (a type change recorded
+        before the link index's first build would cost it its list of changed backlinks).
+        """
+        ids = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
+        names = {t.name for t in self.types}
+        for t in self.types:
+            names |= set(t.formerNames)
+        added = on_demand_types(ids, names)
+        if added:
+            self.types.extend(added)  # the type-id lookup is dropped by the list itself
+            self._sort_types()
+        return added
 
     def refresh_type(self, type_id: str) -> tuple[TypeDefinition | None, str]:
         """The type and its file's revision, reloading it when the file changed outside the app.
@@ -4086,22 +4110,7 @@ class Space:
         t = self.daily_note_type()
         if t is not None:
             return t
-        t = TypeDefinition.from_json(
-            {
-                "id": "dailynote",
-                "name": "DailyNote",
-                "pluralName": "DailyNotes",
-                "folder": "DailyNotes",
-                "icon": "ph-calendar-blank",
-                "color": "blue",
-                "propertyDefinitions": [
-                    {"id": "date", "key": "date", "name": "Date", "type": "datetime",
-                     "isArray": False},
-                    {"id": "reviewed", "key": "reviewed", "name": "Reviewed",
-                     "type": "boolean", "isArray": False},
-                ],
-            }
-        )  # fmt: skip
+        t = on_demand_type("dailynote")
         self.types.append(t)
         self._types_changed(t.id)
         return t
@@ -4991,34 +5000,65 @@ class Space:
         Either way ``space.json`` records the pick (``setup``), so the space is asked once.
         Returns the space-relative paths of the objects written (templates and Tags), for the
         caller to announce. Raises `ValueError` for another value.
+
+        M32: the app no longer asks; a new or empty folder gets ``blank``, and the two starters
+        are also added later, from the type gallery. So a starter leaves out a type whose
+        **name** the space has already (under another id) as well, pointing its relations at
+        that type; a space that was still new (`spaceconfig.needs_setup`) gets its built-in
+        Task and DailyNote types written too (the pick is what makes the space); and a later
+        ``basic`` leaves an ``itops`` marker as it is.
         """
         from . import spaceconfig
-        from .basicsetup import basic_types
+        from .basicsetup import basic_types, retarget_relations
+        from .typemodel import ON_DEMAND_TYPES
 
         if setup not in ("basic", "blank", "itops"):
             raise ValueError(f"Unknown space setup: {setup!r}")
         created: list[str] = []
         with self._lock:
+            fresh = spaceconfig.needs_setup(self.root)
             if setup == "basic":
-                taken = {t.id for t in self.types}
-                for t in basic_types():
-                    if t.id in taken:
+                taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
+                named = self._ids_by_name()
+                starter = basic_types()
+                retarget = {t.id: named[t.name.lower()] for t in starter
+                            if t.id not in taken and t.name.lower() in named}  # fmt: skip
+                for t in starter:
+                    if t.id in taken or t.id in retarget:
                         continue
+                    retarget_relations(t, retarget)
                     self._write_type_json(t, "")
                     self.types.append(t)
                     self._types_changed(t.id)
                 self._sort_types()
             elif setup == "itops":
                 created = self._apply_itops_setup()
-            spaceconfig.set_internal(self.root, "setup", setup)
+            if fresh:
+                for type_id in ON_DEMAND_TYPES:
+                    builtin = self.type_by_id(type_id)
+                    if builtin is not None and builtin.basic:
+                        self._persist_type(builtin)
+            marker = spaceconfig.read(self.root)[0].get("setup")
+            if not (setup == "basic" and marker == "itops"):
+                spaceconfig.set_internal(self.root, "setup", setup)
         return created
+
+    def _ids_by_name(self) -> dict[str, str]:
+        """Lower-cased type name -> the id of the (first) type of that name."""
+        out: dict[str, str] = {}
+        for t in self.types:
+            out.setdefault(t.name.lower(), t.id)
+        return out
 
     def _apply_itops_setup(self) -> list[str]:
         """Write and load the IT ops types, templates and seed Tags; return the objects' paths."""
         from .basicsetup import write_itops_tags, write_itops_types
 
         taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
-        written = [*write_itops_types(self.root, skip=taken), *write_itops_tags(self.root)]
+        written = [
+            *write_itops_types(self.root, skip=taken, named=self._ids_by_name()),
+            *write_itops_tags(self.root),
+        ]
         types_dir = self.root / ".object" / "types"
         created: list[str] = []
         loaded: list[str] = []

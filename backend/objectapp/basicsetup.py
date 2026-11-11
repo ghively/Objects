@@ -108,6 +108,7 @@ __all__ = [
     "basic_types",
     "itops_template",
     "itops_types",
+    "retarget_relations",
     "source_type",
     "sources_property",
     "host_synced_properties",
@@ -741,21 +742,46 @@ def _place_new(path: Path, data: bytes) -> bool:
     return True
 
 
-def write_itops_types(root: Path, skip: Iterable[str] = ()) -> list[Path]:
+def retarget_relations(t: TypeDefinition, retarget: dict[str, str]) -> None:
+    """M32: point ``t``'s relations at the space's own types: each allowed type id that is a key
+    of `retarget` (a starter type left out because the space has a type of that name under
+    another id) becomes that type's id. In place; nothing else changes."""
+    if not retarget:
+        return
+    for p in t.propertyDefinitions:
+        allowed = p.options.get("allowedTypes") if p.type == "entity" else None
+        if isinstance(allowed, list):
+            p.options["allowedTypes"] = [retarget.get(a, a) for a in allowed]
+
+
+def write_itops_types(
+    root: Path, skip: Iterable[str] = (), named: dict[str, str] | None = None
+) -> list[Path]:
     """Write the IT ops types and their default templates into the space at `root`.
 
     Never replaces: a type whose ``.object/types/<id>.json`` exists, or whose id is in `skip`, is
     left out with its template; a template whose ``Templates/<folder>/<Name>.md`` exists is kept
     as it is and the type is written without one registered. A written template is the type's
     ``templates.ids[0]`` and ``defaultTemplateId``. Returns the written paths.
+
+    M32 (the starter added to a space that has types): `named` is the space's lower-cased type
+    names -> ids; a starter type whose name the space has under another id is left out too, and
+    the written types' relations point at the space's type instead (`retarget_relations`).
     """
     root = Path(root)
     skipped = set(skip)
     written: list[Path] = []
     types_dir = root / ".object" / "types"
-    for t in itops_types():
-        if t.id in skipped or (types_dir / f"{t.id}.json").exists():
+    starter = itops_types()
+    retarget = {
+        t.id: named[t.name.lower()]
+        for t in starter
+        if named and t.id not in skipped and named.get(t.name.lower(), t.id) != t.id
+    }
+    for t in starter:
+        if t.id in skipped or t.id in retarget or (types_dir / f"{t.id}.json").exists():
             continue
+        retarget_relations(t, retarget)
         if t.id in ITOPS_TEMPLATE_SECTIONS:
             name, body = itops_template(t.id)
             segment = PurePosixPath(t.folder.strip("/")).name or safe_filename(t.pluralName)

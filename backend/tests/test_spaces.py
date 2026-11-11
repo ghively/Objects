@@ -110,15 +110,19 @@ def test_current_space_always_listed(tmp_path: Path, state: Path):
 # -- creating a space -----------------------------------------------------------
 
 
-def test_create_space_writes_only_space_json(tmp_path: Path, state: Path):
+def test_create_space_writes_space_json_and_the_starting_types(tmp_path: Path, state: Path):
     loc = _folder(tmp_path, "loc")
     path = create_space("  Field notes: 2026 ", loc)
     assert path == loc.resolve() / "Field notes"
-    assert _tree(loc) == {
-        "Field notes/.object/space.json": hashlib.sha256(
-            # `setup` records the starting point, so the space never asks on open (fix pass H2).
-            (json.dumps({"name": "Field notes: 2026", "setup": "blank"}, indent=2) + "\n").encode()
-        ).hexdigest()
+    tree = _tree(loc)
+    assert tree["Field notes/.object/space.json"] == hashlib.sha256(
+        # `setup` records the starting point, so the space never asks on open (fix pass H2).
+        (json.dumps({"name": "Field notes: 2026", "setup": "blank"}, indent=2) + "\n").encode()
+    ).hexdigest()
+    # M32: and the types every space starts with, so notes, daily notes and tasks work at once.
+    assert set(tree) == {
+        "Field notes/.object/space.json",
+        *(f"Field notes/.object/types/{tid}.json" for tid in ("page", "tag", "task", "dailynote")),
     }
     assert [p.name for p in path.iterdir()] == [".object"]
 
@@ -128,7 +132,10 @@ def test_create_space_writes_only_space_json(tmp_path: Path, state: Path):
     assert resp.status_code == 201
     created = Path(resp.json()["path"])
     assert created == loc.resolve() / "Second"
-    assert _tree(created).keys() == {".object/space.json"}
+    assert _tree(created).keys() == {  # M32: and the starting types
+        ".object/space.json",
+        *(f".object/types/{tid}.json" for tid in ("page", "tag", "task", "dailynote")),
+    }
     listed = client.get("/api/spaces").json()["spaces"]
     assert str(created) in [s["path"] for s in listed]
     assert next(s for s in listed if s["path"] == str(created))["name"] == "Second"

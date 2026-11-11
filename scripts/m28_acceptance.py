@@ -14,8 +14,8 @@ before the counterpart edits, which change the links they read):
     ``POST /api/rows``, ``GET /api/graph`` and ``GET /api/type-gallery`` leave ``git status``
     clean;
  2. ``POST /api/spaces {"name": "Ops", "location": <temp>, "setup": "itops"}``: the new folder
-    has 17 types, 16 templates and 30 tags; a new empty folder, served, with
-    ``POST /api/space/setup {"setup": "itops"}`` gets the same; a second call is 409;
+    has the 17 IT ops types (beside Page, Tag, Task, DailyNote; M32), 16 templates and 30 tags; a new empty folder, served, with
+    ``POST /api/space/setup {"setup": "itops"}`` gets the same; a second call is 200 and writes nothing, ``blank`` is 409 (M32);
  3. APP-TEST-01's counterparts: Runs (Inventory app, inventory-web), Documented in (Restart the
     inventory app); Rack A's Contains lists APP-TEST-01; Windows Server 2022's Installed on
     lists both hosts;
@@ -200,9 +200,13 @@ class M28:
         created = Path(res["path"])
         types, templates, tags = setup_files(created)
         space_json = json.loads((created / ".object" / "space.json").read_text("utf-8"))
+        # M32: beside the four types every new space starts with.
+        starting = {"page", "tag", "task", "dailynote"}
         self.run.report(
-            types == want_types and len(templates) == 16 and tags == want_tags and space_json.get("setup") == "itops",
-            "the new space has the 17 IT ops types, 16 templates and 30 seed tags, setup itops",
+            types == want_types | starting and len(templates) == 16 and tags == want_tags
+            and space_json.get("setup") == "itops",
+            "the new space has the 17 IT ops types (and Page, Tag, Task, DailyNote), 16 templates and 30 seed "
+            "tags, setup itops",
             f"types {len(types)}, templates {len(templates)}, tags {len(tags)}, setup {space_json.get('setup')!r}",
         )
 
@@ -211,7 +215,11 @@ class M28:
         served = Served(empty)
         try:
             c1, info = served.http("POST", "/space/setup", {"setup": "itops"})
+            before_again = setup_files(empty)
+            # M32: the starter can be added again (from the type gallery): nothing is replaced or
+            # added; only the plain start is refused once the space has one.
             c2, again = served.http("POST", "/space/setup", {"setup": "itops"})
+            c3, plain = served.http("POST", "/space/setup", {"setup": "blank"})
         finally:
             served.stop()
         types, templates, tags = setup_files(empty)
@@ -221,8 +229,11 @@ class M28:
             "an empty folder with POST /api/space/setup itops gets the same types, templates and tags",
             f"{c1}; IT ops types {len(want_types & types)}, templates {len(templates)}, tags {len(tags)}",
         )
-        detail = again.get("detail") if isinstance(again, dict) else again
-        self.run.report(c2 == 409 and detail == ALREADY, "a second setup is 409", f"{c2} {again}")
+        self.run.report(c2 == 200 and (types, templates, tags) == before_again,
+                        "a second itops setup is 200 and writes nothing more", f"{c2}")
+        detail = plain.get("detail") if isinstance(plain, dict) else plain
+        self.run.report(c3 == 409 and detail == ALREADY, "the plain start is 409 once the space has one",
+                        f"{c3} {plain}")
 
     # 3 ---------------------------------------------------------------------------------
     def counterparts(self) -> None:

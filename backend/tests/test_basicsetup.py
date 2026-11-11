@@ -30,12 +30,17 @@ def test_basic_setup_writes_four_types(tmp_path: Path, state: Path):
     parent = tmp_path / "parent"
     parent.mkdir()
     made = create_space("Basic", parent, setup="basic")
+    # M32: beside the four types every new space starts with (Page, Tag, Task, DailyNote).
     assert _files(made) == [
         ".object/space.json",
         ".object/types/book.json",
+        ".object/types/dailynote.json",
         ".object/types/meeting.json",
+        ".object/types/page.json",
         ".object/types/person.json",
         ".object/types/project.json",
+        ".object/types/tag.json",
+        ".object/types/task.json",
     ]
     loaded = {}
     for tid in ("person", "meeting", "project", "book"):
@@ -107,19 +112,29 @@ def test_basic_setup_via_route_and_space_opens(tmp_path: Path, state: Path):
         )
         assert r.status_code == 201, r.text
     made = Path(r.json()["path"])
-    assert len(list((made / ".object" / "types").glob("*.json"))) == 4
+    # M32: the four basic-setup types beside Page, Tag, Task and DailyNote.
+    assert len(list((made / ".object" / "types").glob("*.json"))) == 8
     names = {t.name for t in Space(made).types}
     assert {"Person", "Meeting", "Project", "Book"} <= names
 
 
-def test_blank_setup_unchanged(tmp_path: Path, state: Path):
-    """Regression guard (green from the start)."""
+STARTING = [
+    ".object/space.json",
+    ".object/types/dailynote.json",
+    ".object/types/page.json",
+    ".object/types/tag.json",
+    ".object/types/task.json",
+]
+
+
+def test_blank_setup_writes_the_starting_types(tmp_path: Path, state: Path):
+    """M32: a plain new space holds its config and the four types every space starts with."""
     parent = tmp_path / "parent"
     parent.mkdir()
     made = create_space("Blank", parent)
-    assert _files(made) == [".object/space.json"]
+    assert _files(made) == STARTING
     made2 = create_space("Blank two", parent, setup="blank")
-    assert _files(made2) == [".object/space.json"]
+    assert _files(made2) == STARTING
 
 
 def test_basic_types_have_fresh_property_ids():

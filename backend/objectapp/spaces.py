@@ -259,7 +259,8 @@ class Registry:
 
 
 def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
-    """Create ``<location>/<safe_filename(name)>`` holding only ``.object/space.json``.
+    """Create ``<location>/<safe_filename(name)>`` holding ``.object/space.json`` and (M32) the
+    types every space starts with: Page, Tag, Task and DailyNote (`typemodel.write_starting_types`).
 
     `setup` is M8's "Pick a starting point": ``'blank'`` is the behaviour above;
     ``'basic'`` also writes the Person, Meeting, Project and Book types
@@ -292,6 +293,10 @@ def create_space(name: str, location: Path | str, setup: str = "blank") -> Path:
     (target / ".object").mkdir()
     # `setup` records the pick, so the space never asks again on open (spaceconfig.needs_setup).
     atomic_write(target / ".object" / "space.json", dump_json({"name": name, "setup": setup}))
+    # M32: every new space can make notes, daily notes and tasks from its first second.
+    from .typemodel import write_starting_types
+
+    write_starting_types(target)
     if setup == "basic":
         from .basicsetup import write_basic_types
 

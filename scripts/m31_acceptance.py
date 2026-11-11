@@ -621,6 +621,10 @@ def check_remodel(run: Run, tmp: Path) -> None:
                "included", f"missing {missing_types}", f"with no object: {empty}")
     changed = []
     for tid in sorted(type_ids & new_types - {"page", "tag"}):
+        if not (root / ".object" / "types" / f"{tid}.json").is_file():
+            # M32: the built-in Task and DailyNote are listed from memory until their first
+            # object (no file to compare); the new space was made with its own.
+            continue
         a = json.loads((root / ".object" / "types" / f"{tid}.json").read_text("utf-8"))
         b = json.loads((new / ".object" / "types" / f"{tid}.json").read_text("utf-8"))
         props = [(p.get("key"), p.get("name"), p.get("type"), [o.get("text") for o in (p.get("options") or {}).get("set") or []])

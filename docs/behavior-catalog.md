@@ -265,6 +265,15 @@ Each starter template pre-fills the new type's properties.
   fills, M31), a default template for each but Source, and 30 seed Tags; a type,
   template or Tag already there is kept as it is. Nothing is written before a pick; closing asks again next
   time. The pick is recorded as `space.json` `setup` (`basic`, `itops` or `blank`; Create space records it too).
+- **Every space can make notes, daily notes and tasks (M32).** "Create space" writes the Note (`Page`), Tag, Task
+  and Daily note (`DailyNote`) types with the space; the plain start of an empty folder (`setup: blank`) writes Task
+  and Daily note too. A space without a Task or Daily note type (an older one) still lists the built-in one, held
+  in memory, so "New task" and "Today's note" always work; its file is written only with the first task or daily
+  note. Opening a space never writes for this. The built-in Task has Status (Not Started, Next Up, In Progress, On
+  Hold, Done; Done completes it), Priority, Date and Deadline. A type the user named "Task" themselves stays the only
+  one. The two starter sets stay available after the start through the same call (`POST /api/space/setup` with
+  `basic` or `itops`): each writes only the types the space lacks, by id and by name, and replaces nothing; `blank`
+  is refused once the space has a start. The IT operations starter turns Work on for its space (M32).
 - Main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant (Gene's 2026-11-08 redesign;
   Calendar is the space's opening view). The Assistant is the built-in, always-on helper — a program
   feature, not an "agent" — shown with its own icon; a click opens its chat. Like an agent row it carries a

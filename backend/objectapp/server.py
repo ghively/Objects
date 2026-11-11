@@ -1113,19 +1113,22 @@ def create_app(
     @api.post("/space/setup")
     def post_space_setup(req: SpaceSetupRequest):
         # Fix pass H2: "Pick a starting point" for a space opened as a new or empty folder.
+        # M32: the app no longer asks. ``blank`` is the plain start of a new or empty folder
+        # (refused once the space has a start); the starter sets ``basic`` and ``itops`` are
+        # also added later, from the type gallery: they write only what the space lacks.
         if req.setup not in ("basic", "itops", "blank"):
             return _error(422, "Pick \"basic\", \"itops\" or \"blank\" as the starting point.")
-        if not needs_setup(space.root):
+        if req.setup == "blank" and not needs_setup(space.root):
             return _error(409, "This space already has a starting point.")
         try:
             created = space.apply_setup(req.setup)
         except ReadOnly as exc:
             return JSONResponse({"reason": exc.reason, "detail": exc.reason}, status_code=423)
-        if req.setup == "itops":
-            # M28: the IT ops types, then the templates and seed Tags as created objects.
-            announce(ChangeEvent("types", "*", None))
-            for rel in created:
-                announce(ChangeEvent("created", rel, space.cached_version(rel)))
+        # The types written (the starter's, a new space's Task and DailyNote), then M28's
+        # templates and seed Tags as created objects.
+        announce(ChangeEvent("types", "*", None))
+        for rel in created:
+            announce(ChangeEvent("created", rel, space.cached_version(rel)))
         return space_info()
 
     @api.put("/space")
