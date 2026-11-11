@@ -14,6 +14,7 @@ import { todayYmd } from '@/calendar/dates'
 import { useCalendar } from '@/calendar/useCalendar'
 import { setLastTypeSpace, useLastType } from '@/create/lastType'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { takeBodyFocus } from '@/nav/focusRequest'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
 import App from './App'
 
@@ -176,5 +177,64 @@ describe('app shortcuts', () => {
     fireEvent.keyDown(editor, { key: 'T', ctrlKey: true, shiftKey: true })
     await new Promise((r) => setTimeout(r, 50))
     expect(mocked.createObject).not.toHaveBeenCalled()
+  })
+
+  // M32, "keys work while you type": with the caret in a note's text or title.
+  test('test Ctrl+N with the caret in the note text makes a new one (of the type in view)', async () => {
+    const { container } = await openObjectPage()
+    const editor = container.querySelector('.ProseMirror')!
+    expect(ctrl(editor, 'n')).toBe(false)
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('project', {}))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'project/Untitled.md' }))
+  })
+
+  test('test Ctrl+N and Alt+N in the title make a new note', async () => {
+    await openObjectPage()
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    expect(ctrl(title, 'n')).toBe(false)
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledTimes(1))
+    // The key a browser tab lets through.
+    expect(fireEvent.keyDown(document.body, { key: 'n', code: 'KeyN', altKey: true })).toBe(false)
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledTimes(2))
+  })
+
+  test('test Ctrl+U and Alt+Shift+N open the New menu from the note text', async () => {
+    const user = userEvent.setup()
+    const { container } = await openObjectPage()
+    const editor = container.querySelector('.ProseMirror')!
+    expect(ctrl(editor, 'u')).toBe(false)
+    expect(await screen.findByRole('textbox', { name: 'Search types' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Search types' })).toBeNull())
+    expect(fireEvent.keyDown(editor, { key: 'N', code: 'KeyN', altKey: true, shiftKey: true })).toBe(false)
+    expect(await screen.findByRole('textbox', { name: 'Search types' })).toBeInTheDocument()
+    expect(mocked.createObject).not.toHaveBeenCalled()
+  })
+
+  test('test the new keys stay off in a field outside a note', async () => {
+    render(<App />)
+    await waitFor(() => expect(mocked.space).toHaveBeenCalled())
+    ctrl(document.body, 'u')
+    const search = await screen.findByRole('textbox', { name: 'Search types' })
+    expect(ctrl(search, 'n')).toBe(true) // not prevented, nothing made
+    await new Promise((r) => setTimeout(r, 30))
+    expect(mocked.createObject).not.toHaveBeenCalled()
+  })
+
+  test("test Ctrl+Shift+D with the caret in the note text opens today's note and asks for the caret at its end", async () => {
+    mocked.createDailyNote.mockResolvedValue({ path: 'DailyNotes/2026-11-11.md', version: 'v1', typeIds: [] })
+    const { container } = await openObjectPage()
+    const editor = container.querySelector('.ProseMirror')!
+    expect(fireEvent.keyDown(editor, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true })).toBe(false)
+    await waitFor(() => expect(usePeek.getState().path).toBe('DailyNotes/2026-11-11.md'))
+    expect(takeBodyFocus('DailyNotes/2026-11-11.md')).toBe('end')
+  })
+
+  test('test a new note made by key steps out from under a popped-out note', async () => {
+    await openObjectPage()
+    usePeek.getState().peek('Projects/Other.md')
+    ctrl(document.body, 'n')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledTimes(1))
+    expect(usePeek.getState().path).toBeNull()
   })
 })

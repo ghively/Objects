@@ -408,9 +408,12 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def('openCommandPalette', 'global', 'Open action palette', [], 'global', false, false),
   // M5, object/ObjectView.tsx (our id and our string)
   def('findInPage', 'page', 'Find in page', ['Mod-f'], 'global', false, false),
-  // M1–M3, App.tsx (outside editable targets)
-  def('openAddEntityMenu', 'global', 'Add new content', ['Mod-u'], 'global', false, false),
-  def('createNewEntityOfType', 'global', 'New object of the same type as this one', ['Mod-n'], 'global', false, false),
+  // M1–M3, App.tsx. M32: the two "new" keys also work with the caret in a note's text or title
+  // (`NEW_KEYS_IN_NOTE` below says how each key was checked against the editor's own keys), and
+  // each has a second key that a browser tab lets through. Delete stays out of editable targets
+  // (there Ctrl+Backspace deletes a word).
+  def('openAddEntityMenu', 'global', 'Add new content', ['Mod-u', 'AltCtrl-Shift-n'], 'global', false, false),
+  def('createNewEntityOfType', 'global', 'New note, or one more of the type in view', ['Mod-n', 'AltCtrl-n'], 'global', false, false),
   def('deleteCurrentPage', 'page', 'Delete current page', ['Mod-Backspace'], 'global', false, false),
   // M4, calendar/CalendarChrome.tsx
   def('goToToday', 'calendar', 'Jump to today', ['t'], 'calendar', false, false),
@@ -484,6 +487,47 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   def('undo', 'global', 'Undo', ['Mod-z'], 'global', false, false),
   def('redo', 'global', 'Redo', ['Mod-Shift-z', 'Mod-y'], 'global', false, false),
 ]
+
+/**
+ * M32, "keys work while you type": what the new-note keys do with the caret in a note (its text,
+ * its title, a field of its page), checked against the editors' own bindings.
+ *
+ * - **New note**, Ctrl+N: the rich editor, the title and the raw editor bind nothing to it, so it
+ *   works in all three. In a browser tab Ctrl+N belongs to the browser (a new window, which a page
+ *   cannot stop), so it also has **Alt+N**, which types nothing on Windows and Linux. On macOS that
+ *   second key is Ctrl+N (`AltCtrl`: Option+N is the "˜" dead key), and with the caret in a text
+ *   field Ctrl+N stays the system's "next line"; ⌘N works there.
+ * - **The New menu**, Ctrl+U: the rich editor leaves Ctrl+U unbound (the catalog: Underline has no
+ *   key), so it works in a note's text and title. In raw mode Ctrl+U is CodeMirror's "undo
+ *   selection": it keeps that meaning there, and the menu also has **Alt+Shift+N**, which collides
+ *   with nothing (macOS: Ctrl+Shift+N, with the same text-field rule as above).
+ * - **Today's note**, Ctrl+Shift+D: no editor binds it; it works anywhere in the window.
+ *
+ * In other editable fields (a dialog's input, a quick-add box) the two "new" keys stay off, as
+ * before M32.
+ */
+export const NEW_KEYS_IN_NOTE = {
+  /** A note's view (page, peek or inline): the keys work in its editable fields. */
+  noteSelector: '[data-object-view]',
+  /** Raw mode keeps Ctrl+U ("undo selection"). */
+  rawEditorSelector: '.cm-editor',
+} as const
+
+/**
+ * Whether a "new" key (`id`: `createNewEntityOfType` or `openAddEntityMenu`) may act on `e`:
+ * always outside editable targets; inside one only in a note's view, and never where the key has a
+ * text-editing meaning of its own (see `NEW_KEYS_IN_NOTE`).
+ */
+export function newKeyAllowed(id: 'createNewEntityOfType' | 'openAddEntityMenu', e: KeyboardEvent, mac = isMacPlatform()): boolean {
+  const target = isEditableTarget(e.target) ? (e.target as Element) : isEditableTarget(document.activeElement) ? document.activeElement : null
+  if (!target) return true
+  if (!target.closest(NEW_KEYS_IN_NOTE.noteSelector)) return false
+  // macOS: Ctrl+N and Ctrl+Shift+N move and select by line in a text field.
+  if (mac && e.ctrlKey && !e.metaKey) return false
+  // Raw mode: Ctrl+U (⌘U) is "undo selection".
+  if (id === 'openAddEntityMenu' && !e.altKey && target.closest(NEW_KEYS_IN_NOTE.rawEditorSelector)) return false
+  return true
+}
 
 /**
  * M8's shortcuts (the plan's "Shortcut keys (new ids, provisional)" table). Every key is provisional. Editor ones are bound by Task 25

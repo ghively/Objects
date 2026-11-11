@@ -42,7 +42,7 @@ import { SidePanel } from '@/shell/SidePanel'
 import { Sidebar } from '@/shell/Sidebar'
 import { TabStrip, useSpaceTypes } from '@/shell/TabStrip'
 import { usePanelShortcuts, useTabShortcuts } from '@/shell/shortcuts'
-import { isEditableTarget } from '@/lib/shortcuts'
+import { isEditableTarget, keysFor, matches, newKeyAllowed } from '@/lib/shortcuts'
 import { lazyWithReload } from '@/lib/lazyReload'
 import { applyOpenOnStart } from '@/nav/startup'
 import { prefetchOnIdle } from '@/nav/prefetch'
@@ -277,24 +277,31 @@ export default function App() {
   // M32: the Work page, its toasts and its overlays exist only while Work is on for this space.
   const workOn = useWorkOn()
 
-  // Shortcuts, only when focus is not in an editable element (there Ctrl+Backspace deletes a word):
-  // Ctrl+U "+ New" menu, Ctrl+N a new object of the current type, Ctrl+Backspace "Delete this object?".
+  // Shortcuts (their keys are in `lib/shortcuts.ts`): the New menu (Ctrl+U, Alt+Shift+N), a new
+  // note, or one more of the type in view (Ctrl+N, Alt+N), and Ctrl+Backspace "Delete this …?".
+  // M32: the two "new" keys also work with the caret in a note's text or title (`newKeyAllowed`
+  // keeps each key's own editing meaning); Delete stays out of editable elements, where
+  // Ctrl+Backspace deletes a word.
   const typesRef = useRef(types)
   useLayoutEffect(() => {
     typesRef.current = types
   }, [types])
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
-      if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return
-      const key = e.key.toLowerCase()
-      if (key === 'u') {
+      if (e.defaultPrevented) return
+      if (matches(e, keysFor('openAddEntityMenu'))) {
+        if (!newKeyAllowed('openAddEntityMenu', e)) return
         e.preventDefault()
+        // What gets made opens in the tab: a note popped out over it steps aside.
+        usePeek.getState().close()
         setNewMenuOpen(true)
-      } else if (key === 'n') {
+      } else if (matches(e, keysFor('createNewEntityOfType'))) {
+        if (!newKeyAllowed('createNewEntityOfType', e)) return
         e.preventDefault()
+        usePeek.getState().close()
         void newNote({}, currentTypeId(typesRef.current))
-      } else if (key === 'backspace') {
+      } else if (matches(e, keysFor('deleteCurrentPage'))) {
+        if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return
         const peekPath = usePeek.getState().path
         const target = currentTarget(useTabs.getState())
         const path = peekPath ?? (target?.kind === 'object' ? target.path : null)

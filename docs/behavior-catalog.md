@@ -165,7 +165,9 @@ Markdown, Block editing, Page, Navigation, Calendar, AI Assistant, Table, Date p
 Ctrl means Cmd on Mac. "Shift" is written as Shift here. "(not in Object)" marks a catalogued key that Object leaves
 unbound on purpose; "(not bound)" one whose key is taken by another action (decision D3).
 
-**General**: Open settings Ctrl+, | Create new task Ctrl+Shift+T | Add new content Ctrl+U | Search
+**General**: Open settings Ctrl+, | Create new task Ctrl+Shift+T | Add new content Ctrl+U or Alt+Shift+N (M32) |
+New note, or one more of the type in view Ctrl+N or Alt+N (M32: Alt+N is the key a browser tab lets through, where
+Ctrl+N opens a browser window) | Search
 this space Ctrl+P or Ctrl+K | Open extended search Ctrl+Shift+P (not in Object) | Toggle dark mode Ctrl+Shift+L |
 Toggle focus mode Ctrl+Shift+M | Toggle left sidebar Ctrl+Shift+Left | Toggle right side panel
 Ctrl+Shift+Right (in Object both panel keys stay out of text fields, where Ctrl+Shift+Left/Right select by word; our call) | Toggle side panel entry list Ctrl+Shift+Down (not in Object) | Toggle media sidebar Ctrl+Alt+Right (not in Object) | Close
@@ -212,6 +214,14 @@ side panel (Shift+Click; inline `[[links]]` too) | Open in preview Alt+Shift+Cli
 **Calendar**: Go to monthly view M | Go to weekly view W | Show the day before and after R (decision C9) | Go to daily view D | Jump to today T | Back / forward one day, week or month
 Left/Right | Toggle calendar sidebar Ctrl+Alt+S | Pop out today's daily note Ctrl+Shift+D (ours, 2026-11-09).
 
+**Keys that work while you type (M32)**: with the caret in a note's text or title, the new-note keys (Ctrl+N,
+Alt+N), the New menu's (Ctrl+U, Alt+Shift+N) and today's note (Ctrl+Shift+D) all work; a note popped out in the
+peek closes first, so what is made is seen. Each key was checked against the editors' own: none is bound in the
+rich editor or the title; in raw mode Ctrl+U stays the editor's "undo selection" (our call: the menu has
+Alt+Shift+N there); on macOS the second keys are Ctrl+N and Ctrl+Shift+N, which stay "next line" inside a text
+field (⌘N works there). In other fields (a dialog's input, a quick-add box) the two "new" keys stay off.
+Ctrl+Backspace stays "delete a word" in every field.
+
 **AI Assistant**: open; copy message Ctrl+Alt+C; replace context; append message Ctrl+Alt+A; send a message to the daily
 note; retry Ctrl+Alt+R; close chat Ctrl+Alt+X; rephrase Ctrl+Alt+U.
 
@@ -249,10 +259,12 @@ Each starter template pre-fills the new type's properties.
 
 ## 4. Sidebar details
 
-- **Today's note** (ours, 2026-11-09, Gene): the top bar's notebook button "Today's note", the palette's "Pop out
-  today's daily note" and Ctrl+Shift+D open today's daily note in the peek, the floating panel over the page (as an
-  object clicked on the Calendar's timeline opens), creating the note first when today has none (the same call as
-  "+ Daily Note"). The page underneath stays as it was; Escape closes the peek.
+- **Today's note** (ours, 2026-11-09, Gene): the top bar's notebook button "Today's note", Home's button (M32), the
+  palette's "Pop out today's daily note" and Ctrl+Shift+D open today's daily note in the peek, the floating panel
+  over the page, creating the note first when today has none (the same call as "+ Daily Note"). The page underneath
+  stays as it was; Escape closes the peek. (M32) It opens with the caret at the end of its text, so the next key
+  typed lands in the note, and the key works with the caret in a note's text or title. It stays a peek while
+  "Open notes as a full page" is on (an explicit pop-out).
 
 - **Home (M32)**: a tab with no page (a new empty tab, the first open of a space with nothing to restore, the
   start choice "Home") shows Home; it replaces the old start text "Pick an object type / Choose a type in the
