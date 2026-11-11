@@ -1430,9 +1430,10 @@ export function ObjectView({
           <Icon name="ph-sidebar-simple" size={17} />
         </span>
       </button>
+      {/* M32: just before the right-aligned group, so "Saving…" / "Saved" never moves the buttons;
+          a part of the toolbar of its own, so it stays while the buttons fade for typing. */}
+      <SaveMark key={path} path={path} className="mr-2 ml-auto" />
       <div className="flex min-w-0 items-center gap-2">
-      {/* M32: first in the right-aligned group, so "Saving…" / "Saved" never moves the buttons. */}
-      <SaveMark key={path} path={path} />
       <FindBar path={path} editorRef={editorRef} />
       <div className="flex h-10 shrink-0 items-center gap-0.5 rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] px-1">
         {mode === 'page' && (

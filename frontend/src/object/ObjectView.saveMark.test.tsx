@@ -1,5 +1,6 @@
 // M32, item 1: the note's toolbar (page and peek) shows the save mark for its own path, to the
-// left of the toolbar's buttons so it never moves them.
+// left of the toolbar's buttons so it never moves them, and it stays while the buttons fade for
+// typing.
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { SpaceInfo, TypeDef } from '@/api/types'
@@ -67,10 +68,23 @@ describe.each(['page', 'peek'] as const)('the save mark in the %s toolbar', (mod
     await screen.findByText('Hello.')
     const mark = container.querySelector('[data-save-mark]') as HTMLElement
     const more = screen.getByRole('button', { name: 'More' })
-    // The same right-aligned group: the mark first, so its width grows away from the buttons.
-    const group = mark.parentElement as HTMLElement
+    // Just before the right-aligned group (the find bar, the buttons), so its width grows away from them.
+    const group = mark.nextElementSibling as HTMLElement
     expect(group.contains(more)).toBe(true)
-    expect(group.firstElementChild).toBe(mark)
-    expect(mark.compareDocumentPosition(screen.getByTestId('find-bar')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(group.contains(screen.getByTestId('find-bar'))).toBe(true)
+    expect(group.nextElementSibling).toBeNull()
+    expect(mark).toHaveClass('ml-auto')
+  })
+
+  test('is the toolbar\'s own part that stays while the rest fades for typing', async () => {
+    const { container } = render(<ObjectView path={PATH} mode={mode} />)
+    await screen.findByText('Hello.')
+    const mark = container.querySelector('[data-save-mark]') as HTMLElement
+    const toolbar = mark.parentElement as HTMLElement
+    expect(toolbar).toHaveAttribute('data-typing-fade')
+    expect(mark).toHaveAttribute('data-typing-stay')
+    // The buttons are in parts that fade.
+    const fading = [...toolbar.children].filter((el) => !el.hasAttribute('data-typing-stay'))
+    expect(fading.some((el) => el.contains(screen.getByRole('button', { name: 'More' })))).toBe(true)
   })
 })

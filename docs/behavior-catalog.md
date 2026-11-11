@@ -342,6 +342,7 @@ Each starter template pre-fills the new type's properties.
 - **Save mark** (M32): in a note's toolbar (page and peek), left of its buttons: "Saving…" while typed text waits
   for its save or a save runs, then a check and "Saved", which fades to the check alone after two seconds. A note
   nobody typed in shows nothing. A failed save keeps the editor's "Changes not saved. Retrying…" and adds nothing.
+  The mark stays while the toolbar's buttons fade for typing (it is what you look at while you type).
 - **Header**, top to bottom: type pill (icon + name; click to change type), a relation button, then any
   property surfaced in the header (a Status chip such as "In Progress"), a "Collections" chip; the title in
   large bold; the Description property as a paragraph under the title; a "Tags" row of colored tag chips with a
@@ -416,7 +417,8 @@ Each starter template pre-fills the new type's properties.
   - `()` always gives the same icon (Object keeps no last-used icon).
   - "Turn off automatic numbered lists" removes `1.` as a mark, alone and combined.
 - **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).
-- **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves.
+- **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves. The note's save
+  mark does not fade (M32).
 - **Edited lines are written in the editor's standard Markdown form**: the line of a block you edit is rewritten
   that way (`_b_` becomes `*b*`, `[X]` becomes `[x]`, a setext heading becomes ATX `#`, a bare URL becomes
   `[url](url)`, `\#` escapes appear); it renders the same, and only that line changes in the file — every untouched

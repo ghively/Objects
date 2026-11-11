@@ -1,7 +1,7 @@
 // Polish item 5: while typing in the editor the chrome (top bar, header buttons) fades until the pointer moves.
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, test } from 'vitest'
-import { TYPING_ATTR, TYPING_FADE_ATTR, TypingFade } from './TypingFade'
+import { TYPING_ATTR, TYPING_FADE_ATTR, TYPING_STAY_ATTR, TypingFade } from './TypingFade'
 
 function Shell() {
   return (
@@ -11,6 +11,9 @@ function Shell() {
         <button type="button">Back</button>
       </header>
       <div {...{ [TYPING_FADE_ATTR]: '' }}>
+        <span data-testid="mark" {...{ [TYPING_STAY_ATTR]: '' }}>
+          Saving…
+        </span>
         <button type="button">More</button>
       </div>
       <div className="ProseMirror" contentEditable suppressContentEditableWarning data-testid="editor">
@@ -46,6 +49,15 @@ describe('TypingFade', () => {
     })
     expect(faded()).toBe(false)
     expect(opacity('Back')).not.toBe('0')
+  })
+
+  // M32: the save mark is what you look at while you type; it must not fade with the buttons.
+  test('a part marked to stay keeps showing while the chrome around it fades', () => {
+    render(<Shell />)
+    fireEvent.keyDown(screen.getByTestId('editor'), { key: 'a' })
+    expect(faded()).toBe(true)
+    expect(opacity('More')).toBe('0')
+    expect(getComputedStyle(screen.getByTestId('mark')).opacity).not.toBe('0')
   })
 
   test('Backspace, Enter and Delete count as typing; shortcuts, arrows and modifiers do not', () => {

@@ -19,7 +19,7 @@ export const SAVE_MARK_TEXT = {
 /** How long "Saved" stays written out before it fades to the check alone. */
 export const SAVED_TEXT_MS = 2000
 
-export function SaveMark({ path }: { path: string }) {
+export function SaveMark({ path, className }: { path: string; className?: string }) {
   const state = useSaveState(path)
   const busy = state === 'saving' || state === 'unsaved'
   /** Something was typed in this view: only then is "Saved" worth saying. */
@@ -44,7 +44,9 @@ export function SaveMark({ path }: { path: string }) {
       data-save-mark={busy ? 'saving' : saved ? 'saved' : ''}
       data-quiet={saved ? String(quiet) : undefined}
       aria-live="polite"
-      className="flex h-10 shrink-0 items-center gap-1 px-1 text-[13px] whitespace-nowrap text-fg-muted select-none"
+      // Stays while the toolbar's buttons fade for typing (`focus/TypingFade`).
+      data-typing-stay=""
+      className={cn('flex h-10 shrink-0 items-center gap-1 px-1 text-[13px] whitespace-nowrap text-fg-muted select-none', className)}
     >
       {busy && SAVE_MARK_TEXT.saving}
       {saved && (
