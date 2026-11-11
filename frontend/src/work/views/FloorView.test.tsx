@@ -15,6 +15,10 @@ import { workBoard, workBoardItem } from '@/test/mockApi'
 import { resetWorkData, useWorkData } from '../state/useWorkData'
 import { resetWorkToasts, useWorkToasts } from '../state/workToasts'
 import { FloorView } from './FloorView'
+import { setWorkOn } from '@/test/workOn'
+
+// M32: Work is on for the space in these tests (while it is off, nothing of the Work page runs).
+beforeEach(() => setWorkOn())
 
 const mocked = vi.mocked(api)
 const NOW = new Date('2026-11-05T10:00:00.000Z')

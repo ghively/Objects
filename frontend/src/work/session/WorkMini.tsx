@@ -1,7 +1,8 @@
 // M23 Task 15: the keep-on-top page: the selected (or current) focus line, Now's top item with its
 // current step, and a brain-dump box. Rendered into the picture-in-picture window (sharing the
 // page's stores) and, `standalone`, as the Object window's on-top page `/?mini=work`, which loads
-// its own data and follows change events.
+// its own data and follows change events. M32: while Work is off for the space the page is empty
+// and loads nothing (the standalone window may outlive the switch).
 import { useEffect, useState, type JSX } from 'react'
 import type { TicketInfo } from '@/api/types'
 import { Icon } from '@/components/Icon'
@@ -12,6 +13,7 @@ import { BrainDumpBar } from '../page/BrainDumpBar'
 import { useWorkData, useWorkEvents } from '../state/useWorkData'
 import { focusLineToday, useWorkUi } from '../state/useWorkUi'
 import { WorkToasts } from '../state/WorkToasts.tsx'
+import { useWorkOn } from '../useWorkOn'
 import { nowPoolOf } from '../views/registry'
 import { WORK_ICONS } from '../workIcons'
 import { WORK_TEXT } from '../workText'
@@ -19,10 +21,14 @@ import { WORK_TEXT } from '../workText'
 /** The standalone page's data: loaded on mount, then reloaded on change events. */
 function StandaloneData(): null {
   useWorkEvents()
+  // Whether Work is on is the space's answer (`GET /api/space`): the data loads once it says yes.
+  const on = useWorkOn()
   useEffect(() => {
     void useSpaceInfo.getState().ensure()
-    void useWorkData.getState().load()
   }, [])
+  useEffect(() => {
+    if (on) void useWorkData.getState().load()
+  }, [on])
   return null
 }
 
@@ -46,6 +52,15 @@ export function WorkMini({ standalone = false }: { standalone?: boolean } = {}):
   const n = focusLineToday(ui) ?? currentLine(lines, items, top)
   const line = n === null ? null : (lines.find((l) => l.n === n) ?? null)
   const step = top?.current ?? null
+  const on = useWorkOn()
+
+  if (!on) {
+    return (
+      <div data-work-mini="" className="flex min-h-full flex-col gap-3 bg-base p-3 text-fg">
+        {standalone ? <StandaloneData /> : null}
+      </div>
+    )
+  }
 
   return (
     <div data-work-mini="" className="flex min-h-full flex-col gap-3 bg-base p-3 text-fg">

@@ -1,6 +1,7 @@
 // M23 Task 8: which Work overlay is open: the focus session (an item) or Make it smaller (a step).
-// `WorkOverlays` (T15) draws them; one at a time.
+// `WorkOverlays` (T15) draws them; one at a time. M32: neither opens while Work is off for the space.
 import { create } from 'zustand'
+import { isWorkOn } from '../useWorkOn'
 
 export interface WorkOverlayState {
   session: { path: string } | null
@@ -13,7 +14,11 @@ export interface WorkOverlayState {
 export const useWorkOverlay = create<WorkOverlayState>()((set) => ({
   session: null,
   smaller: null,
-  openSession: (path) => set({ session: { path }, smaller: null }),
-  openSmaller: (path, stepId) => set({ smaller: { path, stepId }, session: null }),
+  openSession: (path) => {
+    if (isWorkOn()) set({ session: { path }, smaller: null })
+  },
+  openSmaller: (path, stepId) => {
+    if (isWorkOn()) set({ smaller: { path, stepId }, session: null })
+  },
   close: () => set({ session: null, smaller: null }),
 }))

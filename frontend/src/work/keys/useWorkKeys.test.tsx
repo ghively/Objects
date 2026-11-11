@@ -26,6 +26,10 @@ import { registerWorkView, resetWorkViews, workViews } from '../views/registry'
 import '../captures/registerView'
 import '../tasklists/registerView'
 import { useWorkKeys } from './useWorkKeys'
+import { setWorkOn } from '@/test/workOn'
+
+// M32: Work is on for the space in these tests (while it is off, nothing of the Work page runs).
+beforeEach(() => setWorkOn())
 
 /** The glob-registered views `g i` and `g c` open, kept before `resetWorkViews` drops them. */
 const DRIVE_GLOB_VIEWS = workViews().filter((v) => v.id === 'captures' || v.id === 'list-inbox')
@@ -71,7 +75,8 @@ describe('useWorkKeys', () => {
     vi.setSystemTime(new Date('2026-11-05T10:00:00.000Z'))
     vi.clearAllMocks()
     window.localStorage.clear()
-    loadWorkUi(null)
+    // The space the top-level `setWorkOn()` loaded: the page's own UI state is read for its root.
+    loadWorkUi(useSpaceInfo.getState().space?.root ?? null)
     resetWorkViews()
     resetSettingsModal()
     usePeek.getState().close()

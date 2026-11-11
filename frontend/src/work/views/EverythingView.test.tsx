@@ -21,6 +21,10 @@ import { resetWorkData, useWorkData } from '../state/useWorkData'
 import { useWorkSelection } from '../state/useWorkSelection'
 import { useWorkUi } from '../state/useWorkUi'
 import { EverythingView } from './EverythingView'
+import { setWorkOn } from '@/test/workOn'
+
+// M32: Work is on for the space in these tests (while it is off, nothing of the Work page runs).
+beforeEach(() => setWorkOn())
 
 const BOARD = boardJson as unknown as WorkBoard
 const NOW = new Date('2026-11-05T10:00:00.000Z')

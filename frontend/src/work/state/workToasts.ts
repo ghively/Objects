@@ -1,6 +1,9 @@
 // M23 Task 8: the Work section's toasts. Toasts are for problems only (success just happens); the
 // one exception is the 5-second Undo toast for Done, Decline and Approve. `WorkToasts.tsx` draws them.
+// M32: while Work is off for the space nothing draws them (App mounts `WorkToasts` only when on),
+// so none is queued either.
 import { create } from 'zustand'
+import { isWorkOn } from '../useWorkOn'
 
 /** How long an Undo toast stays (Global Constraints: 5 s). */
 export const UNDO_MS = 5000
@@ -24,6 +27,8 @@ let seq = 0
 const timers = new Map<number, ReturnType<typeof setTimeout>>()
 
 function push(text: string, undo: (() => Promise<unknown>) | null, ms: number): number {
+  // M32: Work is off for this space: no toast (and no timer) is made.
+  if (!isWorkOn()) return 0
   seq += 1
   const id = seq
   useWorkToasts.setState((s) => ({ toasts: [...s.toasts, { id, text, undo }] }))

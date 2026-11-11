@@ -1,5 +1,7 @@
 // M23 Task 8: the Work page's data. Every view is computed from these parts (the board above all).
 // Reads only: nothing here writes. `useWorkEvents` reloads the parts a change touches, debounced.
+// M32: while Work is off for the space (`isWorkOn()`), `load` fetches nothing and change events are
+// ignored, so no part of the dashboard is read by a space that does not use it.
 import { useEffect } from 'react'
 import { create } from 'zustand'
 import { api } from '@/api/client'
@@ -16,6 +18,7 @@ import type {
   WorkWins,
 } from '@/api/types'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
+import { isWorkOn } from '../useWorkOn'
 
 export type WorkPart = 'board' | 'all' | 'focus' | 'today' | 'alerts' | 'agent' | 'needsYou' | 'wins' | 'general'
 
@@ -83,6 +86,8 @@ export const useWorkData = create<WorkDataState>()((set, get) => ({
   hidden: new Set<string>(),
 
   async load(parts = DEFAULT_PARTS) {
+    // M32: Work is off for this space: nothing of the dashboard is fetched.
+    if (!isWorkOn()) return
     await Promise.all(
       [...new Set(parts)].map(async (part) => {
         tick += 1
@@ -199,6 +204,8 @@ export function useWorkEvents(): void {
     const pending = new Set<WorkPart>()
     let timer: ReturnType<typeof setTimeout> | null = null
     const off = api.onChange((e) => {
+      // M32: Work is off for this space: a change reloads nothing.
+      if (!isWorkOn()) return
       const types = useSpaceInfo.getState().space?.types ?? []
       const data = useWorkData.getState()
       const parts = partsForEvent(e, types, data.all !== null, data.wins !== null)

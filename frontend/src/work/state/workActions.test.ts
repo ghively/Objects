@@ -13,6 +13,10 @@ import { workBoard, workItem, workStep, workWriteResult } from '@/test/mockApi'
 import { resetWorkData, useWorkData } from './useWorkData'
 import { APPROVE_ARM_MS, directRunner, openItemPanel, stepAction, UNDO_MS } from './workActions'
 import { resetWorkToasts, runUndo, useWorkToasts } from './workToasts'
+import { setWorkOn } from '@/test/workOn'
+
+// M32: Work is on for the space in these tests (while it is off, nothing of the Work page runs).
+beforeEach(() => setWorkOn())
 
 const mocked = vi.mocked(api)
 const PATH = 'Tasks/Printer jams on line 3.md'
