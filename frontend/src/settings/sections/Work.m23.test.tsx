@@ -11,17 +11,19 @@ vi.mock('@/api/client', async (orig) => ({
 import { api, ApiError } from '@/api/client'
 import type { SpaceInfo } from '@/api/types'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
-import { resetSpaceInfo } from '@/settings/useSpaceInfo'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { typeDef, workAlerts } from '@/test/mockApi'
 import { WORK_SEARCH, WORK_TEXT, WorkSection } from './Work'
 
 const mocked = vi.mocked(api)
-const SPACE: SpaceInfo = { name: 'Lab', root: '/Lab', types: [], icon: null, description: null, hideTaskManagement: false, revision: 's1', jiraSite: null }
+const SPACE: SpaceInfo = { name: 'Lab', root: '/Lab', types: [], icon: null, description: null, hideTaskManagement: false, revision: 's1', jiraSite: null, workEnabled: true, workOn: true }
 const FOLDER = 'C:\\Monitoring\\copy'
 
 beforeEach(() => {
   vi.clearAllMocks()
   resetSpaceInfo()
+  // M32: the rows work only while the Work page is on for the space.
+  useSpaceInfo.setState({ space: SPACE, loaded: true })
   useSettings.setState({ settings: settingsDefaults, revision: 'r0', loaded: true })
   mocked.space.mockResolvedValue(SPACE)
   mocked.settings.mockResolvedValue({ settings: settingsDefaults, revision: 'r0' })
@@ -31,10 +33,10 @@ beforeEach(() => {
 })
 
 describe('WorkSection alert rows', () => {
-  test('test the alert rows come after Your name in Activity and Jira site, and are searchable', () => {
+  test('test the alert rows come after the Work switch, Your name in Activity and Jira site, and are searchable', () => {
     render(<WorkSection />)
     const groups = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'))
-    expect(groups).toEqual([WORK_TEXT.yourName, WORK_TEXT.jiraSite, WORK_TEXT.alertFolder, WORK_TEXT.alertIntervals, WORK_TEXT.alertType])
+    expect(groups).toEqual([WORK_TEXT.usePage, WORK_TEXT.yourName, WORK_TEXT.jiraSite, WORK_TEXT.alertFolder, WORK_TEXT.alertIntervals, WORK_TEXT.alertType])
     expect(WORK_SEARCH).toEqual(expect.arrayContaining([WORK_TEXT.alertFolder, WORK_TEXT.alertIntervals, WORK_TEXT.addAlertType]))
   })
 

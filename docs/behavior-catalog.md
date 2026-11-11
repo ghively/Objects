@@ -134,7 +134,14 @@ Object has no accounts.
     read-only page preview: cover, type label, icon and title, the description, the properties the object's panel
     shows (hidden and empty "hide when empty" ones left out, "Empty" otherwise), then the body's first lines; a click
     or Enter opens the object.
-- Task management: "Hide Task Management" per space.
+- Task management: "Hide Tasks in this space" per space (M32; was "Hide Task Management", key `hideTaskManagement`
+  unchanged): "Hides the Tasks page, its entry in the sidebar and the task features in this space. Other spaces are
+  not changed." Tasks already made are kept.
+- Work (Object's own; M32): the first row is the switch "Use the Work page in this space" (`workEnabled` in
+  `.object/space.json`; "Adds a Work page under Tasks: the Now view, queues, captures, alerts and tickets, and ticket
+  fields on tasks and projects. Off: Tasks is a plain task list."). Off: the rest of the section (Your name in
+  Activity, Jira site, the alert rows, the work agent group, Desk sync) stays in place with every control disabled
+  under one line, "Turn on the Work page to use these."; nothing is removed.
 - Automations (M14): in the rule editor, "Set a property" on a date needs a date or "Now" ticked; with neither it
   shows "Pick a date or tick Now." under the value and Save refuses with the same message (it would write the
   date empty, `completed: null`). A rule saved like that before keeps running unchanged; opening it shows the
