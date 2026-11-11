@@ -700,7 +700,7 @@ export function PropertyPanel({
             <DialogHeader>
               <DialogTitle className="text-[17px]">{`Delete "${deleting.name}"?`}</DialogTitle>
               <DialogDescription className="text-[13px] text-fg-muted">
-                The property and its values are removed from every object of this type.
+                The property and its values are removed from every note of this type.
               </DialogDescription>
             </DialogHeader>
             <DeletePropertySection

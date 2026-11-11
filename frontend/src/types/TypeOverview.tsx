@@ -19,6 +19,7 @@ import { typePlural } from '@/lib/typeLabel'
 import { useLinkIndex } from '@/links/linkIndex'
 import { DataView, type Pipeline } from '@/views/DataView'
 import { applyFilters } from '@/views/filter'
+import { UNGROUPED_LABEL } from '@/views/group'
 import { defaultViewState } from '@/views/model'
 import { useRows } from '@/views/useRows'
 import { searchRows } from './SectionView'
@@ -48,7 +49,7 @@ import type { ViewsEdit } from './useTypeViews'
 /** "Unreviewed" keeps its order (newest first) whatever the view's sorts: the view's filters, then that. */
 const unreviewedPipeline: Pipeline = (rows, state, ctx) => {
   const kept = unreviewedRows(applyFilters(rows, state.filterGroup, ctx))
-  return { rows: kept, groups: [{ id: 'other', label: 'Objects', rows: kept }] }
+  return { rows: kept, groups: [{ id: 'other', label: UNGROUPED_LABEL, rows: kept }] }
 }
 
 /** The DailyNote Overview's "Unreviewed": daily notes not marked reviewed, newest first, as a list. */

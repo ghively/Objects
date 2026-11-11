@@ -1,6 +1,7 @@
 // Group-by: the group options per property kind, the groups a set of rows falls into,
 // and the update that moves a row into a group (kanban drag). Pure functions over rows.
 import { typeLabel } from '@/lib/typeLabel'
+import { NOTES } from '@/lib/words'
 import type {
   DataViewDefinition,
   DateValue,
@@ -121,6 +122,11 @@ export interface GroupCtx extends FilterCtx {
 type Config = DataViewDefinition['groupByConfig']
 
 export const OTHER_ID = 'other'
+/**
+ * The label of the one group an ungrouped view has. A list or table shows no header for it; a
+ * board shows it as its single column's title ("Add to Notes"). M32: it read "Objects".
+ */
+export const UNGROUPED_LABEL = NOTES
 const TEXT_MAX = 500
 // Ids made from values (texts, aliases, linked titles, unknown tags) carry a prefix, so a value
 // "other" is not the Other group and no two kinds of value share an id.
@@ -492,7 +498,7 @@ export function groupRows(
 ): { groups: Group[]; hidden: Group[] } {
   const entry = groupBy?.groups?.[0]
   const def = entry ? findDef(ctx.types, entry.propertyId, entry.typeId, ctx.viewTypeIds) : undefined
-  if (!entry || !def) return { groups: [{ id: OTHER_ID, label: 'Objects', rows }], hidden: [] }
+  if (!entry || !def) return { groups: [{ id: OTHER_ID, label: UNGROUPED_LABEL, rows }], hidden: [] }
   const isStatus = isStatusLabel(def)
   const byCategory = isStatus && entry.option === STATUS_CATEGORY_OPTION
 

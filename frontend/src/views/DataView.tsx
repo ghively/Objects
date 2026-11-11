@@ -17,7 +17,7 @@ import { DeleteObjectDialog } from '@/object/DeleteObjectDialog'
 import { TypeChip } from '@/shell/Sidebar'
 import type { CustomizePage } from './CustomizeMenu'
 import { applyFilters } from './filter'
-import { findGroupConfig, groupRows, type Group, type GroupCtx } from './group'
+import { findGroupConfig, groupRows, UNGROUPED_LABEL, type Group, type GroupCtx } from './group'
 import { cardProperties } from './cards/cardConfig'
 import { CardCustomizePage } from './cards/CardCustomize'
 import { CalendarLayout, CalendarSettings } from './layouts/CalendarLayout'
@@ -427,7 +427,7 @@ export function DataView(props: DataViewProps) {
   const result = useMemo(() => (props.pipeline ?? defaultPipeline)(rows, state, ctx), [props.pipeline, rows, state, ctx])
   const flat = result.rows
   const grouped =
-    result.groups.length > 0 && !(result.groups.length === 1 && result.groups[0].id === 'other' && result.groups[0].label === 'Objects')
+    result.groups.length > 0 && !(result.groups.length === 1 && result.groups[0].id === 'other' && result.groups[0].label === UNGROUPED_LABEL)
 
   // Page across groups in order.
   const paged = useMemo(() => {

@@ -166,7 +166,7 @@ export const WORK_TEXT = {
   // ---- Wins ----
   stepsDone14: 'Steps done in 14 days',
   itemsClosed14: 'Items closed in 14 days',
-  objectsChanged14: 'Objects changed in 14 days',
+  objectsChanged14: 'Notes changed in 14 days', // M32 (the glossary): was "Objects changed in 14 days"
   changedToday: 'Changed today',
   whatGotDone: 'What got done',
   noStreaks: 'No streaks to break. This only grows.',
