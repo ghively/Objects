@@ -50,7 +50,8 @@ DEFAULTS: dict[str, Any] = {
     "toggleStyle": "toggle",
     "disableNumberedListTransformation": False,
     "disableSpellcheck": False,
-    "alwaysOpenAsFullPage": False,
+    # M32: a note opens as a full page unless this is turned off.
+    "alwaysOpenAsFullPage": True,
     "hideEntityIconsOnInlineLinks": False,
     "hideOutlinerLines": False,
     # 2026-11-09 (Gene): whether the left sidebar is shown when Object opens.
@@ -94,8 +95,9 @@ DEFAULTS: dict[str, Any] = {
     "aiHidden": False,
     "claudePath": None,
     "aiModel": None,
-    # M22: who "you" are in a work item's Activity and Work notes lines.
-    "activityName": "Gene",
+    # M22: who "you" are in a work item's Activity and Work notes lines. M32: no name is built in;
+    # the readers (`server.activity_name`, `worktools`) put their own fallback for an empty one.
+    "activityName": "",
     # M23: the monitoring folder the Work section's folder watch reads (absolute path or
     # None: off), and per-source staleness intervals in minutes.
     "workAlertFolder": None,
@@ -156,7 +158,7 @@ _CHOICES: dict[str, tuple[str, ...]] = {
     "highlightStyle": ("default", "minimal"),
 }
 _BOOLS = frozenset(k for k, v in DEFAULTS.items() if isinstance(v, bool))
-_OPEN_ON_START_MODES = ("lastOpenedPage", "today", "calendar", "specificObject")
+_OPEN_ON_START_MODES = ("lastOpenedPage", "today", "calendar", "specificObject", "home")  # M32: home
 _TRI = ("open", "closed", "hidden")
 _PRESENTATION_BOOLS = ("hideCoverImage", "hideProgressIndicator", "hideTitle")
 _PRESENTATION_TEXTS = ("footerLeft", "footerRight")

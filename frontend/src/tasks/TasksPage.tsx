@@ -5,6 +5,9 @@
 // `ui.tasks.views` (debounced, with M3's 409 refetch and re-apply). Status writes (checkbox, kanban
 // drop) reload the row, patch it in and show what happened. The rows come from the page's one feed
 // (`useTaskRows`).
+//
+// M32: the plain Tasks page is back as its own page (`TasksPage`, at the end of this file; the
+// dashboard is the optional Work page). The contract ships it as a stub over these lists.
 import { useCallback, useMemo, useState } from 'react'
 import { api } from '@/api/client'
 import type { Row, TaskSectionKey, TasksUi, TypeDef, UpdateResult, ViewState } from '@/api/types'
@@ -23,7 +26,7 @@ import { QuickAddTask } from './QuickAddTask'
 import { completionToast, type TaskOutcome } from './taskActions'
 import { taskRowExtras } from './taskRowExtras'
 import { DEFAULT_TASK_SECTION, TASK_SECTIONS, isTaskSectionKey, sectionRows, todayOpenCount } from './taskSections'
-import { useTaskRows } from './useTaskRows'
+import { useTaskRows, useTaskRowsFeed } from './useTaskRows'
 
 export { findTaskType } from './useTaskRows'
 
@@ -210,4 +213,66 @@ export function sectionCount(sectionKey: TaskSectionKey, now: Date = new Date())
 export function todayTaskCount(now: Date = new Date()): number {
   const { rows, taskType } = useTaskRows.getState()
   return todayOpenCount(rows, taskType, now)
+}
+
+// ---- the Tasks page (M32) ------------------------------------------------------------------
+
+export type TasksTabKey = 'today' | 'upcoming' | 'inbox' | 'all' | 'done'
+
+/**
+ * M32: the plain Tasks page's tabs, in order, each over one of the task sections. The page opens
+ * on the first (Today).
+ */
+export const TASKS_PAGE_TABS: readonly { key: TasksTabKey; label: string; section: TaskSectionKey }[] = [
+  { key: 'today', label: 'Today', section: 'today' },
+  { key: 'upcoming', label: 'Upcoming', section: 'scheduled' },
+  { key: 'inbox', label: 'Inbox', section: 'inbox' },
+  { key: 'all', label: 'All', section: 'all' },
+  { key: 'done', label: 'Done', section: 'completed' },
+]
+
+/**
+ * M32 contract stub of the plain Tasks page (the `tasks` target, and the `work` target while Work
+ * is off): the heading and the five tabs, each showing the existing list of its section
+ * (`TaskSectionPanel`). It mounts the page's one Task rows feed. Lane C builds the real page.
+ */
+export function TasksPage() {
+  useTaskRowsFeed()
+  const [tab, setTab] = useState<TasksTabKey>(TASKS_PAGE_TABS[0].key)
+  const current = TASKS_PAGE_TABS.find((t) => t.key === tab) ?? TASKS_PAGE_TABS[0]
+  return (
+    <div data-tasks-page="" className="h-full min-h-0 overflow-auto">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-6 pt-5 pb-16">
+        <header className="flex items-center gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-hover-2">
+            <Icon name="ph-check-circle" size={20} />
+          </span>
+          <h1 className="dataview-heading min-w-0 shrink-0 text-[20px] font-bold md:text-[22px]">{TASKS_TEXT.heading}</h1>
+        </header>
+        <div role="tablist" aria-label={TASKS_TEXT.heading} className="flex flex-wrap items-center gap-1">
+          {TASKS_PAGE_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              id={`tasks-tab-${t.key}`}
+              aria-selected={t.key === current.key}
+              aria-controls="tasks-panel"
+              onClick={() => setTab(t.key)}
+              className={
+                t.key === current.key
+                  ? 'h-8 rounded-lg bg-hover px-3 text-[14px] font-medium text-fg'
+                  : 'h-8 rounded-lg px-3 text-[14px] text-fg-muted hover:text-fg'
+              }
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div role="tabpanel" id="tasks-panel" aria-labelledby={`tasks-tab-${current.key}`}>
+          <TaskSectionPanel key={current.section} sectionKey={current.section} />
+        </div>
+      </div>
+    </div>
+  )
 }

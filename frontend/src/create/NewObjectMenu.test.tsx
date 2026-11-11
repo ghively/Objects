@@ -12,6 +12,7 @@ import { api } from '@/api/client'
 import { whiteboardApi } from '@/api/whiteboardClient'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { TypePage } from '@/types/TypePage'
 import { createAndOpen } from './createAndOpen'
 import { setLastTypeSpace } from './lastType'
@@ -152,9 +153,16 @@ describe('NewObjectMenu', () => {
     expect(mocked.createObject).not.toHaveBeenCalled()
     unmount()
 
-    render(<NewObjectMenu open onOpenChange={() => undefined} typeId="task" />)
-    await user.click(screen.getByRole('option', { name: 'New Untitled' }))
-    await waitFor(() => expect(usePeek.getState().path).toBe('task/Untitled.md'))
+    // The Task rule, with "Open objects as a full page" off (M32: it starts on, and then a task
+    // opens as a page like the rest; `createAndOpen.test.ts` covers both).
+    useSettings.setState({ settings: { ...settingsDefaults, alwaysOpenAsFullPage: false } })
+    try {
+      render(<NewObjectMenu open onOpenChange={() => undefined} typeId="task" />)
+      await user.click(screen.getByRole('option', { name: 'New Untitled' }))
+      await waitFor(() => expect(usePeek.getState().path).toBe('task/Untitled.md'))
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 })
 

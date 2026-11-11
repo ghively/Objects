@@ -32,8 +32,7 @@ describe('WorkSection', () => {
     render(<WorkSection />)
     expect(screen.getByRole('heading', { level: 2, name: 'Work' })).toBeInTheDocument()
     const name = screen.getByRole('textbox', { name: WORK_TEXT.yourName })
-    expect(name).toHaveValue('Gene')
-    await user.clear(name)
+    expect(name).toHaveValue('') // M32: no name is built in
     await user.type(name, 'Pat{Enter}')
     await waitFor(() => expect(mocked.patchSettings).toHaveBeenCalledWith({ activityName: 'Pat' }, { baseRevision: 'r0' }))
     expect(useSettings.getState().settings.activityName).toBe('Pat')

@@ -1,5 +1,6 @@
-"""``.object/space.json``: the space's name, icon, description, "hide task management" and
-(M22) the Jira site that makes a Jira ticket's browse link.
+"""``.object/space.json``: the space's name, icon, description, "hide task management",
+(M22) the Jira site that makes a Jira ticket's browse link and (M32) the Work switch
+(``workEnabled``: true, false or absent; `work_on` is the effective value).
 
 Absent file = the folder name and defaults; reading never creates or changes it.
 A patch writes only the patched keys over what the file already holds (unknown
@@ -34,11 +35,12 @@ __all__ = [
     "space_fields",
     "space_id",
     "needs_setup",
+    "work_on",
 ]
 
 SPACE_REL = ".object/space.json"
 MAX_NAME_LENGTH = 120
-PATCH_KEYS = ("name", "icon", "description", "hideTaskManagement", "jiraSite")
+PATCH_KEYS = ("name", "icon", "description", "hideTaskManagement", "jiraSite", "workEnabled")
 INTERNAL_KEYS = ("deskSyncRuleId", "spaceId", "setup")
 """M24: keys Object keeps in ``space.json`` for itself; never in `PATCH_KEYS`, never in `space_fields`.
 ``spaceId`` (2026-11-08): the space's stable id (`space_id`), which keys its version history and
@@ -89,19 +91,30 @@ def read(root: Path) -> tuple[dict[str, Any], str, str | None]:
         return {}, revision, f"space.json is not a valid JSON object: {exc}"
 
 
+def work_on(data: dict[str, Any]) -> bool:
+    """M32: whether the Work page is on for the space whose ``space.json`` holds `data`: the
+    stored ``workEnabled`` when it is true or false, else off. Reads only what it is given."""
+    stored = data.get("workEnabled")
+    return stored if isinstance(stored, bool) else False
+
+
 def space_fields(root: Path) -> dict[str, Any]:
     """The ``SpaceInfo`` fields from ``space.json``: name, icon, description, hideTaskManagement,
-    jiraSite (null when absent or not a web address), revision."""
+    jiraSite (null when absent or not a web address), workEnabled (the stored switch: true,
+    false, or null when absent), workOn (the effective one, `work_on`), revision."""
     data, revision, _error = read(root)
     name = data.get("name")
     icon = data.get("icon")
     description = data.get("description")
+    stored_work = data.get("workEnabled")
     return {
         "name": name.strip() if isinstance(name, str) and name.strip() else Path(root).name,
         "icon": icon if isinstance(icon, str) else None,
         "description": description if isinstance(description, str) else None,
         "hideTaskManagement": data.get("hideTaskManagement") is True,
         "jiraSite": data.get("jiraSite") if _jira_site_ok(data.get("jiraSite")) else None,
+        "workEnabled": stored_work if isinstance(stored_work, bool) else None,
+        "workOn": work_on(data),
         "revision": revision,
     }
 

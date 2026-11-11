@@ -24,6 +24,13 @@ export const AUTOSAVE_RETRY_MS = 2000
 export const AUTOSAVE_RETRY_MAX_MS = 30000
 export const AUTOSAVE_ERROR_TEXT = 'Changes not saved. Retrying…'
 
+/**
+ * M32: where the shown text stands against the file. `saved`: nothing to write; `unsaved`: edits
+ * wait for the next save (or saving is paused); `saving`: a save is in flight; `error`: the last
+ * save failed and is being retried (`saveError` holds the text).
+ */
+export type SaveState = 'saved' | 'unsaved' | 'saving' | 'error'
+
 export type AutosaveOptions = {
   path: string
   version: string
@@ -58,6 +65,8 @@ export function useAutosave(opts: AutosaveOptions) {
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryDelayRef = useRef(AUTOSAVE_RETRY_MS)
   const [saveError, setSaveError] = useState<string | null>(null)
+  /** M32: `saveState` without the failure (that is `saveError`). */
+  const [phase, setPhase] = useState<Exclude<SaveState, 'error'>>('saved')
   /** False once the editor using this hook has unmounted. */
   const aliveRef = useRef(true)
 
@@ -87,6 +96,7 @@ export function useAutosave(opts: AutosaveOptions) {
   const start = useCallback(
     async (path: string, body: string, version: string): Promise<void> => {
       inFlightRef.current = true
+      if (optsRef.current.path === path) setPhase('saving')
       const run = (async () => {
         let savedVersion: string | null = null
         try {
@@ -97,6 +107,8 @@ export function useAutosave(opts: AutosaveOptions) {
             savedBodyRef.current = body
             retryDelayRef.current = AUTOSAVE_RETRY_MS
             setSaveError(null)
+            // Keys pressed while this save ran wait for their own save.
+            setPhase(timerRef.current !== null ? 'unsaved' : 'saved')
             // What is on disk is now newer than any text kept for this object
             // earlier (e.g. by a settle while saving was paused): offering that
             // again would revert these edits.
@@ -113,13 +125,16 @@ export function useAutosave(opts: AutosaveOptions) {
           } else if (err instanceof ConflictError) {
             pausedRef.current = true
             setSaveError(null)
+            setPhase('unsaved')
             optsRef.current.onConflict?.(err.currentVersion)
           } else if (err instanceof ReadOnlyError) {
             pausedRef.current = true
             setSaveError(null)
+            setPhase('unsaved')
           } else {
             console.error('autosave failed', err)
             setSaveError(AUTOSAVE_ERROR_TEXT)
+            setPhase('unsaved')
             clearRetry()
             const delay = retryDelayRef.current
             retryDelayRef.current = Math.min(delay * 2, AUTOSAVE_RETRY_MAX_MS)
@@ -171,7 +186,11 @@ export function useAutosave(opts: AutosaveOptions) {
         return
       }
       const body = o.getBody()
-      if (body === null || body === savedBodyRef.current) return
+      if (body === null || body === savedBodyRef.current) {
+        // Nothing to write (the edit was undone): what shows is what is saved.
+        if (body !== null && path === o.path && aliveRef.current) setPhase('saved')
+        return
+      }
       await start(path, body, versionRef.current)
     },
     [cancel, start],
@@ -208,6 +227,8 @@ export function useAutosave(opts: AutosaveOptions) {
   const schedule = useCallback(() => {
     if (optsRef.current.readOnly) return
     cancel()
+    // During a save the state stays `saving`; the save's end sees the timer and says `unsaved`.
+    if (!inFlightRef.current) setPhase('unsaved')
     timerRef.current = setTimeout(() => {
       timerRef.current = null
       void flush()
@@ -220,6 +241,7 @@ export function useAutosave(opts: AutosaveOptions) {
       cancel()
       clearRetry()
       setSaveError(null)
+      setPhase('saved')
       savedBodyRef.current = body
       if (version !== undefined) versionRef.current = version
       pausedRef.current = false
@@ -296,6 +318,8 @@ export function useAutosave(opts: AutosaveOptions) {
     savedBody: () => savedBodyRef.current,
     /** Set while the last save failed for a reason other than a conflict or read-only file. */
     saveError,
+    /** M32: `error` while `saveError` is set, else saved / unsaved / saving (`SaveState`). */
+    saveState: (saveError !== null ? 'error' : phase) as SaveState,
   }
 }
 

@@ -52,9 +52,12 @@ import { TrashView } from '@/trash/TrashView'
 import { CreateTypeDialog } from '@/types/CreateTypeDialog'
 import { DeleteTypeDialog } from '@/types/DeleteTypeDialog'
 import { TypePage } from '@/types/TypePage'
+import { HomePage } from '@/home/HomePage'
+import { TasksPage } from '@/tasks/TasksPage'
 import { WorkPage } from '@/work/page/WorkPage'
 import { WorkOverlays } from '@/work/session/WorkOverlays'
 import { WorkToasts } from '@/work/state/WorkToasts.tsx'
+import { useWorkOn } from '@/work/useWorkOn'
 
 // Pages whose code the shell does not need at start (the graph's sigma and graphology, the
 // calendar, type settings) load when first shown (audit 2026-11-01 F1).
@@ -110,10 +113,12 @@ interface PageCtx {
   types: TypeDef[]
   space: SpaceInfo | null
   open: (t: Target, o?: OpenOptions) => void
+  /** M32: whether the Work page is on for this space (`useWorkOn`). */
+  workOn: boolean
 }
 
 /** The page a target shows, in the main panel or in a side-panel entry (`open` navigates that place). */
-function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
+function pageFor(target: Target, { types, space, open, workOn }: PageCtx): ReactNode {
   switch (target.kind) {
     case 'object':
       // M23: `work: true` (the item panel) shows the work header above the object's page.
@@ -152,8 +157,8 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
         </Suspense>
       )
     case 'tasks':
-      // Gene's redesign: the task lists and M23's dashboard are one page, the Tasks dashboard.
-      return <WorkPage />
+      // M32: the plain Tasks page; the dashboard is the Work page (`work`), when it is on.
+      return <TasksPage />
     case 'graph':
       return (
         <Suspense fallback={null}>
@@ -167,8 +172,9 @@ function pageFor(target: Target, { types, space, open }: PageCtx): ReactNode {
       // M17: the agent page (Profile, Instructions, Tools, Chats).
       return <AgentPage key={target.id} id={target.id} tab={target.tab} />
     case 'work':
-      // M23's Work page, now the Tasks dashboard (Gene's redesign), on its view.
-      return <WorkPage view={target.view} />
+      // M23's Work page (the dashboard), on its view. M32: only while Work is on for this space;
+      // off, a work target (a restored tab, an old link) shows the Tasks page.
+      return workOn ? <WorkPage view={target.view} /> : <TasksPage />
     case 'spaceHistory':
       // 2026-11-08: the space's git history and "Restore space to this point".
       return (
@@ -265,6 +271,8 @@ export default function App() {
   }, [])
 
   const types = useSpaceTypes(space)
+  // M32: the Work page, its toasts and its overlays exist only while Work is on for this space.
+  const workOn = useWorkOn()
 
   // Shortcuts, only when focus is not in an editable element (there Ctrl+Backspace deletes a word):
   // Ctrl+U "+ New" menu, Ctrl+N a new object of the current type, Ctrl+Backspace "Delete this object?".
@@ -311,11 +319,12 @@ export default function App() {
   if (error) {
     content = <Centered title="Can't reach the Object back end." subtitle={error} />
   } else if (target) {
-    content = pageFor(target, { types, space, open })
+    content = pageFor(target, { types, space, open, workOn })
   } else if (!tabsReady) {
     content = null
   } else {
-    content = <Centered title="Pick an object type" subtitle="Choose a type in the sidebar to see its objects." />
+    // M32: an empty tab (and a first open with nothing to restore) is Home.
+    content = <HomePage types={types} />
   }
 
   // A side-panel entry: M5's local graph follows the tab's current object; links in a page open
@@ -334,7 +343,7 @@ export default function App() {
     if (t.kind === 'backlinks') return <BacklinksPanel path={target?.kind === 'object' ? target.path : null} />
     // M10: `SidePanelArea` shows the AI chat itself (it needs the entry).
     if (t.kind === 'aiChat') return null
-    return pageFor(t, { types, space, open: (x, o) => (o?.newTab ? open(x, o) : nav.open(x, o)) })
+    return pageFor(t, { types, space, workOn, open: (x, o) => (o?.newTab ? open(x, o) : nav.open(x, o)) })
   }
 
   return (
@@ -396,9 +405,10 @@ export default function App() {
           onShowRightPanel={() => openInSidepanel({ kind: 'localGraph' })}
         />
         <LinkPicker />
-        {/* M23: the work toasts (problems and Undo) and the focus session / Make it smaller, once. */}
-        <WorkToasts />
-        <WorkOverlays />
+        {/* M23: the work toasts (problems and Undo) and the focus session / Make it smaller, once.
+            M32: only while Work is on for this space. */}
+        {workOn && <WorkToasts />}
+        {workOn && <WorkOverlays />}
         <NewObjectMenu open={newMenuOpen} onOpenChange={setNewMenuOpen} />
         <CreateTypeDialog
           open={createTypeOpen}

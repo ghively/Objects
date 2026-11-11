@@ -76,8 +76,11 @@ describe('opening modes (M7)', () => {
   })
 
   test('test always open as full page opens tasks as pages', () => {
+    // M32: the setting starts on; off, a task opens in the peek.
+    expect(settingsDefaults.alwaysOpenAsFullPage).toBe(true)
+    useSettings.setState({ settings: { ...settingsDefaults, alwaysOpenAsFullPage: false } })
     expect(openModeFor({}, 'task')).toBe('peek')
-    useSettings.setState({ settings: { ...settingsDefaults, alwaysOpenAsFullPage: true } })
+    useSettings.setState({ settings: settingsDefaults })
     expect(openModeFor({}, 'task')).toBe('current')
     expect(openObject('Tasks/Do it.md', {}, 'task')).toBe('current')
     expect(currentTarget(s())).toEqual(objT('Tasks/Do it.md'))

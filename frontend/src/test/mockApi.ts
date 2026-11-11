@@ -821,6 +821,8 @@ type Fn =(...args: never[]) => unknown
 function defaults(): Api {
   return {
     appInfo: async () => ({ version: '0.1.0' }),
+    // M32: the mock space is one where Work reads as on (nothing stored), so the tests of the
+    // dashboard need no set-up; a test of the off state answers `workOn: false` (`test/workOn.ts`).
     space: async () => ({
       name: 'space',
       root: '/space',
@@ -828,6 +830,8 @@ function defaults(): Api {
       icon: null,
       description: null,
       hideTaskManagement: false,
+      workEnabled: null,
+      workOn: true,
       revision: '',
     }),
     objects: async () => [],
@@ -981,7 +985,10 @@ function defaults(): Api {
       icon: null,
       description: null,
       hideTaskManagement: false,
+      workEnabled: null,
       ...patch,
+      // M32: the effective switch follows a patched `workEnabled`, else stays on (see `space`).
+      workOn: typeof patch.workEnabled === 'boolean' ? patch.workEnabled : true,
       revision: 'r1',
     }),
     settings: async () => ({ settings: deviceSettings(), revision: '' }),

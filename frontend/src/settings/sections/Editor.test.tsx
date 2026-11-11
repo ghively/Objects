@@ -34,16 +34,18 @@ describe('EditorSection', () => {
     await user.click(within(toggle).getByRole('radio', { name: 'Bullet' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ toggleStyle: 'bullet' }, expect.anything())
 
-    for (const [label, key] of [
-      ['Turn off automatic numbered lists', 'disableNumberedListTransformation'],
-      ['Disable spellcheck', 'disableSpellcheck'],
-      ['Open objects as a full page', 'alwaysOpenAsFullPage'],
-      ['Hide outliner lines', 'hideOutlinerLines'],
+    // Each switch starts at its default and a click saves the other value. M32: "Open objects as
+    // a full page" starts on.
+    for (const [label, key, start] of [
+      ['Turn off automatic numbered lists', 'disableNumberedListTransformation', false],
+      ['Disable spellcheck', 'disableSpellcheck', false],
+      ['Open objects as a full page', 'alwaysOpenAsFullPage', true],
+      ['Hide outliner lines', 'hideOutlinerLines', false],
     ] as const) {
       const sw = screen.getByRole('switch', { name: label })
-      expect(sw).toHaveAttribute('aria-checked', 'false')
+      expect(sw).toHaveAttribute('aria-checked', String(start))
       await user.click(sw)
-      expect(mocked.patchSettings).toHaveBeenLastCalledWith({ [key]: true }, expect.anything())
+      expect(mocked.patchSettings).toHaveBeenLastCalledWith({ [key]: !start }, expect.anything())
     }
 
     // "Show object type icon…" is on while the icons are not hidden; turning it off hides them.

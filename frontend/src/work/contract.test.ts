@@ -67,7 +67,7 @@ describe('test M22 contract', () => {
       done: 'Done',
     })
     expect(TURN_LABELS).toEqual({ you: 'you', approve: 'approve', agent: 'agent', parked: 'parked', close: 'close', none: 'none' })
-    expect(settingsDefaults.activityName).toBe('Gene')
+    expect(settingsDefaults.activityName).toBe('') // M32: no name is built in
     const ids = SETTINGS_SECTIONS.map((s) => s.id)
     expect(ids.slice(ids.indexOf('automations'), ids.indexOf('automations') + 3)).toEqual(['automations', 'work', 'integrations'])
     expect(SETTINGS_SECTIONS.find((s) => s.id === 'work')).toMatchObject({ group: 'space', label: 'Work', icon: 'ph-briefcase' })

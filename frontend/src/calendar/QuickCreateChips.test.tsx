@@ -9,6 +9,7 @@ vi.mock('@/api/client', async (orig) => ({
 
 import { ensureLinkIndex } from '@/links/linkIndex'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { useUiStore } from '@/shell/usePinned'
 import { calendarDay, objectSummary } from '@/test/mockApi'
 import { mocked, resetDayMocks, TODAY } from './dayFixtures'
@@ -35,10 +36,20 @@ describe('QuickCreateChips', () => {
     await waitFor(() => expect(onCreated).toHaveBeenCalled())
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'meeting/Untitled.md' })
 
-    // A Task opens in the peek, with its `date` set.
+    // A Task is made with its `date` set. M32: "Open objects as a full page" starts on, so it
+    // opens as a page; with the setting off it opens in the peek.
     await user.click(screen.getByRole('button', { name: /Task/ }))
     expect(mocked.createObject).toHaveBeenLastCalledWith('task', { values: { date: { start: '2026-10-24', resolution: 'day' } } })
-    await waitFor(() => expect(usePeek.getState().path).toBe('task/Untitled.md'))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'task/Untitled.md' }))
+    expect(usePeek.getState().path).toBeNull()
+
+    useSettings.setState({ settings: { ...settingsDefaults, alwaysOpenAsFullPage: false } })
+    try {
+      await user.click(screen.getByRole('button', { name: /Task/ }))
+      await waitFor(() => expect(usePeek.getState().path).toBe('task/Untitled.md'))
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 
   test('test createOnce chip hides after creation', async () => {

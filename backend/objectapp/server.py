@@ -1099,6 +1099,9 @@ def create_app(
             "description": fields["description"],
             "hideTaskManagement": fields["hideTaskManagement"],
             "jiraSite": fields["jiraSite"],
+            # M32: the Work switch as stored (true / false / null) and the effective value.
+            "workEnabled": fields["workEnabled"],
+            "workOn": fields["workOn"],
             "revision": fields["revision"],
             "needsSetup": needs_setup(space.root),
         }

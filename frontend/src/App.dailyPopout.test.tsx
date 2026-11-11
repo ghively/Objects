@@ -1,6 +1,6 @@
 // 2026-11-09 (Gene): the sidebar can start collapsed ("Show the sidebar when Object opens"), and
 // today's daily note pops out into the peek from the top bar, the palette and Ctrl+Shift+D.
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { SpaceInfo } from '@/api/types'
 import { deviceSettings, typeDef } from '@/test/mockApi'
@@ -70,7 +70,8 @@ describe("today's daily note pops out", () => {
     mocked.createDailyNote.mockResolvedValue({ path: 'DailyNotes/2026-11-09.md', version: 'v1', typeIds: [] })
     document.title = ''
     await renderReady()
-    fireEvent.click(screen.getByRole('button', { name: "Today's note" }))
+    // M32: the empty tab is Home, which has its own "Today's note"; this is the top bar's.
+    fireEvent.click(within(screen.getByRole('banner')).getByRole('button', { name: "Today's note" }))
     await waitFor(() => expect(usePeek.getState().path).toBe('DailyNotes/2026-11-09.md'))
     expect(mocked.createDailyNote).toHaveBeenCalledTimes(1)
   })

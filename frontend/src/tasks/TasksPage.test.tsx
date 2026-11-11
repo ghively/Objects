@@ -27,7 +27,7 @@ import { useDefs } from '@/types/useDefinitions'
 import { FULL_VIEW_LAYOUTS } from '@/views/model'
 import { TASK_TYPE, taskRow } from './taskFixtures'
 import type { TaskSectionKey } from '@/api/types'
-import { TaskSectionPanel } from './TasksPage'
+import { TASKS_PAGE_TABS, TaskSectionPanel, TasksPage } from './TasksPage'
 import { resetTaskRows, useTaskRowsFeed } from './useTaskRows'
 
 const mocked = vi.mocked(api)
@@ -301,6 +301,39 @@ describe('Task list views (TaskSectionPanel)', () => {
     expect(buttons).toHaveLength(2)
     await user.click(buttons[1])
     await waitFor(() => expect(screen.getAllByTestId('kanban-column')).toHaveLength(4))
+  })
+})
+
+// M32 contract: the plain Tasks page is its own page again (a stub over the lists; lane C builds it).
+describe('TasksPage (M32 contract stub)', () => {
+  test('test the Tasks page has the tabs Today, Upcoming, Inbox, All, Done and opens on Today', async () => {
+    render(<TasksPage />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Tasks' })).toBeInTheDocument()
+    const tabs = within(screen.getByRole('tablist', { name: 'Tasks' })).getAllByRole('tab')
+    expect(tabs.map((t) => t.textContent)).toEqual(['Today', 'Upcoming', 'Inbox', 'All', 'Done'])
+    expect(TASKS_PAGE_TABS.map((t) => t.section)).toEqual(['today', 'scheduled', 'inbox', 'all', 'completed'])
+    expect(screen.getByRole('tab', { name: 'Today' })).toHaveAttribute('aria-selected', 'true')
+    // Today's list, from the page's own rows feed (one fetch).
+    expect(document.querySelector('[data-task-section="today"]')).not.toBeNull()
+    const view = await screen.findByTestId('data-view')
+    await waitFor(() => expect(titlesIn(view)).toEqual(['Overdue', 'Working', 'Finished']))
+    expect(mocked.rows).toHaveBeenCalledTimes(1)
+    // None of the dashboard is here.
+    expect(screen.queryByRole('textbox', { name: 'Brain dump' })).toBeNull()
+    expect(screen.queryByRole('navigation', { name: 'Work views' })).toBeNull()
+  })
+
+  test('test a tab shows its section’s list', async () => {
+    const user = userEvent.setup()
+    render(<TasksPage />)
+    await screen.findByTestId('data-view')
+    await user.click(screen.getByRole('tab', { name: 'Inbox' }))
+    expect(screen.getByRole('tab', { name: 'Inbox' })).toHaveAttribute('aria-selected', 'true')
+    expect(document.querySelector('[data-task-section="inbox"]')).not.toBeNull()
+    await waitFor(() => expect(titlesIn(screen.getByTestId('data-view'))).toEqual(['Fresh']))
+    await user.click(screen.getByRole('tab', { name: 'Done' }))
+    expect(document.querySelector('[data-task-section="completed"]')).not.toBeNull()
+    await waitFor(() => expect(titlesIn(screen.getByTestId('data-view'))).toEqual(['Finished']))
   })
 })
 

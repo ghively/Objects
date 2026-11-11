@@ -391,7 +391,7 @@ def test_settings(env: Env) -> None:
     cfg.write_text(_json.dumps({**data, "jiraSite": None}), encoding="utf-8")
 
     settings = e.c.get("/api/settings").json()
-    assert settings["settings"]["activityName"] == "Gene"
+    assert settings["settings"]["activityName"] == ""  # M32: the default holds no name
     res = e.c.put("/api/settings", json={"patch": {"activityName": "Pat"},
                                          "baseRevision": settings["revision"]})
     assert res.status_code == 200, res.text

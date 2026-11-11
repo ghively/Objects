@@ -33,6 +33,7 @@ import boardJson from '../__fixtures__/board.json'
 import { resetWorkData } from '../state/useWorkData'
 import { loadWorkUi, useWorkUi } from '../state/useWorkUi'
 import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { registerWorkView, resetWorkViews, workViews } from '../views/registry'
 import { WorkPage } from './WorkPage'
 import { clearWorkSearch } from './WorkTopBar'
@@ -179,10 +180,16 @@ describe('WorkPage', () => {
     useLinkIndex.setState({ types: [{ ...TASK_TYPE, basic: true }], objects: [], loaded: true })
     mocked.createObject.mockResolvedValue({ path: 'Tasks/New.md', version: 'v1' })
     mocked.templates.mockResolvedValue([])
-    await show()
-    await user.click(screen.getByRole('button', { name: 'Create task' }))
-    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', {}))
-    await waitFor(() => expect(usePeek.getState().path).toBe('Tasks/New.md'))
+    // With "Open objects as a full page" off (M32: it starts on, and a task then opens as a page).
+    useSettings.setState({ settings: { ...settingsDefaults, alwaysOpenAsFullPage: false } })
+    try {
+      await show()
+      await user.click(screen.getByRole('button', { name: 'Create task' }))
+      await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', {}))
+      await waitFor(() => expect(usePeek.getState().path).toBe('Tasks/New.md'))
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 
   test('test just one thing shows only Now and dims the app', async () => {

@@ -52,6 +52,8 @@ export const EDITOR_TEXT = {
     today: 'Calendar today',
     calendar: 'Calendar',
     specificObject: 'Specific object',
+    // M32 contract: the label only; the option joins `OPEN_MODES` with lane F1's settings work.
+    home: 'Home',
   },
   specificObjectDescription: 'The object shown when the app starts or you switch to this space.',
   selectObject: 'Select object',

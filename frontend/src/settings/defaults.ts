@@ -12,7 +12,8 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   toggleStyle: 'toggle',
   disableNumberedListTransformation: false,
   disableSpellcheck: false,
-  alwaysOpenAsFullPage: false,
+  // M32: a note opens as a full page
+  alwaysOpenAsFullPage: true,
   hideEntityIconsOnInlineLinks: false,
   hideOutlinerLines: false,
   showSidebarOnStart: true,
@@ -47,8 +48,8 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   aiHidden: false,
   claudePath: null,
   aiModel: null,
-  // M22
-  activityName: 'Gene',
+  // M22 (M32: no built-in name)
+  activityName: '',
   // M23
   workAlertFolder: null,
   workAlertIntervals: {},

@@ -133,6 +133,8 @@ def test_unreadable_space_json_423_not_replaced(blocks_space_dir: Path):
         {"icon": 3},
         {"description": ["a"]},
         {"hideTaskManagement": "yes"},
+        {"workEnabled": "yes"},
+        {"workEnabled": None},
         {"colour": "teal"},
     ],
 )
@@ -165,3 +167,44 @@ def test_name_change_does_not_rename_folder(blocks_space_dir: Path):
     after = _tree(blocks_space_dir)
     after.pop(".object/space.json")
     assert after == before
+
+
+# -- M32 contract: the Work switch (`workEnabled` stored, `workOn` effective) --
+
+
+def test_work_switch_absent_reads_off_and_writes_nothing(blocks_space_dir: Path):
+    before = _tree(blocks_space_dir)
+    with _client(blocks_space_dir) as c:
+        info = c.get("/api/space").json()
+    assert info["workEnabled"] is None and info["workOn"] is False
+    fields = spaceconfig.space_fields(blocks_space_dir)
+    assert fields["workEnabled"] is None and fields["workOn"] is False
+    assert _tree(blocks_space_dir) == before
+
+
+def test_work_switch_set_changes_only_space_json(blocks_space_dir: Path):
+    before = _tree(blocks_space_dir)
+    with _client(blocks_space_dir) as c:
+        on = c.put("/api/space", json={"patch": {"workEnabled": True}, "baseRevision": ""})
+        assert on.status_code == 200, on.text
+        assert on.json()["workEnabled"] is True and on.json()["workOn"] is True
+        assert c.get("/api/space").json()["workOn"] is True
+        off = c.put(
+            "/api/space", json={"patch": {"workEnabled": False}, "baseRevision": on.json()["revision"]}
+        )
+        assert off.status_code == 200, off.text
+        assert off.json()["workEnabled"] is False and off.json()["workOn"] is False
+    after = _tree(blocks_space_dir)
+    assert set(after) - set(before) == {".object/space.json"}
+    assert {k: v for k, v in after.items() if k in before} == before  # no .md file, no type file
+    assert json.loads((blocks_space_dir / ".object" / "space.json").read_bytes()) == {"workEnabled": False}
+
+
+def test_work_switch_hand_edited_value_reads_as_absent(tmp_path: Path):
+    (tmp_path / ".object").mkdir()
+    (tmp_path / ".object" / "space.json").write_text('{"workEnabled": "yes"}', encoding="utf-8")
+    fields = spaceconfig.space_fields(tmp_path)
+    assert fields["workEnabled"] is None and fields["workOn"] is False
+    assert spaceconfig.work_on({"workEnabled": True}) is True
+    assert spaceconfig.work_on({"workEnabled": False}) is False
+    assert spaceconfig.work_on({}) is False

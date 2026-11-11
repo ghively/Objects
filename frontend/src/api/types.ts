@@ -444,6 +444,13 @@ export interface SpaceInfo {
    * in `space.json`, no basic types, no files). Optional, as M7's keys are.
    */
   needsSetup?: boolean
+  /**
+   * M32: the Work switch as `space.json` stores it (`workEnabled`): true, false, or null when it
+   * was never set. Optional, as M7's keys are.
+   */
+  workEnabled?: boolean | null
+  /** M32: whether the Work page is on for this space (the effective value; read it through `useWorkOn`). */
+  workOn?: boolean
 }
 
 /** M7 `PUT /api/space` patch: only these keys are written to `space.json`. */
@@ -454,6 +461,8 @@ export interface SpacePatch {
   hideTaskManagement?: boolean
   /** M22: `null` or an `http(s)://` address of at most 300 characters. */
   jiraSite?: string | null
+  /** M32: "Use the Work page in this space". */
+  workEnabled?: boolean
 }
 
 /** M7: the kind of an attachment file (Task 2's `media.py` kinds). */
@@ -472,7 +481,8 @@ export interface UploadedAttachment {
   kind: AttachmentKind
 }
 
-export type OpenOnStartMode = 'lastOpenedPage' | 'today' | 'calendar' | 'specificObject'
+/** "When this space opens". M32 adds `home` (the Home tab). */
+export type OpenOnStartMode = 'lastOpenedPage' | 'today' | 'calendar' | 'specificObject' | 'home'
 
 /** M7: per-device settings (`<state dir>/settings.json`, defaults merged by the server). */
 export interface DeviceSettings {
@@ -485,6 +495,7 @@ export interface DeviceSettings {
   toggleStyle: 'toggle' | 'bullet'
   disableNumberedListTransformation: boolean
   disableSpellcheck: boolean
+  /** "Open objects as a full page". M32: on by default. */
   alwaysOpenAsFullPage: boolean
   hideEntityIconsOnInlineLinks: boolean
   hideOutlinerLines: boolean
@@ -531,7 +542,8 @@ export interface DeviceSettings {
   /** The model passed to `claude --model`; `null` = Claude Code's default. */
   aiModel: string | null
   // ---- M22 (the work model) ----
-  /** "Your name in Activity": who the Activity and Work notes lines name (1-60 characters). */
+  /** "Your name in Activity": who the Activity and Work notes lines name (1-60 characters).
+   *  M32: `''` until a name is set (no name is built in). */
   activityName: string
   // ---- M23 (the Work section) ----
   /** The monitoring folder the folder watch reads (an absolute path, at most 500 characters); `null` = off. */

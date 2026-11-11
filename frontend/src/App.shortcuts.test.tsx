@@ -101,8 +101,10 @@ describe('app shortcuts', () => {
     const notPrevented = fireEvent.keyDown(document.body, { key: 'T', ctrlKey: true, shiftKey: true })
     expect(notPrevented).toBe(false)
     await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', {}))
-    // A task opens in the peek (the New menu's rule for the Task type).
-    await waitFor(() => expect(usePeek.getState().path).toBe('task/Untitled.md'))
+    // M32: "Open objects as a full page" starts on, so the task opens as a page, not in the peek
+    // (the New menu's rule for the Task type while the setting is off).
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'task/Untitled.md' }))
+    expect(usePeek.getState().path).toBeNull()
   })
 
   test('a failed Ctrl+Shift+T create shows the error as a toast, as the New menu shows it', async () => {

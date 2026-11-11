@@ -435,8 +435,8 @@ export function Sidebar({
         </button>
       </div>
 
-      {/* The main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant. Tasks
-          opens the Tasks dashboard (Gene's redesign: M23's Work page and the task lists as one page). */}
+      {/* The main navigation, always visible at the top: Calendar, Tasks, Graph, Assistant. M32:
+          Tasks opens the plain Tasks page (target `tasks`); the dashboard is the Work page. */}
       <nav aria-label="Main" className="flex flex-col gap-0.5">
         <MainNavButton
           icon="ph-calendar-blank"
@@ -444,13 +444,13 @@ export function Sidebar({
           active={calendarActive}
           onClick={(e) => onOpenTarget?.({ kind: 'calendar' }, { newTab: e.ctrlKey || e.metaKey })}
         />
-        {/* Always shown: it is the work dashboard too. While the space hides task management
-            (`space.json` `hideTaskManagement`) the dashboard leaves out the task lists instead. */}
+        {/* Always shown. Active on the `work` target too until the sidebar has its own Work entry
+            (M32 lane B). */}
         <MainNavButton
           icon="ph-check-circle"
           label="Tasks"
           active={tasksActive || workActive}
-          onClick={(e) => onOpenTarget?.({ kind: 'work' }, { newTab: e.ctrlKey || e.metaKey })}
+          onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
         />
         <MainNavButton
           icon="ph-graph"

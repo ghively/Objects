@@ -26,7 +26,7 @@ CONTRACT_DEFAULTS = {
     "toggleStyle": "toggle",
     "disableNumberedListTransformation": False,
     "disableSpellcheck": False,
-    "alwaysOpenAsFullPage": False,
+    "alwaysOpenAsFullPage": True,  # M32: a note opens as a full page
     "hideEntityIconsOnInlineLinks": False,
     "hideOutlinerLines": False,
     "showSidebarOnStart": True,
@@ -44,8 +44,8 @@ CONTRACT_DEFAULTS = {
     "aiHidden": False,
     "claudePath": None,
     "aiModel": None,
-    # M22 (`test_m22_api.py` checks it)
-    "activityName": "Gene",
+    # M22 (`test_m22_api.py` checks it); M32: the default holds no name
+    "activityName": "",
     # M23 (`test_m23_contract.py` checks their messages)
     "workAlertFolder": None,
     "workAlertIntervals": {},
@@ -119,6 +119,13 @@ def test_settings_patch_round_trip_and_unknown_kept(state: Path):
     # Top-level keys are replaced, not merged.
     merged, _ = settings.patch({"openOnStart": {}, "startupSpacePath": None}, new_rev)
     assert merged["openOnStart"] == {} and merged["startupSpacePath"] is None
+
+
+def test_open_on_start_takes_home(state: Path):
+    # M32: "When this space opens" gains "Home".
+    merged, _ = settings.patch({"openOnStart": {"/spaces/a": {"mode": "home"}}}, "")
+    assert merged["openOnStart"] == {"/spaces/a": {"mode": "home"}}
+    assert settings.read()[0]["openOnStart"] == {"/spaces/a": {"mode": "home"}}
 
 
 def test_settings_patch_route_round_trip(state: Path, blocks_space_dir: Path):

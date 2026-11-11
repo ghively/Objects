@@ -158,3 +158,73 @@ describe('a save that fails after the editor left', () => {
   })
 })
 
+describe('saveState (M32 contract)', () => {
+  test('test saveState goes saved, unsaved, saving, saved', async () => {
+    const saves = deferredSaves()
+    let body: string | null = 'A0'
+    const { result } = renderHook(() =>
+      useAutosave({ path: 'a.md', version: 'v0', readOnly: false, getBody: () => body, onSaved: () => {} }),
+    )
+    act(() => result.current.markLoaded('A0', 'v0'))
+    expect(result.current.saveState).toBe('saved')
+
+    body = 'A1'
+    act(() => result.current.schedule())
+    expect(result.current.saveState).toBe('unsaved')
+
+    let first!: Promise<void>
+    await act(async () => {
+      first = result.current.flush()
+    })
+    expect(result.current.saveState).toBe('saving')
+
+    await act(async () => {
+      saves.release(0)
+      await first
+    })
+    expect(result.current.saveState).toBe('saved')
+    expect(result.current.saveError).toBeNull()
+  })
+
+  test('test saveState stays unsaved when more was typed while the save ran', async () => {
+    const saves = deferredSaves()
+    let body: string | null = 'A1'
+    const { result } = renderHook(() =>
+      useAutosave({ path: 'a.md', version: 'v0', readOnly: false, getBody: () => body, onSaved: () => {} }),
+    )
+    act(() => result.current.markLoaded('A0', 'v0'))
+    let first!: Promise<void>
+    await act(async () => {
+      first = result.current.flush()
+    })
+    body = 'A2'
+    act(() => result.current.schedule()) // a key during the save: the 1 s wait starts again
+    expect(result.current.saveState).toBe('saving')
+    await act(async () => {
+      saves.release(0)
+      await first
+    })
+    expect(result.current.saveState).toBe('unsaved')
+    act(() => result.current.cancel())
+  })
+
+  test('test saveState is error while a save has failed, and saved after a load', async () => {
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(api.saveBody).mockRejectedValue(new Error('server gone'))
+    const body: string | null = 'A1'
+    const { result } = renderHook(() =>
+      useAutosave({ path: 'a.md', version: 'v0', readOnly: false, getBody: () => body, onSaved: () => {} }),
+    )
+    act(() => result.current.markLoaded('A0', 'v0'))
+    await act(async () => {
+      await result.current.flush()
+    })
+    expect(result.current.saveError).not.toBeNull()
+    expect(result.current.saveState).toBe('error')
+    // A reload from disk: the retry is dropped and what shows is what is saved.
+    act(() => result.current.markLoaded('A1', 'v1'))
+    expect(result.current.saveState).toBe('saved')
+    quiet.mockRestore()
+  })
+})
+

@@ -1,6 +1,6 @@
-// Gene's redesign: M23's Work entry is gone from the sidebar; the Tasks entry opens the Tasks
-// dashboard (M23's Work page and the task lists as one page) and is active on either target. It
-// stays while the space hides task management, so the work dashboard is never out of reach.
+// Gene's redesign: M23's Work entry is gone from the sidebar. M32 contract: the Tasks entry opens
+// the plain Tasks page (target `tasks`) and, until the sidebar has its own Work entry (lane B),
+// is active on the `work` target too. It stays while the space hides task management.
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -34,16 +34,16 @@ describe('Sidebar Tasks entry (the Tasks dashboard)', () => {
     expect(screen.queryByRole('button', { name: 'Work' })).toBeNull()
   })
 
-  test('test Tasks opens the dashboard, Ctrl+click in a new tab', async () => {
+  test('test Tasks opens the Tasks page, Ctrl+click in a new tab', async () => {
     const onOpenTarget = vi.fn()
     const user = userEvent.setup()
     render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
     await user.click(tasksButton())
-    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'work' }, { newTab: false })
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'tasks' }, { newTab: false })
     await user.keyboard('{Control>}')
     await user.click(tasksButton())
     await user.keyboard('{/Control}')
-    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'work' }, { newTab: true })
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'tasks' }, { newTab: true })
   })
 
   test('test aria-current marks Tasks on the dashboard and on the old tasks target', () => {
@@ -55,7 +55,7 @@ describe('Sidebar Tasks entry (the Tasks dashboard)', () => {
     expect(tasksButton()).toHaveAttribute('aria-current', 'page')
   })
 
-  test('test Tasks stays, and opens the dashboard, while the space hides task management', async () => {
+  test('test Tasks stays, and opens the Tasks page, while the space hides task management', async () => {
     resetSpaceInfo()
     mocked.space.mockResolvedValueOnce({
       name: 'space',
@@ -72,7 +72,7 @@ describe('Sidebar Tasks entry (the Tasks dashboard)', () => {
       render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
       await waitFor(() => expect(useSpaceInfo.getState().space?.hideTaskManagement).toBe(true))
       await user.click(tasksButton())
-      expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'work' }, { newTab: false })
+      expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'tasks' }, { newTab: false })
       expect(screen.queryByRole('button', { name: 'Work' })).toBeNull()
     } finally {
       resetSpaceInfo()

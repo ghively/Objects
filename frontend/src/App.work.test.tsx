@@ -1,4 +1,6 @@
 // M23 Task 17: the Work target and the item panel are wired into the app.
+// M32: the Work page shows only while Work is on for the space (`workOn` in `GET /api/space`);
+// the `tasks` target is the plain Tasks page and an empty tab is Home.
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ChangeEvent, SpaceInfo, UiState } from '@/api/types'
@@ -14,6 +16,10 @@ vi.mock('@/palette/CommandPalette', () => ({ CommandPalette: () => null }))
 vi.mock('@/work/page/WorkPage', () => ({
   WorkPage: ({ view }: { view?: string }) => <div data-testid="work-page">work page {view ?? 'default'}</div>,
 }))
+vi.mock('@/tasks/TasksPage', async (orig) => ({
+  ...(await orig<typeof import('@/tasks/TasksPage')>()),
+  TasksPage: () => <div data-testid="tasks-page">tasks page</div>,
+}))
 vi.mock('@/object/ObjectPage', () => ({
   ObjectPage: ({ path, workHeader }: { path: string; workHeader?: boolean }) => (
     <div data-testid="object-page">
@@ -27,12 +33,16 @@ vi.mock('@/work/session/WorkOverlays', () => ({ WorkOverlays: () => <div data-te
 import { api } from '@/api/client'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { usePeek, useTabs } from '@/nav/tabs'
+import { resetSpaceInfo } from '@/settings/useSpaceInfo'
 import { resetPinned } from '@/shell/usePinned'
 import { useDefs } from '@/types/useDefinitions'
 import App from './App'
 
 const mocked = vi.mocked(api)
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true, revision: 'r1' })
+/** A space with Work on, and the same space as a new one reads (nothing stored: off). */
+const SPACE_WORK_ON = { name: 's', root: '/s', types: [PAGE], workEnabled: true, workOn: true } satisfies SpaceInfo
+const SPACE_WORK_OFF = { name: 's', root: '/s', types: [PAGE], workEnabled: null, workOn: false } satisfies SpaceInfo
 const stored: UiState = { pinned: [], sections: [], allNotesLayout: 'list' }
 const OLD = 'Requests/Printer jams on line 3.md'
 const NEW = 'Requests/Printer jams on line 4.md'
@@ -48,7 +58,8 @@ beforeEach(() => {
   listeners = []
   useDefs.setState({ collections: [], queries: [], loaded: false })
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
-  mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE] } satisfies SpaceInfo)
+  resetSpaceInfo()
+  mocked.space.mockResolvedValue(SPACE_WORK_ON)
   mocked.collections.mockResolvedValue([])
   mocked.queries.mockResolvedValue([])
   mocked.objects.mockResolvedValue([])
@@ -105,5 +116,65 @@ describe('M23 Work wiring', () => {
     await screen.findByTestId('work-page')
     expect(screen.getAllByTestId('work-toasts')).toHaveLength(1)
     expect(screen.getAllByTestId('work-overlays')).toHaveLength(1)
+  })
+})
+
+describe('M32 contract wiring: Tasks, Work off, Home', () => {
+  test('test the tasks target renders the Tasks page, not the dashboard, with Work on', async () => {
+    act(() => useTabs.getState().open({ kind: 'tasks' }))
+    render(<App />)
+    expect(await screen.findByTestId('tasks-page')).toBeInTheDocument()
+    expect(screen.queryByTestId('work-page')).toBeNull()
+    const strip = screen.getByRole('tablist', { name: 'Tabs' })
+    await waitFor(() => expect(within(strip).getByText('Tasks')).toBeInTheDocument())
+    expect(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('button', { name: 'Tasks' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    // Work is on: its toasts and overlays are there on every page.
+    expect(screen.getAllByTestId('work-toasts')).toHaveLength(1)
+    expect(screen.getAllByTestId('work-overlays')).toHaveLength(1)
+  })
+
+  test('test with Work off a work target shows the Tasks page and no toasts or overlays mount', async () => {
+    mocked.space.mockResolvedValue(SPACE_WORK_OFF)
+    act(() => useTabs.getState().open({ kind: 'work', view: 'flow' }))
+    render(<App />)
+    expect(await screen.findByTestId('tasks-page')).toBeInTheDocument()
+    expect(screen.queryByTestId('work-page')).toBeNull()
+    expect(screen.queryByTestId('work-toasts')).toBeNull()
+    expect(screen.queryByTestId('work-overlays')).toBeNull()
+    // The tab keeps its target: turning Work on later shows the dashboard there.
+    expect(useTabs.getState().tabs[0].history.at(-1)).toEqual({ kind: 'work', view: 'flow' })
+  })
+
+  test('test a space that does not say (an older answer) reads as Work off', async () => {
+    mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [PAGE] } satisfies SpaceInfo)
+    act(() => useTabs.getState().open({ kind: 'work' }))
+    render(<App />)
+    expect(await screen.findByTestId('tasks-page')).toBeInTheDocument()
+    expect(screen.queryByTestId('work-toasts')).toBeNull()
+  })
+
+  test('test the sidebar Tasks entry opens the tasks target', async () => {
+    act(() => useTabs.getState().open({ kind: 'object', path: 'Pages/A.md' }))
+    render(<App />)
+    await screen.findByText('object page Pages/A.md plain')
+    const tasks = within(screen.getByRole('navigation', { name: 'Main' })).getByRole('button', { name: 'Tasks' })
+    act(() => tasks.click())
+    expect(await screen.findByTestId('tasks-page')).toBeInTheDocument()
+    expect(useTabs.getState().tabs[0].history.at(-1)).toEqual({ kind: 'tasks' })
+  })
+
+  test('test an empty tab shows Home with New note and Today’s note', async () => {
+    render(<App />)
+    expect(await screen.findByRole('button', { name: 'New note' })).toBeInTheDocument()
+    // Home's own "Today's note", beside the top bar's.
+    const home = screen.getByRole('region', { name: 'Home' })
+    expect(within(home).getByRole('button', { name: "Today's note" })).toBeInTheDocument()
+    expect(screen.queryByText('Pick an object type')).toBeNull()
+    // Showing Home makes nothing.
+    expect(mocked.createObject).not.toHaveBeenCalled()
+    expect(mocked.createDailyNote).not.toHaveBeenCalled()
   })
 })

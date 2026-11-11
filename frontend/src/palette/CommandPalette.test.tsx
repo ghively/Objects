@@ -17,6 +17,7 @@ import { todayYmd } from '@/calendar/dates'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useRecent } from '@/nav/recent'
 import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { objectSummary, searchResult, typeDef } from '@/test/mockApi'
 import { ACTION_TEXT } from './actions'
 import { CommandPalette, paletteShortcut } from './CommandPalette'
@@ -340,13 +341,19 @@ describe('search mode', () => {
   })
 
   test('a Task result opens in the peek on plain Enter', async () => {
-    mocked.search.mockResolvedValue({ results: [searchResult({ path: 'Tasks/Todo.md', title: 'Todo', type: 'task' })], partial: false })
-    const { user } = setup()
-    const input = await openSearch(user)
-    await user.type(input, 'todo')
-    await screen.findByText('Todo')
-    await user.keyboard('{Enter}')
-    expect(usePeek.getState().path).toBe('Tasks/Todo.md')
+    // With "Open objects as a full page" off (M32: it starts on, and a task then opens as a page).
+    useSettings.setState({ settings: { ...settingsDefaults, alwaysOpenAsFullPage: false } })
+    try {
+      mocked.search.mockResolvedValue({ results: [searchResult({ path: 'Tasks/Todo.md', title: 'Todo', type: 'task' })], partial: false })
+      const { user } = setup()
+      const input = await openSearch(user)
+      await user.type(input, 'todo')
+      await screen.findByText('Todo')
+      await user.keyboard('{Enter}')
+      expect(usePeek.getState().path).toBe('Tasks/Todo.md')
+    } finally {
+      useSettings.setState({ settings: settingsDefaults })
+    }
   })
 
   test('type include and exclude and tag options add chips and refetch; clear filter', async () => {
