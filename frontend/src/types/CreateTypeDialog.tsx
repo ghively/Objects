@@ -266,7 +266,7 @@ export function CreateTypeDialog({ open, onOpenChange, onCreated }: CreateTypeDi
                     <button
                       type="button"
                       aria-expanded={isOpen}
-                      aria-controls={panelId}
+                      aria-controls={isOpen ? panelId : undefined}
                       onClick={() => setOpened((cur) => (cur.includes(g.key) ? cur.filter((k) => k !== g.key) : [...cur, g.key]))}
                       className="-mx-1 flex items-center gap-1 rounded px-1 py-0.5 hover:bg-hover hover:text-fg"
                     >
