@@ -193,18 +193,38 @@ describe('Work off (M32)', () => {
     mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [WORK], workOn: false } satisfies SpaceInfo)
   })
 
-  test('no work fetch, no work rows and no resolution note, in the page and with the work header asked for', async () => {
+  test('no work fetch, no empty work rows and no resolution note, in the page and with the work header asked for', async () => {
+    // A note of the type that holds no work value (its Steps are empty), as a plain task is.
+    mocked.object.mockImplementation(async () => {
+      const d = detail(ORIGINAL, 'v1')
+      return { ...d, frontmatter: { type: 'Request', title: 'Printer jams on line 3', ticketId: 'INC0012345', steps: [] } }
+    })
     const utils = render(<ObjectPage path={PATH} workHeader />)
     await screen.findByRole('heading', { level: 1, name: 'Printer jams on line 3' })
     const editor = await waitFor(() => pmEditor(utils.container))
     await waitFor(() => expect(serializeBody(editor)).toBe(ORIGINAL))
-    // The type has loaded: its plain rows show, the work-only ones do not.
+    // The type has loaded: its plain rows show, the empty work-only ones do not (though the
+    // Steps property is "always show").
     expect(await screen.findByText('Ticket ID')).toBeInTheDocument()
     expect(screen.queryByText('Steps')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit step 1' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Resolution note' })).not.toBeInTheDocument()
     expect(utils.container.querySelector('[data-work-header]')).toBeNull()
     expect(mocked.workItem).not.toHaveBeenCalled()
+  })
+
+  // The plan, item 10: no value is hidden by the Work switch.
+  test('a work row that holds a value still shows with Work off, and only then are its steps read', async () => {
+    const utils = render(<ObjectPage path={PATH} workHeader />)
+    await screen.findByRole('heading', { level: 1, name: 'Printer jams on line 3' })
+    // The note holds one step: the Steps row shows it, read as the server decodes it.
+    expect(await screen.findByText('Steps')).toBeInTheDocument()
+    expect(await screen.findByText('Check the printer cable')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Edit step 1' })).toBeInTheDocument()
+    expect(mocked.workItem).toHaveBeenCalledWith(PATH)
+    // Still a plain note page otherwise: no work header and no resolution note.
+    expect(screen.queryByRole('button', { name: 'Resolution note' })).not.toBeInTheDocument()
+    expect(utils.container.querySelector('[data-work-header]')).toBeNull()
   })
 
   test('the stored work values stay in the file: a body save sends the body only', async () => {
@@ -214,6 +234,9 @@ describe('Work off (M32)', () => {
     const mine = typeInBody(editor, ' Mine.')
     await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(PATH, mine, 'v1'), { timeout: 3000 })
     expect(mocked.updateProperties).not.toHaveBeenCalled()
-    expect(mocked.workItem).not.toHaveBeenCalled()
+    // The note holds a step, so its decoded steps are read (a read); nothing of the work is written.
+    for (const write of [mocked.workStep, mocked.workSteps, mocked.workFields, mocked.workNote, mocked.workClose, mocked.workFloor]) {
+      expect(write).not.toHaveBeenCalled()
+    }
   }, 15000)
 })
