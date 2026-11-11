@@ -3168,7 +3168,10 @@ class Space:
 
         ``task[0]`` receives the Task hook's result; ``requested`` the asked-for values a
         recurrence replaced. M32: ``work`` False (a generic property write while Work is off
-        for the space) leaves the work hook out; the work service's own write always runs it.
+        for the space) leaves out the System inferred from a Ticket ID; a work type's
+        ``completed`` is stamped and cleared whatever the switch says, as before M32 (with
+        Work off its Steps may be in its file without being listed: `_is_work_kind`). The
+        work service's own write always runs the whole hook.
         """
 
         def hook(fm: dict, sets: dict[str, Any], removals: list[str]) -> None:
@@ -3183,6 +3186,11 @@ class Space:
                 requested.update({k: v for k, v in asked.items() if sets.get(k) != v})
             if work:
                 on_work_write(t, fm, sets, removals, now, explicit)
+            else:
+                on_work_write(
+                    t, fm, sets, removals, now, explicit,
+                    system=False, work_type=self._is_work_kind(t),
+                )
 
         return hook
 
