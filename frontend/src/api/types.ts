@@ -380,7 +380,9 @@ export interface TypeDef {
 /** One template of the "Add new object type" gallery (`GET /api/type-gallery`, item 21). */
 export interface TypeTemplate {
   key: string
-  section: 'useCases' | 'research' | 'media' | 'planningAndReflection' | 'itOperations' | null
+  section: 'personal' | 'useCases' | 'research' | 'media' | 'planningAndReflection' | 'itOperations' | null
+  /** M32: the gallery shows this entry's group closed until the user opens it (IT operations). */
+  collapsed?: boolean
   name: string
   pluralName: string
   description: string
@@ -1315,6 +1317,8 @@ export interface CreatedDailyNote {
   version: string
   /** The inferred DailyNote type when this write saved its JSON first. */
   typeIds: string[]
+  /** M32: true when the day's note already existed (the server answers 200, not 409). */
+  existing?: boolean
 }
 
 // ---- M5: search, references, graph ----

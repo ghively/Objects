@@ -92,6 +92,18 @@ describe('api client M4', () => {
     ])
   })
 
+  test("createDailyNote 200 with existing is still 'exists' to callers and announces nothing (M32)", async () => {
+    vi.stubGlobal('fetch', respond(200, { path: 'DailyNotes/2026-10-26.md', version: 'v7', typeIds: [], existing: true }))
+    let err: unknown
+    const seen = await collect(async () => {
+      err = await api.createDailyNote('2026-10-26').catch((e: unknown) => e)
+    })
+    expect(err).toBeInstanceOf(DailyNoteExistsError)
+    expect((err as DailyNoteExistsError).path).toBe('DailyNotes/2026-10-26.md')
+    expect((err as DailyNoteExistsError).reason).toBe('exists')
+    expect(seen).toEqual([])
+  })
+
   test('createDailyNote 422 is a plain ApiError', async () => {
     vi.stubGlobal('fetch', respond(422, { detail: 'Bad date' }))
     const err = await api.createDailyNote('2026-13-01').catch((e: unknown) => e)

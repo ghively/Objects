@@ -797,6 +797,10 @@ export const api = {
         d.reason === 'nameTaken' ? 'nameTaken' : 'exists',
       ),
     )
+    // M32: the server answers 200 with `existing: true` for a day whose note is already there. To callers that is
+    // still "exists": nothing was created, so no `created` event, and nobody may treat it as a fresh note (the
+    // slot would otherwise write its tags over the note's own).
+    if (res.existing) throw new DailyNoteExistsError('A daily note for this day exists', res.path, 'exists')
     emitLocal([created(res.path, res.version), ...(res.typeIds ?? []).map((t) => typesEvent(t))])
     return { path: res.path, version: res.version, typeIds: res.typeIds ?? [] }
   },
