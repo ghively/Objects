@@ -516,6 +516,9 @@ Each starter template pre-fills the new type's properties.
     a type" (was "Object Select"; its list is "Search types"); the system type property is named "Type"; property
     settings say "note" where they said "object" ("Linked type", "Allow one linked note, or several.", "Number
     existing notes"). A relation's picker reads "Search for notes".
+  - Add Property by key (M32 fix pass): in "Search Properties" (and in "Search types") ArrowDown and ArrowUp move
+    a highlight through the list, and Enter picks the highlighted row, or the first match when none is
+    highlighted. The Name field then opens with the default name selected, so typing replaces it.
 - **Property name** (a property label's menu, and "Name" in Property settings): Enter or leaving the field commits
   the new name; Escape goes back only to the last committed name, so Enter then Escape keeps the new one (Escape
   in Property settings closes the dialog).
