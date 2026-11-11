@@ -335,6 +335,10 @@ Each starter template pre-fills the new type's properties.
   - Date: a chip; click opens a picker: an input with an info icon, presets (Yesterday, Today, Tomorrow, In 1
     week, In 2 weeks), month and year dropdowns, a month grid with the chosen day as a pill, toggles
     "Include Time" and "End Date", Remove, Cancel, Confirm. The chip has an `x` to clear and an expand icon.
+  - Date, typed (M32): the picker's input reads everyday words ("friday", "next friday", "next week", "nov 20",
+    "in 3 days", "tomorrow at 9 am"). Enter sets the date and closes the picker; leaving the field sets it and
+    keeps the picker open. Text it can't read stays in the field with "Can't read that date. Try "friday" or
+    "nov 20"." under it, and nothing is written.
   - Object property (for example Status or Category pointing at Tag): a dropdown arrow on the property header;
     click opens "Search or Create" with an expand-to-search button, then a list of the target objects as
     colored chips each with a checkbox (multi-select). Two tag objects with the same title are different

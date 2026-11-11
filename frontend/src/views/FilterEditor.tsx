@@ -432,6 +432,28 @@ const TEXT_KINDS = new Set([
 const COMPUTED_EDITOR = { text: 'text', number: 'number', date: 'datetimeSimple', none: 'text' } as const
 const DATE_KINDS = new Set(['datetime', 'datetimeSimple', 'entity_createdAt', 'entity_lastUpdated'])
 
+/** A filter's exact day: its button opens the date picker; Enter in the picker's field closes it (M32). */
+function ExactDate({ day, onChange }: { day: string; onChange(day: string): void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button type="button" aria-label={FILTER_TEXT.selectDate} className={SELECT}>
+          {day}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto border-line bg-raised p-0">
+        <DatePicker
+          value={{ start: day, resolution: 'day' }}
+          constraints={{ resolutionConstraint: 'day', endTimeSettings: 'notAllowed' }}
+          onChange={(v) => v && onChange(v.start.slice(0, 10))}
+          onClose={() => setOpen(false)}
+        />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function ValueEditor({
   filter,
   choice,
@@ -570,22 +592,7 @@ function ValueEditor({
           options={DATE_RELATIVE_OPTIONS.map((o) => ({ value: o.key, label: o.label }))}
           placeholder={FILTER_TEXT.selectDate}
         />
-        {mode === 'exactDate' && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button type="button" aria-label={FILTER_TEXT.selectDate} className={SELECT}>
-                {r.exactDate}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-auto border-line bg-raised p-0">
-              <DatePicker
-                value={{ start: r.exactDate ?? '', resolution: 'day' }}
-                constraints={{ resolutionConstraint: 'day', endTimeSettings: 'notAllowed' }}
-                onChange={(v) => v && set({ exactDate: v.start.slice(0, 10) })}
-              />
-            </PopoverContent>
-          </Popover>
-        )}
+        {mode === 'exactDate' && <ExactDate day={r.exactDate ?? ''} onChange={(day) => set({ exactDate: day })} />}
       </span>
     )
   }

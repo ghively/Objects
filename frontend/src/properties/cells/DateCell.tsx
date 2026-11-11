@@ -56,6 +56,9 @@ const sameDate = (a: DateValue | null, b: DateValue | null) => JSON.stringify(a)
  * repeat or reminder goes in `remove`). "Remove date" writes at once and removes both with it.
  * Without `onChangeMany` (a table cell) it writes the date alone, as in M2.
  *
+ * M32: Enter in the picker's date field sets the typed date ("friday", "next week", "nov 20") and
+ * closes the picker (the Task draft is written by that close, as by any other).
+ *
  * M9: on a template (its frontmatter has `template:`), a `datetime` property also offers a
  * creation-date variable ("Select variable", "Day of creation" …), written as `{creation:<var>}`
  * in place of the date and resolved when the template is applied. "Select variable" removes it.
@@ -78,7 +81,13 @@ export function DateCell({
   const variable = offersVariable ? creationVariable(frontmatter?.[def.key]) : null
   const repeat = textOf(frontmatter?.repeat)
   const remind = textOf(frontmatter?.remind)
-  const [draft, setDraft] = useState<TaskDateChange | null>(null)
+  const [draft, setDraftState] = useState<TaskDateChange | null>(null)
+  // The draft as of the last change, readable in the same tick (Enter sets it, then closes).
+  const draftNow = useRef<TaskDateChange | null>(null)
+  const setDraft = (d: TaskDateChange | null) => {
+    draftNow.current = d
+    setDraftState(d)
+  }
   // M8: any other date property with `supportsReminders` keeps its reminder in the `reminders` map.
   const reminders = frontmatter?.reminders
   const ownReminder =
@@ -118,12 +127,12 @@ export function DateCell({
   }
 
   // A draft still open when the cell goes away (the object closed) is written, not lost.
-  const pending = useRef<{ draft: TaskDateChange | null; commit: (d: TaskDateChange) => void }>({ draft: null, commit })
-  pending.current = { draft, commit }
+  const pending = useRef(commit)
+  pending.current = commit
   useEffect(
     () => () => {
-      const { draft: d, commit: c } = pending.current
-      if (d) c(d)
+      const d = draftNow.current
+      if (d) pending.current(d)
     },
     [],
   )
@@ -133,7 +142,8 @@ export function DateCell({
     if (!task) return
     if (o) setDraft({ date: value, repeat, remind })
     else {
-      if (draft) commit(draft)
+      const d = draftNow.current
+      if (d) commit(d)
       setDraft(null)
     }
   }
@@ -175,6 +185,7 @@ export function DateCell({
             constraints={def.options.constraints}
             onChange={() => {}}
             task={{ repeat: draft.repeat, remind: draft.remind, occurrenceLog: textOf(frontmatter?.occurrenceLog) }}
+            onClose={() => onOpenChange(false)}
             onTaskChange={(next) => {
               if (next.date === null) {
                 commit(next)
@@ -188,6 +199,7 @@ export function DateCell({
             value={value}
             constraints={def.options.constraints}
             reminder={reminder}
+            onClose={() => onOpenChange(false)}
             onChange={(next) => {
               onChange(next)
               if (next === null) setOpen(false)
