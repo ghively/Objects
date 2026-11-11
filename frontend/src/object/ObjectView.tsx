@@ -81,6 +81,7 @@ import {
   focusedBodyCaret,
 } from './bodyCaret'
 import { claimHandover, dropHandover, handOver, peekHandover } from './renameHandover'
+import { retitledBody } from './titleHeading'
 import { typeHasOwnProperties } from './ownProperties'
 import { PropertyPanel } from './PropertyPanel'
 import { SaveMark } from './SaveMark'
@@ -427,12 +428,17 @@ export function ObjectView({
    * text this editor has not saved; it shows them in its first render and saves the text.
    */
   const viewRootRef = useRef<HTMLDivElement | null>(null)
-  const handOverTo = (res: RenameResult, title: string) => {
-    const d = detailRef.current
+  const handOverTo = (res: RenameResult, title: string, d: ObjectDetail | null) => {
     const h = editorRef.current
     if (mode === 'inline' || !d || !h) return
-    const shown = h.getBody()
-    const onDisk = h.savedBody() ?? d.body
+    // The rename rewrote a first `# Old title` heading in the file (`titleHeading.ts`). What is
+    // handed over stands on the rename's version, so it carries the same change: the text as the
+    // file now holds it, and the text typed meanwhile with the heading it now has. Without this
+    // the next save would write the old heading back, with no conflict.
+    const then = h.getBody()
+    const before = h.savedBody() ?? d.body
+    const onDisk = retitledBody(before, d.summary.title, title)
+    const shown = then === null ? null : retitledBody(then, d.summary.title, title)
     handOver(res.path, {
       detail: {
         ...d,
@@ -446,7 +452,7 @@ export function ObjectView({
       slot: viewRootRef.current?.parentElement ?? null,
     })
     // This editor is leaving: what it holds is handed over, and it must not write to the old path.
-    if (shown !== null && shown !== onDisk) h.reload(shown, res.version)
+    if (then !== null && then !== before) h.reload(then, res.version)
   }
 
   const bodyControl = useRef<BodyControl>({
@@ -661,6 +667,8 @@ export function ObjectView({
     },
     onWorkError: (err: unknown) => showToast(err instanceof Error ? err.message : String(err)),
     onRenamed: (res: RenameResult, oldPath: string, title: string) => {
+      // The note as it was before the rename (its old title decides whether the text changed).
+      const was = detailRef.current
       // The title changed even when the path didn't (safe_filename may map both titles to one name).
       setDetail((d) =>
         d
@@ -673,9 +681,16 @@ export function ObjectView({
           : d,
       )
       if (res.path !== oldPath) {
-        handOverTo(res, title)
+        handOverTo(res, title, was)
         renamedToRef.current = res.path
         useTabs.getState().retarget(oldPath, res.path)
+      } else if (was) {
+        // The file kept its name, so this view and its editor stay. When the rename rewrote the
+        // text's `# Old title` heading, the editor still shows the old one on the new version:
+        // read the file again as after a rejected save (a clean editor reloads; one with words
+        // typed meanwhile asks), so the next save cannot put the old heading back.
+        const held = editorRef.current?.savedBody() ?? was.body
+        if (retitledBody(held, was.summary.title, title) !== held) enqueueRef.current(true)
       }
     },
   })
