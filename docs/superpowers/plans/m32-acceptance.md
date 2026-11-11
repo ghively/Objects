@@ -273,6 +273,13 @@ that pinned the old rule follow (`test_lifecycle`, two; `test_templates::test_te
     (`GET /api/objects`, and the `summary` of `GET /api/object`), in the form of Object's own stamps, so it has its
     place in Notes and in Home's Recent. Nothing is written to the file for it; the rows, saved searches, formulas
     and `/api/v1` still see no `lastUpdated` for such a note.
+44. A space remodelled from a space where Work is on is a space where Work is on: an import that makes a new space
+    from an Object space creates it with `workEnabled: true` when Work is on in the source (its stored switch, the IT
+    starter's marker, or, for the space that is open, its data), and with `workEnabled: false` when the source stores
+    the switch off (so the ticket data its notes hold doesn't turn the new space's default on). The new space keeps
+    its own `setup` marker (`blank`: the starter did not make it). The source is only read; an import into an
+    existing space leaves that space's switch alone. Without this the new space read Work off, and by call 24 its
+    carried types listed none of their unchanged ticket fields, though their files held them all.
 
 ## Known limits
 
