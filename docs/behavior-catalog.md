@@ -150,7 +150,7 @@ Object has no accounts.
   not changed." Tasks already made are kept. (M32) While it is on: the sidebar has no Tasks entry and no Work entry
   under it; a Tasks or Work tab (a restored one, a pinned link) shows one quiet line, "Tasks are hidden in this
   space.", with "Open Task management settings"; Home leaves its Tasks block out; the work toasts and overlays do
-  not show; the palette offers no "Create Task"; Ctrl+Shift+T makes no task (outside a note and in one); the
+  not show; the palette offers no "New task"; Ctrl+Shift+T makes no task (outside a note and in one); the
   Shortcuts sheet leaves the task keys and the Work group out; the Calendar's day header has no task link. The Task
   type, the tasks and the Calendar's own Tasks section stay; the switch off brings everything back at once.
 - Work (Object's own; M32): the first row is the switch "Use the Work page in this space" (`workEnabled` in
@@ -313,7 +313,7 @@ Each starter template pre-fills the new type's properties.
 ## 4. Sidebar details
 
 - **Today's note** (ours, 2026-11-09, Gene): the top bar's notebook button "Today's note", Home's button (M32), the
-  palette's "Pop out today's daily note" and Ctrl+Shift+D open today's daily note in the peek, the floating panel
+  palette's "Today's note" ((M32 fix pass) was "Pop out today's daily note") and Ctrl+Shift+D open today's daily note in the peek, the floating panel
   over the page, creating the note first when today has none (the same call as "+ Daily Note"). The page underneath
   stays as it was; Escape closes the peek. (M32) It opens with the caret at the end of its text, so the next key
   typed lands in the note, and the key works with the caret in a note's text or title. It stays a peek while
@@ -679,7 +679,11 @@ Each starter template pre-fills the new type's properties.
   note" and "Make a new note from the clipboard". "Create new {type} with title "{q}"" makes a Note unless a type
   filter is set, the page in view has a type (a type's page, a collection, a saved search) or a name pattern
   matches: never one more of the type made last. The palette forgets what was typed (and its filters) the moment
-  it closes: reopened at once, within its closing animation, it starts empty.
+  it closes: reopened at once, within its closing animation, it starts empty. (M32 fix pass) Its commands open
+  with "New note" and "New task" (they were "Create Note" and "Create Task"; every other type keeps "Create
+  <Type>"), and today's note reads "Today's note": "new", "note", "task" and "today" find them, as do the names
+  they had. Each runs what its key runs: "New note" makes a Note in the tab (a popped-out note steps aside),
+  "New task" what Ctrl+Shift+T makes, "Today's note" what Ctrl+Shift+D opens.
 - **New** (M32, "New means a note"): the sidebar's "New" button makes a Note at once and opens it with the title
   focused (Ctrl/Cmd+click a new tab, Shift+click the side panel, as every create); a small arrow beside it,
   "Choose a type", opens the New menu. Home's "New note" does the same.

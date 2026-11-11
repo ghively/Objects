@@ -29,6 +29,7 @@ import { PALETTE_TEXT } from './searchOptions'
 import { SearchView } from './SearchView'
 import { usePalette, type PaletteMode } from './usePalette'
 import { useSettingsModal } from '@/settings/useSettingsModal'
+import { createNewTask } from '@/shell/shortcuts'
 import { switchSpace } from '@/spaces/switchSpace'
 import { openTodaysNote } from '@/calendar/openTodaysNote'
 import { useTasksHidden } from '@/tasks/tasksHidden'
@@ -120,7 +121,7 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
     openExtendedSearch(q)
   }, [])
 
-  // M32: while the space hides Tasks the palette offers no task command ("Create Task").
+  // M32: while the space hides Tasks the palette offers no task command ("New task").
   const tasksHidden = useTasksHidden()
   const actionTypes = useMemo(() => {
     const task = tasksHidden ? findTaskType(types) : undefined
@@ -134,6 +135,14 @@ export function CommandPalette({ onOpenTarget, onToggleSidebar, onToggleRightPan
       createObject: (typeId) => {
         void newNote({}, typeId)
       },
+      // W17: "New note" and "New task" run what their keys run. The new-note key makes a Note in
+      // the tab, so a note popped out over it steps aside first (as `App`'s handler does); the
+      // command says "note", so it is a Note on a type's page too.
+      newNote: () => {
+        usePeek.getState().close()
+        void newNote()
+      },
+      newTask: createNewTask,
       openCalendar: () => onOpenTarget({ kind: 'calendar' }),
       openToday: () => {
         // The calendar in Day view on today; never creates a daily note (M4).

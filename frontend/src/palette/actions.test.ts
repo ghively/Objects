@@ -17,10 +17,91 @@ function ctx(partial: Partial<ActionContext> = {}): ActionContext {
   }
 }
 
+// Fix pass W17: the palette says "Find notes and commands", so the three everyday commands are
+// there under the names the rest of the app uses, found by "new", "note", "task" and "today".
+describe('the everyday commands (W17)', () => {
+  const TASK = typeDef({ id: 'task', name: 'Task', pluralName: 'Tasks', basic: true })
+  const everyday = (partial: Partial<ActionContext> = {}) =>
+    ctx({
+      types: [typeDef({ id: 'person', name: 'Person' }), TASK, typeDef({ id: 'page', name: 'Page', basic: true })],
+      newNote: vi.fn(),
+      newTask: vi.fn(),
+      openTodaysNote: vi.fn(),
+      openAllNotes: vi.fn(),
+      ...partial,
+    })
+  const found = (q: string, c = everyday()) => matchActions(buildActions(c), q).map((a) => a.label)
+
+  test('test the commands open with New note and New task, then one Create per other type, and Today\'s note', () => {
+    expect(buildActions(everyday()).map((a) => a.label)).toEqual([
+      'New note',
+      'New task',
+      'Create Person',
+      'Open calendar',
+      'Open today',
+      "Today's note",
+      'Open all notes',
+      'Open global graph',
+      'Toggle left sidebar',
+      'Toggle right side panel',
+    ])
+  })
+
+  test('test "new", "note", "task" and "today" each find their command', () => {
+    expect(found('new')).toEqual(['New note', 'New task'])
+    expect(found('note')).toEqual(['New note', "Today's note", 'Open all notes'])
+    expect(found('task')).toEqual(['New task'])
+    expect(found('today')).toEqual(['Open today', "Today's note"])
+    expect(found('new no')).toEqual(['New note'])
+    expect(found("today's note")).toEqual(["Today's note"])
+  })
+
+  test('test the names they had still find them', () => {
+    expect(found('create')).toEqual(['New note', 'New task', 'Create Person'])
+    expect(found('create note')).toEqual(['New note'])
+    expect(found('create task')).toEqual(['New task'])
+    expect(found('pop out today')).toEqual(["Today's note"])
+    expect(found('daily')).toEqual(["Today's note"])
+  })
+
+  test('test each runs what its key runs, not a plain create of the type', () => {
+    const c = everyday()
+    const byId = Object.fromEntries(buildActions(c).map((a) => [a.id, a]))
+    byId.newNote.run()
+    byId.newTask.run()
+    byId.openTodaysNote.run()
+    expect(c.newNote).toHaveBeenCalledTimes(1)
+    expect(c.newTask).toHaveBeenCalledTimes(1)
+    expect(c.openTodaysNote).toHaveBeenCalledTimes(1)
+    expect(c.createObject).not.toHaveBeenCalled()
+    // The type chip beside each is still its type's.
+    expect(byId.newNote.typeId).toBe('page')
+    expect(byId.newTask.typeId).toBe('task')
+  })
+
+  test('test a Task type under another name still reads "New task", and its own name finds it', () => {
+    const c = everyday({ types: [typeDef({ id: 'task', name: 'Task / Action', pluralName: 'Tasks', basic: true }), typeDef({ id: 'page', name: 'Page', basic: true })] })
+    expect(buildActions(c).map((a) => a.label).slice(0, 2)).toEqual(['New note', 'New task'])
+    expect(buildActions(c).map((a) => a.label)).not.toContain('Create Task / Action')
+    expect(found('action', c)).toEqual(['New task'])
+  })
+
+  test('test no New task without a Task type (a space that hides Tasks), and a caller with no key handlers creates the type', () => {
+    const noTask = everyday({ types: [typeDef({ id: 'page', name: 'Page', basic: true })] })
+    expect(found('task', noTask)).toEqual([])
+    expect(found('new', noTask)).toEqual(['New note'])
+    const plain = everyday({ newNote: undefined, newTask: undefined })
+    const byId = Object.fromEntries(buildActions(plain).map((a) => [a.id, a]))
+    byId.newNote.run()
+    byId.newTask.run()
+    expect(vi.mocked(plain.createObject).mock.calls).toEqual([['page'], ['task']])
+  })
+})
+
 describe('buildActions', () => {
-  test('lists a create action per type by name, then the fixed actions', () => {
+  test('lists New note, a create action per other type by name, then the fixed actions', () => {
     expect(buildActions(ctx()).map((a) => a.label)).toEqual([
-      'Create Note',
+      'New note',
       'Create Person',
       'Open calendar',
       'Open today',
@@ -67,7 +148,7 @@ describe('buildActions', () => {
     })
     const actions = buildActions(c)
     expect(actions.map((a) => a.label)).toEqual([
-      'Create Note',
+      'New note',
       'Create Person',
       'Open calendar',
       'Open today',
@@ -105,7 +186,7 @@ describe('matchActions', () => {
   })
 
   test('matches a label by prefix, word prefixes or a substring, in list order', () => {
-    expect(labels('create')).toEqual(['Create Note', 'Create Person'])
+    expect(labels('create')).toEqual(['New note', 'Create Person'])
     expect(labels('cr pe')).toEqual(['Create Person'])
     expect(labels('cal')).toEqual(['Open calendar'])
     expect(labels('Toggle')).toEqual(['Toggle left sidebar', 'Toggle right side panel'])
