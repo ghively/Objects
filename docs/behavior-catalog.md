@@ -356,6 +356,9 @@ Each starter template pre-fills the new type's properties.
   row shows on an object only while it has a value. A property the target type stores under the same key wins.
   In views a counterpart filters, sorts and groups like a relation; its table column is read-only and a board
   grouped by it refuses drops.
+- **Work off** (M32): while "Use the Work page in this space" is off, the page of a Task, a Project or any type
+  with work fields is a plain note page: no work header, no Resolution note, no Steps, list or Floor items rows,
+  and nothing is read from the Work API. Their values stay in the file and show again when Work is turned on.
 
 ## 6. Editor chrome and menus
 

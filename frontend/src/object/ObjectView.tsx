@@ -84,6 +84,7 @@ import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 import { isWorkType } from '@/types/WorkFieldsSection'
 import { ResolutionNoteSection } from '@/work/ResolutionNote'
 import { WorkHeader } from '@/work/panel/WorkHeader'
+import { useWorkOn } from '@/work/useWorkOn'
 import { useSettings } from '@/settings/useSettings'
 
 // Raw mode (CodeMirror) loads when first switched to, not with the shell (audit 2026-11-01 F1).
@@ -291,6 +292,8 @@ function workKeysOf(type: TypeDef | undefined): string[] {
   if (!isWorkType(type)) return []
   return type!.propertyDefinitions.filter((d) => d.type === 'steps' || d.type === 'floorItems').map((d) => d.key)
 }
+
+const NO_KEYS: string[] = []
 
 /** The stored values of `keys`, as one string (what a decoded read belongs to). */
 function rawWorkValues(frontmatter: Record<string, unknown>, keys: string[]): string {
@@ -1022,15 +1025,18 @@ export function ObjectView({
   const canTemplate = !!type && !isTemplate && templatesAllowed(type)
   const isTag = !!summary && isTagType(type, summary.type)
   const isTask = !!summary && !isTemplate && isTaskRoleType(type, summary.type)
+  // M32: with the Work page off for this space a work type's page is a plain note page: no work
+  // header, no resolution note, no work rows (`PropertyPanel`) and no work fetch.
+  const workOn = useWorkOn()
   /** M22: a work item with a Ticket ID shows its resolution note. */
   const ticketId = detail?.frontmatter.ticketId
-  const isTicket = !!summary && !isTemplate && isWorkType(type) && typeof ticketId === 'string' && ticketId.trim() !== ''
+  const isTicket = workOn && !!summary && !isTemplate && isWorkType(type) && typeof ticketId === 'string' && ticketId.trim() !== ''
   /** M23: the item panel's work header (a work item, not a template). */
-  const showWorkHeader = !!workHeader && !!summary && !isTemplate && isWorkType(type)
+  const showWorkHeader = workOn && !!workHeader && !!summary && !isTemplate && isWorkType(type)
   // M22: a work item's steps and floor items are shown as the server decodes them (each with its
   // id and rev, which step actions send back): read once per stored value (a load, an external
   // change), taken from a work write's result otherwise. Reading never writes.
-  const workKeys = workKeysOf(type)
+  const workKeys = workOn ? workKeysOf(type) : NO_KEYS
   const workRaw = detail && workKeys.length > 0 ? rawWorkValues(detail.frontmatter, workKeys) : null
   const decodedNow = decoded && workRaw !== null && decoded.path === path && decoded.raw === workRaw ? decoded : null
   useEffect(() => {

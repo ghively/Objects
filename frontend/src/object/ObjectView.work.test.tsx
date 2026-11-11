@@ -19,6 +19,7 @@ import { showToast } from '@/editor/media/upload'
 import { resetLinkIndex } from '@/links/linkIndex'
 import { useFind } from '@/find/useFind'
 import { usePeek, useTabs } from '@/nav/tabs'
+import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { ObjectPage } from './ObjectPage'
 
 const mocked = vi.mocked(api)
@@ -68,9 +69,11 @@ beforeEach(() => {
   resetLinkIndex()
   useFind.getState().close()
   listeners = []
+  useSpaceInfo.setState({ space: null, loaded: false })
   vi.mocked(showToast).mockReset()
   for (const fn of Object.values(mocked)) vi.mocked(fn).mockReset()
-  mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [WORK] } satisfies SpaceInfo)
+  // M32: these are the Work-on tests; "Work off" below answers `workOn: false`.
+  mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [WORK], workOn: true } satisfies SpaceInfo)
   mocked.objects.mockResolvedValue([detail(ORIGINAL, 'v1').summary])
   mocked.object.mockImplementation(async () => detail(ORIGINAL, 'v1'))
   mocked.resolve.mockResolvedValue(null)
@@ -182,4 +185,35 @@ describe('work writes on the object page', () => {
     await user.click(toggle)
     expect(await screen.findByText('Work notes: INC0012345 Printer jams on line 3')).toBeInTheDocument()
   })
+})
+
+// M32, item 10: with the Work page off for the space a work type's page is a plain note page.
+describe('Work off (M32)', () => {
+  beforeEach(() => {
+    mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [WORK], workOn: false } satisfies SpaceInfo)
+  })
+
+  test('no work fetch, no work rows and no resolution note, in the page and with the work header asked for', async () => {
+    const utils = render(<ObjectPage path={PATH} workHeader />)
+    await screen.findByRole('heading', { level: 1, name: 'Printer jams on line 3' })
+    const editor = await waitFor(() => pmEditor(utils.container))
+    await waitFor(() => expect(serializeBody(editor)).toBe(ORIGINAL))
+    // The type has loaded: its plain rows show, the work-only ones do not.
+    expect(await screen.findByText('Ticket ID')).toBeInTheDocument()
+    expect(screen.queryByText('Steps')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit step 1' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Resolution note' })).not.toBeInTheDocument()
+    expect(utils.container.querySelector('[data-work-header]')).toBeNull()
+    expect(mocked.workItem).not.toHaveBeenCalled()
+  })
+
+  test('the stored work values stay in the file: a body save sends the body only', async () => {
+    const utils = render(<ObjectPage path={PATH} />)
+    const editor = await waitFor(() => pmEditor(utils.container))
+    await waitFor(() => expect(serializeBody(editor)).toBe(ORIGINAL))
+    const mine = typeInBody(editor, ' Mine.')
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(PATH, mine, 'v1'), { timeout: 3000 })
+    expect(mocked.updateProperties).not.toHaveBeenCalled()
+    expect(mocked.workItem).not.toHaveBeenCalled()
+  }, 15000)
 })
