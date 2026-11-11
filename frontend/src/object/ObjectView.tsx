@@ -50,6 +50,7 @@ import { NOTE_LOWER, TYPE_SETTINGS } from '@/lib/words'
 import { revealMenuLabel } from '@/lib/platformText'
 import { takeBodyFocus } from '@/nav/focusRequest'
 import { canGoBack, usePeek, useTabs, type Target } from '@/nav/tabs'
+import { ReferenceCounts } from '@/references/ReferenceCounts'
 import { ReferencesSection } from '@/references/ReferencesSection'
 import { byPluralName, TypeChip } from '@/shell/Sidebar'
 import { templatesAllowed } from '@/types/TemplateManager'
@@ -1881,6 +1882,8 @@ export function ObjectView({
               onPropertiesChange={writeProperties}
               onOpenTag={onOpenTag}
               onEnterBody={enterBody}
+              // W10: what the references section under the text holds, said above the fold.
+              beside={<ReferenceCounts path={path} />}
             />
           </>
         }

@@ -910,6 +910,13 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   (section 11). An empty section (M32) is one quiet line with no heading and no explanation ("No backlinks
   yet", "No related content yet", "No unlinked mentions", "No related tags"), in the page's references, in a tab
   on its own and in the side panel's Backlinks entry; every tab stays, with its count.
+- **A count above the fold (M32)**: the references section sits under the text, below the window on most notes.
+  Beside the type chip in a note's header (page and peek) a quiet line says what is there, only when there is
+  something: "2 backlinks · 1 mention" (singular and plural as they should be; each part only when it is not
+  zero; nothing at all for a note with neither). A click, or Enter, on a part scrolls to the references section
+  and opens that tab, also when the section was closed on that note. The numbers are the section's own (one
+  request per note, as before); a section the Settings hide is not counted. Nothing about the sections changes:
+  unlinked mentions always show under their tab.
 - **Backlinks stay live**: when another object gains or loses a link to the open one (Link on a mention, an
   outside edit adding `[[X]]`), the Properties panel's Backlinks chips and the Tasks dashboard's Context grouping
   update without a reload (a change to any other object re-reads them).

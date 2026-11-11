@@ -96,6 +96,8 @@ export interface ObjectHeaderProps {
    * when the body can't take it; Enter then leaves the field as before.
    */
   onEnterBody?(): boolean
+  /** Shown after the type chip, on its row (the note page's count of backlinks and mentions). */
+  beside?: ReactNode
 }
 
 /** A hover action. Used as a popover trigger (`asChild`), so it passes the trigger's ref and props on. */
@@ -125,7 +127,7 @@ function PickerPopover({ trigger, children }: { trigger: ReactNode; children: (c
   )
 }
 
-export function ObjectHeader({ summary, type, readOnly, onRename, onDraft, onPropertiesChange, onOpenTag, onEnterBody }: ObjectHeaderProps) {
+export function ObjectHeader({ summary, type, readOnly, onRename, onDraft, onPropertiesChange, onOpenTag, onEnterBody, beside }: ObjectHeaderProps) {
   const color = type?.color ?? 'gray'
   const editable = !readOnly && !!onPropertiesChange
   const titleEditable = !readOnly && !!onRename && !isDailyNoteType(type, summary.type)
@@ -303,6 +305,7 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onDraft, onPro
           {/* M32: the built-in Page reads "Note", DailyNote "Daily note"; a renamed type keeps its name. */}
           {typeLabel(type, summary.type)}
         </span>
+        {beside}
       </div>
 
       {editable && (
