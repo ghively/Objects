@@ -254,6 +254,16 @@ Each starter template pre-fills the new type's properties.
   object clicked on the Calendar's timeline opens), creating the note first when today has none (the same call as
   "+ Daily Note"). The page underneath stays as it was; Escape closes the peek.
 
+- **Home (M32)**: a tab with no page (a new empty tab, the first open of a space with nothing to restore, the
+  start choice "Home") shows Home; it replaces the old start text "Pick an object type / Choose a type in the
+  sidebar to see its objects.", which is gone. Top to bottom: "New note" and "Today's note"; "Recent", the last 12
+  notes edited, newest first (title, type, when edited; daily notes included; tasks, tags and templates left
+  out; a click opens the note); "Tasks", the open overdue tasks and today's, each with the task checkbox, or
+  the line "Nothing due today."; an empty space shows "Nothing here yet. Start a note, or open today." and the
+  two buttons only. Opening Home writes no file. Its tab reads "Home". "When this space opens" › "Home" shows it
+  in the active tab (our call: that tab starts over; a persistent or pinned tab keeps its page and an empty tab
+  is used, a new one only when there is none); "Where I left off" with nothing to restore is Home.
+
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
 - A space opened as a new or empty folder (`objectapp --space <folder>`: no `setup` in `space.json`, no basic

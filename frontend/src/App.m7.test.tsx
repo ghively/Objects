@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { SpaceInfo } from '@/api/types'
 import { deviceSettings, objectDetail, objectSummary, typeDef } from '@/test/mockApi'
@@ -115,6 +115,32 @@ describe('App, M7 tabs', () => {
     await renderReady()
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: PATH })
     expect(await screen.findByRole('textbox', { name: 'Title' })).toBeInTheDocument()
+  })
+
+  // M32: "Home" on start shows Home in the active tab; a first open with no tab is Home too.
+  test('test open on start: Home, and a first open with nothing to restore', async () => {
+    // Nothing stored: no tab, Home shows, and nothing was created by showing it.
+    document.title = ''
+    const first = await renderReady()
+    expect(useTabs.getState().tabs).toHaveLength(0)
+    expect(await screen.findByRole('region', { name: 'Home' })).toBeInTheDocument()
+    expect(mocked.createObject).not.toHaveBeenCalled()
+    expect(mocked.createDailyNote).not.toHaveBeenCalled()
+    first.unmount()
+
+    // home, with a page restored: the active tab shows Home.
+    useTabs.getState().open({ kind: 'trash' })
+    mocked.settings.mockResolvedValue({
+      settings: deviceSettings({ openOnStart: { [ROOT]: { mode: 'home' } } }),
+      revision: '',
+    })
+    useSettings.setState({ loaded: false })
+    document.title = ''
+    await renderReady()
+    expect(currentTarget(useTabs.getState())).toBeNull()
+    expect(useTabs.getState().tabs).toHaveLength(1)
+    expect(await screen.findByRole('region', { name: 'Home' })).toBeInTheDocument()
+    expect(within(screen.getByRole('tablist', { name: 'Tabs' })).getByRole('tab')).toHaveTextContent('Home')
   })
 
   test('test tab shortcuts close, open, cycle and navigate', async () => {

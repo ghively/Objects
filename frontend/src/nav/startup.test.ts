@@ -51,4 +51,42 @@ describe('applyOpenOnStart', () => {
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'calendar' })
     expect(useCalendar.getState().view).toBe('day')
   })
+
+  // M32: "Home" shows Home (an empty tab) in the active tab; "Where I left off" with nothing to
+  // restore is Home too.
+  test('test home shows Home in the active tab and stacks no tab per start', () => {
+    const t = useTabs.getState()
+    t.open({ kind: 'object', path: 'Pages/A.md' })
+    const aId = useTabs.getState().activeId!
+    applyOpenOnStart({ mode: 'home' })
+    expect(currentTarget(useTabs.getState())).toBeNull()
+    expect(useTabs.getState().activeId).toBe(aId)
+    expect(useTabs.getState().tabs).toHaveLength(1)
+    applyOpenOnStart({ mode: 'home' })
+    expect(useTabs.getState().tabs).toHaveLength(1)
+  })
+
+  test('test home leaves a persistent or pinned tab alone and uses an empty tab, a new one only when none is', () => {
+    const t = useTabs.getState()
+    t.open({ kind: 'object', path: 'Pages/A.md' })
+    const aId = useTabs.getState().activeId!
+    t.togglePersistent(aId)
+    applyOpenOnStart({ mode: 'home' })
+    expect(useTabs.getState().tabs).toHaveLength(2)
+    expect(currentTarget(useTabs.getState())).toBeNull()
+    expect(useTabs.getState().tabs[0].history).toEqual([{ kind: 'object', path: 'Pages/A.md' }])
+    // The next start, with the persistent tab active again: the empty tab is reused.
+    useTabs.getState().activate(aId)
+    applyOpenOnStart({ mode: 'home' })
+    expect(useTabs.getState().tabs).toHaveLength(2)
+    expect(currentTarget(useTabs.getState())).toBeNull()
+  })
+
+  test('test where I left off with nothing to restore is Home: no tab, no target, nothing opened', () => {
+    applyOpenOnStart({ mode: 'lastOpenedPage' })
+    expect(useTabs.getState().tabs).toHaveLength(0)
+    expect(currentTarget(useTabs.getState())).toBeNull()
+    applyOpenOnStart(undefined)
+    expect(currentTarget(useTabs.getState())).toBeNull()
+  })
 })

@@ -22,6 +22,7 @@ import { queryTitle } from '@/queries/autoTitle'
 import { useTitleCtx } from '@/queries/QueryPage'
 import { TypeChip } from '@/shell/Sidebar'
 import { TabMenu } from '@/shell/TabMenu'
+import { HOME } from '@/lib/words'
 import { useAgents } from '@/agents/useAgents'
 import { useDefinitions } from '@/types/useDefinitions'
 
@@ -31,16 +32,22 @@ export function useSpaceTypes(space: SpaceInfo | null): TypeDef[] {
   return indexTypes.length > 0 ? indexTypes : (space?.types ?? [])
 }
 
-/** Title of a target as tabs, crumbs and the tab menu show it. */
-export function useTargetTitle(space: SpaceInfo | null): (target: Target | null) => string {
+/** What a side-panel entry with no page is called (the main tabs' is Home, M32). */
+export const EMPTY_ENTRY_TITLE = 'New tab'
+
+/**
+ * Title of a target as tabs, crumbs and the tab menu show it. A tab with no page is Home (M32);
+ * `empty` names it otherwise (a side-panel entry).
+ */
+export function useTargetTitle(space: SpaceInfo | null): (target: Target | null, empty?: string) => string {
   const byPath = useLinkIndex((s) => byPathOf(s.objects))
   const types = useSpaceTypes(space)
   const { collections, queries } = useDefinitions()
   const titleCtx = useTitleCtx(types)
   const agents = useAgents((s) => s.agents)
   return useCallback(
-    (target: Target | null): string => {
-      if (!target) return 'New tab'
+    (target: Target | null, empty: string = HOME): string => {
+      if (!target) return empty
       switch (target.kind) {
         case 'collection':
           return collections.find((x) => x.id === target.id)?.name ?? target.id
@@ -83,11 +90,11 @@ export function useTargetTitle(space: SpaceInfo | null): (target: Target | null)
 }
 
 /** A target's icon and title (tabs, breadcrumbs, the tab menu). */
-export function TargetLabel({ target, space }: { target: Target | null; space: SpaceInfo | null }) {
+export function TargetLabel({ target, space, emptyTitle }: { target: Target | null; space: SpaceInfo | null; emptyTitle?: string }) {
   const byPath = useLinkIndex((s) => byPathOf(s.objects))
   const types = useSpaceTypes(space)
   const { collections, queries } = useDefinitions()
-  const title = useTargetTitle(space)(target)
+  const title = useTargetTitle(space)(target, emptyTitle)
   let icon = null
   if (target?.kind === 'collection') {
     icon = <IconOrEmoji icon={collections.find((x) => x.id === target.id)?.icon} size={15} fallback={COLLECTION_ICON} />

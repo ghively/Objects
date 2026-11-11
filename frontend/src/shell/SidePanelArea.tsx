@@ -39,7 +39,7 @@ import {
 import { currentTarget, useTabs, type OpenOptions, type SidepanelEntry, type SidepanelTarget, type Target } from '@/nav/tabs'
 import { BacklinksPanel } from '@/references/BacklinksPanel'
 import { REFERENCES_TEXT } from '@/references/referencesUi'
-import { TargetLabel } from '@/shell/TabStrip'
+import { EMPTY_ENTRY_TITLE, TargetLabel } from '@/shell/TabStrip'
 import { EXPLORE_TEXT, ExplorePanel } from './ExplorePanel'
 
 /** The drag data of a side-panel entry dragged by its title (its id). */
@@ -134,7 +134,7 @@ export function EntryLabel({ entry, space }: { entry: SidepanelEntry; space: Spa
       </>
     )
   }
-  return <TargetLabel target={entry.target as Target | null} space={space} />
+  return <TargetLabel target={entry.target as Target | null} space={space} emptyTitle={EMPTY_ENTRY_TITLE} />
 }
 
 export interface SidePanelAreaProps {

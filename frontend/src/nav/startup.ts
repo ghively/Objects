@@ -2,7 +2,10 @@
  * "When this space opens": what the active tab shows once a space
  * has loaded its tabs. `lastOpenedPage` ("Where I left off", the default) keeps the restored tabs;
  * `today` ("Calendar today") opens the Calendar's Day view on today; `calendar` opens the Calendar;
- * `specificObject` opens that object in the active tab.
+ * `specificObject` opens that object in the active tab; `home` (M32) shows Home there.
+ *
+ * M32: Home is what a tab with no page shows (`home/HomePage`), so "Where I left off" with nothing
+ * to restore (the first open of a space: no tab) is Home without anything being opened here.
  */
 import type { DeviceSettings } from '@/api/types'
 import { useCalendar } from '@/calendar/useCalendar'
@@ -32,6 +35,9 @@ export function applyOpenOnStart(choice: OpenOnStart | undefined): void {
       else tabs.open(target, { inPlace: true })
       return
     }
+    case 'home':
+      tabs.openHome()
+      return
     case 'lastOpenedPage':
       return
   }

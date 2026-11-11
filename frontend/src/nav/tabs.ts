@@ -141,6 +141,11 @@ export interface TabsState {
   activate(id: string): void
   /** Open a new tab showing the active tab's current target (or nothing). */
   newTab(): void
+  /**
+   * M32: show Home (a tab with no page) in the active tab. A persistent or pinned tab keeps its
+   * page: a tab already empty is activated instead, else a new empty tab is added.
+   */
+  openHome(): void
   /** Drop every tab (tests, and recovery from bad persisted state). */
   reset(): void
   /** An object moved (renamed or retyped): point every tab's history and the peek at its new path. */
@@ -442,6 +447,24 @@ export const useTabs = create<TabsState>()(
         const s = get()
         const target = currentTarget(s)
         const t = freshTab(target)
+        set({ tabs: sortPinned([...s.tabs, t]), activeId: t.id })
+      },
+
+      openHome() {
+        const s = get()
+        const tab = activeTab(s)
+        // No tab at all is Home already.
+        if (!tab || tab.index < 0) return
+        if (!tab.persistent && !tab.pinned) {
+          set(updateActive(s, (t) => ({ ...t, history: [], crumbs: [], index: -1 })))
+          return
+        }
+        const empty = s.tabs.find((t) => t.index < 0)
+        if (empty) {
+          set({ ...updateTab(s, empty.id, (t) => ({ ...t, lastOpened: stamp() })), activeId: empty.id })
+          return
+        }
+        const t = freshTab(null)
         set({ tabs: sortPinned([...s.tabs, t]), activeId: t.id })
       },
 
