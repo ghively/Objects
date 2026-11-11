@@ -157,12 +157,15 @@ Object has no accounts.
     or Enter opens the object.
 - Task management: "Hide Tasks in this space" per space (M32; was "Hide Task Management", key `hideTaskManagement`
   unchanged): "Hides the Tasks page, its entry in the sidebar and the task features in this space. Other spaces are
-  not changed." Tasks already made are kept. (M32) While it is on: the sidebar has no Tasks entry and no Work entry
-  under it; a Tasks or Work tab (a restored one, a pinned link) shows one quiet line, "Tasks are hidden in this
-  space.", with "Open Task management settings"; Home leaves its Tasks block out; the work toasts and overlays do
-  not show; the palette offers no "New task"; Ctrl+Shift+T makes no task (outside a note and in one); the
-  Shortcuts sheet leaves the task keys and the Work group out; the Calendar's day header has no task link. The Task
-  type, the tasks and the Calendar's own Tasks section stay; the switch off brings everything back at once.
+  not changed." Tasks already made are kept. (M32) While it is on: the sidebar has no Tasks entry; a Tasks tab (a
+  restored one, a pinned link) shows one quiet line, "Tasks are hidden in this space.", with "Open Task management
+  settings"; Home leaves its Tasks block out; the palette offers no "New task"; Ctrl+Shift+T makes no task
+  (outside a note and in one); the Shortcuts sheet leaves the task keys out; the Calendar's day header has no task
+  link. The Task type, the tasks and the Calendar's own Tasks section stay; the switch off brings everything back
+  at once. It hides Tasks, not Work: in a space with the Work page on, the Work entry, the page, its toasts,
+  overlays and keys and the Shortcuts sheet's Work group stay as they were, and the dashboard leaves out its own
+  task lists (M23's rule; see the Work page's own lines). With Work off there is no Work page to keep, so a Work tab shows the
+  same quiet line as a Tasks tab.
 - Work (Object's own; M32): the first row is the switch "Use the Work page in this space" (`workEnabled` in
   `.object/space.json`; "Adds a Work page under Tasks: the Now view, queues, captures, alerts and tickets, and ticket
   fields on tasks and projects. Off: Tasks is a plain task list."). Off: the rest of the section (Your name in
@@ -202,8 +205,10 @@ Ctrl means Cmd on Mac. "Shift" is written as Shift here. "(not in Object)" marks
 unbound on purpose; "(not bound)" one whose key is taken by another action (decision D3).
 
 **General**: Open settings Ctrl+, | Create new task Ctrl+Shift+T | Add new content Ctrl+U or Alt+Shift+N (M32) |
-New note, or one more of the type in view Ctrl+N or Alt+N (M32: Alt+N is the key a browser tab lets through, where
-Ctrl+N opens a browser window) | Search
+New note Ctrl+N or Alt+N (M32: Alt+N is the key a browser tab lets through, where Ctrl+N opens a browser window;
+the key makes a Note everywhere, as the "New" button does, also on a single note's or task's page, with one
+exception: on a type's own page, where its notes are listed, it makes one more of that type, as that page's
+own "New" button does) | Search
 this space Ctrl+P or Ctrl+K | Open extended search Ctrl+Shift+P (not in Object) | Toggle dark mode Ctrl+Shift+L |
 Toggle focus mode Ctrl+Shift+M | Toggle left sidebar Ctrl+Shift+Left | Toggle right side panel
 Ctrl+Shift+Right (in Object both panel keys stay out of text fields, where Ctrl+Shift+Left/Right select by word; our call) | Toggle side panel entry list Ctrl+Shift+Down (not in Object) | Toggle media sidebar Ctrl+Alt+Right (not in Object) | Close
@@ -257,7 +262,8 @@ Left/Right | Toggle calendar sidebar Ctrl+Alt+S | Pop out today's daily note Ctr
 
 **Keys that work while you type (M32)**: with the caret in a note's text or title, the new-note keys (Ctrl+N,
 Alt+N), the New menu's (Ctrl+U, Alt+Shift+N) and today's note (Ctrl+Shift+D) all work; a note popped out in the
-peek closes first, so what is made is seen. Each key was checked against the editors' own: none is bound in the
+peek closes first, so what is made is seen. A key held down acts once (its repeats make nothing more), and
+"New" pressed twice while a note is being made makes one note. Each key was checked against the editors' own: none is bound in the
 rich editor or the title; in raw mode Ctrl+U stays the editor's "undo selection" (our call: the menu has
 Alt+Shift+N there); on macOS the second keys are Ctrl+N and Ctrl+Shift+N, which stay "next line" inside a text
 field (⌘N works there). In other fields (a dialog's input, a quick-add box) the two "new" keys stay off.
@@ -331,7 +337,9 @@ Each starter template pre-fills the new type's properties.
   over the page, creating the note first when today has none (the same call as "+ Daily Note"). The page underneath
   stays as it was; Escape closes the peek. (M32) It opens with the caret at the end of its text, so the next key
   typed lands in the note, and the key works with the caret in a note's text or title. It stays a peek while
-  "Open notes as a full page" is on (an explicit pop-out).
+  "Open notes as a full page" is on (an explicit pop-out). Asked for while today's note is already popped out,
+  or is the page in view (with nothing popped out over it), the caret goes to the end of its text where it is
+  open, and nothing more opens.
 
 - **Home (M32)**: a tab with no page (a new empty tab, the first open of a space with nothing to restore, the
   start choice "Home") shows Home; it replaces the old start text "Pick an object type / Choose a type in the
@@ -380,15 +388,17 @@ Each starter template pre-fills the new type's properties.
   one. The two starter sets stay available after the start through the same call (`POST /api/space/setup` with
   `basic` or `itops`): each writes only the types the space lacks, by id and by name, and replaces nothing; `blank`
   is refused once the space has a start. The IT operations starter turns Work on for its space (M32).
-- Main navigation, always visible at the top (M32): Notes, Calendar, Tasks, Work (only while the Work page is on
+- Main navigation, always visible at the top (M32): All notes, Calendar, Tasks, Work (only while the Work page is on
   for the space; directly under Tasks; it opens the `work` target), Graph, Assistant. Tasks is the active entry for
   the `tasks` target only, Work for `work` (a `work` target shown while Work is off reads as Tasks). The Assistant
   and the Agents section stay exactly where they were (M32 decision 1). The Assistant is the built-in, always-on helper — a program
   feature, not an "agent" — shown with its own icon; a click opens its chat. Like an agent row it carries a
   hover `…` menu (Open chat, Settings, Memory & skills — no Duplicate/Delete: it is built in), the way into
   its own page (Profile, Instructions, Memory, Skills, Learning, Chats…).
-- **Notes** (M32; was "All notes", off the sidebar since 2026-11-08): the first main entry opens the all-notes
-  view, heading "Notes", "Every note, by when it was last edited.": every note by last edit (`lastUpdated`, else
+- **All notes** (M32; off the sidebar since 2026-11-08; the build first called it "Notes", the same word as the
+  Note type's row under Types, which keeps "Notes"): the first main entry opens the all-notes view; the entry,
+  its tab and the view's heading read "All notes", over "Every note, by when it was last edited.": every note by
+  last edit (`lastUpdated`, else
   the creation time), newest first, grouped Today / Yesterday / This week / Earlier (our call: "This week" is
   the five days before yesterday, so the list never empties on a Monday); daily notes are in, tasks, tags and
   templates are left out; a list row ends with when it was edited. A sort or grouping picked in the toolbar
@@ -400,10 +410,14 @@ Each starter template pre-fills the new type's properties.
 - **Tasks** (M32): the sidebar's Tasks entry opens the plain Tasks page (the `tasks` target; the `work` target
   too while Work is off for the space). Header: icon, "Tasks", "Search tasks" (filters the shown list by title as
   you type; Esc clears it) and "New task" (creates a task and opens it). Under it "Add a task": Enter (or "Add
-  task") adds without opening and keeps focus. Date words anywhere in the text — today, tomorrow, a weekday
-  ("friday", "next friday"), "next week", "in 3 days", "nov 20", `2026-11-20` — set the task's date and show as a
-  chip beside the field while typing; the words (and an "on", "by" or "due" just before them) are left out of the
-  title, and a month and day already past this year means next year's. Backspace at the start of the field, or
+  task") adds without opening and keeps focus. Date words anywhere in the text — today, tomorrow, a weekday's
+  full name ("friday", "next friday"), "next week", "in 3 days", `2026-11-20` — set the task's date and show as a
+  chip beside the field while typing; the words (and an "on", "by", "due" or "for" just before them) are left out
+  of the title, and a month and day already past this year means next year's. Words that are everyday words too
+  — a shortened weekday ("sat", "sun", "wed") and a month with a day ("nov 20", "3 may") — are a date only as the
+  last words of the text or right after "on", "by", "due" or "next" ("Pay rent fri", "Dentist on 3 may"; "Buy sun
+  cream" and "Chapter 3 may need a rewrite" keep their words). While the chip shows, a line under the field reads
+  the task as it will be saved (`Adds "Call the bank" on Nov 13, 2026`). Backspace at the start of the field, or
   the chip's ×, removes the chip, and the words then stay in the title as typed. The new task's file has an empty
   body: the title is not repeated in it (a default template's body is kept). Tabs: **Today** (two groups,
   "Overdue (n)" — open tasks whose date ended before today — then "Today (n)" — the date covers today or the
@@ -412,10 +426,14 @@ Each starter template pre-fills the new type's properties.
   then the weekday and date — then "Later"), **Inbox** (open tasks with no date, newest first), **All** (every
   task, open ones first) and **Done** (latest first); then a "More" menu with the other plain lists as they were
   (Status, Deadline, Recurring, Reminders, Tags, Context: each a list view with its own layouts, filters and
-  saved view). The page opens on Today and comes back on the list last shown, kept per space in the browser:
-  opening the page or changing tabs writes no file. A group's header shows its count once ("Overdue (1)"). Rows:
+  saved view). The tab row is one stop for the Tab key; Left and Right move to the next tab and show its list,
+  Home and End go to the first and the last. The sidebar's Tasks entry opens the page on Today, also when the page is
+  already showing another list; a tab that is restored (a reload, a tab come back to, Back) shows the list it was
+  on, kept per space in the browser: opening the page or changing tabs writes no file. A group's header shows its count once ("Overdue (1)"). Rows:
   the circle (a click completes the task), the title (a click opens the task; a done task's is struck through),
-  the date chip (a click opens Today / Tomorrow / Next week / No date and "Pick a date", the date picker; an
+  the date chip (a click opens Today / Tomorrow / Next week / No date and "Pick a date", the date picker, which
+  opens with the caret in its date field and the date shown selected, so "friday" and Enter set it at once; Up
+  and Down move through the chip's menu, Home and End jump; an
   overdue date is in the theme's danger colour; a task with no date shows the chip's calendar icon), the deadline
   label and the priority pill; 50 rows, then "Load more". On a type whose status has no Done option, the circle
   offers "Add a Done status" — one click adds it to the type and completes the task — instead of "This type has
@@ -442,8 +460,8 @@ Each starter template pre-fills the new type's properties.
   Move all open tasks to); "Open in Calendar" under it opens the Calendar's Day view on today. Today's badge
   counts that list's open tasks, Inbox's counts the inbox. While the space hides task management ("Hide Task
   Management"), the Work page leaves out the task lists (the list views and Today's tasks); the work views and
-  the timeline stay. (M32) "Hide Tasks in this space" now hides the Work page too: its sidebar entry goes and a
-  Work tab shows "Tasks are hidden in this space." (section 2, Task management). On
+  the timeline stay. (M32) "Hide Tasks in this space" hides the plain Tasks page and its entry, not the Work page:
+  the Work entry, the page and its toasts, overlays and keys stay (section 2, Task management). On
   Today's timeline a block too short for its label and time (the 24-minute Morning brief) shows the two on
   one line under the track (the next row down when two would meet; the tooltip stays). The Task rows load
   once for the page. (M32) The plain Tasks page is its own page again (above); the task lists stay views of the
@@ -493,10 +511,17 @@ Each starter template pre-fills the new type's properties.
   the Trash.", "This note opens read-only: …", "This note's file was deleted or moved on disk. Edits here aren't
   saved.", "3 notes will change.", "A template fills in new notes for you."; the reference tabs' tooltips are
   "Links to this note" and "Similar notes".
+- **A task's own page has the tick (M32)**: on the page and the peek of a Task, the circle the task rows have
+  sits beside the title. A click completes the task (the first Done status, `completed` stamped, the same write
+  the rows make) or reopens a done one; Ctrl-click or its caret opens Status; a recurring task moves on and says
+  "Moved to …"; on a Task type with no Done status it offers "Add a Done status", as in the rows. Other types,
+  also ones with a status of their own, have no tick.
 - **Save mark** (M32): in a note's toolbar (page and peek), left of its buttons: "Saving…" while typed text waits
   for its save or a save runs, then a check and "Saved", which fades to the check alone after two seconds. A note
   nobody typed in shows nothing. A failed save keeps the editor's "Changes not saved. Retrying…" and adds nothing.
-  The mark stays while the toolbar's buttons fade for typing (it is what you look at while you type).
+  The mark stays while the toolbar's buttons fade for typing (it is what you look at while you type). A screen
+  reader is told "Saved" only (a polite announcement); "Saving…" is shown and can be read, but is not announced
+  with every save. The mark follows a typed title's commit the same way.
 - **Header**, top to bottom: type pill (icon + name; click to change type), a relation button, then any
   property surfaced in the header (a Status chip such as "In Progress"), a "Collections" chip; the title in
   large bold; the Description property as a paragraph under the title; a "Tags" row of colored tag chips with a
@@ -507,8 +532,16 @@ Each starter template pre-fills the new type's properties.
   first), and the typed title is committed as the caret leaves; ArrowUp, or Shift+Tab, with the caret at the
   body's very first position goes back to the end of the title (Shift+Tab in a list item or an indented block
   still unindents). Words typed in the body while the rename runs are kept: they are saved under the note's new
-  file name and the caret stays where it was. A note opened with a request for its body (Today's note: the end of
-  its text) takes the caret there once its editor is ready. Renaming an object (its title, a
+  file name and the caret stays where it was. A typed title is kept like the text (M32): it is committed 2 s
+  after the last key in the title (no Enter needed; not on every key, since a commit renames the file), and at
+  once when the window is hidden or closing and when the note is left (a tab or note switch, the peek closed).
+  A timed commit leaves the field alone: the focus, the caret and the selection stay, keys typed while the
+  rename runs stay in the field and are committed after the next pause, and the save mark says "Saving…", then
+  "Saved". An emptied title is not committed (it reverts on leaving the field, as before); a title the server
+  refuses is said once in a notice, stays in the field, and is not sent again until it changes. A note whose
+  text opens with `# Old title` keeps that heading in step with the title through a rename (the editor shows the
+  new heading at once, and its next save keeps it). A note opened with a request for its body (Today's note:
+  the end of its text) takes the caret there once its editor is ready. Renaming an object (its title, a
   table's title cell, a whiteboard's name) rewrites the links to it in other objects and then says so with a short
   notice, "Updated links in 3 notes" ("1 note"; M32: was "objects"); nothing is shown when no other object linked
   to it.
@@ -613,15 +646,24 @@ Each starter template pre-fills the new type's properties.
     the note starts with a to-do (the browser's own key did nothing there).
 - **Saving (M32)**: a note is saved 1 s after the last key and, while typing continues, at most 3 s after the
   first unsaved key. It is also saved at once when the text or the window loses focus, when the window is hidden
-  or closing (`pagehide`: a request the browser finishes after the page is gone, for a note up to 60 KB; the text
-  is also kept for a reload until the save lands), on a note or tab switch and when the editor closes. Nothing is
-  sent when nothing changed, and never two saves at once: a save asked for while one runs follows it with the
-  latest text. Conflicts, read-only files and "Changes not saved. Retrying…" are as before.
+  or closing (`pagehide`), on a note or tab switch and when the editor closes. Every save of a note up to 60 KB is
+  a request the browser finishes after the page is gone, whichever of these started it (on a close the first of
+  them is the one in flight). Nothing is sent when nothing changed, and never two saves at once: a save asked for
+  while one runs follows it with the latest text. Conflicts, read-only files and "Changes not saved. Retrying…"
+  are as before.
+  - Text the window could not save before it went (a longer note whose request the close cut off, or words typed
+    while an earlier save was still running) is kept in the browser's storage for that space, outlives the
+    window, and is offered the next time the note opens ("Recover unsaved changes": the kept text beside the
+    version on disk, "Save changes" / "Discard"; nothing is written without that choice). Kept text the file
+    already holds is cleared when the space opens, and never offered.
 - **Make this line a task (M32)**, Ctrl+Shift+T with the caret in a note: the line holding the caret becomes a
   Task titled with its text and is replaced by the task's link card, whatever the line is: a paragraph, a heading,
   a list line (the list is split around it; nested lines become the task's body) or a to-do (a ticked one is made
   Done). With blocks selected: every to-do in them, or the first block when they hold none. A line without text
-  and a code block are left alone, and a task that can't be made changes nothing.
+  and a code block are left alone, and a task that can't be made changes nothing. The task's row in the note has
+  its circle before the title: a ticked task's title is struck through there as it is in the lists, and the row's
+  hover toolbar (align left / centre / right, `…`) stands above the row, at the side the block is aligned to,
+  never over the title (the same for any link shown as one line).
 - **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves. The note's save
   mark does not fade (M32).
 - **Edited lines are written in the editor's standard Markdown form**: the line of a block you edit is rewritten
@@ -711,6 +753,9 @@ Each starter template pre-fills the new type's properties.
   type, else the type made last); footer hints.
 - **View toolbar** (type pages, `All` tab): count pill, Filter, Sort, Group by, a layout dropdown, Customize.
   - Layouts (`views/model.ts`): List, Wall, Kanban, Gallery, Table, Embed, Calendar, Timeline, Chart, Gallery strip.
+    A Kanban board with nothing to group by has one column, titled with the type's plural when the view shows one
+    type ("Recipes", "Add to Recipes"; "Notes" for the Note type), and "Notes" when it shows several (M32; the
+    title is not stored).
     Chart export (the Customize page): **Export PNG** renders the frame at 2x; **Export SVG** saves the chart's own
     SVG as vector shapes with its styles written on the shapes and the legend drawn below (fix pass 2026-11-09);
     the number chart, which draws no SVG, exports its rendered frame.
@@ -909,6 +954,13 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   (section 11). An empty section (M32) is one quiet line with no heading and no explanation ("No backlinks
   yet", "No related content yet", "No unlinked mentions", "No related tags"), in the page's references, in a tab
   on its own and in the side panel's Backlinks entry; every tab stays, with its count.
+- **A count above the fold (M32)**: the references section sits under the text, below the window on most notes.
+  Beside the type chip in a note's header (page and peek) a quiet line says what is there, only when there is
+  something: "2 backlinks · 1 mention" (singular and plural as they should be; each part only when it is not
+  zero; nothing at all for a note with neither). A click, or Enter, on a part scrolls to the references section
+  and opens that tab, also when the section was closed on that note. The numbers are the section's own (one
+  request per note, as before); a section the Settings hide is not counted. Nothing about the sections changes:
+  unlinked mentions always show under their tab.
 - **Backlinks stay live**: when another object gains or loses a link to the open one (Link on a mention, an
   outside edit adding `[[X]]`), the Properties panel's Backlinks chips and the Tasks dashboard's Context grouping
   update without a reload (a change to any other object re-reads them).

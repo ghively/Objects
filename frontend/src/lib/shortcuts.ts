@@ -413,7 +413,7 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
   // each has a second key that a browser tab lets through. Delete stays out of editable targets
   // (there Ctrl+Backspace deletes a word).
   def('openAddEntityMenu', 'global', 'New', ['Mod-u', 'AltCtrl-Shift-n'], 'global', false, false),
-  def('createNewEntityOfType', 'global', 'New note, or one more of the type in view', ['Mod-n', 'AltCtrl-n'], 'global', false, false),
+  def('createNewEntityOfType', 'global', 'New note', ['Mod-n', 'AltCtrl-n'], 'global', false, false),
   def('deleteCurrentPage', 'page', 'Delete this note', ['Mod-Backspace'], 'global', false, false),
   // M4, calendar/CalendarChrome.tsx
   def('goToToday', 'calendar', 'Jump to today', ['t'], 'calendar', false, false),

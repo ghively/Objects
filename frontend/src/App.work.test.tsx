@@ -178,31 +178,50 @@ describe('M32 contract wiring: Tasks, Work off, Home', () => {
     expect(screen.queryByTestId('work-toasts')).toBeNull()
   })
 
-  // "Hide Tasks in this space": the Tasks and Work pages give way to one quiet line.
-  test('test while the space hides Tasks, tasks and work targets show one quiet line and no Work extras mount', async () => {
+  // "Hide Tasks in this space" hides Tasks, not Work (the decision of the M32 fix pass, F12: the
+  // integrate step had hidden the Work page too, reversing M23's rule that the dashboard stays
+  // and only leaves its task lists out).
+  test('test while the space hides Tasks, a tasks target shows one quiet line and the Work page, its entry and its extras stay', async () => {
     mocked.space.mockResolvedValue({ ...SPACE_WORK_ON, hideTaskManagement: true })
     act(() => useTabs.getState().open({ kind: 'tasks' }))
     render(<App />)
     expect(await screen.findByText('Tasks are hidden in this space.')).toBeInTheDocument()
     expect(screen.queryByTestId('tasks-page')).toBeNull()
+    // The sidebar: no Tasks entry; the Work entry is there, as before M32.
+    const main = screen.getByRole('navigation', { name: 'Main' })
+    expect(within(main).queryByRole('button', { name: 'Tasks' })).toBeNull()
+    expect(within(main).getByRole('button', { name: 'Work' })).toBeInTheDocument()
+    // The work toasts and overlays (and with them the work keys) are mounted, once.
+    expect(screen.getAllByTestId('work-toasts')).toHaveLength(1)
+    expect(screen.getAllByTestId('work-overlays')).toHaveLength(1)
+    // The line leads to the setting.
+    act(() => screen.getByRole('button', { name: 'Open Task management settings' }).click())
+    expect(useSettingsModal.getState().section).toBe('taskManagement')
+    act(() => useSettingsModal.getState().close())
+    // A work target shows the Work page (which leaves its own task lists out: `WorkPage.test.tsx`).
+    act(() => within(main).getByRole('button', { name: 'Work' }).click())
+    expect(await screen.findByTestId('work-page')).toBeInTheDocument()
+    expect(screen.queryByText('Tasks are hidden in this space.')).toBeNull()
     act(() => useTabs.getState().open({ kind: 'work', view: 'today' }))
-    await waitFor(() => expect(useTabs.getState().tabs[0].history.at(-1)).toEqual({ kind: 'work', view: 'today' }))
-    expect(screen.getByText('Tasks are hidden in this space.')).toBeInTheDocument()
+    expect(await screen.findByTestId('work-page')).toHaveTextContent('work page today')
+    // The switch off brings the Tasks entry back in place.
+    act(() => useSpaceInfo.setState((st) => ({ space: st.space && { ...st.space, hideTaskManagement: false } })))
+    expect(within(main).getByRole('button', { name: 'Tasks' })).toBeInTheDocument()
+    expect(screen.getByTestId('work-page')).toHaveTextContent('work page today')
+  })
+
+  test('test with Work off and Tasks hidden, a work target shows the quiet line too and nothing of Work mounts', async () => {
+    mocked.space.mockResolvedValue({ ...SPACE_WORK_OFF, hideTaskManagement: true })
+    act(() => useTabs.getState().open({ kind: 'work', view: 'today' }))
+    render(<App />)
+    expect(await screen.findByText('Tasks are hidden in this space.')).toBeInTheDocument()
     expect(screen.queryByTestId('work-page')).toBeNull()
     expect(screen.queryByTestId('tasks-page')).toBeNull()
     expect(screen.queryByTestId('work-toasts')).toBeNull()
     expect(screen.queryByTestId('work-overlays')).toBeNull()
-    // No entry for either in the sidebar.
     const main = screen.getByRole('navigation', { name: 'Main' })
     expect(within(main).queryByRole('button', { name: 'Tasks' })).toBeNull()
     expect(within(main).queryByRole('button', { name: 'Work' })).toBeNull()
-    // The line leads to the setting, and the switch off brings the page back in place.
-    act(() => screen.getByRole('button', { name: 'Open Task management settings' }).click())
-    expect(useSettingsModal.getState().section).toBe('taskManagement')
-    act(() => useSettingsModal.getState().close())
-    act(() => useSpaceInfo.setState((st) => ({ space: st.space && { ...st.space, hideTaskManagement: false } })))
-    expect(await screen.findByTestId('work-page')).toHaveTextContent('work page today')
-    expect(screen.getAllByTestId('work-toasts')).toHaveLength(1)
   })
 
   test('test the sidebar Tasks entry opens the tasks target', async () => {
@@ -228,18 +247,18 @@ describe('M32 contract wiring: Tasks, Work off, Home', () => {
   })
 
   // M32 lane B: the sidebar's Notes and Work entries.
-  test('test the sidebar Notes entry is first and opens the all-notes view, tab title Notes', async () => {
+  test('test the sidebar All notes entry is first and opens the all-notes view, tab title All notes', async () => {
     act(() => useTabs.getState().open({ kind: 'object', path: 'Pages/A.md' }))
     render(<App />)
     await screen.findByText('object page Pages/A.md plain')
     const main = screen.getByRole('navigation', { name: 'Main' })
     const notes = within(main).getAllByRole('button')[0]
-    expect(notes).toHaveTextContent('Notes')
+    expect(notes).toHaveTextContent('All notes')
     act(() => notes.click())
-    expect(await screen.findByRole('heading', { name: 'Notes', level: 1 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'All notes', level: 1 })).toBeInTheDocument()
     expect(useTabs.getState().tabs[0].history.at(-1)).toEqual({ kind: 'allNotes' })
-    expect(within(main).getByRole('button', { name: 'Notes' })).toHaveAttribute('aria-current', 'page')
-    expect(within(screen.getByRole('tablist', { name: 'Tabs' })).getByRole('tab')).toHaveTextContent('Notes')
+    expect(within(main).getByRole('button', { name: 'All notes' })).toHaveAttribute('aria-current', 'page')
+    expect(within(screen.getByRole('tablist', { name: 'Tabs' })).getByRole('tab')).toHaveTextContent('All notes')
   })
 
   test('test the sidebar Work entry opens the work target while Work is on', async () => {

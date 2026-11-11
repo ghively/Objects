@@ -82,7 +82,7 @@ describe('RemoveFromCollectionDialog', () => {
     expect(screen.getByText('Take it out of just this collection, or use the option below to delete it everywhere.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Remove from collection' }))
     expect(onRemove).toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: /^Delete 2 (objects|notes)$/ }))
+    await user.click(screen.getByRole('button', { name: 'Delete 2 notes' }))
     expect(onDelete).toHaveBeenCalled()
   })
 })

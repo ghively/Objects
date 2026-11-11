@@ -8,6 +8,11 @@ export const NOTES = 'Notes'
 /** The same nouns inside a sentence ("Delete this note?", "Recently opened notes appear here."). */
 export const NOTE_LOWER = 'note'
 export const NOTES_LOWER = 'notes'
+/**
+ * The view of every note by last edited: the sidebar's first entry, its tab and its heading. Not
+ * "Notes": that is the Note type's own row under Types.
+ */
+export const ALL_NOTES = 'All notes'
 
 /** What the built-in DailyNote type is called on screen. */
 export const DAILY_NOTE = 'Daily note'

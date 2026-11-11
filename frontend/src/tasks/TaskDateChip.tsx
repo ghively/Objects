@@ -3,7 +3,7 @@
 // date picker of the property panel. A task with no date has the chip too (the calendar icon), so
 // a date is one click and a pick away. Like the checkbox it owns no row state: it writes the date
 // (`taskActions.setDate`) and hands the outcome to the owner, which patches its list.
-import { useState, type ReactNode, type SyntheticEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type SyntheticEvent } from 'react'
 import type { DateValue, Row, TypeDef } from '@/api/types'
 import { addDays, parseYmd, ymd } from '@/calendar/dates'
 import { Icon } from '@/components/Icon'
@@ -97,6 +97,15 @@ export function TaskDateChip({
   const [open, setOpen] = useState(false)
   const [picking, setPicking] = useState(false)
   const [busy, setBusy] = useState(false)
+  /** "Pick a date" opened the picker: its date field takes the caret, the date shown selected, so
+   * a date typed at once ("friday", Enter) replaces it. */
+  const pickerRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!picking) return
+    const field = pickerRef.current?.querySelector<HTMLInputElement>('input:not([type="time"])')
+    field?.focus()
+    field?.select()
+  }, [picking])
   const date = asDate(row.values.date)
   const today = todayProp ? ymd(todayProp) : zonedToday()
   const overdue = isOverdue(row, type, today)
@@ -127,6 +136,17 @@ export function TaskDateChip({
   const pick = (next: DateValue | null) => {
     setOpen(false)
     void write(next)
+  }
+
+  /** A menu's keys: Up and Down move through its items (round the ends), Home and End jump. */
+  const onMenuKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const items = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)')]
+    const at = items.indexOf(document.activeElement as HTMLElement)
+    const n = items.length
+    const to = e.key === 'ArrowDown' ? (at + 1) % n : e.key === 'ArrowUp' ? (at - 1 + n) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1
+    if (to < 0 || n === 0) return
+    e.preventDefault()
+    items[to].focus()
   }
 
   const choices: [string, DateValue | null][] = [
@@ -164,19 +184,21 @@ export function TaskDateChip({
       </span>
       <PopoverContent align="end" className="w-auto border-line bg-raised p-0 text-fg" onClick={stop} onPointerDown={stop} onKeyDown={stop}>
         {picking ? (
-          <DatePicker
-            value={date}
-            constraints={type?.propertyDefinitions.find((d) => d.key === 'date')?.options.constraints}
-            now={todayProp}
-            onChange={(next) => {
-              void write(next)
-              if (next === null) setOpen(false)
-            }}
-            // M32: Enter in the date field, once the date is set, closes the chip's picker.
-            onClose={() => setOpen(false)}
-          />
+          <div ref={pickerRef}>
+            <DatePicker
+              value={date}
+              constraints={type?.propertyDefinitions.find((d) => d.key === 'date')?.options.constraints}
+              now={todayProp}
+              onChange={(next) => {
+                void write(next)
+                if (next === null) setOpen(false)
+              }}
+              // M32: Enter in the date field, once the date is set, closes the chip's picker.
+              onClose={() => setOpen(false)}
+            />
+          </div>
         ) : (
-          <div role="menu" aria-label={TASK_DATE_TEXT.label} className="flex w-44 flex-col p-1.5">
+          <div role="menu" aria-label={TASK_DATE_TEXT.label} onKeyDown={onMenuKeyDown} className="flex w-44 flex-col p-1.5">
             {choices.map(([label, value]) => (
               <button key={label} type="button" role="menuitem" disabled={busy} onClick={() => pick(value)} className={ITEM}>
                 {label}

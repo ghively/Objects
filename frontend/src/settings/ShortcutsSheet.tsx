@@ -46,7 +46,8 @@ export function ShortcutsSheet() {
   const close = useSettingsModal((s) => s.closeShortcuts)
   const aiHidden = useAiHidden()
   const tasksHidden = useTasksHidden()
-  const workShown = useWorkOn() && !tasksHidden
+  // "Hide Tasks in this space" leaves the task keys out, not the Work group (it hides Tasks).
+  const workShown = useWorkOn()
   // The groups in the catalog's order (`CATEGORY_ORDER`), the uncatalogued ones after.
   const byCategory = open ? shortcutsByCategory() : new Map<string, ShortcutDef[]>()
   const groups = sortCategories([...byCategory.keys()])

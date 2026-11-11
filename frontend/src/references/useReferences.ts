@@ -64,9 +64,26 @@ export function useReferences(path: string, relatedLimit: number): UseReferences
     fetchNow()
   }, [fetchNow])
 
+  // The note itself was deleted (it stays on screen with "Undo Delete"): there is nothing to ask
+  // the server for, which would answer 404, until the note is back.
+  const gone = useRef(false)
+  useEffect(() => {
+    gone.current = false
+  }, [path])
+
   useEffect(() => {
     const off = api.onChange((e) => {
       if (!RELOAD_KINDS.has(e.kind)) return
+      if (e.path === path && e.kind === 'deleted') {
+        gone.current = true
+        if (timer.current) clearTimeout(timer.current)
+        timer.current = null
+        return
+      }
+      if (gone.current) {
+        if (e.path !== path || e.kind !== 'created') return
+        gone.current = false
+      }
       const a = absorb.current
       if (a && e.kind === 'changed' && e.path === a.path) {
         absorb.current = null
@@ -85,7 +102,7 @@ export function useReferences(path: string, relatedLimit: number): UseReferences
         timer.current = null
       }
     }
-  }, [fetchNow])
+  }, [fetchNow, path])
 
   // Unmounting drops any reply still in flight.
   useEffect(

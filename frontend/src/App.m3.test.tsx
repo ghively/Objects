@@ -48,10 +48,10 @@ describe('navigation wiring', () => {
     render(<App />)
     const strip = screen.getByRole('tablist', { name: 'Tabs' })
 
-    // M32: the all-notes view reads "Notes" (tab and heading).
+    // M32: the all-notes view reads "All notes" (tab and heading).
     useTabs.getState().open({ kind: 'allNotes' })
-    await waitFor(() => expect(within(strip).getByText('Notes')).toBeInTheDocument())
-    expect(await screen.findByRole('heading', { name: 'Notes', level: 1 })).toBeInTheDocument()
+    await waitFor(() => expect(within(strip).getByText('All notes')).toBeInTheDocument())
+    expect(await screen.findByRole('heading', { name: 'All notes', level: 1 })).toBeInTheDocument()
 
     useTabs.getState().open({ kind: 'collection', id: 'reading' })
     await waitFor(() => expect(within(strip).getByText('Reading list')).toBeInTheDocument())
@@ -65,7 +65,7 @@ describe('navigation wiring', () => {
     const user = userEvent.setup()
     useTabs.getState().open({ kind: 'type', typeId: 'page' })
     render(<App />)
-    await screen.findByRole('heading', { name: /^(Pages|Notes)$/, level: 1 })
+    await screen.findByRole('heading', { name: 'Notes', level: 1 })
     await user.click(screen.getByRole('button', { name: 'More' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Pin to sidebar' }))
     await waitFor(() => expect(stored.pinned).toEqual([{ kind: 'type', id: 'page' }]))

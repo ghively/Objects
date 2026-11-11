@@ -16,11 +16,35 @@ afterEach(() => {
 })
 
 describe('SaveMark', () => {
-  test('a note nobody typed in shows no text, in a polite live region', () => {
+  const live = () => mark().querySelector('[aria-live]') as HTMLElement
+
+  test('a note nobody typed in shows no text; the mark holds a polite live region', () => {
     render(<SaveMark path={PATH} />)
-    expect(mark()).toHaveAttribute('aria-live', 'polite')
+    expect(live()).toHaveAttribute('aria-live', 'polite')
     expect(mark()).toHaveAttribute('data-save-mark', '')
     expect(mark()).toHaveTextContent('')
+  })
+
+  // The M32 review, F7: the whole mark was the live region, so a screen reader heard "Saving…"
+  // and then "Saved" with every save, every few seconds while typing. Only "Saved" is said.
+  test('test "Saving…" is shown but not announced; "Saved" is', () => {
+    render(<SaveMark path={PATH} />)
+    expect(mark()).not.toHaveAttribute('aria-live')
+    act(() => setSaveState(PATH, 'unsaved'))
+    expect(mark()).toHaveTextContent('Saving…')
+    expect(live()).toHaveTextContent('')
+    act(() => setSaveState(PATH, 'saving'))
+    expect(live()).toHaveTextContent('')
+    expect(screen.getByText('Saving…').closest('[aria-live]')).toBeNull()
+    act(() => setSaveState(PATH, 'saved'))
+    expect(live()).toHaveTextContent('Saved')
+    // The next edit empties the region again, so the next "Saved" is a change to announce.
+    act(() => setSaveState(PATH, 'unsaved'))
+    expect(live()).toHaveTextContent('')
+    // The live region is always there (one added together with its text is not announced).
+    act(() => setSaveState(PATH, 'error'))
+    expect(live()).toBeInTheDocument()
+    expect(live()).toHaveTextContent('')
   })
 
   test('says "Saving…" while edits wait or a save runs, then "Saved"', () => {

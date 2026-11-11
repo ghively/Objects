@@ -235,9 +235,9 @@ describe('a rename that moves the file', () => {
     await waitFor(() => expect(mocked.renameObject).toHaveBeenCalledWith(PATH, 'Plans', 'v1'))
     // The rename is still on its way; the caret is already in the body.
     expect(bodyHasFocus(editor)).toBe(true)
-    const finish = async () => {
+    const finish = async (onDisk = body) => {
       // The file has moved: only the new path can be read or written.
-      files[NEW] = file(NEW, 'Plans', body, 'v2')
+      files[NEW] = file(NEW, 'Plans', onDisk, 'v2')
       delete files[PATH]
       mocked.object.mockClear()
       await act(async () => {
@@ -296,6 +296,69 @@ describe('a rename that moves the file', () => {
     expect(bodyHasFocus(next)).toBe(true)
     expect(next.state.selection.from).toBe(4)
     expect(mocked.saveBody).not.toHaveBeenCalled()
+  }, 15000)
+
+  // The M32 review, F1: the server's rename rewrites a first `# Old title` heading in the same
+  // write. The view that takes over is handed the text from before the rename with the version
+  // from after it, so it must show the heading as the file now has it: otherwise the next save
+  // writes the old heading back over the new one, with no conflict.
+  test.each([
+    ['plain', '# Notes\n\nfirst line\n', '# Plans\n\nfirst line\n'],
+    ['CRLF', '# Notes\r\n\r\nfirst line\r\n', '# Plans\r\n\r\nfirst line\r\n'],
+  ])(
+    'a body that opens with the title (%s) shows the new title as its heading, and the next save keeps it',
+    async (_name, body, renamed) => {
+      mocked.saveBody.mockImplementation(async (p: string, b: string) => {
+        files[p] = file(p, 'Plans', b, 'v3')
+        return { version: 'v3' }
+      })
+      const { container, editor, finish } = await renameAndStayInBody(body)
+      await finish(renamed)
+      const next = pm(container)
+      expect(next).not.toBe(editor)
+      expect(serializeBody(next)).toBe(renamed)
+      expect(next.view.dom.querySelector('h1')).toHaveTextContent('Plans')
+      // The handed-over text is what the file holds: nothing to save yet.
+      expect(mocked.saveBody).not.toHaveBeenCalled()
+      act(() => {
+        next.commands.focus('end')
+        next.commands.insertContent(' more')
+      })
+      await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledTimes(1), { timeout: 4000 })
+      const [path, saved, base] = mocked.saveBody.mock.calls[0]
+      expect(path).toBe(NEW)
+      expect(base).toBe('v2')
+      expect(saved).toBe(renamed.replace('first line', 'first line more'))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    },
+    15000,
+  )
+
+  test('words typed while the rename ran are saved under the new heading, not the old one', async () => {
+    mocked.saveBody.mockResolvedValue({ version: 'v3' })
+    const { container, editor, finish } = await renameAndStayInBody('# Notes\n\nfirst line\n')
+    act(() => {
+      editor.commands.focus('end')
+      editor.commands.insertContent(' more')
+    })
+    await finish('# Plans\n\nfirst line\n')
+    expect(serializeBody(pm(container))).toBe('# Plans\n\nfirst line more\n')
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(NEW, '# Plans\n\nfirst line more\n', 'v2'))
+    expect(mocked.saveBody).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  }, 15000)
+
+  test('a heading the user changed meanwhile is theirs: it is saved as typed', async () => {
+    mocked.saveBody.mockResolvedValue({ version: 'v3' })
+    const { container, editor, finish } = await renameAndStayInBody('# Notes\n\nfirst line\n')
+    act(() => {
+      editor.commands.focus(1 + 'Notes'.length)
+      editor.commands.insertContent(' two')
+    })
+    expect(serializeBody(editor)).toBe('# Notes two\n\nfirst line\n')
+    await finish('# Plans\n\nfirst line\n')
+    expect(serializeBody(pm(container))).toBe('# Notes two\n\nfirst line\n')
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(NEW, '# Notes two\n\nfirst line\n', 'v2'))
   }, 15000)
 
   test('a title committed by clicking elsewhere moves the note without taking the focus into the body', async () => {
@@ -384,6 +447,53 @@ describe('a rename that moves the file', () => {
     expect(keptUnsaved(NEW)).toBe(typed)
     // The editor is back on what the file holds; the offered text is one click from saved.
     expect(serializeBody(pm(container))).toBe('')
+  }, 15000)
+})
+
+// F1, the other branch: two titles can map to one file name ("Notes?" and "Notes"), so the rename
+// answers the same path and this view and its editor stay. The file's heading still changed.
+describe('a rename that keeps the file name', () => {
+  const HEADED = '# Notes\n\nfirst line\n'
+  const RENAMED = '# Plans\n\nfirst line\n'
+
+  test('the heading follows the title, and the next save keeps it', async () => {
+    const user = userEvent.setup()
+    files[PATH] = file(PATH, 'Notes', HEADED, 'v1')
+    mocked.renameObject.mockImplementation(async () => {
+      files[PATH] = file(PATH, 'Plans', RENAMED, 'v2')
+      return { path: PATH, version: 'v2', relinked: [], skipped: [] }
+    })
+    mocked.saveBody.mockResolvedValue({ version: 'v3' })
+    const { editor, title } = await open()
+    await user.clear(title)
+    await user.type(title, 'Plans{Enter}')
+    await waitFor(() => expect(serializeBody(editor)).toBe(RENAMED))
+    expect(mocked.saveBody).not.toHaveBeenCalled()
+    act(() => {
+      editor.commands.focus('end')
+      editor.commands.insertContent(' more')
+    })
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(PATH, '# Plans\n\nfirst line more\n', 'v2'), {
+      timeout: 4000,
+    })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  }, 15000)
+
+  test('a body without the title as a heading is not read again', async () => {
+    const user = userEvent.setup()
+    mocked.renameObject.mockImplementation(async () => {
+      files[PATH] = file(PATH, 'Plans', BODY, 'v2')
+      return { path: PATH, version: 'v2', relinked: [], skipped: [] }
+    })
+    const { editor, title } = await open()
+    mocked.object.mockClear()
+    await user.clear(title)
+    await user.type(title, 'Plans{Enter}')
+    await waitFor(() => expect(mocked.renameObject).toHaveBeenCalled())
+    await act(async () => {})
+    expect(mocked.object).not.toHaveBeenCalled()
+    expect(serializeBody(editor)).toBe(BODY)
+    expect(bodyHasFocus(editor)).toBe(true)
   }, 15000)
 })
 

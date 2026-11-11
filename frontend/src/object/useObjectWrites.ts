@@ -49,6 +49,8 @@ export interface ObjectWritesOptions {
   onRenamed?(res: RenameResult, oldPath: string, title: string): void
   /** A write failed for another reason (read-only, invalid value, gone). */
   onError?(err: unknown): void
+  /** M32 (W1): a rename was refused (not a version conflict): the title is not what was asked. */
+  onRenameRefused?(err: unknown, title: string): void
   /** M22: a work write succeeded: merge `res.frontmatter` and load `res.body` at `res.version`. */
   onWorkWritten?(res: WorkWriteResult): void
   /** M22: a work write was refused (a step that changed meanwhile, a move the rules refuse, …). */
@@ -196,7 +198,13 @@ export function useObjectWrites(opts: ObjectWritesOptions): ObjectWrites {
   const rename = useCallback(
     (title: string) =>
       enqueue(async (path, baseVersion) => {
-        const res = await api.renameObject(path, title, baseVersion)
+        let res: RenameResult
+        try {
+          res = await api.renameObject(path, title, baseVersion)
+        } catch (err) {
+          if (!(err instanceof ConflictError)) optsRef.current.onRenameRefused?.(err, title)
+          throw err
+        }
         // Writes queued behind the rename go to the new path.
         pathRef.current = res.path
         for (const op of opsRef.current) if (op.path === path) op.path = res.path

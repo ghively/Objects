@@ -200,12 +200,96 @@ describe('app shortcuts', () => {
   })
 
   // M32, "keys work while you type": with the caret in a note's text or title.
-  test('test Ctrl+N with the caret in the note text makes a new one (of the type in view)', async () => {
+  // The walk's W5 (decision): on a single note's page the key makes a Note, as the "New" button
+  // there does (it made one more of the open note's type: a Task on a task's page).
+  test('test Ctrl+N with the caret in the note text makes a new Note, whatever the open note is', async () => {
     const { container } = await openObjectPage()
     const editor = container.querySelector('.ProseMirror')!
     expect(ctrl(editor, 'n')).toBe(false)
-    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('project', {}))
-    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'project/Untitled.md' }))
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('page', {}))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'page/Untitled.md' }))
+  })
+
+  test.each([
+    ['a task', objectSummary({ path: 'Tasks/Call Pat.md', type: 'task', title: 'Call Pat' }), 'Task'],
+    ['a note of another type', NOTES, 'Project'],
+  ])("test the new-note key on %s's page makes a Note", async (_name, open, typeName) => {
+    mocked.objects.mockResolvedValue([NOTES, open])
+    mocked.object.mockImplementation(async () =>
+      objectDetail({ summary: open, frontmatter: { type: typeName, title: open.title }, body: '', version: 'v1' }),
+    )
+    useTabs.getState().open({ kind: 'object', path: open.path })
+    render(<App />)
+    await screen.findByRole('textbox', { name: 'Title' })
+    await waitFor(() => expect(useLinkIndex.getState().objects.length).toBe(2))
+    expect(fireEvent.keyDown(document.body, { key: 'n', code: 'KeyN', altKey: true })).toBe(false)
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledTimes(1))
+    expect(mocked.createObject).toHaveBeenCalledWith('page', {})
+  })
+
+  test.each([
+    ['the Tasks page', { kind: 'tasks' } as const],
+    ["a type's settings", { kind: 'typeSettings', typeId: 'project' } as const],
+    ['the Trash', { kind: 'trash' } as const],
+  ])('test the new-note key on %s makes a Note', async (_name, target) => {
+    useTabs.getState().open(target)
+    render(<App />)
+    await waitFor(() => expect(mocked.space).toHaveBeenCalled())
+    await screen.findByRole('button', { name: 'New' })
+    ctrl(document.body, 'n')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledTimes(1))
+    expect(mocked.createObject).toHaveBeenCalledWith('page', {})
+  })
+
+  test("test the new-note key on a type's own page makes one more of that type, as the page's New button does", async () => {
+    useTabs.getState().open({ kind: 'type', typeId: 'task' })
+    render(<App />)
+    await waitFor(() => expect(mocked.space).toHaveBeenCalled())
+    await screen.findByRole('button', { name: 'New' })
+    await waitFor(() => expect(useLinkIndex.getState().types.length).toBe(3))
+    ctrl(document.body, 'n')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', {}))
+  })
+
+  // The M32 review, F4: Alt+N held wrote six notes; a double click on "New" wrote two.
+  test('test a held key makes one note: the repeats of the new-note key do nothing', async () => {
+    render(<App />)
+    await waitFor(() => expect(mocked.space).toHaveBeenCalled())
+    await screen.findByRole('button', { name: 'New' })
+    expect(fireEvent.keyDown(document.body, { key: 'n', code: 'KeyN', altKey: true })).toBe(false)
+    for (let i = 0; i < 5; i++) {
+      // Still prevented (the browser's own Ctrl+N or Ctrl+U must not fire), and nothing is made.
+      expect(fireEvent.keyDown(document.body, { key: 'n', code: 'KeyN', altKey: true, repeat: true })).toBe(false)
+      expect(fireEvent.keyDown(document.body, { key: 'n', ctrlKey: true, repeat: true })).toBe(false)
+    }
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledTimes(1))
+    await new Promise((r) => setTimeout(r, 30))
+    expect(mocked.createObject).toHaveBeenCalledTimes(1)
+  })
+
+  test("test a held today's-note key asks for the note once", async () => {
+    mocked.createDailyNote.mockResolvedValue({ path: 'DailyNotes/2026-11-11.md', version: 'v1', typeIds: [] })
+    render(<App />)
+    await waitFor(() => expect(mocked.space).toHaveBeenCalled())
+    await screen.findByRole('button', { name: 'New' })
+    fireEvent.keyDown(document.body, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true })
+    for (let i = 0; i < 5; i++) fireEvent.keyDown(document.body, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true, repeat: true })
+    await waitFor(() => expect(usePeek.getState().path).toBe('DailyNotes/2026-11-11.md'))
+    expect(mocked.createDailyNote).toHaveBeenCalledTimes(1)
+  })
+
+  test('test a double click on "New" makes one note', async () => {
+    let made!: (r: { path: string; version: string }) => void
+    mocked.createObject.mockImplementationOnce(() => new Promise((r) => (made = r)))
+    render(<App />)
+    await waitFor(() => expect(mocked.space).toHaveBeenCalled())
+    const button = await screen.findByRole('button', { name: 'New' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    expect(mocked.createObject).toHaveBeenCalledTimes(1)
+    made({ path: 'page/Untitled.md', version: 'v1' })
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'page/Untitled.md' }))
+    expect(mocked.createObject).toHaveBeenCalledTimes(1)
   })
 
   test('test Ctrl+N and Alt+N in the title make a new note', async () => {
@@ -259,6 +343,50 @@ describe('app shortcuts', () => {
     })
     // Taken once: nothing is left to move the caret again.
     expect(takeBodyFocus('DailyNotes/2026-11-11.md')).toBeNull()
+  })
+
+  // The M32 review, F5: asked for again while it is open, today's note did nothing and left a
+  // focus request behind (taken by the note the next time it was opened, whenever that was).
+  test("test Today's note asked for again while it is popped out puts the caret at the end of its text, and leaves no request", async () => {
+    mocked.createDailyNote.mockResolvedValue({ path: 'DailyNotes/2026-11-11.md', version: 'v1', typeIds: [] })
+    const day = objectSummary({ path: 'DailyNotes/2026-11-11.md', type: 'page', title: '2026-11-11' })
+    mocked.object.mockImplementation(async (path: string) =>
+      path === day.path
+        ? objectDetail({ summary: day, frontmatter: { type: 'Page', title: day.title }, body: 'Morning.\n', version: 'v1' })
+        : objectDetail({ summary: NOTES, frontmatter: { type: 'Project', title: 'Notes' }, body: 'Some text.\n', version: 'v1' }),
+    )
+    await openObjectPage()
+    fireEvent.keyDown(document.body, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true })
+    const dialog = await screen.findByRole('dialog')
+    const pm = await waitFor(() => {
+      const el = dialog.querySelector('.ProseMirror') as (HTMLElement & { editor?: TiptapEditor }) | null
+      if (!el?.editor) throw new Error('editor not mounted')
+      expect(document.activeElement).toBe(el)
+      return el as HTMLElement & { editor: TiptapEditor }
+    })
+    // The caret is moved to the start and the focus leaves the text.
+    pm.editor.commands.setTextSelection(1)
+    ;(dialog.querySelector('input[aria-label="Title"]') as HTMLElement | null)?.focus()
+    pm.blur()
+    expect(document.activeElement).not.toBe(pm)
+    fireEvent.keyDown(document.body, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true })
+    await waitFor(() => expect(document.activeElement).toBe(pm))
+    expect(pm.editor.state.selection.from).toBe(pm.editor.state.doc.content.size - 1)
+    expect(usePeek.getState().path).toBe('DailyNotes/2026-11-11.md')
+    expect(takeBodyFocus('DailyNotes/2026-11-11.md')).toBeNull()
+  })
+
+  test("test Today's note asked for while it is the open page puts the caret at the end of its text there, with no pop-out", async () => {
+    mocked.createDailyNote.mockResolvedValue({ path: PATH, version: 'v1', typeIds: [] })
+    const { container } = await openObjectPage()
+    const pm = container.querySelector('.ProseMirror') as HTMLElement & { editor: TiptapEditor }
+    await waitFor(() => expect(pm.editor.state.doc.textContent).toBe('Some text.'))
+    expect(document.activeElement).not.toBe(pm)
+    fireEvent.keyDown(document.body, { key: 'D', code: 'KeyD', ctrlKey: true, shiftKey: true })
+    await waitFor(() => expect(document.activeElement).toBe(pm))
+    expect(pm.editor.state.selection.from).toBe(pm.editor.state.doc.content.size - 1)
+    expect(usePeek.getState().path).toBeNull()
+    expect(takeBodyFocus(PATH)).toBeNull()
   })
 
   test('test a new note made by key steps out from under a popped-out note', async () => {

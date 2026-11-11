@@ -47,7 +47,7 @@ export interface ActionContext {
   openToday(): void
   /** 2026-11-09: today's daily note in the peek (created when missing). */
   openTodaysNote?(): void
-  /** The all-notes view (M32: the sidebar's "Notes" entry opens it too). */
+  /** The all-notes view (M32: the sidebar's "All notes" entry opens it too). */
   openAllNotes?(): void
   openGlobalGraph(): void
   openGraphView(): void

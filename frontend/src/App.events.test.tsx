@@ -160,4 +160,36 @@ describe('kept unsaved text (end review of the second audit fix pass)', () => {
     expect(keptUnsaved('Projects/Renamed.md', 'id1')).toBe('mine\n')
     resetUnsaved()
   })
+
+  // The walk's W1: a title typed just before the window closed is committed as it goes; the file
+  // moves after that page is gone, so its tabs still name the old path.
+  test('the tabs a closed window left on the old path are moved when the space opens', async () => {
+    const { setTabsSpace } = await import('@/nav/tabs')
+    await setTabsSpace('/s')
+    act(() => useTabs.getState().open({ kind: 'object', path: 'Projects/Untitled.md' }))
+    localStorage.setItem('object.renaming:/s\nProjects/Untitled.md', 'id7')
+    mocked.objects.mockResolvedValue([...OBJECTS.filter((o) => o.id !== 'id7'), objectSummary({ path: 'Projects/Plans.md', type: 'project', title: 'Plans', id: 'id7' })])
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('object-page')).toHaveTextContent('Projects/Plans.md'))
+    expect(localStorage.getItem('object.renaming:/s\nProjects/Untitled.md')).toBeNull()
+  })
+
+  // M32 fix pass, F2: a window that closed with its save on the way never cleared its entry.
+  test('text the file already holds is forgotten when the space opens; text it does not hold stays', async () => {
+    const { keptUnsaved, resetUnsaved } = await import('@/editor/unsaved')
+    const { objectDetail, objectSummary } = await import('@/test/mockApi')
+    const left = (path: string, body: string) => localStorage.setItem(`object.unsaved:/s\n${path}`, JSON.stringify({ body, id: null }))
+    left('Projects/Landed.md', 'saved after the window had gone\n')
+    left('Projects/Cut.md', 'words the close cut off\n')
+    const disk: Record<string, string> = { 'Projects/Landed.md': 'saved after the window had gone\n', 'Projects/Cut.md': 'before\n' }
+    mocked.object.mockImplementation(async (path: string) => {
+      if (!(path in disk)) throw new Error('Not found')
+      return objectDetail({ summary: objectSummary({ path }), body: disk[path], version: 'v1' })
+    })
+    render(<App />)
+    await screen.findByRole('button', { name: 'New' })
+    await waitFor(() => expect(keptUnsaved('Projects/Landed.md')).toBeNull())
+    expect(keptUnsaved('Projects/Cut.md')).toBe('words the close cut off\n')
+    resetUnsaved()
+  })
 })

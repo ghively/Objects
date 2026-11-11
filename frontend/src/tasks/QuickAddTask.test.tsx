@@ -124,6 +124,36 @@ describe('QuickAddTask date words (M32)', () => {
     )
   })
 
+  // The M32 review, F3 (decision): the title that will be saved is visible before Enter.
+  test('test while the chip shows, a line under the field reads the title as it will be saved', async () => {
+    const user = userEvent.setup()
+    render(<QuickAddTask taskTypeId="task" />)
+    const input = screen.getByPlaceholderText('Add a task')
+    await user.type(input, 'Read')
+    expect(screen.queryByTestId('quick-add-preview')).toBeNull()
+    await user.type(input, ' Friday Night Lights')
+    // The known false positive is plain to see: the saved title is not what was typed.
+    const preview = screen.getByTestId('quick-add-preview')
+    expect(preview).toHaveTextContent('Adds "Read Night Lights" on Nov 13, 2026')
+    expect(input).toHaveAccessibleDescription('Adds "Read Night Lights" on Nov 13, 2026')
+    // Without the chip the words are the title, and there is nothing to say.
+    await user.click(screen.getByRole('button', { name: 'Remove date' }))
+    expect(screen.queryByTestId('quick-add-preview')).toBeNull()
+    expect(input).not.toHaveAccessibleDescription()
+    await user.type(input, '{Enter}')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', { title: 'Read Friday Night Lights', body: '' }))
+  })
+
+  test('test everyday words that are also date words stay in the title (F3)', async () => {
+    const user = userEvent.setup()
+    render(<QuickAddTask taskTypeId="task" />)
+    const input = screen.getByPlaceholderText('Add a task')
+    await user.type(input, 'Buy sun cream')
+    expect(screen.queryByTestId('quick-add-date')).toBeNull()
+    await user.type(input, '{Enter}')
+    await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('task', { title: 'Buy sun cream', body: '' }))
+  })
+
   test('the chip’s × removes it too, and other date words typed after bring a chip back', async () => {
     const user = userEvent.setup()
     render(<QuickAddTask taskTypeId="task" />)

@@ -18,8 +18,9 @@ import { SectionHeader } from './SectionHeader'
 import { chipStyle } from './typeColor'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { typePlural } from '@/lib/typeLabel'
-import { NEW_TYPE, NOTES, SAVED_SEARCHES, TYPES, WORK } from '@/lib/words'
+import { ALL_NOTES, NEW_TYPE, SAVED_SEARCHES, TYPES, WORK } from '@/lib/words'
 import { useTasksHidden } from '@/tasks/tasksHidden'
+import { openTasksOnToday } from '@/tasks/tasksTab'
 import { useWorkOn } from '@/work/useWorkOn'
 import { usePalette } from '@/palette/usePalette'
 import { useSettings } from '@/settings/useSettings'
@@ -72,7 +73,7 @@ export interface SidebarProps {
   onOpenTarget?: (target: Target, opts: { newTab?: boolean }) => void
   /** Highlights the "Saved searches" entry. */
   queriesActive?: boolean
-  /** M32: highlights the "Notes" entry (the all-notes view). */
+  /** M32: highlights the "All notes" entry (the all-notes view). */
   notesActive?: boolean
   /** Highlights the "Calendar" entry. */
   calendarActive?: boolean
@@ -151,8 +152,11 @@ export const SEARCH_THIS_SPACE = 'Search this space'
 /** The sidebar entry for the Work page (M32: only while Work is on for the space). */
 export const WORK_LABEL = WORK
 
-/** M32: the sidebar's first entry, every note by last edited (the all-notes view). */
-export const NOTES_LABEL = NOTES
+/**
+ * M32: the sidebar's first entry, every note by last edited (the all-notes view). "All notes",
+ * so that it and the Note type's row under Types ("Notes") are two different words.
+ */
+export const NOTES_LABEL = ALL_NOTES
 
 /** The sidebar entry for the saved-search list (M32: was "Queries"). */
 export const QUERIES_LABEL = SAVED_SEARCHES
@@ -496,10 +500,15 @@ export function Sidebar({
             icon="ph-check-circle"
             label="Tasks"
             active={tasksActive}
-            onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
+            onClick={(e) => {
+              // The page opens on Today (plan item 9), not on the list used last.
+              openTasksOnToday()
+              onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })
+            }}
           />
         )}
-        {workOn && !tasksHidden && (
+        {/* While Work is on; "Hide Tasks in this space" hides the Tasks entry above, not this one. */}
+        {workOn && (
           <MainNavButton
             icon="ph-briefcase"
             label={WORK_LABEL}

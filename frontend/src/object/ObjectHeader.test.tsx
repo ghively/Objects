@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ObjectSummary } from '@/api/types'
 import { objectSummary, typeDef } from '@/test/mockApi'
 
@@ -13,7 +13,7 @@ import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, useTabs } from '@/nav/tabs'
 import { markFresh, resetFresh } from '@/create/freshObjects'
-import { ObjectHeader } from './ObjectHeader'
+import { ObjectHeader, TITLE_COMMIT_MS } from './ObjectHeader'
 
 const mocked = vi.mocked(api)
 const PAGE = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages' })
@@ -316,5 +316,160 @@ describe('ObjectHeader', () => {
     expect(title).toHaveFocus()
     fireEvent.keyDown(title, { key: 'Enter' })
     expect(title).not.toHaveFocus()
+  })
+})
+
+// The hands-on walk, W1 (Critical): a typed title was saved only on Enter, Tab or a click
+// elsewhere, so "New note", a title, and a closed window lost the title. The title is now kept
+// like the text: committed after a pause in typing, without disturbing the person.
+describe('a typed title is committed after a pause (W1)', () => {
+  beforeEach(() => vi.useFakeTimers())
+  afterEach(() => vi.useRealTimers())
+
+  const type = (title: HTMLElement, value: string) => fireEvent.change(title, { target: { value, selectionStart: value.length } })
+  const wait = (ms: number) => act(async () => vi.advanceTimersByTimeAsync(ms))
+
+  function mount(onRename: (title: string) => void | Promise<boolean> = vi.fn(), extra: Partial<Parameters<typeof ObjectHeader>[0]> = {}) {
+    const utils = render(<ObjectHeader summary={page()} type={PAGE} onRename={onRename} onPropertiesChange={vi.fn()} {...extra} />)
+    const title = screen.getByRole('textbox', { name: 'Title' }) as HTMLInputElement
+    act(() => title.focus())
+    return { ...utils, title }
+  }
+
+  test('test 2 s after the last key the title is committed once, with the focus and the selection where they were', async () => {
+    const onRename = vi.fn()
+    const { title } = mount(onRename)
+    type(title, 'Plans for May ')
+    title.setSelectionRange(2, 5)
+    await wait(TITLE_COMMIT_MS - 1)
+    expect(onRename).not.toHaveBeenCalled()
+    await wait(1)
+    expect(onRename).toHaveBeenCalledTimes(1)
+    expect(onRename).toHaveBeenCalledWith('Plans for May')
+    // Nothing about the field changed: the text as typed (the space too), the focus, the selection.
+    expect(title).toHaveFocus()
+    expect(title).toHaveValue('Plans for May ')
+    expect([title.selectionStart, title.selectionEnd]).toEqual([2, 5])
+    await wait(10_000)
+    expect(onRename).toHaveBeenCalledTimes(1)
+  })
+
+  test('test typing that goes on does not commit; the pause after it does', async () => {
+    const onRename = vi.fn()
+    const { title } = mount(onRename)
+    let text = ''
+    for (const ch of 'Plans for May') {
+      text += ch
+      type(title, text)
+      await wait(700) // 9 s of typing, never 2 s quiet
+    }
+    expect(onRename).not.toHaveBeenCalled()
+    await wait(TITLE_COMMIT_MS - 700)
+    expect(onRename).toHaveBeenCalledTimes(1)
+    expect(onRename).toHaveBeenCalledWith('Plans for May')
+  })
+
+  test('test keys typed while the rename is on its way are kept, and committed after the next pause', async () => {
+    let done!: (ok: boolean) => void
+    const onRename = vi.fn(() => new Promise<boolean>((r) => (done = r)))
+    const { title, rerender } = mount(onRename)
+    type(title, 'Plans')
+    await wait(TITLE_COMMIT_MS)
+    expect(onRename).toHaveBeenCalledWith('Plans')
+    type(title, 'Plans for May')
+    // The server's answer: the note is now called "Plans". The field's own text wins.
+    await act(async () => done(true))
+    rerender(<ObjectHeader summary={page({ title: 'Plans' })} type={PAGE} onRename={onRename} onPropertiesChange={vi.fn()} />)
+    expect(title).toHaveValue('Plans for May')
+    expect(title).toHaveFocus()
+    await wait(TITLE_COMMIT_MS)
+    expect(onRename).toHaveBeenCalledTimes(2)
+    expect(onRename).toHaveBeenLastCalledWith('Plans for May')
+  })
+
+  test.each([
+    ['an emptied title', ''],
+    ['a title of spaces', '   '],
+    ['the title it already has', 'Notes'],
+    ['the same title with spaces around it', '  Notes '],
+  ])('test %s is not committed by the timer', async (_name, value) => {
+    const onRename = vi.fn()
+    const { title } = mount(onRename)
+    type(title, value)
+    await wait(10_000)
+    expect(onRename).not.toHaveBeenCalled()
+    expect(title).toHaveValue(value) // the person may be retyping: the field is left alone
+  })
+
+  test('test a title the server refuses keeps the draft and is not sent again until it changes', async () => {
+    const onRename = vi.fn(async () => false)
+    const { title } = mount(onRename)
+    type(title, 'Taken')
+    await wait(TITLE_COMMIT_MS)
+    expect(onRename).toHaveBeenCalledTimes(1)
+    await wait(60_000)
+    expect(onRename).toHaveBeenCalledTimes(1)
+    expect(title).toHaveValue('Taken')
+    expect(title).toHaveFocus()
+    // A changed title is a new try.
+    type(title, 'Taken 2')
+    await wait(TITLE_COMMIT_MS)
+    expect(onRename).toHaveBeenCalledTimes(2)
+    expect(onRename).toHaveBeenLastCalledWith('Taken 2')
+  })
+
+  test('test the #tag picker open holds the commit; it follows once the tag is picked', async () => {
+    const onRename = vi.fn()
+    const { title } = mount(onRename)
+    fireEvent.change(title, { target: { value: 'Plans #do', selectionStart: 9 } })
+    await wait(10_000)
+    expect(onRename).not.toHaveBeenCalled()
+    fireEvent.keyDown(title, { key: 'Escape' })
+    type(title, 'Plans')
+    await wait(TITLE_COMMIT_MS)
+    expect(onRename).toHaveBeenCalledWith('Plans')
+  })
+
+  test('test an IME composition is never cut by the commit', async () => {
+    const onRename = vi.fn()
+    const { title } = mount(onRename)
+    fireEvent.compositionStart(title)
+    type(title, 'にほ')
+    await wait(10_000)
+    expect(onRename).not.toHaveBeenCalled()
+    fireEvent.compositionEnd(title)
+    type(title, '日本')
+    await wait(TITLE_COMMIT_MS)
+    expect(onRename).toHaveBeenCalledWith('日本')
+  })
+
+  test('test the view is told the title that waits, so it can commit it when the note is left', async () => {
+    const onDraft = vi.fn()
+    const { title } = mount(vi.fn(), { onDraft })
+    type(title, ' Plans ')
+    expect(onDraft).toHaveBeenLastCalledWith('Plans')
+    type(title, '')
+    expect(onDraft).toHaveBeenLastCalledWith(null)
+    type(title, 'Notes')
+    expect(onDraft).toHaveBeenLastCalledWith(null)
+  })
+
+  test('test a read-only note and a daily note commit nothing', async () => {
+    const onRename = vi.fn()
+    render(<ObjectHeader summary={page({ type: 'dailynote' })} type={DAILY} onRename={onRename} onPropertiesChange={vi.fn()} />)
+    const title = screen.getByRole('textbox', { name: 'Title' })
+    type(title, 'Other')
+    await wait(10_000)
+    expect(onRename).not.toHaveBeenCalled()
+  })
+
+  test('test a blur commits at once and the timer does not send it a second time', async () => {
+    const onRename = vi.fn()
+    const { title } = mount(onRename)
+    type(title, 'Plans')
+    act(() => title.blur())
+    expect(onRename).toHaveBeenCalledTimes(1)
+    await wait(10_000)
+    expect(onRename).toHaveBeenCalledTimes(1)
   })
 })

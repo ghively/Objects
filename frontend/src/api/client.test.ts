@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { ChangeEvent, TypeDef } from './types'
-import { api, ApiError, CLIENT_ID, ConfirmRequiredError, ConflictError, RevisionConflictError } from './client'
+import { api, ApiError, CLIENT_ID, ConfirmRequiredError, ConflictError, KEEPALIVE_MAX_BYTES, RevisionConflictError } from './client'
 
 function respond(status: number, body: unknown) {
   return vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
@@ -146,6 +146,9 @@ describe('api client v2 writes', () => {
       baseVersion: 'v1',
       clientId: CLIENT_ID,
     })
+    // M32 (W1): a title typed just before the window closes is committed on `pagehide`, so the
+    // request must be one the browser finishes after the page is gone.
+    expect((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].keepalive).toBe(true)
     expect(seen).toEqual([
       {
         kind: 'renamed',
@@ -328,5 +331,61 @@ describe('mockApi', () => {
     for (const fn of Object.values(mocked)) expect(vi.isMockFunction(fn)).toBe(true)
     const custom = mockApi({ trash: async () => [] })
     expect(vi.isMockFunction(custom.trash)).toBe(true)
+  })
+})
+
+// The M32 review, F2: a body save must be able to outlive the page whatever started it (a
+// pause, a blur, `pagehide`): on a close the first of them is the request in flight.
+describe('a body save outlives the page when it fits', () => {
+  const init = (m: ReturnType<typeof vi.fn>, i: number) => (m.mock.calls[i] as unknown as [string, RequestInit])[1]
+
+  // Each save announces itself a task later: let that pass before the next test listens.
+  afterEach(() => new Promise<void>((r) => setTimeout(r, 0)))
+
+  test('test saveBody sends a keepalive request', async () => {
+    const fetchMock = respond(200, { version: 'v2' })
+    vi.stubGlobal('fetch', fetchMock)
+    await api.saveBody('Pages/A.md', 'x', 'v1')
+    expect(fetchMock.mock.calls[0]).toEqual(['/api/object/body', expect.objectContaining({ method: 'PUT', keepalive: true })])
+  })
+
+  test('test a body over the keepalive limit goes as a normal request', async () => {
+    const fetchMock = respond(200, { version: 'v2' })
+    vi.stubGlobal('fetch', fetchMock)
+    const big = 'é'.repeat(KEEPALIVE_MAX_BYTES / 2) // 2 bytes each: the JSON is over the limit
+    await api.saveBody('Pages/A.md', big, 'v1')
+    expect(init(fetchMock, 0).keepalive).toBeUndefined()
+    expect(JSON.parse(String(init(fetchMock, 0).body)).body).toBe(big)
+    // The limit is on the bytes sent, not the characters: the same count of plain letters fits.
+    await api.saveBody('Pages/A.md', 'e'.repeat(KEEPALIVE_MAX_BYTES / 2), 'v2')
+    expect(init(fetchMock, 1).keepalive).toBe(true)
+  })
+
+  test('test saves in flight together stay inside the allowance, which a save gives back when it ends', async () => {
+    // The browser refuses a keepalive request that takes the ones in flight over 64 KiB.
+    const ends: ((r: Response) => void)[] = []
+    const fetchMock = vi.fn(() => new Promise<Response>((res) => ends.push(res)))
+    vi.stubGlobal('fetch', fetchMock)
+    const ok = () => new Response(JSON.stringify({ version: 'v2' }), { status: 200 })
+    const most = 'e'.repeat(KEEPALIVE_MAX_BYTES - 2000)
+    const first = api.saveBody('Pages/A.md', most, 'v1')
+    const second = api.saveBody('Pages/B.md', 'e'.repeat(4000), 'v1')
+    const third = api.saveBody('Pages/C.md', 'small', 'v1')
+    expect(init(fetchMock, 0).keepalive).toBe(true)
+    expect(init(fetchMock, 1).keepalive).toBeUndefined() // would go over with the first in flight
+    expect(init(fetchMock, 2).keepalive).toBe(true) // still fits beside the first
+    ends[0](ok())
+    await first
+    const fourth = api.saveBody('Pages/B.md', 'e'.repeat(4000), 'v1')
+    expect(init(fetchMock, 3).keepalive).toBe(true)
+    // A save that fails gives its share back too.
+    ends[3](new Response(JSON.stringify({ detail: { currentVersion: 'v9' } }), { status: 409 }))
+    await expect(fourth).rejects.toBeInstanceOf(ConflictError)
+    const fifth = api.saveBody('Pages/A.md', most, 'v1')
+    expect(init(fetchMock, 4).keepalive).toBe(true)
+    ends[1](ok())
+    ends[2](ok())
+    ends[4](ok())
+    await Promise.all([second, third, fifth])
   })
 })

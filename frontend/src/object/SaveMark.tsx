@@ -3,8 +3,9 @@
  * editor publishes (`editor/saveStateStore`): "Saving…" while edits wait for a save or one runs,
  * then "Saved", which fades to the check alone after a moment. A note nobody typed in shows
  * nothing, and a failed save shows nothing new here (the editor's own "Changes not saved.
- * Retrying…" stays). A polite live region, so a screen reader hears the change without losing
- * its place.
+ * Retrying…" stays, and is announced there). Only "Saved" sits in a polite live region: a screen
+ * reader hears that the words are safe without losing its place, and is not told "Saving…" every
+ * few seconds while typing (it can still be read where it is).
  */
 import { useEffect, useState } from 'react'
 import { Icon } from '@/components/Icon'
@@ -43,21 +44,23 @@ export function SaveMark({ path, className }: { path: string; className?: string
     <span
       data-save-mark={busy ? 'saving' : saved ? 'saved' : ''}
       data-quiet={saved ? String(quiet) : undefined}
-      aria-live="polite"
       // Stays while the toolbar's buttons fade for typing (`focus/TypingFade`).
       data-typing-stay=""
       className={cn('flex h-10 shrink-0 items-center gap-1 px-1 text-[13px] whitespace-nowrap text-fg-muted select-none', className)}
     >
       {busy && SAVE_MARK_TEXT.saving}
-      {saved && (
-        <>
-          <Icon name="ph-check" size={14} />
-          {/* Faded, not removed: the word stays in the live region. */}
-          <span className={cn('overflow-hidden transition-[max-width,opacity] duration-500', quiet ? 'max-w-0 opacity-0' : 'max-w-[4em]')}>
-            {SAVE_MARK_TEXT.saved}
-          </span>
-        </>
-      )}
+      {/* Always there, so "Saved" arriving in it is a change a screen reader announces. */}
+      <span aria-live="polite" className="flex items-center gap-1">
+        {saved && (
+          <>
+            <Icon name="ph-check" size={14} />
+            {/* Faded, not removed: the word stays in the live region. */}
+            <span className={cn('overflow-hidden transition-[max-width,opacity] duration-500', quiet ? 'max-w-0 opacity-0' : 'max-w-[4em]')}>
+              {SAVE_MARK_TEXT.saved}
+            </span>
+          </>
+        )}
+      </span>
     </span>
   )
 }

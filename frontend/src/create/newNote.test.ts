@@ -67,6 +67,34 @@ describe('newNote (M32)', () => {
     expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain(NEW_NOTE_FAILED)
   })
 
+  // The M32 review, F4: a double click on "New" wrote Untitled.md and Untitled (2).md.
+  test('test a second ask while a note is being made makes no second note', async () => {
+    let made!: (r: { path: string; version: string }) => void
+    mocked.createObject.mockImplementationOnce(() => new Promise((r) => (made = r)))
+    const first = newNote()
+    const second = newNote()
+    const third = newNote({ ctrlKey: true }, 'task')
+    expect(second).toBe(first)
+    expect(third).toBe(first)
+    expect(mocked.createObject).toHaveBeenCalledTimes(1)
+    made({ path: 'Pages/Untitled.md', version: 'v1' })
+    await first
+    expect(useTabs.getState().tabs).toHaveLength(1)
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'object', path: 'Pages/Untitled.md' })
+    // Once it is made, "New" makes the next one.
+    mocked.createObject.mockResolvedValueOnce({ path: 'Pages/Untitled (2).md', version: 'v1' })
+    await newNote()
+    expect(mocked.createObject).toHaveBeenCalledTimes(2)
+  })
+
+  test('test a failed create does not block the next one', async () => {
+    mocked.createObject.mockRejectedValueOnce(new Error('The space is read-only.'))
+    await newNote()
+    mocked.createObject.mockResolvedValueOnce({ path: 'Pages/Untitled.md', version: 'v1' })
+    await newNote()
+    expect(mocked.createObject).toHaveBeenCalledTimes(2)
+  })
+
   test('test suggestFor with last: false leaves the last type out (the palette makes a Note)', () => {
     useLastType.getState().set('task')
     expect(suggestFor('Fresh idea', [PAGE, TASK])).toEqual(['task'])

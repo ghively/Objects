@@ -13,7 +13,7 @@ Object is a place to write notes and keep track of what you have to do. Your not
 
 ## Finding your way around
 
-**Home** is what an empty tab shows: **New note**, **Today's note**, the notes you edited last and the tasks due today. In the sidebar, **Notes** lists everything you wrote, newest first; **Calendar** shows your days, with each day's note and tasks; **Tasks** is your task list.
+**Home** is what an empty tab shows: **New note**, **Today's note**, the notes you edited last and the tasks due today. In the sidebar, **All notes** lists everything you wrote, newest first; **Calendar** shows your days, with each day's note and tasks; **Tasks** is your task list.
 
 A note that is linked from elsewhere lists those places under it, along with unlinked mentions: places that name the note without a link yet. Renaming a note updates the links to it.
 

@@ -16,6 +16,7 @@ import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { agent } from '@/test/mockApi'
 import { setWorkOn } from '@/test/workOn'
+import { readTasksTab, writeTasksTab } from '@/tasks/tasksTab'
 import { Sidebar } from './Sidebar'
 
 const mocked = vi.mocked(api)
@@ -42,7 +43,7 @@ describe('Sidebar Tasks and Work entries (M32)', () => {
     render(<Sidebar types={[]} />)
     await waitFor(() => expect(useSpaceInfo.getState().space).not.toBeNull())
     expect(workButton()).toBeNull()
-    expect(mainNames().slice(0, 4)).toEqual(['Notes', 'Calendar', 'Tasks', 'Graph'])
+    expect(mainNames().slice(0, 4)).toEqual(['All notes', 'Calendar', 'Tasks', 'Graph'])
   })
 
   test('test Work shows directly under Tasks while Work is on, and opens the work target', async () => {
@@ -51,7 +52,7 @@ describe('Sidebar Tasks and Work entries (M32)', () => {
     const user = userEvent.setup()
     render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
     await waitFor(() => expect(workButton()).not.toBeNull())
-    expect(mainNames().slice(0, 5)).toEqual(['Notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
+    expect(mainNames().slice(0, 5)).toEqual(['All notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
     await user.click(workButton()!)
     expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'work' }, { newTab: false })
     await user.keyboard('{Control>}')
@@ -111,12 +112,27 @@ describe('Sidebar Tasks and Work entries (M32)', () => {
     render(<Sidebar types={[]} />)
     await waitFor(() => expect(useSpaceInfo.getState().space?.hideTaskManagement).toBe(true))
     expect(within(main()).queryByRole('button', { name: 'Tasks' })).toBeNull()
-    expect(workButton()).toBeNull()
+    // The setting hides Tasks, not Work: the Work entry stays where it is (the fix pass, F12).
+    expect(workButton()).not.toBeNull()
     // The rest of the main entries are untouched (decision 1: AI stays where it is).
-    expect(mainNames().slice(0, 3)).toEqual(['Notes', 'Calendar', 'Graph'])
-    // The switch off again: both are back, without a reload.
+    expect(mainNames().slice(0, 4)).toEqual(['All notes', 'Calendar', 'Work', 'Graph'])
+    // The switch off again: Tasks is back, without a reload.
     act(() => useSpaceInfo.setState((st) => ({ space: st.space && { ...st.space, hideTaskManagement: false } })))
-    expect(mainNames().slice(0, 5)).toEqual(['Notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
+    expect(mainNames().slice(0, 5)).toEqual(['All notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
+  })
+
+  // The walk's W14: the Tasks entry opens the page on Today, not on the list used last.
+  test('test the Tasks entry asks for Today: the list remembered for the space is let go', async () => {
+    const user = userEvent.setup()
+    const onOpenTarget = vi.fn()
+    render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
+    await waitFor(() => expect(useSpaceInfo.getState().space).not.toBeNull())
+    const root = useSpaceInfo.getState().space!.root
+    writeTasksTab(root, 'inbox')
+    expect(readTasksTab(root)).toBe('inbox')
+    await user.click(tasksButton()!)
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'tasks' }, { newTab: false })
+    expect(readTasksTab(root)).toBeNull()
   })
 
   test('test Tasks shows while AI features are hidden', () => {

@@ -6,12 +6,15 @@
  * note" button, Home's, the palette's "Pop out today's daily note" and Ctrl+Shift+D.
  *
  * M32: it asks for the caret at the end of the note's text (`nav/focusRequest`; the note's editor
- * takes the request when it is ready), so the next key typed lands in today's note.
+ * takes the request when it is ready), so the next key typed lands in today's note. Asked for
+ * while the note is already popped out, or is the page in view, the caret goes to the end of the
+ * text that is open, at once: no request is left behind for a later opening to take.
  */
 import { showToast } from '@/editor/media/upload'
 import { invalidateLinkIndex } from '@/links/linkIndex'
 import { requestBodyFocus } from '@/nav/focusRequest'
-import { usePeek } from '@/nav/tabs'
+import { currentTarget, usePeek, useTabs } from '@/nav/tabs'
+import { focusBody } from '@/object/bodyCaret'
 import { ensureDailyNote } from '@/palette/paste'
 import { todayYmd } from './dates'
 
@@ -21,10 +24,23 @@ export const TODAYS_NOTE_TEXT = {
   failed: "Couldn't open today's daily note.", // our string
 } as const
 
+/** The view (`peek` or `page`) showing the note at `path` now, or null. */
+function openViewOf(path: string, mode: 'peek' | 'page'): Element | null {
+  for (const view of document.querySelectorAll(`[data-object-view="${mode}"]`)) {
+    for (const el of view.querySelectorAll('[data-object-path]')) if (el.getAttribute('data-object-path') === path) return view
+  }
+  return null
+}
+
 export async function openTodaysNote(day: string = todayYmd()): Promise<string | null> {
   try {
     const path = await ensureDailyNote(day)
     void invalidateLinkIndex()
+    // Already open: the caret goes to the end of the text where it is shown (the pop-out first).
+    const inPeek = usePeek.getState().path === path
+    const target = currentTarget(useTabs.getState())
+    const isPage = usePeek.getState().path === null && target?.kind === 'object' && target.path === path
+    if ((inPeek || isPage) && focusBody(openViewOf(path, inPeek ? 'peek' : 'page'), 'end')) return path
     requestBodyFocus(path, 'end')
     // The pop-out is an explicit peek: it stays one while "Open notes as a full page" is on.
     usePeek.getState().show(path)

@@ -43,13 +43,13 @@ describe('new targets', () => {
     await waitFor(() => expect(within(strip).getByText('Open pages')).toBeInTheDocument())
     useTabs.getState().open({ kind: 'query', id: 'auto' })
     // An uncustomised query's tab shows its automatic title, as its page does.
-    await waitFor(() => expect(within(strip).getByText(/^(Pages|Notes)$/)).toBeInTheDocument())
+    await waitFor(() => expect(within(strip).getByText('Notes')).toBeInTheDocument())
     expect(within(strip).queryByText('New Query')).toBeNull()
-    // M32: the tabs read "Saved searches" and "Notes".
+    // M32: the tabs read "Saved searches" and "All notes".
     useTabs.getState().open({ kind: 'queries' })
     await waitFor(() => expect(within(strip).getByText('Saved searches')).toBeInTheDocument())
     useTabs.getState().open({ kind: 'allNotes' })
-    await waitFor(() => expect(within(strip).getByText('Notes')).toBeInTheDocument())
+    await waitFor(() => expect(within(strip).getByText('All notes')).toBeInTheDocument())
 
     await user.click(screen.getByRole('button', { name: /back/i }))
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'queries' })

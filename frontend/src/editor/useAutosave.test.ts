@@ -6,8 +6,8 @@ vi.mock('@/api/client', async (orig) => ({
   api: (await import('@/test/mockApi')).mockApi(),
 }))
 
-import { api, CLIENT_ID, ConflictError } from '@/api/client'
-import { AUTOSAVE_DELAY_MS, AUTOSAVE_MAX_WAIT_MS, KEEPALIVE_MAX_BYTES, useAutosave } from './useAutosave'
+import { api, ConflictError } from '@/api/client'
+import { AUTOSAVE_DELAY_MS, AUTOSAVE_MAX_WAIT_MS, useAutosave } from './useAutosave'
 
 type Call = [path: string, body: string, version: string]
 
@@ -323,8 +323,10 @@ describe('saving you can trust (M32)', () => {
     expect(saves.calls).toHaveLength(1)
   })
 
-  test('test pagehide saves at once with a keepalive request', async () => {
-    const net = deferredFetch()
+  // The request itself (a keepalive one whenever the text fits) is `api.saveBody`'s, and is
+  // checked against the real client in `useAutosave.keepalive.test.ts` and `api/client.test.ts`.
+  test('test pagehide saves at once', async () => {
+    const saves = deferredSaves()
     const onSaved = vi.fn()
     let body: string | null = 'A0'
     const { result } = hook(() => body, { onSaved })
@@ -334,37 +336,31 @@ describe('saving you can trust (M32)', () => {
     await act(async () => {
       window.dispatchEvent(new Event('pagehide'))
     })
-    expect(api.saveBody).not.toHaveBeenCalled()
-    expect(net.calls).toHaveLength(1)
-    expect(net.calls[0].url).toBe('/api/object/body')
-    expect(net.calls[0].init).toMatchObject({
-      method: 'PUT',
-      keepalive: true,
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    })
-    expect(JSON.parse(String(net.calls[0].init.body))).toEqual({ path: 'a.md', body: 'A1', baseVersion: 'v0', clientId: CLIENT_ID })
+    expect(saves.calls).toEqual([['a.md', 'A1', 'v0']])
     expect(result.current.saveState).toBe('saving')
     expect(result.current.isPending()).toBe(false) // the timed save was dropped: one request, not two
     // The page lived on (a false alarm, or it came back): the answer is taken like any save's.
     await act(async () => {
-      net.answer(0, 200, { version: 'v1' })
+      saves.release(0)
     })
     await settleMicrotasks()
     expect(onSaved).toHaveBeenCalledWith('v1')
     expect(result.current.saveState).toBe('saved')
     expect(result.current.isDirty()).toBe(false)
-    // The next save builds on the version the keepalive save returned.
-    const saves = deferredSaves()
+    // The next save builds on the version that save returned.
     body = 'A2'
     await act(async () => {
       void result.current.flush()
     })
-    expect(saves.calls).toEqual([['a.md', 'A2', 'v1']])
+    expect(saves.calls).toEqual([
+      ['a.md', 'A1', 'v0'],
+      ['a.md', 'A2', 'v1'],
+    ])
   })
 
   test('test pagehide keeps the unsaved text for the next open until its save lands', async () => {
     const { keptUnsaved } = await import('./unsaved')
-    const net = deferredFetch()
+    const saves = deferredSaves()
     let body: string | null = 'A0'
     const { result } = hook(() => body, { objectId: 'id-a' })
     act(() => result.current.markLoaded('A0', 'v0'))
@@ -374,28 +370,14 @@ describe('saving you can trust (M32)', () => {
     })
     expect(keptUnsaved('a.md', 'id-a')).toBe('A1')
     await act(async () => {
-      net.answer(0, 200, { version: 'v1' })
+      saves.release(0)
     })
     await settleMicrotasks()
     expect(keptUnsaved('a.md', 'id-a')).toBeNull()
   })
 
-  test('test pagehide with a body over the keepalive limit uses the normal request', async () => {
-    const net = deferredFetch()
-    const saves = deferredSaves()
-    const big = 'é'.repeat(KEEPALIVE_MAX_BYTES / 2) // 2 bytes each: the JSON is over the limit
-    const body: string | null = big
-    const { result } = hook(() => body)
-    act(() => result.current.markLoaded('A0', 'v0'))
-    await act(async () => {
-      window.dispatchEvent(new Event('pagehide'))
-    })
-    expect(net.calls).toHaveLength(0)
-    expect(saves.calls).toEqual([['a.md', big, 'v0']])
-  })
-
   test('test a conflict answered to the pagehide save pauses saving and reports it', async () => {
-    const net = deferredFetch()
+    vi.mocked(api.saveBody).mockRejectedValueOnce(new ConflictError('v9'))
     const onConflict = vi.fn()
     let body: string | null = 'A0'
     const { result } = hook(() => body, { onConflict })
@@ -404,9 +386,6 @@ describe('saving you can trust (M32)', () => {
     await act(async () => {
       window.dispatchEvent(new Event('pagehide'))
     })
-    await act(async () => {
-      net.answer(0, 409, { currentVersion: 'v9' })
-    })
     await settleMicrotasks()
     expect(onConflict).toHaveBeenCalledWith('v9')
     expect(result.current.saveState).toBe('unsaved')
@@ -414,12 +393,11 @@ describe('saving you can trust (M32)', () => {
     await act(async () => {
       await result.current.flush()
     })
-    expect(net.calls).toHaveLength(1)
-    expect(api.saveBody).not.toHaveBeenCalled()
+    expect(api.saveBody).toHaveBeenCalledTimes(1)
   })
 
   test('test the document becoming hidden saves at once', async () => {
-    const net = deferredFetch()
+    const saves = deferredSaves()
     let body: string | null = 'A0'
     const { result } = hook(() => body)
     act(() => result.current.markLoaded('A0', 'v0'))
@@ -429,24 +407,22 @@ describe('saving you can trust (M32)', () => {
     await act(async () => {
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    expect(net.calls).toHaveLength(0)
+    expect(saves.calls).toHaveLength(0)
     setVisibility('hidden')
     await act(async () => {
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    expect(net.calls).toHaveLength(1)
-    expect(JSON.parse(String(net.calls[0].init.body))).toMatchObject({ path: 'a.md', body: 'A1', baseVersion: 'v0' })
+    expect(saves.calls).toEqual([['a.md', 'A1', 'v0']])
     // Closing a window says hidden, then pagehide: still one request.
     await act(async () => {
       window.dispatchEvent(new Event('pagehide'))
     })
-    expect(net.calls).toHaveLength(1)
+    expect(saves.calls).toHaveLength(1)
     await act(async () => {
-      net.answer(0, 200, { version: 'v1' })
+      saves.release(0)
     })
     await settleMicrotasks()
-    expect(net.calls).toHaveLength(1)
-    expect(api.saveBody).not.toHaveBeenCalled()
+    expect(saves.calls).toHaveLength(1)
     expect(result.current.saveState).toBe('saved')
   })
 

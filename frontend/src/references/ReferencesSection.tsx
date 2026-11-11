@@ -16,7 +16,7 @@
  * heading) is remembered per object and wins over the defaults. Backlinks render in "Backlink
  * content view" and nested ones per "How nested backlinks show at first".
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ObjectSummary, References, ReferencesTab, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { cn } from '@/lib/utils'
@@ -39,6 +39,7 @@ import {
   type ReferencesSettings,
   type ReferencesUi,
 } from './referencesUi'
+import { clearReferenceCounts, publishReferenceCounts, useReferencesTabAsk } from './referenceCounts'
 import { useReferences, type ReloadOptions } from './useReferences'
 
 export interface ReferencesSectionProps {
@@ -67,6 +68,36 @@ export function ReferencesSection({ path, summary }: ReferencesSectionProps) {
   }, [path])
 
   const tabs = useMemo(() => (data ? visibleTabs(data.tabs, settings, summary.type) : []), [data, settings, summary.type])
+
+  // The M32 walk's W10: the note's header shows a quiet count of what is down here (the section
+  // sits below the window on most notes). It reads these numbers: nothing is fetched twice. A tab
+  // the settings hide is not counted (there would be nothing to open).
+  const backlinkCount = data && tabs.includes('backlinks') ? data.backlinks.length : 0
+  const mentionCount = data && tabs.includes('mentions') ? data.mentions.length : 0
+  const hasData = !!data
+  useEffect(() => {
+    if (hasData) publishReferenceCounts(path, { backlinks: backlinkCount, mentions: mentionCount })
+  }, [path, hasData, backlinkCount, mentionCount])
+  useEffect(() => () => clearReferenceCounts(path), [path])
+
+  // A click on the header's count asks for a tab: open it (also when the section was closed),
+  // bring the section into view and put the focus on the tab.
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const ask = useReferencesTabAsk(path)
+  const answered = useRef(ask?.n ?? 0)
+  useEffect(() => {
+    if (!ask || ask.n === answered.current || !tabs.includes(ask.tab)) return
+    answered.current = ask.n
+    setSaved((now) => {
+      const next: ReferencesUi = { ...(now ?? defaultReferencesUi(tabs, settings)), tab: ask.tab, closed: false }
+      saveReferencesUi(key, next)
+      return next
+    })
+    const section = sectionRef.current
+    section?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
+    section?.querySelector<HTMLElement>(`[data-tab="${ask.tab}"]`)?.focus({ preventScroll: true })
+  }, [ask, tabs, settings, key])
+
   if (!data || tabs.length === 0) return null
 
   const ui: ReferencesUi = saved ?? defaultReferencesUi(tabs, settings)
@@ -85,7 +116,7 @@ export function ReferencesSection({ path, summary }: ReferencesSectionProps) {
   }
 
   return (
-    <section data-references-section="" aria-label="References" className="mt-10 flex flex-col gap-3 pb-6">
+    <section ref={sectionRef} data-references-section="" aria-label="References" className="mt-10 flex flex-col gap-3 pb-6">
       <div role="tablist" aria-label="References" className="flex flex-wrap items-center gap-1">
         {tabs.map((tab) => {
           const meta = TAB_META[tab]

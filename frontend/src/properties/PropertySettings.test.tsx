@@ -100,7 +100,7 @@ describe('PropertySettings', () => {
     expect(api.saveType).not.toHaveBeenCalled()
     expect(screen.getByText(/Links that no longer fit the rules above/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Apply changes' }))
-    expect(await screen.findByText(/^3 (objects|notes) will change\.$/)).toBeInTheDocument()
+    expect(await screen.findByText('3 notes will change.')).toBeInTheDocument()
     expect(screen.getByText('Links that break the rules will be removed.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() => expect(api.saveType).toHaveBeenCalledTimes(2))

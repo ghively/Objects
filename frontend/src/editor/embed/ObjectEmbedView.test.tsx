@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { Editor as TiptapEditor } from '@tiptap/core'
 import { EditorContent } from '@tiptap/react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -17,6 +19,7 @@ vi.mock('@/create/createAndOpen', async (orig) => ({
 import { api } from '@/api/client'
 import { openObject } from '@/create/createAndOpen'
 import { resetLinkIndex } from '@/links/linkIndex'
+import { TASK_TYPE } from '@/tasks/taskFixtures'
 import { editorExtensions, loadBody, serializeBody } from '../document'
 import { EMBED_VIEWS, embedViewOf } from './ObjectEmbedView'
 
@@ -168,6 +171,56 @@ describe('ObjectEmbedView', () => {
     expect(chip).toHaveClass('wikilink-unresolved')
     expect(mocked.rows).not.toHaveBeenCalled()
     expect(serializeBody(editor)).toBe(body)
+  })
+
+  // The walk's W6: a task embedded in a note (the row Ctrl+Shift+T leaves). Its hover toolbar
+  // drew over the title, and a ticked one was not struck through as it is in the lists.
+  describe('a task embedded in a note', () => {
+    const TASK = objectSummary({ path: 'Tasks/Call Pat.md', type: 'task', title: 'Call Pat' })
+    const css = (file: string) => readFileSync(join(__dirname, '..', '..', file), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+
+    async function embedded(status: string) {
+      setup([typeDef({ id: 'page' }), TASK_TYPE])
+      mocked.objects.mockResolvedValue([TASK, PAGE])
+      mocked.resolve.mockImplementation(async (link: string) => (link === 'Call Pat' ? TASK.path : null))
+      mocked.rows.mockImplementation(async () => [row({ summary: TASK, values: { status: [status] } })])
+      await mount('Before\n\n<!-- block: view=inline -->\n![[Call Pat]]\n')
+      return screen.findByTestId('object-embed-task')
+    }
+
+    test('test a ticked task is marked done beside its title, and tasks.css strikes that title', async () => {
+      const task = await embedded('Done')
+      // What the rule in tasks.css selects: the row's own checkbox says done, the title follows it.
+      const tick = within(task).getByRole('checkbox')
+      expect(tick).toHaveAttribute('aria-checked', 'true')
+      expect(tick.closest('[data-task-done]')?.parentElement).toBe(task)
+      const title = within(task).getByText('Call Pat')
+      expect(title).toHaveClass('truncate')
+      expect(title.closest('button')?.parentElement).toBe(task)
+      const rules = css('tasks/tasks.css')
+      expect(rules).toContain('.object-embed-task:has(> [data-task-done]) > button .truncate')
+      expect(rules).toContain('text-decoration: line-through')
+    })
+
+    test('test an open task is not marked done', async () => {
+      const task = await embedded('Next Up')
+      expect(within(task).getByRole('checkbox')).toHaveAttribute('aria-checked', 'false')
+      expect(task.querySelector('[data-task-done]')).toBeNull()
+    })
+
+    test('test the hover toolbar of a one-line row stands above the row, clear of its title', async () => {
+      await embedded('Next Up')
+      const embed = screen.getByTestId('object-embed')
+      expect(embed).toHaveAttribute('data-view', 'inline')
+      expect(embed.querySelector('.resizable-embed-toolbar')).not.toBeNull()
+      // The rule that moves it (jsdom lays nothing out; the live check measures the two boxes).
+      const rules = css('editor/nodes/objectEmbed.css')
+      const at = rules.indexOf(".object-editor .object-embed[data-view='inline'] .resizable-embed-frame > .resizable-embed-toolbar {")
+      expect(at).toBeGreaterThan(-1)
+      const rule = rules.slice(at, rules.indexOf('}', at))
+      expect(rule).toContain('bottom: calc(100% + 2px)')
+      expect(rule).toContain('top: auto')
+    })
   })
 
   test('alignment writes align on the embed', async () => {

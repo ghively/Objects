@@ -12,8 +12,8 @@ import { CollectionPage } from '@/collections/CollectionPage'
 import { QueriesPage } from '@/queries/QueriesPage'
 import { QueryPage } from '@/queries/QueryPage'
 import { LinkPicker } from '@/links/LinkPicker'
-import { invalidateLinkIndex, refreshLinkIndex, useLinkIndex } from '@/links/linkIndex'
-import { moveUnsaved, setUnsavedSpace } from '@/editor/unsaved'
+import { ensureLinkIndex, invalidateLinkIndex, refreshLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { forgetSaved, moveUnsaved, setUnsavedSpace, takeRenamedAway } from '@/editor/unsaved'
 import { setLastTypeSpace } from '@/create/lastType'
 import { setRecentSpace } from '@/nav/recent'
 import { isSidepanelShown } from '@/nav/sidepanel'
@@ -102,15 +102,15 @@ function countsByType(s: { objects: ObjectSummary[]; loaded: boolean }): Record<
 export { isEditableTarget }
 
 /**
- * The type the new-note key makes: the open type, else the open note's type, else a Note (M32:
- * never the last type made). A daily note is made by its date, so from one the key makes a Note.
+ * The type the new-note key makes: a Note, as the "New" button does (M32: never the last type
+ * made). One exception: on a type's own page, where its notes are listed, it makes one more of
+ * that type, as that page's own "New" button does. On a single note's or task's page it makes a
+ * Note (the walk's W5: it made a Task on a task's page). A daily note is made by its date, so on
+ * the Daily notes page the key makes a Note too.
  */
 function currentTypeId(types: TypeDef[]): string {
   const target = currentTarget(useTabs.getState())
-  let id: string | undefined
-  if (target?.kind === 'type' || target?.kind === 'typeSettings') id = target.typeId
-  else if (target?.kind === 'object') id = useLinkIndex.getState().objects.find((o) => o.path === target.path)?.type
-  const type = id ? types.find((x) => x.id === id) : undefined
+  const type = target?.kind === 'type' ? types.find((x) => x.id === target.typeId) : undefined
   return type && !isDailyNoteType(type) ? type.id : noteTypeId(types)
 }
 
@@ -181,9 +181,12 @@ function pageFor(target: Target, { types, space, open, workOn, tasksHidden }: Pa
     case 'work':
       // M23's Work page (the dashboard), on its view. M32: only while Work is on for this space;
       // off, a work target (a restored tab, an old link) shows the Tasks page, on the list that
-      // stands for the view it named (`{view: 'today'}` → Today, `inbox` → Inbox…).
-      if (tasksHidden) return <TasksHidden />
-      return workOn ? <WorkPage view={target.view} /> : <TasksPage list={tasksListForWorkView(target.view)} />
+      // stands for the view it named (`{view: 'today'}` → Today, `inbox` → Inbox…). "Hide Tasks
+      // in this space" hides Tasks, not Work: with Work on the dashboard stays and leaves its own
+      // task lists out (M23's rule, `WorkPage`); with Work off the target is the Tasks page,
+      // which the setting hides.
+      if (workOn) return <WorkPage view={target.view} />
+      return tasksHidden ? <TasksHidden /> : <TasksPage list={tasksListForWorkView(target.view)} />
     case 'spaceHistory':
       // 2026-11-08: the space's git history and "Restore space to this point".
       return (
@@ -226,8 +229,24 @@ export default function App() {
     fetchSpace()
       .then(async (s) => {
         setUnsavedSpace(s.root)
+        // Text a closed window kept while its save was still on its way: what the file now holds
+        // is forgotten here, so it is not offered as unsaved later (`editor/unsaved.ts`).
+        void forgetSaved(async (path) => {
+          const d = await api.object(path)
+          return { body: d.body, id: d.summary.id ?? null }
+        })
         await Promise.all([setTabsSpace(s.root), setRecentSpace(s.root), setLastTypeSpace(s.root), settingsReady])
         if (!live) return
+        // A title committed as the last window closed moved its note's file after that page was
+        // gone: the tabs it left still name the old path. They follow the note, found by its id.
+        void ensureLinkIndex()
+          .then(() => {
+            for (const [oldPath, path] of takeRenamedAway(useLinkIndex.getState().objects)) {
+              useTabs.getState().retarget(oldPath, path)
+              moveUnsaved(oldPath, path)
+            }
+          })
+          .catch(() => undefined)
         // "When this space opens" (per space, on this device).
         applyOpenOnStart(useSettings.getState().settings.openOnStart?.[s.root])
         // "Show the sidebar when Object opens" (Appearance); off starts with it collapsed.
@@ -282,11 +301,12 @@ export default function App() {
   const types = useSpaceTypes(space)
   // M32: the Work page, its toasts and its overlays exist only while Work is on for this space.
   const workOn = useWorkOn()
-  // M32: "Hide Tasks in this space" hides the Tasks and Work entries, pages, toasts and overlays.
+  // M32: "Hide Tasks in this space" hides the Tasks entry and page (not Work: the dashboard stays).
   const tasksHidden = useTasksHidden()
 
   // Shortcuts (their keys are in `lib/shortcuts.ts`): the New menu (Ctrl+U, Alt+Shift+N), a new
-  // note, or one more of the type in view (Ctrl+N, Alt+N), and Ctrl+Backspace "Delete this …?".
+  // note, or on a type's page one more of that type (Ctrl+N, Alt+N), and Ctrl+Backspace "Delete
+  // this …?". A key held down acts once: its repeats are swallowed and make nothing more.
   // M32: the two "new" keys also work with the caret in a note's text or title (`newKeyAllowed`
   // keeps each key's own editing meaning); Delete stays out of editable elements, where
   // Ctrl+Backspace deletes a word.
@@ -300,12 +320,14 @@ export default function App() {
       if (matches(e, keysFor('openAddEntityMenu'))) {
         if (!newKeyAllowed('openAddEntityMenu', e)) return
         e.preventDefault()
+        if (e.repeat) return
         // What gets made opens in the tab: a note popped out over it steps aside.
         usePeek.getState().close()
         setNewMenuOpen(true)
       } else if (matches(e, keysFor('createNewEntityOfType'))) {
         if (!newKeyAllowed('createNewEntityOfType', e)) return
         e.preventDefault()
+        if (e.repeat) return
         usePeek.getState().close()
         void newNote({}, currentTypeId(typesRef.current))
       } else if (matches(e, keysFor('deleteCurrentPage'))) {
@@ -427,9 +449,9 @@ export default function App() {
         />
         <LinkPicker />
         {/* M23: the work toasts (problems and Undo) and the focus session / Make it smaller, once.
-            M32: only while Work is on for this space. */}
-        {workOn && !tasksHidden && <WorkToasts />}
-        {workOn && !tasksHidden && <WorkOverlays />}
+            M32: only while Work is on for this space ("Hide Tasks" leaves them: it hides Tasks). */}
+        {workOn && <WorkToasts />}
+        {workOn && <WorkOverlays />}
         <NewObjectMenu open={newMenuOpen} onOpenChange={setNewMenuOpen} />
         <CreateTypeDialog
           open={createTypeOpen}

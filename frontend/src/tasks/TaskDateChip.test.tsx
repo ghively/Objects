@@ -96,6 +96,48 @@ describe('TaskDateChip', () => {
     await waitFor(() => expect(screen.queryByTestId('date-picker')).toBeNull())
   })
 
+  // The walk's W7: "Pick a date" opened with the focus on the page, so typing "friday" did nothing.
+  test('test Pick a date opens with the caret in the date field, its text selected: typing a date and Enter sets it', async () => {
+    const user = userEvent.setup()
+    mocked.rows.mockResolvedValue([])
+    render(<TaskDateChip row={taskRow('Tasks/A.md', { date: day('2026-10-23') }, 'v1')} type={TASK_TYPE} today={TODAY} />)
+    await user.click(screen.getByTestId('task-date'))
+    await user.click(await screen.findByRole('menuitem', { name: 'Pick a date' }))
+    const picker = await screen.findByTestId('date-picker')
+    const field = within(picker).getByRole<HTMLInputElement>('textbox', { name: 'Starts' })
+    await waitFor(() => expect(field).toHaveFocus())
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, field.value.length])
+    // No click in the field: the words replace the date shown.
+    await user.keyboard('friday{Enter}')
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/A.md', { date: day('2026-10-30') }, 'v1'))
+    await waitFor(() => expect(screen.queryByTestId('date-picker')).toBeNull())
+  })
+
+  // The M32 review, F8: the picker says it is a menu, so it answers a menu's keys.
+  test('test the arrow keys move through the date menu, Home and End jump, and Enter picks', async () => {
+    const user = userEvent.setup()
+    mocked.rows.mockResolvedValue([])
+    render(<TaskDateChip row={taskRow('Tasks/A.md', { date: day('2026-10-23') }, 'v1')} type={TASK_TYPE} today={TODAY} />)
+    await user.click(screen.getByTestId('task-date'))
+    const menu = await screen.findByRole('menu', { name: 'Date' })
+    const item = (name: string) => within(menu).getByRole('menuitem', { name })
+    await waitFor(() => expect(item('Today')).toHaveFocus())
+    await user.keyboard('{ArrowDown}')
+    expect(item('Tomorrow')).toHaveFocus()
+    await user.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}')
+    expect(item('Pick a date')).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(item('Today')).toHaveFocus() // round to the top
+    await user.keyboard('{ArrowUp}')
+    expect(item('Pick a date')).toHaveFocus()
+    await user.keyboard('{Home}')
+    expect(item('Today')).toHaveFocus()
+    await user.keyboard('{End}{ArrowUp}{ArrowUp}')
+    expect(item('Next week')).toHaveFocus()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/A.md', { date: day('2026-11-02') }, 'v1'))
+  })
+
   test('a 409 reloads the row and reports the conflict; a read-only task has no picker', async () => {
     const user = userEvent.setup()
     const onResult = vi.fn()
