@@ -482,7 +482,9 @@ Each starter template pre-fills the new type's properties.
 - **Save mark** (M32): in a note's toolbar (page and peek), left of its buttons: "Saving…" while typed text waits
   for its save or a save runs, then a check and "Saved", which fades to the check alone after two seconds. A note
   nobody typed in shows nothing. A failed save keeps the editor's "Changes not saved. Retrying…" and adds nothing.
-  The mark stays while the toolbar's buttons fade for typing (it is what you look at while you type).
+  The mark stays while the toolbar's buttons fade for typing (it is what you look at while you type). A screen
+  reader is told "Saved" only (a polite announcement); "Saving…" is shown and can be read, but is not announced
+  with every save. The mark follows a typed title's commit the same way.
 - **Header**, top to bottom: type pill (icon + name; click to change type), a relation button, then any
   property surfaced in the header (a Status chip such as "In Progress"), a "Collections" chip; the title in
   large bold; the Description property as a paragraph under the title; a "Tags" row of colored tag chips with a
