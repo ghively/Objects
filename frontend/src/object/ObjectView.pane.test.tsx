@@ -117,3 +117,103 @@ describe('Show properties by default: off', () => {
     expect(screen.getByText('Status')).toBeInTheDocument()
   })
 })
+
+// M32, item 11: a type with no properties of its own (the built-in Note and Daily note: system
+// rows only) opens with the pane closed; the note's own toggle and the device setting still decide.
+describe('a type with no properties of its own (M32)', () => {
+  const sys = (id: string, type: 'entity_title' | 'entity_tags' | 'entity_createdAt', name: string) => propertyDef({ id, key: id, type, name })
+  const SYSTEM = [sys('title', 'entity_title', 'Title'), sys('tags', 'entity_tags', 'Tags'), sys('createdAt', 'entity_createdAt', 'Created at')]
+  const NOTE: TypeDef = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', basic: true, revision: 'r1', propertyDefinitions: SYSTEM })
+  const DAILY: TypeDef = typeDef({
+    id: 'dailynote',
+    name: 'DailyNote',
+    pluralName: 'DailyNotes',
+    basic: true,
+    revision: 'r1',
+    propertyDefinitions: [
+      ...SYSTEM,
+      propertyDef({ id: 'date', key: 'date', type: 'datetime', name: 'Date' }),
+      propertyDef({ id: 'reviewed', key: 'reviewed', type: 'boolean', name: 'Reviewed' }),
+    ],
+  })
+
+  function loadOf(type: TypeDef, frontmatter: Record<string, unknown> = {}) {
+    const path = type === DAILY ? 'DailyNotes/2026-11-11.md' : PATH
+    const detail = objectDetail({
+      summary: objectSummary({ path, type: type.id, title: 'Notes' }),
+      frontmatter: { type: type.name, title: 'Notes', ...frontmatter },
+      body: 'Hello.\n',
+      version: 'v1',
+    })
+    mocked.space.mockResolvedValue({ name: 's', root: '/s', types: [type] } satisfies SpaceInfo)
+    mocked.objects.mockResolvedValue([detail.summary])
+    mocked.object.mockResolvedValue(detail)
+    return path
+  }
+  const closed = () => expect(screen.getByRole('button', { name: 'Show properties' })).toHaveAttribute('aria-pressed', 'false')
+  const open = () => expect(screen.getByRole('button', { name: 'Hide properties' })).toHaveAttribute('aria-pressed', 'true')
+
+  test.each(['page', 'peek'] as const)('a Note opens with the pane closed (%s)', async (mode) => {
+    loadOf(NOTE)
+    render(<ObjectView path={PATH} mode={mode} />)
+    await screen.findByText('Hello.')
+    // Once the type is known too: still closed.
+    await waitFor(() => expect(mocked.space).toHaveBeenCalled())
+    closed()
+    expect(screen.queryByText('Created at')).toBeNull()
+    expect(mocked.updateProperties).not.toHaveBeenCalled()
+  })
+
+  test('a Daily note (its Date and Reviewed show in its header) opens with the pane closed', async () => {
+    const path = loadOf(DAILY)
+    render(<ObjectView path={path} mode="page" />)
+    await screen.findByText('Hello.')
+    closed()
+  })
+
+  test("the note's own toggle wins: showing saves hideProperties: false, hiding again removes it", async () => {
+    const user = userEvent.setup()
+    loadOf(NOTE)
+    render(<ObjectView path={PATH} mode="page" />)
+    await screen.findByText('Hello.')
+    await user.click(screen.getByRole('button', { name: 'Show properties' }))
+    expect(await screen.findByText('Created at')).toBeInTheDocument()
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith(PATH, { hideProperties: false }, 'v1', undefined))
+    await user.click(screen.getByRole('button', { name: 'Hide properties' }))
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenLastCalledWith(PATH, { hideProperties: null }, expect.anything(), undefined))
+    closed()
+  })
+
+  test('a Note saved with hideProperties: false opens with the pane shown', async () => {
+    loadOf(NOTE, { hideProperties: false })
+    render(<ObjectView path={PATH} mode="page" />)
+    await screen.findByText('Hello.')
+    open()
+    expect(await screen.findByText('Created at')).toBeInTheDocument()
+  })
+
+  test('a type with a property of its own still opens with the pane shown, and "Show properties by default" off closes it', async () => {
+    load({})
+    const first = render(<ObjectView path={PATH} mode="page" />)
+    await screen.findByText('Hello.')
+    expect(await screen.findByText('Status')).toBeInTheDocument()
+    open()
+    first.unmount()
+    useSettings.setState({ settings: { ...settingsDefaults, showPropertiesByDefault: false }, loaded: true })
+    render(<ObjectView path={PATH} mode="page" />)
+    await screen.findByText('Hello.')
+    closed()
+  })
+
+  test('"Show properties by default" off keeps a Note closed, and its toggle still opens it', async () => {
+    const user = userEvent.setup()
+    useSettings.setState({ settings: { ...settingsDefaults, showPropertiesByDefault: false }, loaded: true })
+    loadOf(NOTE)
+    render(<ObjectView path={PATH} mode="page" />)
+    await screen.findByText('Hello.')
+    closed()
+    await user.click(screen.getByRole('button', { name: 'Show properties' }))
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith(PATH, { hideProperties: false }, 'v1', undefined))
+    open()
+  })
+})

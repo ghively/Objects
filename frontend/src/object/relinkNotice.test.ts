@@ -20,9 +20,9 @@ describe('the rename notice (M2#8)', () => {
     expect(relinkedObjectCount({ path: 'Pages/New.md', relinked: [] })).toBe(0)
   })
 
-  test('reads "Updated links in N objects", singular for one, nothing for none', () => {
-    expect(relinkedText(3)).toBe('Updated links in 3 objects')
-    expect(relinkedText(1)).toBe('Updated links in 1 object')
+  test('reads "Updated links in N notes", singular for one, nothing for none', () => {
+    expect(relinkedText(3)).toBe('Updated links in 3 notes')
+    expect(relinkedText(1)).toBe('Updated links in 1 note')
     expect(relinkedText(0)).toBeNull()
   })
 
@@ -30,6 +30,6 @@ describe('the rename notice (M2#8)', () => {
     announceRelinked({ path: 'Pages/New.md', relinked: [] })
     expect(toasts()).toEqual([])
     announceRelinked({ path: 'Pages/New.md', relinked: ['Pages/A.md', 'Pages/B.md'] })
-    expect(toasts()).toEqual(['Updated links in 2 objects'])
+    expect(toasts()).toEqual(['Updated links in 2 notes'])
   })
 })

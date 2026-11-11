@@ -225,7 +225,7 @@ Copy deep link | Delete current page Ctrl+Backspace | Focus the last block (Down
 page up/down.
 (M31) Select all top-level blocks Ctrl+Alt+Shift+A and Copy deep link Ctrl+Alt+Shift+L (our keys; ⌃⇧⌘A / ⌃⇧⌘L on
 macOS) work in the page or the open peek, caret in the editor included: the first selects every top-level block as a
-block selection, the second copies the object's reference `[[Title]]` (as Copy > "Copy object reference"; Object has
+block selection, the second copies the object's reference `[[Title]]` (as Copy > "Copy reference", M32: was "Copy object reference"; Object has
 no URL scheme, our call) and toasts "Deep link copied". Home, End, Page Up and Page Down ("Page up", "Page down") scroll
 the page outside text fields.
 
@@ -435,14 +435,44 @@ Each starter template pre-fills the new type's properties.
 - **Full page**: the same content, with the property pane docked on the left (Status, Time frame,
   Collaborators... one block per property, each "Empty" when unset) and the outline as a column of short
   dashes at the right edge (hover opens the outline popover). The browser tab title is the object title.
+- **The note page is for writing** (M32): the property pane starts closed for a type with no properties of its
+  own (the Note and the Daily note, which have only the system rows Collections, Description, Created at, Last
+  updated, Tags, Icon, Aliases; a Daily note's Date and Reviewed show in its header) and open for every other
+  type. "Show properties by default" off still closes it everywhere, and the toggle on a note wins and is kept in
+  that note (`hideProperties: false` shows, `true` hides; toggling back to where the note starts removes the key).
+  The body is at least 60% of the window's height, and a click in the empty space below the text puts the caret
+  at the end of the text (under a last block that holds no text, a divider or an image, on a new empty line). In a
+  narrow layout (the side panel open, a small window) the properties card follows the text, before the
+  references, where it used to sit above the text; the 60% minimum does not apply there, so the card stays near.
+- **Words on the note page** (M32, the glossary): the type chip, the "Change type" list and the type beside a
+  reference read "Note" for the built-in Page type and "Daily note" for DailyNote (a renamed type keeps its
+  name). The `…` menu: "Type settings" (was "Object type settings"), "Merge into note" (was "Merge into
+  object"), Copy > "Copy reference" with the toast "Link copied", "Delete" (was "Delete object"); "Change type",
+  "Open as page" and the two AI rows are unchanged and stay where they were. The delete dialog names the note:
+  'Delete “Title”?' ("Delete this note?" without a title), over "Moves it to the Trash, where it can be restored
+  for 30 days." Change type asks "Change type?". Notices say "note": "Couldn't open this note.", "This note is in
+  the Trash.", "This note opens read-only: …", "This note's file was deleted or moved on disk. Edits here aren't
+  saved.", "3 notes will change.", "A template fills in new notes for you."; the reference tabs' tooltips are
+  "Links to this note" and "Similar notes".
+- **Save mark** (M32): in a note's toolbar (page and peek), left of its buttons: "Saving…" while typed text waits
+  for its save or a save runs, then a check and "Saved", which fades to the check alone after two seconds. A note
+  nobody typed in shows nothing. A failed save keeps the editor's "Changes not saved. Retrying…" and adds nothing.
+  The mark stays while the toolbar's buttons fade for typing (it is what you look at while you type).
 - **Header**, top to bottom: type pill (icon + name; click to change type), a relation button, then any
   property surfaced in the header (a Status chip such as "In Progress"), a "Collections" chip; the title in
   large bold; the Description property as a paragraph under the title; a "Tags" row of colored tag chips with a
   small list icon; a divider; the body. A freshly created object (the New menu, a type's `+`, Ctrl+U and the
   other create buttons) opens with its title focused and selected, in the peek and on the full page, so typing
-  names it; "Add description" puts the caret in the description it reveals. Renaming an object (its title, a
+  names it; "Add description" puts the caret in the description it reveals. Title to body (M32): Enter, ArrowDown
+  or Tab in the title puts the caret at the start of the body (page and peek; Tab never walks the property pane
+  first), and the typed title is committed as the caret leaves; ArrowUp, or Shift+Tab, with the caret at the
+  body's very first position goes back to the end of the title (Shift+Tab in a list item or an indented block
+  still unindents). Words typed in the body while the rename runs are kept: they are saved under the note's new
+  file name and the caret stays where it was. A note opened with a request for its body (Today's note: the end of
+  its text) takes the caret there once its editor is ready. Renaming an object (its title, a
   table's title cell, a whiteboard's name) rewrites the links to it in other objects and then says so with a short
-  notice, "Updated links in 3 objects" ("1 object"); nothing is shown when no other object linked to it.
+  notice, "Updated links in 3 notes" ("1 note"; M32: was "objects"); nothing is shown when no other object linked
+  to it.
 - **Whiteboard changed outside** (its `.whiteboard.json` edited in another program while the board is open): the
   board reloads and says "Changed elsewhere. Reloaded."; another view of the same board in this window (a page
   and a peek) follows silently.
@@ -481,6 +511,9 @@ Each starter template pre-fills the new type's properties.
   row shows on an object only while it has a value. A property the target type stores under the same key wins.
   In views a counterpart filters, sorts and groups like a relation; its table column is read-only and a board
   grouped by it refuses drops.
+- **Work off** (M32): while "Use the Work page in this space" is off, the page of a Task, a Project or any type
+  with work fields is a plain note page: no work header, no Resolution note, no Steps, list or Floor items rows,
+  and nothing is read from the Work API. Their values stay in the file and show again when Work is turned on.
 
 ## 6. Editor chrome and menus
 
@@ -545,7 +578,8 @@ Each starter template pre-fills the new type's properties.
   a list line (the list is split around it; nested lines become the task's body) or a to-do (a ticked one is made
   Done). With blocks selected: every to-do in them, or the first block when they hold none. A line without text
   and a code block are left alone, and a task that can't be made changes nothing.
-- **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves.
+- **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves. The note's save
+  mark does not fade (M32).
 - **Edited lines are written in the editor's standard Markdown form**: the line of a block you edit is rewritten
   that way (`_b_` becomes `*b*`, `[X]` becomes `[x]`, a setext heading becomes ATX `#`, a bare URL becomes
   `[url](url)`, `\#` escapes appear); it renders the same, and only that line changes in the file — every untouched
@@ -816,7 +850,9 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   dropdown, date icon, priority pill) plus the line that links here ("Parent project: <object chip>"); other
   objects show the linking block with its parent context. A leading radio-dot marks each reference; hovering shows
   small action icons (expand, `...`, and three more at the right). Unlinked Mentions is a separate section
-  (section 11).
+  (section 11). An empty section (M32) is one quiet line with no heading and no explanation ("No backlinks
+  yet", "No related content yet", "No unlinked mentions", "No related tags"), in the page's references, in a tab
+  on its own and in the side panel's Backlinks entry; every tab stays, with its count.
 - **Backlinks stay live**: when another object gains or loses a link to the open one (Link on a mention, an
   outside edit adding `[[X]]`), the Properties panel's Backlinks chips and the Tasks dashboard's Context grouping
   update without a reload (a change to any other object re-reads them).
@@ -1234,7 +1270,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 An "Unlinked Mentions" section sits under Backlinks on an object's page; it lists text elsewhere that matches
 this object's title or an alias without being a link ("Unlinked name matches", section label "Mentions"; an
 alias counts as a mention of the original object). Settings > Editor > "Backlink sections start as"
-has Backlinks Open | Closed and Unlinked Mentions Open | Closed | Hidden.
+has Backlinks Open | Closed and Unlinked Mentions Open | Closed | Hidden. With no mentions (M32) the section is
+the one line "No unlinked mentions" and the Mentions tab stays; when there are any they always show, under their
+heading, each with its "Link" button.
 
 Object builds it in full (M5): `backend/objectapp/references.py` (matching on Unicode word
 boundaries, titles and aliases of at least a minimum length, longest name first, linking a mention from the

@@ -110,7 +110,7 @@ export function useTypeEditor(typeId: string | undefined | null): TypeEditor {
         const latest = current(id)
         let body: TypeDef
         if (typeof next === 'function') {
-          if (!latest) throw new Error('Unknown object type')
+          if (!latest) throw new Error('Unknown type')
           body = next(latest)
         } else {
           body = latest && base ? { ...rebase(base, next, latest), revision: latest.revision } : next

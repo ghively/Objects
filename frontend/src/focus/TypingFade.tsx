@@ -5,7 +5,8 @@
  * (`FocusMode.tsx`), which hides chrome until it is left.
  *
  * The chrome opts in with the `data-typing-fade` attribute; while `<html>` has `data-typing`,
- * its children fade out and take no pointer events. The values are
+ * its children fade out and take no pointer events. A child marked `data-typing-stay` keeps
+ * showing (M32: the note's save mark, which is what you look at while you type). The values are
  * (`.glass-chrome-fade>*{transition:opacity .22s ease-out}`, `.is-faded-out>*{opacity:0}`, pointer
  * events off, no transition under reduced motion). Mounted once, by `FocusMode`.
  */
@@ -15,9 +16,11 @@ import { useEffect } from 'react'
 export const TYPING_ATTR = 'data-typing'
 /** The attribute that marks a piece of chrome that fades while typing. */
 export const TYPING_FADE_ATTR = 'data-typing-fade'
+/** M32: the attribute of a child of the fading chrome that stays while typing (the save mark). */
+export const TYPING_STAY_ATTR = 'data-typing-stay'
 
 export const TYPING_FADE_CSS = `[${TYPING_FADE_ATTR}] > * { transition: opacity .22s ease-out; }
-html[${TYPING_ATTR}] [${TYPING_FADE_ATTR}] > * { opacity: 0; }
+html[${TYPING_ATTR}] [${TYPING_FADE_ATTR}] > *:not([${TYPING_STAY_ATTR}]) { opacity: 0; }
 html[${TYPING_ATTR}] [${TYPING_FADE_ATTR}], html[${TYPING_ATTR}] [${TYPING_FADE_ATTR}] * { pointer-events: none !important; }
 @media (prefers-reduced-motion: reduce) { [${TYPING_FADE_ATTR}] > * { transition: none !important; } }`
 

@@ -4,7 +4,7 @@
  * calendar's daily note) renders only the body editor and its autosave.
  */
 import type { Editor as TiptapEditor, JSONContent } from '@tiptap/core'
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { api, ConflictError, isResync } from '@/api/client'
 import { openAiChat, useAiHidden } from '@/ai/store'
@@ -36,7 +36,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Editor } from '@/editor/Editor'
 import { RecoveryDialog } from '@/editor/RecoveryDialog'
-import { dropUnsaved, keptUnsaved } from '@/editor/unsaved'
+import { dropUnsaved, keepUnsaved, keptUnsaved } from '@/editor/unsaved'
 import type { BodyEditorHandle } from '@/editor/useAutosave'
 import { FindBar } from '@/find/FindBar'
 import { useFind } from '@/find/useFind'
@@ -44,8 +44,11 @@ import { installLinkPicker } from '@/links/LinkPicker'
 import { invalidateLinkIndex, typeOf, useLinkIndex, ensureLinkIndex } from '@/links/linkIndex'
 import { installWikilinkPresenter } from '@/links/wikilinkPresenter'
 import { formatKeys, isEditableTarget, keysFor, matches } from '@/lib/shortcuts'
+import { typeLabel } from '@/lib/typeLabel'
 import { cn } from '@/lib/utils'
+import { NOTE_LOWER, TYPE_SETTINGS } from '@/lib/words'
 import { revealMenuLabel } from '@/lib/platformText'
+import { takeBodyFocus } from '@/nav/focusRequest'
 import { canGoBack, usePeek, useTabs, type Target } from '@/nav/tabs'
 import { ReferencesSection } from '@/references/ReferencesSection'
 import { byPluralName, TypeChip } from '@/shell/Sidebar'
@@ -69,7 +72,18 @@ import { keyIsForView, usePageShortcuts } from './pageShortcuts'
 import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
 import { ImportSourceLine, importSourceOf } from './ImportSourceLine'
 import { counterpartEditor } from './CounterpartRows'
+import {
+  bodyEditorOf,
+  caretAtBodyStart,
+  caretInTopLevelBlock,
+  focusBody,
+  focusBodyEnd,
+  focusedBodyCaret,
+} from './bodyCaret'
+import { claimHandover, dropHandover, handOver, peekHandover } from './renameHandover'
+import { typeHasOwnProperties } from './ownProperties'
 import { PropertyPanel } from './PropertyPanel'
+import { SaveMark } from './SaveMark'
 import { useObjectWrites, type BodyControl } from './useObjectWrites'
 import { useTypeEditor } from './useTypeEditor'
 import { COLLECTION_ICON } from '@/lib/defIcons'
@@ -84,6 +98,7 @@ import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 import { isWorkType } from '@/types/WorkFieldsSection'
 import { ResolutionNoteSection } from '@/work/ResolutionNote'
 import { WorkHeader } from '@/work/panel/WorkHeader'
+import { useWorkOn } from '@/work/useWorkOn'
 import { useSettings } from '@/settings/useSettings'
 
 // Raw mode (CodeMirror) loads when first switched to, not with the shell (audit 2026-11-01 F1).
@@ -160,7 +175,8 @@ export const FIND_IN_PAGE_MENU_ITEM = 'Find in page'
 /** M8 menu items and the focus-mode button. */
 export const OBJECT_M8_TEXT = {
   versionHistory: 'Version history',
-  mergeObject: 'Merge into object',
+  /** M32: was "Merge into object". */
+  mergeObject: `Merge into ${NOTE_LOWER}`,
   mergeTag: 'Merge into tag',
   present: 'Present',
   addToWhiteboard: 'Add to whiteboard',
@@ -192,10 +208,19 @@ export const OBJECT_AI_TEXT = {
 export const OBJECT_MENU_TEXT = {
   import: 'Import',
   copy: 'Copy',
-  copyReference: 'Copy object reference',
-  referenceCopied: 'Link to object copied',
+  /** M32: was "Copy object reference" / "Link to object copied". */
+  copyReference: 'Copy reference',
+  referenceCopied: 'Link copied',
   copyAsMarkdown: 'Copy as Markdown',
   markdownCopied: 'Markdown copied',
+} as const
+
+/** M32: the view's notices, in the glossary's words (each said "object"). */
+export const OBJECT_VIEW_TEXT = {
+  cantOpen: `Couldn't open this ${NOTE_LOWER}.`,
+  fileGone: `This ${NOTE_LOWER}'s file was deleted or moved on disk. Edits here aren't saved.`,
+  readOnly: (reason: string) => `This ${NOTE_LOWER} opens read-only: ${reason}. Fix the file to edit it.`,
+  readOnlyFrontmatter: `This ${NOTE_LOWER}'s frontmatter couldn't be read, so it opens read-only. Fix the file to edit it.`,
 } as const
 
 /** Write `text` to the clipboard, then toast `done`. */
@@ -292,6 +317,8 @@ function workKeysOf(type: TypeDef | undefined): string[] {
   return type!.propertyDefinitions.filter((d) => d.type === 'steps' || d.type === 'floorItems').map((d) => d.key)
 }
 
+const NO_KEYS: string[] = []
+
 /** The stored values of `keys`, as one string (what a decoded read belongs to). */
 function rawWorkValues(frontmatter: Record<string, unknown>, keys: string[]): string {
   return JSON.stringify(keys.map((k) => frontmatter[k] ?? null))
@@ -312,7 +339,13 @@ export function ObjectView({
   onDeleted,
   workHeader,
 }: ObjectViewProps) {
-  const [detail, setDetail] = useState<ObjectDetail | null>(null)
+  /**
+   * M32: the note as the view this one replaces left it when its own rename moved the file
+   * (`renameHandover.ts`). With it the first render already shows the editor; nothing is loaded
+   * again. The caret and the text not yet saved are claimed once the view has mounted.
+   */
+  const [handed] = useState(() => (mode === 'inline' ? null : peekHandover(path)))
+  const [detail, setDetail] = useState<ObjectDetail | null>(handed)
   /** Mirrors `detail` for callbacks that must not wait for a render (a work write's result). */
   const detailRef = useRef<ObjectDetail | null>(null)
   detailRef.current = detail
@@ -323,7 +356,7 @@ export function ObjectView({
    * with `api.workItem` (the front matter holds them as stored), for the raw values in `raw`.
    */
   const [decoded, setDecoded] = useState<{ path: string; raw: string; fields: Record<string, unknown> } | null>(null)
-  const [version, setVersion] = useState('')
+  const [version, setVersion] = useState(handed?.version ?? '')
   const [error, setError] = useState<string | null>(null)
   const [raw, setRaw] = useState(false)
   /** The pane toggled in this view; until then the object's own `hideProperties` decides. */
@@ -362,7 +395,7 @@ export function ObjectView({
 
   const editorRef = useRef<BodyEditorHandle | null>(null)
   /** The version the editor's next save is based on (mirrors `version` without waiting for a render). */
-  const versionRef = useRef('')
+  const versionRef = useRef(handed?.version ?? '')
   const onVersionRef = useRef(onVersion)
   onVersionRef.current = onVersion
   const onDetailRef = useRef(onDetail)
@@ -385,6 +418,36 @@ export function ObjectView({
   const pendingRef = useRef(false)
   /** The path our own rename moved this object to (its reload keeps the view on screen). */
   const renamedToRef = useRef<string | null>(null)
+
+  /**
+   * M32: our own rename moved the file. The page and the peek are keyed by path, so this view and
+   * its editor are replaced at once (here, and by the app on the rename's event), and Enter in the
+   * title has already put the caret in the body. So that nothing typed meanwhile is lost and the
+   * caret stays, the view that takes over is handed the note as it stands, the caret, and the
+   * text this editor has not saved; it shows them in its first render and saves the text.
+   */
+  const viewRootRef = useRef<HTMLDivElement | null>(null)
+  const handOverTo = (res: RenameResult, title: string) => {
+    const d = detailRef.current
+    const h = editorRef.current
+    if (mode === 'inline' || !d || !h) return
+    const shown = h.getBody()
+    const onDisk = h.savedBody() ?? d.body
+    handOver(res.path, {
+      detail: {
+        ...d,
+        body: onDisk,
+        version: res.version,
+        frontmatter: { ...d.frontmatter, title },
+        summary: { ...d.summary, path: res.path, title },
+      },
+      caret: focusedBodyCaret(viewRootRef.current),
+      unsaved: shown !== null && shown !== onDisk ? shown : null,
+      slot: viewRootRef.current?.parentElement ?? null,
+    })
+    // This editor is leaving: what it holds is handed over, and it must not write to the old path.
+    if (shown !== null && shown !== onDisk) h.reload(shown, res.version)
+  }
 
   const bodyControl = useRef<BodyControl>({
     flush: async () => {
@@ -610,6 +673,7 @@ export function ObjectView({
           : d,
       )
       if (res.path !== oldPath) {
+        handOverTo(res, title)
         renamedToRef.current = res.path
         useTabs.getState().retarget(oldPath, res.path)
       }
@@ -787,6 +851,16 @@ export function ObjectView({
     pendingRef.current = false
     setPending(null)
     setRecovery(null)
+    if (handed && handed.summary.path === path) {
+      // M32: handed over by the view our own rename replaced: the note is already shown, at the
+      // version the rename answered. Only what the server works out is read again.
+      adoptVersion(versionRef.current)
+      void ensureLinkIndex()
+      refreshComputed()
+      return () => {
+        alive = false
+      }
+    }
     if (renamedToRef.current === path) {
       // Our own rename: keep showing the object while its new path loads.
       renamedToRef.current = null
@@ -819,7 +893,7 @@ export function ObjectView({
     return () => {
       alive = false
     }
-  }, [path, adoptVersion, markDeleted, offerKept])
+  }, [path, adoptVersion, markDeleted, offerKept, handed, refreshComputed])
 
   const toggleRaw = async () => {
     // Save everything first (and wait for saves already in flight or queued),
@@ -861,7 +935,7 @@ export function ObjectView({
       void editorRef.current?.resume(versionRef.current)
       if (err instanceof ConflictError) {
         enqueueRef.current(false)
-        throw new Error('The object changed on disk. It has been reloaded; try again.', { cause: err })
+        throw new Error(`This ${NOTE_LOWER} changed on disk. It has been reloaded; try again.`, { cause: err })
       }
       throw err
     }
@@ -962,7 +1036,6 @@ export function ObjectView({
   // The menu's page keys for the active view (`keyIsForView`: the view holding focus, or the main
   // page with focus on the body and nothing open over it): Ctrl+E Export and Ctrl+I Import outside
   // the editor (inside it they are code and italic), Ctrl+Shift+* pins or unpins, the editor included.
-  const viewRootRef = useRef<HTMLDivElement | null>(null)
   const pageKeysRef = useRef({ summary, type })
   pageKeysRef.current = { summary, type }
   useEffect(() => {
@@ -1003,14 +1076,16 @@ export function ObjectView({
   // default), hiding saves `hideProperties: true` and showing removes the key; off (2026-11-09),
   // the pane starts hidden, showing saves `hideProperties: false` and hiding removes the key.
   // Read-only: this view only.
+  // M32, item 11: the pane also starts hidden for a type with no properties of its own (the Note
+  // and the Daily note: system rows only), so the text gets the room; the same two saved values
+  // decide for the object (`true` hides, `false` shows), and a toggle back to the start removes it.
   const hideProperties = detail?.frontmatter.hideProperties
-  const panelOpen = paneToggled ?? (propertiesByDefault ? hideProperties !== true : hideProperties === false)
+  const startsOpen = propertiesByDefault && typeHasOwnProperties(type)
+  const panelOpen = paneToggled ?? (typeof hideProperties === 'boolean' ? !hideProperties : startsOpen)
   const togglePanel = () => {
     const next = !panelOpen
     setPaneToggled(next)
-    if (!propsReadOnly && detail) {
-      writeProperties({ hideProperties: propertiesByDefault ? (next ? null : true) : next ? false : null })
-    }
+    if (!propsReadOnly && detail) writeProperties({ hideProperties: next === startsOpen ? null : !next })
   }
   const onTypeChange = (next: TypeDef) => typeEditor.save(next)
   const onOpenTag = (name: string) => void openTag(name).catch(() => undefined)
@@ -1022,15 +1097,18 @@ export function ObjectView({
   const canTemplate = !!type && !isTemplate && templatesAllowed(type)
   const isTag = !!summary && isTagType(type, summary.type)
   const isTask = !!summary && !isTemplate && isTaskRoleType(type, summary.type)
+  // M32: with the Work page off for this space a work type's page is a plain note page: no work
+  // header, no resolution note, no work rows (`PropertyPanel`) and no work fetch.
+  const workOn = useWorkOn()
   /** M22: a work item with a Ticket ID shows its resolution note. */
   const ticketId = detail?.frontmatter.ticketId
-  const isTicket = !!summary && !isTemplate && isWorkType(type) && typeof ticketId === 'string' && ticketId.trim() !== ''
+  const isTicket = workOn && !!summary && !isTemplate && isWorkType(type) && typeof ticketId === 'string' && ticketId.trim() !== ''
   /** M23: the item panel's work header (a work item, not a template). */
-  const showWorkHeader = !!workHeader && !!summary && !isTemplate && isWorkType(type)
+  const showWorkHeader = workOn && !!workHeader && !!summary && !isTemplate && isWorkType(type)
   // M22: a work item's steps and floor items are shown as the server decodes them (each with its
   // id and rev, which step actions send back): read once per stored value (a load, an external
   // change), taken from a work write's result otherwise. Reading never writes.
-  const workKeys = workKeysOf(type)
+  const workKeys = workOn ? workKeysOf(type) : NO_KEYS
   const workRaw = detail && workKeys.length > 0 ? rawWorkValues(detail.frontmatter, workKeys) : null
   const decodedNow = decoded && workRaw !== null && decoded.path === path && decoded.raw === workRaw ? decoded : null
   useEffect(() => {
@@ -1192,7 +1270,7 @@ export function ObjectView({
                 {otherTypes.map((t) => (
                   <DropdownMenuItem key={t.id} onSelect={() => setChangeTo(t)}>
                     <TypeChip type={t} size={18} />
-                    {t.name}
+                    {typeLabel(t)}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuSubContent>
@@ -1200,7 +1278,7 @@ export function ObjectView({
             {type && (
               <DropdownMenuItem data-type-setting="" onSelect={() => openTarget({ kind: 'typeSettings', typeId: type.id })}>
                 <Icon name="ph-gear-six" size={14} />
-                Object type settings
+                {TYPE_SETTINGS}
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
@@ -1352,6 +1430,9 @@ export function ObjectView({
           <Icon name="ph-sidebar-simple" size={17} />
         </span>
       </button>
+      {/* M32: just before the right-aligned group, so "Saving…" / "Saved" never moves the buttons;
+          a part of the toolbar of its own, so it stays while the buttons fade for typing. */}
+      <SaveMark key={path} path={path} className="mr-2 ml-auto" />
       <div className="flex min-w-0 items-center gap-2">
       <FindBar path={path} editorRef={editorRef} />
       <div className="flex h-10 shrink-0 items-center gap-0.5 rounded-xl border border-[var(--float-border)] bg-[var(--float-bg)] px-1">
@@ -1410,6 +1491,72 @@ export function ObjectView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, autoFocus, hasDetail, loadFailed])
 
+  // M32: once the editor shows the loaded body, the view takes what was left for it: after our
+  // own rename the text typed meanwhile (shown at once, saved here) and the caret; otherwise a
+  // body-focus request for this note ("Today's note": the end of its text). Each is taken once.
+  const takenRef = useRef(false)
+  useEffect(() => {
+    if (mode === 'inline' || !hasDetail || takenRef.current) return
+    takenRef.current = true
+    // One view takes the caret and the text (the one in the leaving view's place); the entry
+    // goes once every view of this update has had its turn.
+    const claim = handed ? claimHandover(path, viewRootRef.current?.parentElement ?? null) : null
+    if (handed) setTimeout(() => dropHandover(path), 0)
+    const h = editorRef.current
+    const text = claim?.unsaved
+    if (h && text != null) {
+      // Shown now, saved by this view; the editor's own saving waits for the answer.
+      h.reload(text, versionRef.current)
+      h.hold()
+      api
+        .saveBody(path, text, versionRef.current)
+        .then((res) => {
+          setDetail((d) => (d && d.summary.path === path ? { ...d, body: text, version: res.version } : d))
+          adoptVersion(res.version)
+          // Anything typed since is saved on that version.
+          void editorRef.current?.resume(res.version)
+        })
+        .catch((err: unknown) => {
+          // It could not be written (the file changed again): the editor goes back to the file
+          // and the text is kept and offered, as text left unsaved always is.
+          const d = detailRef.current
+          const kept = editorRef.current?.getBody() ?? text
+          keepUnsaved(path, kept, d?.summary.id)
+          if (d) {
+            editorRef.current?.reload(d.body, versionRef.current)
+            setRecovery({ kept, onDisk: d.body, error: null })
+          }
+          if (err instanceof ConflictError) enqueueRef.current(false)
+        })
+    }
+    const at = claim?.caret ?? takeBodyFocus(path)
+    if (at) focusBody(viewRootRef.current, at)
+  }, [mode, hasDetail, path, handed, adoptVersion])
+
+  /** M32, item 2: Enter, ArrowDown or Tab in the title: the caret goes to the start of the body. */
+  const enterBody = useCallback(() => focusBody(viewRootRef.current, 'start'), [])
+
+  /**
+   * M32, item 2: ArrowUp or Shift+Tab with the caret at the body's very first position goes back
+   * to the end of the title. Shift+Tab in a list item or an indented block stays the editor's
+   * (it unindents). Capture phase: the editor never sees the key.
+   */
+  const onBodyKeyDown = (e: ReactKeyboardEvent) => {
+    if (e.nativeEvent.isComposing || e.ctrlKey || e.metaKey || e.altKey) return
+    const up = e.key === 'ArrowUp' && !e.shiftKey
+    const back = e.key === 'Tab' && e.shiftKey
+    if (!up && !back) return
+    const ed = bodyEditorOf(viewRootRef.current)
+    // Only the body's own caret: not a field inside a block (a table cell's formula, a code block).
+    if (!ed || e.target !== ed.view.dom || !caretAtBodyStart(ed) || (back && !caretInTopLevelBlock(ed))) return
+    const title = viewRootRef.current?.querySelector<HTMLInputElement>('[data-page-title] input[aria-label="Title"]')
+    if (!title) return
+    e.preventDefault()
+    e.stopPropagation()
+    title.focus()
+    title.setSelectionRange(title.value.length, title.value.length)
+  }
+
   const recoveryDialog = (
     <RecoveryDialog
       open={recovery !== null}
@@ -1436,14 +1583,14 @@ export function ObjectView({
       />
       {recoveryDialog}
       {typeEditor.dialog}
-      <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} />
+      <DeleteObjectDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={deleteObject} title={summary?.title} />
       {exportOpen && <ExportDialog open onOpenChange={setExportOpen} path={path} prepare={settle} />}
       {importOpen && type && <ImportCsvDialog type={type} open onOpenChange={setImportOpen} />}
       {summary && (
         <Dialog open={collectionsOpen} onOpenChange={setCollectionsOpen}>
           <DialogContent className="w-auto border-line bg-raised p-0 text-fg sm:max-w-none">
             <DialogTitle className="sr-only">Edit collections</DialogTitle>
-            <DialogDescription className="sr-only">Choose the collections this object belongs to.</DialogDescription>
+            <DialogDescription className="sr-only">{`Choose the collections this ${NOTE_LOWER} belongs to.`}</DialogDescription>
             <CollectionPicker
               value={summary.collections ?? []}
               typeId={summary.type}
@@ -1505,7 +1652,7 @@ export function ObjectView({
       >
         {!detail || !summary ? (
           error ? (
-            <p className="text-[14px] text-fg-muted">{`Couldn't open this object. ${error}`}</p>
+            <p className="text-[14px] text-fg-muted">{`${OBJECT_VIEW_TEXT.cantOpen} ${error}`}</p>
           ) : (
             <p className="text-[14px] text-fg-muted">Loading…</p>
           )
@@ -1513,7 +1660,7 @@ export function ObjectView({
           <>
             {deleted && (
               <div role="alert" className="mb-3 rounded-lg border border-danger/60 bg-raised px-3 py-2 text-[14px]">
-                This object's file was deleted or moved on disk. Edits here aren't saved.
+                {OBJECT_VIEW_TEXT.fileGone}
               </div>
             )}
             {/* The header's Tags row (the inline view's only header row; the calendar shows the date). */}
@@ -1560,7 +1707,7 @@ export function ObjectView({
             <div className="mx-auto w-full max-w-[var(--page-content-width)] px-12 pt-10 pb-24" data-object-path={path}>
               {error ? (
                 <div className="rounded-lg border border-line bg-raised p-4">
-                  <p className="font-semibold">Couldn't open this object.</p>
+                  <p className="font-semibold">{OBJECT_VIEW_TEXT.cantOpen}</p>
                   <p className="mt-1 text-fg-muted">{error}</p>
                 </div>
               ) : (
@@ -1606,6 +1753,7 @@ export function ObjectView({
               onRename={(title) => void writes.rename(title)}
               onPropertiesChange={writeProperties}
               onOpenTag={onOpenTag}
+              onEnterBody={enterBody}
             />
           </>
         }
@@ -1613,9 +1761,7 @@ export function ObjectView({
           <>
             {readOnly && (
               <div role="status" className="mb-4 rounded-lg border border-line bg-raised px-3 py-2 text-[14px] text-fg-muted">
-                {summary.readOnlyReason
-                  ? `This object opens read-only: ${summary.readOnlyReason}. Fix the file to edit it.`
-                  : "This object's frontmatter couldn't be read, so it opens read-only. Fix the file to edit it."}
+                {summary.readOnlyReason ? OBJECT_VIEW_TEXT.readOnly(summary.readOnlyReason) : OBJECT_VIEW_TEXT.readOnlyFrontmatter}
               </div>
             )}
             {isTemplate && (
@@ -1633,10 +1779,20 @@ export function ObjectView({
             )}
             {deleted && !trashId && (
               <div role="alert" className="mb-4 rounded-lg border border-danger/60 bg-raised px-3 py-2 text-[14px]">
-                This object's file was deleted or moved on disk. Edits here aren't saved.
+                {OBJECT_VIEW_TEXT.fileGone}
               </div>
             )}
-            <div className="object-body-text">
+            {/* M32, item 11: the text has at least 60% of the window (not while the properties sit
+                under it in a narrow layout), and a click in the empty space below it is a click at
+                its end. */}
+            <div
+              className="object-body-text min-h-[60vh] cursor-text [[data-properties=inline]_&]:min-h-0"
+              onKeyDownCapture={onBodyKeyDown}
+              onMouseDown={(e) => {
+                if (e.target !== e.currentTarget || e.button !== 0) return
+                if (focusBodyEnd(viewRootRef.current)) e.preventDefault()
+              }}
+            >
               {raw ? (
                 <Suspense fallback={null}>
                   <RawMode
@@ -1663,9 +1819,9 @@ export function ObjectView({
                 />
               )}
             </div>
-            <ReferencesSection path={path} summary={summary} type={type} />
           </>
         }
+        below={<ReferencesSection path={path} summary={summary} type={type} />}
       >
         {overlays}
       </PageLayout>

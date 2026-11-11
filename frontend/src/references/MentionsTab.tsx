@@ -1,6 +1,7 @@
 /**
  * The Mentions tab: objects whose body names this object without linking it, each occurrence with
- * its context (the match highlighted) and a "Link" button. Linking sends the entry's version
+ * its context (the match highlighted) and a "Link" button. With none, one quiet line says so (M32);
+ * with any, they always show (ground rule: unlinked mentions are never removed or hidden). Linking sends the entry's version
  * (`api.linkMention`), then reloads once; a stale version (409) or moved text (422) reloads
  * without retrying.
  */
@@ -8,7 +9,7 @@ import { useState } from 'react'
 import { api, ApiError, ConflictError } from '@/api/client'
 import type { MentionEntry, ObjectSummary } from '@/api/types'
 import type { ReloadOptions } from './useReferences'
-import { EmptyState, EntryHeader, HighlightedContext, openReference } from './BacklinksTab'
+import { EmptyLine, EntryHeader, HighlightedContext, openReference } from './BacklinksTab'
 import { REFERENCES_TEXT } from './referencesUi'
 
 export interface MentionsTabProps {
@@ -23,7 +24,7 @@ export interface MentionsTabProps {
 export function MentionsTab({ target, entries, summaries, reload, onToast }: MentionsTabProps) {
   const [busy, setBusy] = useState(false)
 
-  if (entries.length === 0) return <EmptyState title={REFERENCES_TEXT.mentionsEmpty} />
+  if (entries.length === 0) return <EmptyLine text={REFERENCES_TEXT.mentionsEmpty} />
 
   const link = async (entry: MentionEntry, occ: MentionEntry['occurrences'][number]) => {
     if (busy) return

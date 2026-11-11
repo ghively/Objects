@@ -7,6 +7,7 @@
  */
 import type { BodyContext, ReferencesTab } from '@/api/types'
 import { cpToUtf16 } from '@/lib/codepoints'
+import { NOTE_LOWER, NOTES_LOWER } from '@/lib/words'
 
 export interface ReferencesUi {
   tab: ReferencesTab
@@ -26,8 +27,8 @@ export const REFERENCES_TEXT = {
   mentionsInText: 'Mentions in text',
   /** our string */
   via: (property: string) => `via ${property}`,
+  /** M32: an empty section is this one quiet line (its explanation went). */
   backlinksEmptyTitle: 'No backlinks yet',
-  backlinksEmptyDescription: 'Backlinks show up here once another page links to this one.',
   link: 'Link',
   linkCreated: 'Link created',
   /** our string (as M3) */
@@ -40,8 +41,6 @@ export const REFERENCES_TEXT = {
   /** Paged lists; the backlinks list shows 50 at a time */
   loadMore: 'Load more',
   relatedEmptyTitle: 'No related content yet',
-  /** our string: the stand-in is lexical, not semantic */
-  relatedEmptyDescription: 'Objects that share words with this one will appear here.',
   /** our string */
   relatedTagsEmpty: 'No related tags',
   /** The per-backlink toggle's group name */
@@ -57,8 +56,8 @@ export const REFERENCES_TEXT = {
 /** Each tab's label and info tooltip. */
 export const TAB_META: Record<ReferencesTab, { label: string; info?: string }> = {
   all: { label: 'All' },
-  backlinks: { label: 'Backlinks', info: 'Links to this object' },
-  related: { label: 'Related Content', info: 'Similar objects' },
+  backlinks: { label: 'Backlinks', info: `Links to this ${NOTE_LOWER}` },
+  related: { label: 'Related Content', info: `Similar ${NOTES_LOWER}` },
   mentions: { label: 'Mentions', info: 'Unlinked name matches' },
   relatedTags: { label: 'Related tags' },
 }

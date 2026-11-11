@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ObjectDetail, SpaceInfo, TypeDef } from '@/api/types'
-import { objectDetail, objectSummary, typeDef } from '@/test/mockApi'
+import { objectDetail, objectSummary, propertyDef, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
@@ -32,7 +32,15 @@ import { ObjectView } from './ObjectView'
 const mocked = vi.mocked(api)
 const PAGE: TypeDef = typeDef({ id: 'page', name: 'Page', pluralName: 'Pages', revision: 'r1' })
 const TAG: TypeDef = typeDef({ id: 'tag', name: 'Tag', pluralName: 'Tags', basic: true, revision: 'r1' })
-const TASK: TypeDef = typeDef({ id: 'task', name: 'Task', pluralName: 'Tasks', basic: true, revision: 'r1' })
+// A property of its own, as the real Task type has: its pane (Task Stats sit under it) starts open (M32).
+const TASK: TypeDef = typeDef({
+  id: 'task',
+  name: 'Task',
+  pluralName: 'Tasks',
+  basic: true,
+  revision: 'r1',
+  propertyDefinitions: [propertyDef({ id: 'status', key: 'status', name: 'Status', type: 'label' })],
+})
 
 function detailFor(path: string, type: string, title: string): ObjectDetail {
   return objectDetail({
@@ -79,13 +87,13 @@ describe('ObjectView M8', () => {
     const names = within(menu)
       .getAllByRole('menuitem')
       .map((i) => i.textContent)
-    for (const n of ['Version history', 'Merge into object', 'Present', 'Add to whiteboard']) expect(names.some((x) => x.startsWith(n))).toBe(true)
+    for (const n of ['Version history', 'Merge into note', 'Present', 'Add to whiteboard']) expect(names.some((x) => x.startsWith(n))).toBe(true)
     expect(names).not.toContain('Merge into tag')
 
     await user.click(within(menu).getByRole('menuitem', { name: 'Version history' }))
     expect(useVersionHistory.getState().path).toBe('Pages/Notes.md')
     ;({ user, menu } = await openMenu())
-    await user.click(within(menu).getByRole('menuitem', { name: 'Merge into object' }))
+    await user.click(within(menu).getByRole('menuitem', { name: 'Merge into note' }))
     expect(useMerge.getState().source).toBe('Pages/Notes.md')
     ;({ user, menu } = await openMenu())
     await user.click(within(menu).getByRole('menuitem', { name: /^Present/ }))
@@ -103,7 +111,7 @@ describe('ObjectView M8', () => {
       .getAllByRole('menuitem')
       .map((i) => i.textContent)
     expect(names).toContain('Merge into tag')
-    expect(names).not.toContain('Merge into object')
+    expect(names).not.toContain('Merge into note')
     await user.click(within(menu).getByRole('menuitem', { name: 'Merge into tag' }))
     expect(useMerge.getState().source).toBe('Tags/Old tag.md')
   })

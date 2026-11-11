@@ -25,6 +25,7 @@ import { PropertyMenu } from '@/properties/PropertyMenu'
 import { isSynced, syncedStale, SyncedLine } from '@/properties/synced'
 import { DeletePropertySection, PropertySettings } from '@/properties/PropertySettings'
 import { useSettings } from '@/settings/useSettings'
+import { useWorkOn } from '@/work/useWorkOn'
 import { DEV_INFO_TEXT, DevInfo } from '@/settings/DevInfo'
 import { LAYOUT_KEYS, removeProperty } from '@/properties/typeEdits'
 import { CounterpartRows, mergeCounterparts } from './CounterpartRows'
@@ -51,6 +52,9 @@ const CORE_KEYS = new Set([
   'importSource',
   ...LAYOUT_KEYS,
 ])
+
+/** M22's work kinds: their rows belong to the Work page (M32: shown only while it is on). */
+const WORK_KINDS: ReadonlySet<PropertyType> = new Set<PropertyType>(['steps', 'textList', 'floorItems'])
 
 function isEmpty(v: unknown): boolean {
   return (
@@ -489,7 +493,10 @@ export function PropertyPanel({
   const canEditType = !!type && !!onTypeChange && !type.readOnlyReason
   const deleting = deleteFor ? type?.propertyDefinitions.find((d) => d.id === deleteFor) : undefined
   const typed = (type?.propertyDefinitions.length ?? 0) > 0
-  const rows = propertyRows(type, frontmatter).filter((d) => d.type !== 'entity_title')
+  // M32: the work kinds' rows (steps, lists, floor items) show only while the Work page is on for
+  // the space; off, they are left out of the panel (their values stay in the file).
+  const workOn = useWorkOn()
+  const rows = propertyRows(type, frontmatter).filter((d) => d.type !== 'entity_title' && (workOn || !WORK_KINDS.has(d.type)))
   const visible: PropertyDef[] = []
   const hidden: PropertyDef[] = []
   for (const d of rows) {

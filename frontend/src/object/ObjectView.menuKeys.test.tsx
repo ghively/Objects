@@ -91,7 +91,7 @@ describe('object … menu key hints, Import and Copy', () => {
     expect(await screen.findByText(IMPORT_CSV_TEXT.heading)).toBeInTheDocument()
   })
 
-  test('Copy > Copy object reference and Copy as Markdown', async () => {
+  test('Copy > Copy reference and Copy as Markdown', async () => {
     const user = userEvent.setup()
     // user-event installs its own clipboard on setup: put the spy back.
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
@@ -99,9 +99,9 @@ describe('object … menu key hints, Import and Copy', () => {
     const n = within(menu).getAllByRole('menuitem').map((i) => i.textContent ?? '')
     expect(n.indexOf('Copy')).toBe(n.indexOf('Text stats') + 1)
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Copy' }))
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy object reference' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy reference' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('[[Notes]]'))
-    await waitFor(() => expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Link to object copied'))
+    await waitFor(() => expect(document.querySelector('[data-editor-toasts]')?.textContent).toContain('Link copied'))
     await user.click(screen.getByRole('button', { name: 'More' }))
     menu = await screen.findByRole('menu')
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'Copy' }))

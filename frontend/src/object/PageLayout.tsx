@@ -17,9 +17,11 @@
  *   its infobox (Gene, 2026-10-29, over a cover above the content column).
  *
  * Narrow widths: below the container's md breakpoint (`PROPERTIES_BESIDE_WIDTH`, 768 px) the
- * Standard, Profile and Encyclopedia properties move inline under the header (drawn as the `card`
- * variant). Profile's and Encyclopedia's property sidebar shows only from md. Standard keeps its
- * left panel here until Gene checks.
+ * Standard, Profile and Encyclopedia properties move inline (drawn as the `card` variant).
+ * Profile's and Encyclopedia's property sidebar shows only from md. Standard keeps its left panel
+ * here until Gene checks. M32 (the note page is for writing): the inline properties follow the
+ * text, before `below` (the references), where they used to sit between the header and the text
+ * and push it down the page (the side panel open at 1440 px).
  */
 import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import type { ObjectFrontmatterLayout, ObjectSummary, TypeDef, TypeFont } from '@/api/types'
@@ -129,6 +131,8 @@ export interface PageLayoutProps {
   properties: ReactNode | ((variant: PanelVariant) => ReactNode)
   /** The body editor, with any notices above it. */
   body: ReactNode
+  /** M32: what follows the text (the references section); narrow, the inline properties come before it. */
+  below?: ReactNode
   mode?: 'page' | 'peek'
   /** The toolbar row above the scrolling content (panel toggle, `…` menu). */
   toolbar?: ReactNode
@@ -218,6 +222,7 @@ export function PageLayout({
   header,
   properties,
   body,
+  below,
   mode = 'page',
   toolbar,
   onCoverChange,
@@ -266,6 +271,13 @@ export function PageLayout({
       {body}
     </div>
   )
+  const belowEl = below ? (
+    <div data-page-below="" style={font}>
+      {below}
+    </div>
+  ) : null
+  // Narrow: the properties as a card after the text (M32: the text comes first).
+  const inlineEl = inline ? <div data-properties-inline="">{propertiesEl}</div> : null
 
   // The inspector floats top right; with a cover shown it keeps below the cover's bottom (and so
   // clear of its controls) until the cover scrolls away.
@@ -298,6 +310,7 @@ export function PageLayout({
           {headerEl}
           {propertiesEl && <div data-index-card="">{propertiesEl}</div>}
           {bodyEl}
+          {belowEl}
         </>
       )
       break
@@ -308,8 +321,9 @@ export function PageLayout({
             <ProfileImage summary={summary} type={type} />
           </div>
           {headerEl}
-          <div data-properties-inline="">{propertiesEl}</div>
           {bodyEl}
+          {inlineEl}
+          {belowEl}
         </>
       ) : (
         <div className="flex gap-10">
@@ -320,6 +334,7 @@ export function PageLayout({
           <div className="flex min-w-0 flex-1 flex-col">
             {headerEl}
             {bodyEl}
+            {belowEl}
           </div>
         </div>
       )
@@ -328,8 +343,9 @@ export function PageLayout({
       content = inline ? (
         <>
           {headerEl}
-          <div data-properties-inline="">{propertiesEl}</div>
           {bodyEl}
+          {inlineEl}
+          {belowEl}
         </>
       ) : (
         <>
@@ -337,6 +353,7 @@ export function PageLayout({
           <div className="flex items-start gap-10">
             <div data-encyclopedia-main="" className="flex min-w-0 flex-1 flex-col">
               {bodyEl}
+              {belowEl}
             </div>
             {propertiesEl}
           </div>
@@ -347,8 +364,9 @@ export function PageLayout({
       content = (
         <>
           {headerEl}
-          {inline && <div data-properties-inline="">{propertiesEl}</div>}
           {bodyEl}
+          {inlineEl}
+          {belowEl}
         </>
       )
   }

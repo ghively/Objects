@@ -1,10 +1,11 @@
 /** Shown on an object this window moved to the Trash: "Deleted content", "Go back", "Undo Delete". */
 import { Button } from '@/components/ui/button'
 import { Icon } from '@/components/Icon'
+import { NOTE_LOWER } from '@/lib/words'
 
 export const DELETED_TEXT = {
   heading: 'Deleted content',
-  hint: 'This object is in the Trash.',
+  hint: `This ${NOTE_LOWER} is in the Trash.`,
   back: 'Go back',
   undo: 'Undo Delete',
 }

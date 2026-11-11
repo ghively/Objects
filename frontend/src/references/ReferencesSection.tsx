@@ -4,7 +4,10 @@
  * object's role (`References.tabs`). Nothing renders when the object offers no tabs. The active
  * tab is a filled pill; clicking it again hides the content, clicking any tab shows it; the tab
  * and closed state are remembered per object (`referencesUi.ts`). "All" stacks the other tabs'
- * content in tab order, each under its label.
+ * content in tab order, each under its label. M32 (the note page is for writing): a part with
+ * nothing in it is one quiet line ("No backlinks yet", "No unlinked mentions"), with no label and
+ * no explanation, so an empty note isn't crowded; a part with anything in it shows as before, and
+ * every tab stays (unlinked mentions are never removed or hidden).
  *
  * M8 settings: a section set to "Hidden" loses its tab,
  * Related Content is dropped for the types in "Types without related content", and with no
@@ -123,13 +126,30 @@ export function ReferencesSection({ path, summary }: ReferencesSectionProps) {
       {!ui.closed && (
         <div role="tabpanel" data-tabpanel={active}>
           {active === 'all' ? (
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col">
               {tabs
                 .filter((t) => t !== 'all')
                 .map((t) => {
                   const open = partOpen(t, ui, settings)
+                  if (tabCount(t, { ...data, tabs }) === 0) {
+                    // Nothing in it: its tab's one quiet line, with no heading to open or close.
+                    return (
+                      <div key={t} data-all-part={t} data-part-empty="" className="mt-1 first:mt-0">
+                        <TabContent
+                          tab={t}
+                          path={path}
+                          data={data}
+                          settings={settings}
+                          limit={limit}
+                          reload={reload}
+                          onShowMore={() => setLimit((n) => n + RELATED_STEP)}
+                          onToast={setToast}
+                        />
+                      </div>
+                    )
+                  }
                   return (
-                    <div key={t} data-all-part={t} data-part-open={open} className="flex flex-col gap-2">
+                    <div key={t} data-all-part={t} data-part-open={open} className="mt-6 flex flex-col gap-2 first:mt-0">
                       <h3 className="text-[13px] font-semibold text-fg-muted">
                         <button
                           type="button"

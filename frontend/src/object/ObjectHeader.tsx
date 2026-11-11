@@ -12,6 +12,7 @@ import { Icon, IconOrEmoji } from '@/components/Icon'
 import { IconPicker } from '@/components/IconPicker'
 import { ImagePicker } from '@/components/ImagePicker'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { typeLabel } from '@/lib/typeLabel'
 import { useTabs } from '@/nav/tabs'
 import { AliasesCell } from '@/properties/cells/AliasesCell'
 import { DescriptionCell } from '@/properties/cells/DescriptionCell'
@@ -69,6 +70,11 @@ export interface ObjectHeaderProps {
   onPropertiesChange?(updates: Record<string, unknown>): void
   /** Open a tag's page; default: `openTag`. */
   onOpenTag?(name: string): void
+  /**
+   * M32: put the caret at the start of the body (Enter, ArrowDown or Tab in the title). False
+   * when the body can't take it; Enter then leaves the field as before.
+   */
+  onEnterBody?(): boolean
 }
 
 /** A hover action. Used as a popover trigger (`asChild`), so it passes the trigger's ref and props on. */
@@ -98,7 +104,7 @@ function PickerPopover({ trigger, children }: { trigger: ReactNode; children: (c
   )
 }
 
-export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesChange, onOpenTag }: ObjectHeaderProps) {
+export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesChange, onOpenTag, onEnterBody }: ObjectHeaderProps) {
   const color = type?.color ?? 'gray'
   const editable = !readOnly && !!onPropertiesChange
   const titleEditable = !readOnly && !!onRename && !isDailyNoteType(type, summary.type)
@@ -205,7 +211,8 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesCh
           className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[color-mix(in_srgb,var(--chip-bg)_85%,white)] bg-[var(--chip-bg)] px-2 text-[15px] font-medium text-[var(--chip-fg)]"
         >
           <IconOrEmoji icon={type?.icon ?? null} fallback="ph-file-text" size={15} />
-          {type?.name ?? summary.type}
+          {/* M32: the built-in Page reads "Note", DailyNote "Daily note"; a renamed type keeps its name. */}
+          {typeLabel(type, summary.type)}
         </span>
       </div>
 
@@ -302,6 +309,13 @@ export function ObjectHeader({ summary, type, readOnly, onRename, onPropertiesCh
                 if (e.key === 'Escape' && hash !== null) {
                   e.preventDefault()
                   closeHash()
+                  return
+                }
+                // M32: Enter, ArrowDown or Tab go on to the body (the caret at its start); the
+                // blur that causes commits the typed title. Tab never walks the property pane.
+                const plain = !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey
+                if (plain && hash === null && (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'Tab') && onEnterBody?.()) {
+                  e.preventDefault()
                   return
                 }
                 // As the table's title cells: Enter and Escape both end the edit, which

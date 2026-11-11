@@ -8,7 +8,7 @@ import { openTag } from '@/object/ObjectHeader'
 import { tagColor, useTagObjects } from '@/properties/TagPicker'
 import { useTabs } from '@/nav/tabs'
 import { tagStyle } from '@/theme/palette'
-import { EmptyState } from './BacklinksTab'
+import { EmptyLine } from './BacklinksTab'
 import { REFERENCES_TEXT } from './referencesUi'
 
 export interface RelatedTagsTabProps {
@@ -18,7 +18,7 @@ export interface RelatedTagsTabProps {
 
 export function RelatedTagsTab({ entries, summaries }: RelatedTagsTabProps) {
   const tags = useTagObjects()
-  if (entries.length === 0) return <EmptyState title={REFERENCES_TEXT.relatedTagsEmpty} />
+  if (entries.length === 0) return <EmptyLine text={REFERENCES_TEXT.relatedTagsEmpty} />
   return (
     <ul className="flex flex-wrap gap-1.5" data-references-list="relatedTags">
       {entries.map((entry) => {

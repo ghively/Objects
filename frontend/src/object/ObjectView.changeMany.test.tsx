@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ObjectDetail, SpaceInfo, TypeDef, UpdateResult } from '@/api/types'
-import { objectDetail, objectSummary, typeDef } from '@/test/mockApi'
+import { objectDetail, objectSummary, propertyDef, typeDef } from '@/test/mockApi'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig<typeof import('@/api/client')>()),
@@ -27,7 +27,14 @@ import { usePeek, useTabs } from '@/nav/tabs'
 import { ObjectPage } from './ObjectPage'
 
 const mocked = vi.mocked(api)
-const TASK: TypeDef = typeDef({ id: 'task', name: 'Task', pluralName: 'Tasks', revision: 'r1' })
+// A property of its own, as the real Task type has: its pane starts open (M32).
+const TASK: TypeDef = typeDef({
+  id: 'task',
+  name: 'Task',
+  pluralName: 'Tasks',
+  revision: 'r1',
+  propertyDefinitions: [propertyDef({ id: 'status', key: 'status', name: 'Status', type: 'label' })],
+})
 const PATH = 'Tasks/Call.md'
 const DETAIL: ObjectDetail = objectDetail({
   summary: objectSummary({ path: PATH, type: 'task', title: 'Call' }),

@@ -62,7 +62,7 @@ describe('ObjectView … menu', () => {
       'Pin to sidebar',
       'Pin to...',
       'Change type',
-      'Object type settings',
+      'Type settings',
       'Present',
       'Export',
       'Import',
@@ -74,10 +74,10 @@ describe('ObjectView … menu', () => {
       'Fill empty properties using AI',
       'Edit collections',
       'Duplicate',
-      'Merge into object',
+      'Merge into note',
       'Wide layout',
       'Raw Markdown',
-      'Delete object',
+      'Delete',
     ])
     // The separators split the menu into its groups.
     const groups: string[][] = [[]]
@@ -111,7 +111,8 @@ describe('ObjectView … menu', () => {
   test('test header buttons use the floating chrome tokens', async () => {
     const { container } = render(<ObjectView path={PATH} mode="page" />)
     await screen.findByText('Hello.')
-    const toggle = screen.getByRole('button', { name: 'Hide properties' })
+    // M32: a plain note's pane starts closed, so the toggle reads "Show properties".
+    const toggle = screen.getByRole('button', { name: 'Show properties' })
     expect(toggle.className).toContain('border-[var(--float-btn-border)]')
     expect(toggle.className).toContain('bg-[var(--float-bg)]')
     expect(container.querySelector('.border-\\[var\\(--float-border\\)\\]')).not.toBeNull()
