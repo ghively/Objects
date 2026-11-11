@@ -117,6 +117,57 @@ describe('CreateSpaceDialog', () => {
     expect(typeof api.spaceSetup).toBe('function')
   })
 
+  // Fix pass W9.
+  test('test after creating the dialog is headed "Space created" and shows the whole path inside the box (W9)', async () => {
+    const user = await openDialog()
+    const long = '/home/gene/Documents/Spaces/Personal/Archive/2026/A much longer folder name than the dialog is wide/Reading list'
+    mocked.createSpace.mockResolvedValueOnce({ path: long })
+    await user.type(screen.getByPlaceholderText('Name'), 'Reading list')
+    await user.click(screen.getByRole('button', { name: 'Create space' }))
+    // The heading says what happened; the form's heading and intro are gone.
+    const dialog = await screen.findByRole('dialog', { name: 'Space created' })
+    expect(screen.queryByText('Create new space')).toBeNull()
+    expect(screen.queryByText('Name your space')).toBeNull()
+    expect(dialog).toHaveTextContent('Switch to it now?')
+    // The path in full, free to wrap inside the box (not one unbreakable line that pushes the box wider).
+    const path = screen.getByText(long)
+    expect(path).toHaveAttribute('title', long)
+    expect(path).toHaveClass('break-all')
+    expect(path).not.toHaveClass('truncate')
+    // Its column may shrink to the dialog's width, so the buttons stay inside too.
+    expect(path.parentElement).toHaveClass('min-w-0')
+    expect(dialog).toContainElement(screen.getByRole('button', { name: 'Later' }))
+    expect(dialog).toContainElement(screen.getByRole('button', { name: 'Switch space' }))
+  })
+
+  test('test the Location field says the space is made as a new folder inside it (W9)', async () => {
+    await openDialog()
+    const location = screen.getByRole('textbox', { name: 'Location' })
+    const hint = screen.getByText('The space is made as a new folder with its name inside this folder.')
+    expect(location).toHaveAccessibleDescription('The space is made as a new folder with its name inside this folder.')
+    // Under the field.
+    expect(location.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('test a Location that is not there is said plainly, and nothing is offered to switch to (W9)', async () => {
+    const user = await openDialog()
+    const location = screen.getByRole('textbox', { name: 'Location' })
+    await waitFor(() => expect(location).toHaveValue('/home/gene/Spaces'))
+    await user.clear(location)
+    await user.type(location, '/home/gene/Spaces/Second')
+    await user.type(screen.getByPlaceholderText('Name'), 'Second')
+    // The server's answer for a location that is no folder (missing, or a file).
+    mocked.createSpace.mockRejectedValueOnce(new ApiError(404, '"/home/gene/Spaces/Second" is not a folder.'))
+    await user.click(screen.getByRole('button', { name: 'Create space' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('The folder "/home/gene/Spaces/Second" does not exist.')
+    expect(screen.queryByText(/is not a folder/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Switch space' })).toBeNull()
+    // Another 404 of the route keeps the server's own words.
+    mocked.createSpace.mockRejectedValueOnce(new ApiError(404, 'Choose a folder for the new space.'))
+    await user.click(screen.getByRole('button', { name: 'Create space' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Choose a folder for the new space.'))
+  })
+
   test('test import from closes the dialog and opens the import dialog with the name and location (M15)', async () => {
     const user = await openDialog()
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Location' })).toHaveValue('/home/gene/Spaces'))

@@ -344,7 +344,11 @@ Each starter template pre-fills the new type's properties.
 - Space switcher (top left): popover with a Search field, one row per space with its own icon, a check on the
   current one, a divider, "+ Create space".
 - **A new space just starts (M32)**: "Create new space" asks for a name and a folder only (plus "Import from…" and
-  "Do I need a new space?"); it makes the space with the plain start (`setup: blank`) and offers to switch. A
+  "Do I need a new space?"); it makes the space with the plain start (`setup: blank`) and offers to switch.
+  (M32 fix pass) Under Location: "The space is made as a new folder with its name inside this folder." (the
+  space is `<Location>/<its name>`, and Location itself must be there); a Location that is no folder reads 'The
+  folder "…" does not exist.'. After creating, the dialog is headed "Space created" with "Switch to it now?", the
+  new folder's path (it wraps inside the box) and "Later" / "Switch space". A
   space opened as a new or empty folder asks nothing: the "Pick a starting point" dialog is gone, and nothing is
   written by opening. The starter sets ("Start with basic setup", "IT operations"; `POST /api/space/setup`) are
   offered from the type gallery instead. What the IT operations set writes is unchanged: the 17 IT ops types (Host,
