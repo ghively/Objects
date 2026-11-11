@@ -10,6 +10,7 @@ import { api } from '@/api/client'
 import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, useTabs, type Target } from '@/nav/tabs'
 import { typeDef } from '@/test/mockApi'
+import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { resetPinned } from './usePinned'
 import { TabStrip } from './TabStrip'
 
@@ -135,5 +136,35 @@ describe('TabStrip', () => {
   test('the tab menu button is in the strip', () => {
     render(<TabStrip space={null} />)
     expect(screen.getByRole('button', { name: 'Tab menu' })).toBeInTheDocument()
+  })
+})
+
+// Asked for by the M32 review: nothing covered a `work` tab while Work is off for the space.
+describe('a Work tab (M32)', () => {
+  const space = (workOn: boolean, hideTaskManagement = false) =>
+    useSpaceInfo.setState({ space: { name: 's', root: '/s', types: [], workEnabled: workOn, workOn, hideTaskManagement } as never, loaded: true })
+  afterEach(() => resetSpaceInfo())
+
+  test('test with Work off a work tab reads "Tasks" with the Tasks icon: it shows the Tasks page', () => {
+    space(false)
+    s().open({ kind: 'work', view: 'today' })
+    render(<TabStrip space={null} />)
+    expect(tabs()[0]).toHaveTextContent('Tasks')
+    expect(tabs()[0].querySelector('[data-icon]')).toHaveAttribute('data-icon', 'ph-check-circle')
+  })
+
+  test('test with Work on it reads "Work" with the Work icon, also while the space hides Tasks', () => {
+    space(true)
+    s().open({ kind: 'work' })
+    render(<TabStrip space={null} />)
+    expect(tabs()[0]).toHaveTextContent('Work')
+    expect(tabs()[0].querySelector('[data-icon]')).toHaveAttribute('data-icon', 'ph-briefcase')
+    act(() => space(true, true))
+    expect(tabs()[0]).toHaveTextContent('Work')
+    expect(tabs()[0].querySelector('[data-icon]')).toHaveAttribute('data-icon', 'ph-briefcase')
+    // Turned off while the tab is open: the tab follows.
+    act(() => space(false))
+    expect(tabs()[0]).toHaveTextContent('Tasks')
+    expect(tabs()[0].querySelector('[data-icon]')).toHaveAttribute('data-icon', 'ph-check-circle')
   })
 })

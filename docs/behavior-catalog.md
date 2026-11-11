@@ -147,12 +147,15 @@ Object has no accounts.
     or Enter opens the object.
 - Task management: "Hide Tasks in this space" per space (M32; was "Hide Task Management", key `hideTaskManagement`
   unchanged): "Hides the Tasks page, its entry in the sidebar and the task features in this space. Other spaces are
-  not changed." Tasks already made are kept. (M32) While it is on: the sidebar has no Tasks entry and no Work entry
-  under it; a Tasks or Work tab (a restored one, a pinned link) shows one quiet line, "Tasks are hidden in this
-  space.", with "Open Task management settings"; Home leaves its Tasks block out; the work toasts and overlays do
-  not show; the palette offers no "Create Task"; Ctrl+Shift+T makes no task (outside a note and in one); the
-  Shortcuts sheet leaves the task keys and the Work group out; the Calendar's day header has no task link. The Task
-  type, the tasks and the Calendar's own Tasks section stay; the switch off brings everything back at once.
+  not changed." Tasks already made are kept. (M32) While it is on: the sidebar has no Tasks entry; a Tasks tab (a
+  restored one, a pinned link) shows one quiet line, "Tasks are hidden in this space.", with "Open Task management
+  settings"; Home leaves its Tasks block out; the palette offers no "Create Task"; Ctrl+Shift+T makes no task
+  (outside a note and in one); the Shortcuts sheet leaves the task keys out; the Calendar's day header has no task
+  link. The Task type, the tasks and the Calendar's own Tasks section stay; the switch off brings everything back
+  at once. It hides Tasks, not Work: in a space with the Work page on, the Work entry, the page, its toasts,
+  overlays and keys and the Shortcuts sheet's Work group stay as they were, and the dashboard leaves out its own
+  task lists (M23's rule, section 3, Work). With Work off there is no Work page to keep, so a Work tab shows the
+  same quiet line as a Tasks tab.
 - Work (Object's own; M32): the first row is the switch "Use the Work page in this space" (`workEnabled` in
   `.object/space.json`; "Adds a Work page under Tasks: the Now view, queues, captures, alerts and tickets, and ticket
   fields on tasks and projects. Off: Tasks is a plain task list."). Off: the rest of the section (Your name in
@@ -433,8 +436,8 @@ Each starter template pre-fills the new type's properties.
   Move all open tasks to); "Open in Calendar" under it opens the Calendar's Day view on today. Today's badge
   counts that list's open tasks, Inbox's counts the inbox. While the space hides task management ("Hide Task
   Management"), the Work page leaves out the task lists (the list views and Today's tasks); the work views and
-  the timeline stay. (M32) "Hide Tasks in this space" now hides the Work page too: its sidebar entry goes and a
-  Work tab shows "Tasks are hidden in this space." (section 2, Task management). On
+  the timeline stay. (M32) "Hide Tasks in this space" hides the plain Tasks page and its entry, not the Work page:
+  the Work entry, the page and its toasts, overlays and keys stay (section 2, Task management). On
   Today's timeline a block too short for its label and time (the 24-minute Morning brief) shows the two on
   one line under the track (the next row down when two would meet; the tooltip stays). The Task rows load
   once for the page. (M32) The plain Tasks page is its own page again (above); the task lists stay views of the

@@ -111,10 +111,11 @@ describe('Sidebar Tasks and Work entries (M32)', () => {
     render(<Sidebar types={[]} />)
     await waitFor(() => expect(useSpaceInfo.getState().space?.hideTaskManagement).toBe(true))
     expect(within(main()).queryByRole('button', { name: 'Tasks' })).toBeNull()
-    expect(workButton()).toBeNull()
+    // The setting hides Tasks, not Work: the Work entry stays where it is (the fix pass, F12).
+    expect(workButton()).not.toBeNull()
     // The rest of the main entries are untouched (decision 1: AI stays where it is).
-    expect(mainNames().slice(0, 3)).toEqual(['All notes', 'Calendar', 'Graph'])
-    // The switch off again: both are back, without a reload.
+    expect(mainNames().slice(0, 4)).toEqual(['All notes', 'Calendar', 'Work', 'Graph'])
+    // The switch off again: Tasks is back, without a reload.
     act(() => useSpaceInfo.setState((st) => ({ space: st.space && { ...st.space, hideTaskManagement: false } })))
     expect(mainNames().slice(0, 5)).toEqual(['All notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
   })

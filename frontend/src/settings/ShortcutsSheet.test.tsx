@@ -94,7 +94,7 @@ describe('ShortcutsSheet', () => {
     expect(within(sheet).getByRole('region', { name: 'Work' })).toBeInTheDocument()
   })
 
-  test('test while the space hides Tasks the task keys and the Work group are left out', async () => {
+  test('test while the space hides Tasks the task keys are left out; the Work group stays while Work is on', async () => {
     render(<ShortcutsSheet />)
     act(() => useSettingsModal.getState().openShortcuts())
     const sheet = await screen.findByRole('dialog', { name: 'Shortcuts' })
@@ -102,7 +102,8 @@ describe('ShortcutsSheet', () => {
     act(() => useSpaceInfo.setState((s) => ({ space: s.space && { ...s.space, hideTaskManagement: true } })))
     expect(sheet.querySelector('[data-shortcut="createNewTask"]')).toBeNull()
     expect(sheet.querySelector('[data-shortcut="turnBlockIntoTaskObject"]')).toBeNull()
-    expect(within(sheet).queryByRole('region', { name: 'Work' })).toBeNull()
+    // Hide Tasks hides Tasks, not Work (the fix pass, F12).
+    expect(within(sheet).getByRole('region', { name: 'Work' })).toBeInTheDocument()
     // The rest of the two groups stays.
     expect(sheet.querySelector('[data-shortcut="openSettings"]')).not.toBeNull()
     expect(within(sheet).getByRole('region', { name: 'Block editing' })).toBeInTheDocument()

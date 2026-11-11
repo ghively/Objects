@@ -502,7 +502,8 @@ export function Sidebar({
             onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
           />
         )}
-        {workOn && !tasksHidden && (
+        {/* While Work is on; "Hide Tasks in this space" hides the Tasks entry above, not this one. */}
+        {workOn && (
           <MainNavButton
             icon="ph-briefcase"
             label={WORK_LABEL}

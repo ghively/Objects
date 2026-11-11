@@ -181,9 +181,12 @@ function pageFor(target: Target, { types, space, open, workOn, tasksHidden }: Pa
     case 'work':
       // M23's Work page (the dashboard), on its view. M32: only while Work is on for this space;
       // off, a work target (a restored tab, an old link) shows the Tasks page, on the list that
-      // stands for the view it named (`{view: 'today'}` → Today, `inbox` → Inbox…).
-      if (tasksHidden) return <TasksHidden />
-      return workOn ? <WorkPage view={target.view} /> : <TasksPage list={tasksListForWorkView(target.view)} />
+      // stands for the view it named (`{view: 'today'}` → Today, `inbox` → Inbox…). "Hide Tasks
+      // in this space" hides Tasks, not Work: with Work on the dashboard stays and leaves its own
+      // task lists out (M23's rule, `WorkPage`); with Work off the target is the Tasks page,
+      // which the setting hides.
+      if (workOn) return <WorkPage view={target.view} />
+      return tasksHidden ? <TasksHidden /> : <TasksPage list={tasksListForWorkView(target.view)} />
     case 'spaceHistory':
       // 2026-11-08: the space's git history and "Restore space to this point".
       return (
@@ -298,7 +301,7 @@ export default function App() {
   const types = useSpaceTypes(space)
   // M32: the Work page, its toasts and its overlays exist only while Work is on for this space.
   const workOn = useWorkOn()
-  // M32: "Hide Tasks in this space" hides the Tasks and Work entries, pages, toasts and overlays.
+  // M32: "Hide Tasks in this space" hides the Tasks entry and page (not Work: the dashboard stays).
   const tasksHidden = useTasksHidden()
 
   // Shortcuts (their keys are in `lib/shortcuts.ts`): the New menu (Ctrl+U, Alt+Shift+N), a new
@@ -446,9 +449,9 @@ export default function App() {
         />
         <LinkPicker />
         {/* M23: the work toasts (problems and Undo) and the focus session / Make it smaller, once.
-            M32: only while Work is on for this space. */}
-        {workOn && !tasksHidden && <WorkToasts />}
-        {workOn && !tasksHidden && <WorkOverlays />}
+            M32: only while Work is on for this space ("Hide Tasks" leaves them: it hides Tasks). */}
+        {workOn && <WorkToasts />}
+        {workOn && <WorkOverlays />}
         <NewObjectMenu open={newMenuOpen} onOpenChange={setNewMenuOpen} />
         <CreateTypeDialog
           open={createTypeOpen}
