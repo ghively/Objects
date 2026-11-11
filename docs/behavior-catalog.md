@@ -154,7 +154,7 @@ Object has no accounts.
   link. The Task type, the tasks and the Calendar's own Tasks section stay; the switch off brings everything back
   at once. It hides Tasks, not Work: in a space with the Work page on, the Work entry, the page, its toasts,
   overlays and keys and the Shortcuts sheet's Work group stay as they were, and the dashboard leaves out its own
-  task lists (M23's rule, section 3, Work). With Work off there is no Work page to keep, so a Work tab shows the
+  task lists (M23's rule; see the Work page's own lines). With Work off there is no Work page to keep, so a Work tab shows the
   same quiet line as a Tasks tab.
 - Work (Object's own; M32): the first row is the switch "Use the Work page in this space" (`workEnabled` in
   `.object/space.json`; "Adds a Work page under Tasks: the Now view, queues, captures, alerts and tickets, and ticket
