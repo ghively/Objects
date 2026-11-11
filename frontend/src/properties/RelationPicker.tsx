@@ -9,6 +9,7 @@ import { showToast } from '@/editor/media/upload'
 import { TypeChip } from '@/shell/Sidebar'
 import { creatableTypes, createTitled, fuzzyMatch } from '@/links/LinkPicker'
 import { ensureLinkIndex, typeOf, useLinkIndex } from '@/links/linkIndex'
+import { pageType } from '@/palette/searchOptions'
 import { tagStyle, themeColor } from '@/theme/palette'
 
 const LIMIT = 50
@@ -119,10 +120,13 @@ export function RelationPicker({ def, value, onChange, onClose, onOpenSettings }
       : writable
     // A relation's context is its allowed types only: with none (any type), not the active tab's
     // collection or query, which says nothing about what this relation points at.
-    const first = suggestFor(q, offered, { allowed, scope: [] })[0]
+    // M32 ("new means a note"): the type made last is no suggestion either. With nothing suggested
+    // and any type allowed, the Note leads the rows (unlabelled), so Enter makes a note.
+    const first = suggestFor(q, offered, { allowed, scope: [], last: false })[0]
     const top = offered.find((t) => t.id === first)
-    const rest = offered.filter((t) => t !== top).map((t) => ({ t, suggested: false }))
-    return top ? [{ t: top, suggested: true }, ...rest] : rest
+    const lead = top ?? (allowed.length ? undefined : pageType(offered))
+    const rest = offered.filter((t) => t !== lead).map((t) => ({ t, suggested: false }))
+    return lead ? [{ t: lead, suggested: !!top }, ...rest] : rest
   }, [tagsOnly, def.options.hasFixedSet, q, exact, types, allowed])
   const createOf = async (t: TypeDef) => {
     if (creating) return

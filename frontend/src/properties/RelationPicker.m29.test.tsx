@@ -102,6 +102,31 @@ describe('RelationPicker create rows (M29)', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  // M32 item 7: the type made last is no suggestion; with nothing to go on, Enter makes a Note.
+  it('the type made last is not suggested: an any-type relation makes a Note on Enter (M32)', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    useLastType.getState().set('application')
+    render(<RelationPicker def={relDef({ isArray: false })} value={[]} onChange={onChange} />)
+    await user.type(screen.getByRole('textbox', { name: 'Search for notes' }), 'Shopping list')
+    expect(createButtons().map((b) => b.type)).toEqual(['page', 'application', 'host', 'software', 'tag'])
+    expect(createButtons().filter((b) => b.text?.includes('Suggested'))).toEqual([])
+    expect(createButtons()[0].text).toBe("Create 'Shopping list'Note")
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith([{ target: 'Shopping list', path: 'page/Shopping list.md' }]))
+    expect(mocked.createObject.mock.calls).toEqual([['page', { title: 'Shopping list' }]])
+  })
+
+  it('the type made last is not put first among a relation\'s allowed types either (M32)', async () => {
+    const user = userEvent.setup()
+    useLastType.getState().set('host')
+    render(
+      <RelationPicker def={relDef({ isArray: true, allowedTypes: ['application', 'host'] })} value={[]} onChange={vi.fn()} />,
+    )
+    await user.type(screen.getByRole('textbox', { name: 'Search for notes' }), 'Payroll')
+    expect(createButtons().map((b) => b.type)).toEqual(['application', 'host'])
+  })
+
   it("an any-type relation doesn't take the active tab's scope (M29 review #13)", async () => {
     const user = userEvent.setup()
     // On a collection of Hosts, a relation to any type doesn't suggest Host for a name that isn't one.

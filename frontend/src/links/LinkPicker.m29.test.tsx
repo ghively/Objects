@@ -97,6 +97,25 @@ describe('[[ create rows (M29)', () => {
     expect(serializeBody(editor)).toBe('Hello [[APP01]]\n')
   })
 
+  // M32 item 7: after a task (or any other type) was made, a new linked note is still a Note.
+  test('test the type made last is not taken: New is a Page (M32)', async () => {
+    useLastType.getState().set('application')
+    const input = await typeQuery('Shopping list')
+    await waitFor(() => expect(createRow('page')).not.toBeNull())
+    expect(createRow('page')!.textContent).not.toContain('Suggested')
+    expect(createRow('application')).toBeNull()
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(useLinkPicker.getState().range).toBeNull())
+    expect(mocked.createObject.mock.calls).toEqual([['page', { title: 'Shopping list' }]])
+  })
+
+  test('test a name pattern still suggests its type, whatever was made last (M32)', async () => {
+    useLastType.getState().set('application')
+    await typeQuery('APP01')
+    await waitFor(() => expect(createRow('host')).not.toBeNull())
+    expect(createRow('host')!.textContent).toContain('Suggested')
+  })
+
   test('no suggestion falls back to Page (shown as Note)', async () => {
     await typeQuery('Shopping list')
     await waitFor(() => expect(createRow('page')).not.toBeNull())
