@@ -453,6 +453,14 @@ Each starter template pre-fills the new type's properties.
   decision D1). How-to guides opens a read-only list (People, Meetings, Projects, Books — one per basic-setup type —
   and The Tasks dashboard); a guide shows read-only with "All guides" to go back. The guides ship with the app and
   are never seeded into a space as objects (they would land in All notes and the counts).
+  (M32, notes first) The list is Tasks, People, Meetings, Projects, Books. "Tasks" (was "The Tasks dashboard")
+  explains the plain Tasks page (Today / Upcoming / Inbox / All / Done, More, "Add a task" with date words, the date
+  chip, "Search tasks", "New task"), with a short last section "The Work page (optional)" for the dashboard. The
+  type guides say to add the type from the `+` beside Types (a new space no longer asks for a starting point).
+  Getting started opens with "Your first five minutes" (write a note, today's note, link with `[[`, a task with a
+  date, Ctrl+K, tags), then "Finding your way around", "Types and properties (optional)", one paragraph on the
+  Assistant as a helper that acts only when asked, Spaces and "Where your files live"; one line says the Work page
+  and the IT operations types are off until turned on. No help text calls a note an "object".
 - **Theme toggle** in the sidebar footer switches dark and light immediately (it persists).
 
 ## 8. Search, New menu, view toolbar

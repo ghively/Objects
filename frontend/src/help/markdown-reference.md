@@ -1,10 +1,10 @@
 # Markdown reference
 
-Every object is a `.md` file. Object writes plain Markdown wherever Markdown can say it, and a small HTML comment on its own line where it cannot, so the file still reads cleanly in any editor. Saving changes only the lines you edited.
+Every note is a `.md` file. Object writes plain Markdown wherever Markdown can say it, and a small HTML comment on its own line where it cannot, so the file still reads cleanly in any editor. Saving changes only the lines you edited.
 
 ## Properties (front matter)
 
-The file starts with the object's properties between two `---` lines, in YAML:
+The file starts with the note's properties between two `---` lines, in YAML:
 
     ---
     id: 3f1c9a20
@@ -17,7 +17,7 @@ The file starts with the object's properties between two `---` lines, in YAML:
     project: "[[Office move]]"
     ---
 
-`id` stays the same when you rename the object, so links keep working. Labels are stored by option name, dates as `YYYY-MM-DD`, and a property that points at other objects as one or more `[[Title]]` links.
+`id` stays the same when you rename the note, so links keep working. Labels are stored by option name, dates as `YYYY-MM-DD`, and a property that points at other notes as one or more `[[Title]]` links.
 
 ## Headings
 
@@ -54,7 +54,7 @@ A toggle wraps its content in two comments. The first line inside is the toggle'
 
 ## Links
 
-- `[[Title]]` links to another object in the space; typing `@` or `[[` in the editor inserts one.
+- `[[Title]]` links to another note in the space; typing `@` or `[[` in the editor inserts one.
 - `[text](address)` is an ordinary Markdown link.
 - `![caption](Attachments/photo.png)` shows an image from the space's `Attachments/` folder.
 

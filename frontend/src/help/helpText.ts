@@ -2,13 +2,15 @@
 // shows is bundled with the app (no remote page, no external link) and nothing is written into
 // the space.
 
+import { TASKS } from '@/lib/words'
+
 export const HELP_TEXT = {
   section: 'Help & Resources',
   shortcuts: 'Keyboard shortcuts', // our string
   gettingStarted: 'Getting started', // our string
   markdownReference: 'Markdown reference', // our string
   guides: 'How-to guides', // our string
-  guidesIntro: 'Short guides to the basic setup types and the Tasks dashboard.', // our string
+  guidesIntro: 'Short guides to Tasks and to four types you can add: People, Meetings, Projects and Books.', // our string (M32)
   allGuides: 'All guides', // our string
   show: 'Show Help & Resources', // our string
   hide: 'Hide Help & Resources', // our string
@@ -18,15 +20,17 @@ export const HELP_TEXT = {
 export type HelpDoc = 'gettingStarted' | 'markdownReference' | 'guides'
 
 /**
- * The how-to guides (decision D1): read-only Help pages bundled with the app, one per basic-setup
- * type plus the Tasks dashboard. They are never seeded into a space as objects.
+ * The how-to guides (decision D1): read-only Help pages bundled with the app. M32: "Tasks" leads
+ * (the plain Tasks page, with a short section on the optional Work page; its id and file keep the
+ * name they had as "The Tasks dashboard"), then one per type of the everyday set. They are never
+ * seeded into a space as notes.
  */
 export const GUIDES = [
+  { id: 'tasksDashboard', title: TASKS },
   { id: 'people', title: 'People' },
   { id: 'meetings', title: 'Meetings' },
   { id: 'projects', title: 'Projects' },
   { id: 'books', title: 'Books' },
-  { id: 'tasksDashboard', title: 'The Tasks dashboard' },
 ] as const
 
 export type GuideId = (typeof GUIDES)[number]['id']
