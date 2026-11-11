@@ -20,6 +20,7 @@ import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { typePlural } from '@/lib/typeLabel'
 import { ALL_NOTES, NEW_TYPE, SAVED_SEARCHES, TYPES, WORK } from '@/lib/words'
 import { useTasksHidden } from '@/tasks/tasksHidden'
+import { openTasksOnToday } from '@/tasks/tasksTab'
 import { useWorkOn } from '@/work/useWorkOn'
 import { usePalette } from '@/palette/usePalette'
 import { useSettings } from '@/settings/useSettings'
@@ -499,7 +500,11 @@ export function Sidebar({
             icon="ph-check-circle"
             label="Tasks"
             active={tasksActive}
-            onClick={(e) => onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })}
+            onClick={(e) => {
+              // The page opens on Today (plan item 9), not on the list used last.
+              openTasksOnToday()
+              onOpenTarget?.({ kind: 'tasks' }, { newTab: e.ctrlKey || e.metaKey })
+            }}
           />
         )}
         {/* While Work is on; "Hide Tasks in this space" hides the Tasks entry above, not this one. */}

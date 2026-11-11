@@ -16,6 +16,7 @@ import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { agent } from '@/test/mockApi'
 import { setWorkOn } from '@/test/workOn'
+import { readTasksTab, writeTasksTab } from '@/tasks/tasksTab'
 import { Sidebar } from './Sidebar'
 
 const mocked = vi.mocked(api)
@@ -118,6 +119,20 @@ describe('Sidebar Tasks and Work entries (M32)', () => {
     // The switch off again: Tasks is back, without a reload.
     act(() => useSpaceInfo.setState((st) => ({ space: st.space && { ...st.space, hideTaskManagement: false } })))
     expect(mainNames().slice(0, 5)).toEqual(['All notes', 'Calendar', 'Tasks', 'Work', 'Graph'])
+  })
+
+  // The walk's W14: the Tasks entry opens the page on Today, not on the list used last.
+  test('test the Tasks entry asks for Today: the list remembered for the space is let go', async () => {
+    const user = userEvent.setup()
+    const onOpenTarget = vi.fn()
+    render(<Sidebar types={[]} onOpenTarget={onOpenTarget} />)
+    await waitFor(() => expect(useSpaceInfo.getState().space).not.toBeNull())
+    const root = useSpaceInfo.getState().space!.root
+    writeTasksTab(root, 'inbox')
+    expect(readTasksTab(root)).toBe('inbox')
+    await user.click(tasksButton()!)
+    expect(onOpenTarget).toHaveBeenLastCalledWith({ kind: 'tasks' }, { newTab: false })
+    expect(readTasksTab(root)).toBeNull()
   })
 
   test('test Tasks shows while AI features are hidden', () => {

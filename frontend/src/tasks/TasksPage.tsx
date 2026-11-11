@@ -4,8 +4,9 @@
 // The page: the header ("Tasks", "Search tasks", "New task"), "Add a task" (the quick add, which
 // reads date words), the tabs Today, Upcoming, Inbox, All and Done (`taskTabs.ts`, drawn by
 // `TaskList`) and a "More" menu with the other plain lists (Status, Deadline, Recurring,
-// Reminders, Tags, Context). It opens on Today and remembers the last list per space in the
-// browser (`tasksTab.ts`). Opening it, or moving between its tabs, writes no file.
+// Reminders, Tags, Context). From the sidebar it opens on Today; a tab that is restored shows the
+// list it was on, remembered per space in the browser (`tasksTab.ts`). Opening it, or moving
+// between its tabs, writes no file.
 //
 // The task lists (`TaskSectionPanel`; the "More" lists here, every list view of the Work page):
 // each task section (`taskSections.ts`) is a `DataView` over the section's Task rows, with the
@@ -37,7 +38,7 @@ import { completionToast, type TaskOutcome } from './taskActions'
 import { taskRowExtras } from './taskRowExtras'
 import { DEFAULT_TASK_SECTION, TASK_SECTIONS, isTaskSectionKey, sectionRows, todayOpenCount } from './taskSections'
 import { TASKS_MORE_LISTS, TASKS_PAGE_TABS, TASK_TABS_TEXT, searchTasks, tabGroups } from './taskTabs'
-import { DEFAULT_TASKS_LIST, TASKS_PAGE_LISTS, readTasksTab, writeTasksTab } from './tasksTab'
+import { DEFAULT_TASKS_LIST, TASKS_PAGE_LISTS, readTasksTab, useTasksVisits, writeTasksTab } from './tasksTab'
 import { useTaskRows, useTaskRowsFeed } from './useTaskRows'
 
 export { findTaskType } from './useTaskRows'
@@ -281,9 +282,11 @@ export function TasksPage({ list }: { list?: TaskSectionKey } = {}) {
   const { rows, loading, patchRow, taskType } = useTaskRows()
   const root = useSpaceInfo((s) => s.space?.root ?? null)
   const asked = TASKS_PAGE_LISTS.find((k) => k === list) ?? null
+  /** Goes to Tasks from the sidebar: each one starts the page on Today again (`tasksTab.ts`). */
+  const visit = useTasksVisits()
   /** The list picked on this visit; before a pick, the one asked for, else the one remembered for the space, else Today. */
-  const [picked, setPicked] = useState<{ root: string | null; asked: TaskSectionKey | null; list: TaskSectionKey } | null>(null)
-  const mine = picked && picked.root === root && picked.asked === asked ? picked.list : null
+  const [picked, setPicked] = useState<{ root: string | null; asked: TaskSectionKey | null; visit: number; list: TaskSectionKey } | null>(null)
+  const mine = picked && picked.root === root && picked.asked === asked && picked.visit === visit ? picked.list : null
   const active: TaskSectionKey = mine ?? asked ?? readTasksTab(root) ?? DEFAULT_TASKS_LIST
   const [search, setSearch] = useState('')
   const [toast, setToast] = useState<string | null>(null)
@@ -296,7 +299,7 @@ export function TasksPage({ list }: { list?: TaskSectionKey } = {}) {
 
   const show = (list: TaskSectionKey) => {
     setToast(null)
-    setPicked({ root, asked, list })
+    setPicked({ root, asked, visit, list })
     writeTasksTab(root, list)
   }
   const onResult = useCallback(

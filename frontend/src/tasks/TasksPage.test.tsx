@@ -30,6 +30,7 @@ import { FULL_VIEW_LAYOUTS } from '@/views/model'
 import { TASK_TYPE, taskRow } from './taskFixtures'
 import type { TaskSectionKey } from '@/api/types'
 import { TASKS_PAGE_TABS, TaskSectionPanel, TasksPage, tasksListForWorkView } from './TasksPage'
+import { openTasksOnToday } from './tasksTab'
 import { resetTaskRows, useTaskRowsFeed } from './useTaskRows'
 
 const mocked = vi.mocked(api)
@@ -494,7 +495,35 @@ describe('TasksPage (M32)', () => {
     expect(screen.getByRole('button', { name: 'More' })).toHaveTextContent('More')
   })
 
-  test('test the last tab is remembered per space, in the browser', async () => {
+  // The walk's W14 (decision): plan item 9 says the page "opens on Today". A restored tab (a
+  // reload, a tab come back to) keeps the list it was on; going to Tasks from the sidebar starts
+  // on Today (`openTasksOnToday`, what the sidebar's Tasks entry calls).
+  test('test going to Tasks from the sidebar opens on Today, also with the page already showing another list', async () => {
+    const user = userEvent.setup()
+    setWorkOn(false) // a loaded space (root /space)
+    const first = render(<TasksPage />)
+    await screen.findByText('Overdue (1)')
+    await user.click(screen.getByRole('tab', { name: 'Inbox' }))
+    expect(screen.getByRole('tab', { name: 'Inbox' })).toHaveAttribute('aria-selected', 'true')
+    // The Tasks entry clicked while the page is open on Inbox: Today.
+    act(() => openTasksOnToday())
+    expect(screen.getByRole('tab', { name: 'Today' })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByText('Overdue (1)')).toBeInTheDocument()
+    // A pick after that still wins, and is what a restored tab comes back to.
+    await user.click(screen.getByRole('tab', { name: 'Done' }))
+    first.unmount()
+    const again = render(<TasksPage />)
+    expect(screen.getByRole('tab', { name: 'Done' })).toHaveAttribute('aria-selected', 'true')
+    again.unmount()
+    // From the sidebar with the page closed: Today, whatever was shown last.
+    act(() => openTasksOnToday())
+    render(<TasksPage />)
+    expect(screen.getByRole('tab', { name: 'Today' })).toHaveAttribute('aria-selected', 'true')
+    // Nothing of this writes a file.
+    expect(mocked.patchUi).not.toHaveBeenCalled()
+  })
+
+  test('test the list shown is remembered per space, in the browser, for a tab that is restored', async () => {
     const user = userEvent.setup()
     setWorkOn(false) // a loaded space (root /space)
     const first = render(<TasksPage />)

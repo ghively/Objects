@@ -404,8 +404,9 @@ Each starter template pre-fills the new type's properties.
   task, open ones first) and **Done** (latest first); then a "More" menu with the other plain lists as they were
   (Status, Deadline, Recurring, Reminders, Tags, Context: each a list view with its own layouts, filters and
   saved view). The tab row is one stop for the Tab key; Left and Right move to the next tab and show its list,
-  Home and End go to the first and the last. The page opens on Today and comes back on the list last shown, kept per space in the browser:
-  opening the page or changing tabs writes no file. A group's header shows its count once ("Overdue (1)"). Rows:
+  Home and End go to the first and the last. The sidebar's Tasks entry opens the page on Today, also when the page is
+  already showing another list; a tab that is restored (a reload, a tab come back to, Back) shows the list it was
+  on, kept per space in the browser: opening the page or changing tabs writes no file. A group's header shows its count once ("Overdue (1)"). Rows:
   the circle (a click completes the task), the title (a click opens the task; a done task's is struck through),
   the date chip (a click opens Today / Tomorrow / Next week / No date and "Pick a date", the date picker, which
   opens with the caret in its date field and the date shown selected, so "friday" and Enter set it at once; Up
