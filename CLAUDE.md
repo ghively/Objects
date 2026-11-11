@@ -4,6 +4,7 @@
 
 ## Ground rules (set by Gene Hively, the owner)
 
+- **Notes first** (Gene, 2026-11-11): Object is a go-to notes app for a person organising their life. The manual note-taking and task-tracking experience is first class with all friction removed; AI is a helper, not the primary operator; the work dashboard and the IT types are things you turn on, never the default. Where this and the catalog disagree, this wins and the catalog is updated (analysis `docs/superpowers/plans/notes-first-analysis-2026-11-11.md`, plan `2026-11-11-m32-notes-first.md`).
 - **Fidelity to the behaviour catalog and design spec is the bar.** Match their labels, options, behaviour and values. Don't over-engineer, don't invent schema, keep questions few.
 - **Object's own model (the design spec) defines the data model**, not any other project's conventions. Don't design around `C:\Git\wiki`; it gets migrated into Object's format later as a separate project.
 - **Never touch `C:\Git\wiki`.**
