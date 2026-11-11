@@ -80,7 +80,7 @@ import {
   focusBodyEnd,
   focusedBodyCaret,
 } from './bodyCaret'
-import { dropHandover, handOver, peekHandover } from './renameHandover'
+import { claimHandover, dropHandover, handOver, peekHandover } from './renameHandover'
 import { typeHasOwnProperties } from './ownProperties'
 import { PropertyPanel } from './PropertyPanel'
 import { SaveMark } from './SaveMark'
@@ -340,12 +340,12 @@ export function ObjectView({
   workHeader,
 }: ObjectViewProps) {
   /**
-   * M32: what the view this one replaces left for it when its own rename moved the file
-   * (`renameHandover.ts`): the note as it stands, the caret, and text not yet saved. With it the
-   * first render already shows the editor; nothing is loaded again.
+   * M32: the note as the view this one replaces left it when its own rename moved the file
+   * (`renameHandover.ts`). With it the first render already shows the editor; nothing is loaded
+   * again. The caret and the text not yet saved are claimed once the view has mounted.
    */
   const [handed] = useState(() => (mode === 'inline' ? null : peekHandover(path)))
-  const [detail, setDetail] = useState<ObjectDetail | null>(handed?.detail ?? null)
+  const [detail, setDetail] = useState<ObjectDetail | null>(handed)
   /** Mirrors `detail` for callbacks that must not wait for a render (a work write's result). */
   const detailRef = useRef<ObjectDetail | null>(null)
   detailRef.current = detail
@@ -356,7 +356,7 @@ export function ObjectView({
    * with `api.workItem` (the front matter holds them as stored), for the raw values in `raw`.
    */
   const [decoded, setDecoded] = useState<{ path: string; raw: string; fields: Record<string, unknown> } | null>(null)
-  const [version, setVersion] = useState(handed?.detail.version ?? '')
+  const [version, setVersion] = useState(handed?.version ?? '')
   const [error, setError] = useState<string | null>(null)
   const [raw, setRaw] = useState(false)
   /** The pane toggled in this view; until then the object's own `hideProperties` decides. */
@@ -395,7 +395,7 @@ export function ObjectView({
 
   const editorRef = useRef<BodyEditorHandle | null>(null)
   /** The version the editor's next save is based on (mirrors `version` without waiting for a render). */
-  const versionRef = useRef(handed?.detail.version ?? '')
+  const versionRef = useRef(handed?.version ?? '')
   const onVersionRef = useRef(onVersion)
   onVersionRef.current = onVersion
   const onDetailRef = useRef(onDetail)
@@ -443,6 +443,7 @@ export function ObjectView({
       },
       caret: focusedBodyCaret(viewRootRef.current),
       unsaved: shown !== null && shown !== onDisk ? shown : null,
+      slot: viewRootRef.current?.parentElement ?? null,
     })
     // This editor is leaving: what it holds is handed over, and it must not write to the old path.
     if (shown !== null && shown !== onDisk) h.reload(shown, res.version)
@@ -850,7 +851,7 @@ export function ObjectView({
     pendingRef.current = false
     setPending(null)
     setRecovery(null)
-    if (handed && handed.detail.summary.path === path) {
+    if (handed && handed.summary.path === path) {
       // M32: handed over by the view our own rename replaced: the note is already shown, at the
       // version the rename answered. Only what the server works out is read again.
       adoptVersion(versionRef.current)
@@ -1496,9 +1497,12 @@ export function ObjectView({
   useEffect(() => {
     if (mode === 'inline' || !hasDetail || takenRef.current) return
     takenRef.current = true
-    dropHandover(path)
+    // One view takes the caret and the text (the one in the leaving view's place); the entry
+    // goes once every view of this update has had its turn.
+    const claim = handed ? claimHandover(path, viewRootRef.current?.parentElement ?? null) : null
+    if (handed) setTimeout(() => dropHandover(path), 0)
     const h = editorRef.current
-    const text = handed?.unsaved
+    const text = claim?.unsaved
     if (h && text != null) {
       // Shown now, saved by this view; the editor's own saving waits for the answer.
       h.reload(text, versionRef.current)
@@ -1524,7 +1528,7 @@ export function ObjectView({
           if (err instanceof ConflictError) enqueueRef.current(false)
         })
     }
-    const at = handed?.caret ?? takeBodyFocus(path)
+    const at = claim?.caret ?? takeBodyFocus(path)
     if (at) focusBody(viewRootRef.current, at)
   }, [mode, hasDetail, path, handed, adoptVersion])
 

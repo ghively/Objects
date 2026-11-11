@@ -321,6 +321,55 @@ describe('a rename that moves the file', () => {
     expect(bodyHasFocus(next)).toBe(false)
   }, 15000)
 
+  test('with the note open in two places, the pane being typed in keeps the caret and the text is saved once', async () => {
+    const user = userEvent.setup()
+    files[PATH] = file(PATH, 'Notes', '', 'v1')
+    let finishRename!: (r: RenameResult) => void
+    mocked.renameObject.mockImplementation(
+      () =>
+        new Promise<RenameResult>((resolve) => {
+          finishRename = resolve
+        }),
+    )
+    mocked.saveBody.mockResolvedValue({ version: 'v3' })
+    useTabs.getState().open({ kind: 'object', path: PATH })
+    const { container } = render(
+      <>
+        <div data-pane="main">
+          <ObjectPageOfTab />
+        </div>
+        <div data-pane="side">
+          <ObjectPageOfTab />
+        </div>
+      </>,
+    )
+    const pane = (name: string) => container.querySelector(`[data-pane="${name}"]`) as HTMLElement
+    const side = await waitFor(() => pm(pane('side')))
+    await waitFor(() => pm(pane('main')))
+    const title = pane('side').querySelector('input[aria-label="Title"]') as HTMLInputElement
+    await user.clear(title)
+    await user.type(title, 'Plans{Enter}')
+    await waitFor(() => expect(mocked.renameObject).toHaveBeenCalledTimes(1))
+    act(() => {
+      side.commands.insertContent('Hello')
+    })
+    const typed = serializeBody(side)
+    files[NEW] = file(NEW, 'Plans', '', 'v2')
+    delete files[PATH]
+    await act(async () => {
+      finishRename({ path: NEW, version: 'v2', relinked: [], skipped: [] })
+    })
+    const nextSide = pm(pane('side'))
+    const nextMain = pm(pane('main'))
+    expect(nextSide).not.toBe(side)
+    expect(serializeBody(nextSide)).toBe(typed)
+    expect(bodyHasFocus(nextSide)).toBe(true)
+    expect(bodyHasFocus(nextMain)).toBe(false)
+    await waitFor(() => expect(mocked.saveBody).toHaveBeenCalledWith(NEW, typed, 'v2'))
+    expect(mocked.saveBody).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  }, 15000)
+
   test('text that cannot be saved under the new path is kept and offered, never dropped', async () => {
     mocked.saveBody.mockRejectedValue(new Error('disk full'))
     const { container, editor, finish } = await renameAndStayInBody('')
