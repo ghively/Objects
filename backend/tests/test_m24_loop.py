@@ -277,6 +277,9 @@ def test_a_crashed_approve_run_asks_for_approval_again(env: Env) -> None:
     assert _step_now(env)["state"] == "approved"
     env.acts()
     env.idle()
+    # The crashed entry is "failed", not pending, so `idle` can answer before the worker's pass
+    # that withdraws it (seen once under full-suite load, 2026-11-11): wait for that pass.
+    env.wait_for(lambda: env.loop.store.get(e["id"])["state"] != "failed")
     settled = env.loop.store.get(e["id"])
     assert settled["state"] == "withdrawn" and settled["reason"] == REAPPROVE
     assert _step_now(env)["state"] == "open" and _step_now(env)["result"] == REAPPROVE
