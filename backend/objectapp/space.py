@@ -5767,7 +5767,12 @@ class Space:
             hidden = self._hidden_fields.get(old.id) or []
             if hidden:
                 old.propertyDefinitions = _merge_hidden(old.propertyDefinitions, hidden)
-                new.propertyDefinitions = _merge_hidden(new.propertyDefinitions, hidden)
+                # One the caller sends back unchanged (a window that listed the type while
+                # Work was on, "Add work fields" asked again) keeps the file's place too.
+                held = {p.key: p.to_json() for _after, p in hidden}
+                new.propertyDefinitions = _merge_hidden(
+                    [p for p in new.propertyDefinitions if held.get(p.key) != p.to_json()], hidden
+                )
             if is_task_type(old) and not self.work_on():
                 # A window that listed the Task while Work was on still holds every ticket
                 # and work field; with Work off the ones the type doesn't have (not saved,

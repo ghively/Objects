@@ -345,6 +345,19 @@ def test_add_work_fields_with_work_off_stores_them_and_lists_none(plain: Path):
     assert [p.key for p in sp.type_by_id(t.id).propertyDefinitions] == stored
 
 
+def test_add_work_fields_asked_again_with_work_off_keeps_the_files_order(tmp_path: Path, apps):
+    """The type lists none of its fields with Work off, so "Add work fields" sends them all
+    again: the ones the file already holds stay where the file has them."""
+    root = old_basic_space(tmp_path)
+    stored = _stored(root, "project")
+    a = apps(root)
+    rev = a.type("project")["revision"]
+    r = a.c.post("/api/types/project/work-fields", json={"baseRevision": rev})
+    assert r.status_code == 200, r.text
+    assert _stored(root, "project") == stored
+    assert a.keys("project") == set()
+
+
 def test_a_restored_work_type_is_listed_by_the_same_rule(plain: Path):
     _set_config(plain, workEnabled=False)
     sp = Space(plain)
