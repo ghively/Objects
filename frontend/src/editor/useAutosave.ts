@@ -1,8 +1,12 @@
 /**
  * Debounced, conflict-safe autosave shared by the formatted editor and raw mode.
  *
- * - `schedule()` saves 1000 ms after the last call; `flush()` saves now (on blur);
- *   `settle()` saves now and waits until no save is in flight or queued.
+ * - `schedule()` saves 1000 ms after the last call, and at most 3000 ms after the first
+ *   call since the last save (M32: typing that never pauses is still saved); `flush()`
+ *   saves now (on blur); `settle()` saves now and waits until no save is in flight or queued.
+ * - M32: it also saves now when the window loses focus, when the document becomes hidden
+ *   and on `pagehide`. The last two send a `keepalive` request, which the browser finishes
+ *   after the page is gone, and keep the text in `unsaved.ts` until the save lands.
  * - Nothing is sent when the body equals the last loaded or saved body.
  * - One save in flight at a time; edits made meanwhile are saved right after.
  * - A 409 calls `onConflict` and pauses saving until a new version arrives.
@@ -14,15 +18,23 @@
  *   left) are kept in `unsaved.ts` and offered when the object opens again.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { api, ConflictError, ReadOnlyError } from '@/api/client'
+import { announceLocalChange, api, ApiError, CLIENT_ID, ConflictError, ReadOnlyError } from '@/api/client'
 import type { FindControl } from './extensions/findInPage'
 import { dropUnsaved, keepUnsaved } from './unsaved'
 
 export const AUTOSAVE_DELAY_MS = 1000
+/** M32: while typing continues, the longest a key waits for its save. */
+export const AUTOSAVE_MAX_WAIT_MS = 3000
 /** First retry delay after a failed save; it doubles up to `AUTOSAVE_RETRY_MAX_MS`. */
 export const AUTOSAVE_RETRY_MS = 2000
 export const AUTOSAVE_RETRY_MAX_MS = 30000
 export const AUTOSAVE_ERROR_TEXT = 'Changes not saved. Retrying…'
+/**
+ * M32: the largest request body sent with `keepalive`. Browsers allow 64 KiB over all the
+ * keepalive requests in flight; a longer note goes as a normal request, which a closing page
+ * may cut off (its text is kept in `unsaved.ts` for a reload either way).
+ */
+export const KEEPALIVE_MAX_BYTES = 60 * 1024
 
 /**
  * M32: where the shown text stands against the file. `saved`: nothing to write; `unsaved`: edits
@@ -43,6 +55,49 @@ export type AutosaveOptions = {
   objectId?: string | null
 }
 
+/** How a save is sent. `keepalive`: as a request that outlives the page (M32, `pagehide`). */
+type SaveHow = { keepalive?: boolean }
+
+/** One save: `body` to `path` against `version`. */
+type Job = { path: string; body: string; version: string; keepalive: boolean }
+
+/**
+ * The save `api.saveBody` sends (`PUT /api/object/body`, the same headers and payload), as a
+ * `keepalive` request: the browser completes it even when the page is closed or reloaded right
+ * after. The launch key travels in the window's cookie, as on every same-origin request. Null
+ * when the payload is over `KEEPALIVE_MAX_BYTES` (the caller then sends the normal request).
+ */
+function saveBodyKeepalive(path: string, body: string, baseVersion: string): Promise<{ version: string }> | null {
+  const payload = JSON.stringify({ path, body, baseVersion, clientId: CLIENT_ID })
+  if (new TextEncoder().encode(payload).length > KEEPALIVE_MAX_BYTES) return null
+  return (async () => {
+    const res = await fetch('/api/object/body', {
+      method: 'PUT',
+      keepalive: true,
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: payload,
+    })
+    let data: unknown = null
+    try {
+      data = await res.json()
+    } catch {
+      // an empty or non-JSON answer
+    }
+    // FastAPI wraps an error's payload in {detail: ...}; accept both shapes (as the client does).
+    let d = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
+    if (d.detail && typeof d.detail === 'object') d = d.detail as Record<string, unknown>
+    if (res.ok) {
+      const version = String(d.version ?? '')
+      // As `api.saveBody`: other views of this note in the window hear of the save.
+      if (version && version !== baseVersion) announceLocalChange(path, version)
+      return { version }
+    }
+    if (res.status === 409) throw new ConflictError(String(d.currentVersion ?? ''))
+    if (res.status === 423) throw new ReadOnlyError(String(d.reason ?? (typeof d.detail === 'string' ? d.detail : 'read-only')))
+    throw new ApiError(res.status, typeof d.detail === 'string' ? d.detail : res.statusText)
+  })()
+}
+
 export function useAutosave(opts: AutosaveOptions) {
   const optsRef = useRef(opts)
   /** The object id last seen at each path this editor showed (kept text is tied to it). */
@@ -55,13 +110,20 @@ export function useAutosave(opts: AutosaveOptions) {
   const versionRef = useRef(opts.version)
   const savedBodyRef = useRef<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** M32: the max wait, running from the first `schedule()` since the last save. */
+  const maxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inFlightRef = useRef(false)
-  /** A save asked for while one was in flight: its path and the text at that moment. */
-  const queuedRef = useRef<{ path: string; body: string | null } | null>(null)
+  /** The path of the save in flight (set while `inFlightRef` is). */
+  const inFlightPathRef = useRef<string | null>(null)
+  /**
+   * Saves asked for while one was in flight, by path: the text at that moment and the version
+   * it stood on. One per path, so a flush on the next note never drops the note before it.
+   */
+  const queuedRef = useRef(new Map<string, { body: string | null; version: string }>())
   const pausedRef = useRef(false)
-  /** The save running now (including any save queued behind it), if any. */
+  /** The saves running now (the one in flight and every save queued behind it), if any. */
   const runningRef = useRef<Promise<void> | null>(null)
-  const flushRef = useRef<(pathOverride?: string) => Promise<void>>(async () => {})
+  const flushRef = useRef<(pathOverride?: string, how?: SaveHow) => Promise<void>>(async () => {})
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryDelayRef = useRef(AUTOSAVE_RETRY_MS)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -90,76 +152,116 @@ export function useAutosave(opts: AutosaveOptions) {
       clearTimeout(timerRef.current)
       timerRef.current = null
     }
+    if (maxTimerRef.current !== null) {
+      clearTimeout(maxTimerRef.current)
+      maxTimerRef.current = null
+    }
   }, [])
 
-  /** Save `body` to `path` against `version`, then any save queued meanwhile. */
-  const start = useCallback(
-    async (path: string, body: string, version: string): Promise<void> => {
-      inFlightRef.current = true
+  /** Send one save and take its answer. Resolves with the new version, or null when it failed. */
+  const saveOnce = useCallback(
+    async (job: Job): Promise<string | null> => {
+      const { path, body, version } = job
+      inFlightPathRef.current = path
       if (optsRef.current.path === path) setPhase('saving')
+      try {
+        const res = await ((job.keepalive ? saveBodyKeepalive(path, body, version) : null) ?? api.saveBody(path, body, version))
+        if (optsRef.current.path === path) {
+          versionRef.current = res.version
+          savedBodyRef.current = body
+          retryDelayRef.current = AUTOSAVE_RETRY_MS
+          setSaveError(null)
+          // Keys pressed while this save ran wait for their own save.
+          const now = optsRef.current.getBody()
+          setPhase(now !== null && now !== body ? 'unsaved' : 'saved')
+          // What is on disk is now newer than any text kept for this object
+          // earlier (e.g. by a settle while saving was paused): offering that
+          // again would revert these edits.
+          dropUnsaved(path, idsRef.current.get(path))
+          optsRef.current.onSaved(res.version)
+        }
+        return res.version
+      } catch (err) {
+        if (!aliveRef.current || optsRef.current.path !== path) {
+          // The editor has left this object: nobody is there to resolve a conflict
+          // or see a retry, so keep the text to offer when the object opens again:
+          // the text asked for on leaving, when it is newer than this save's.
+          const q = queuedRef.current.get(path)
+          keepUnsaved(path, q && q.body !== null ? q.body : body, idsRef.current.get(path))
+        } else if (err instanceof ConflictError) {
+          pausedRef.current = true
+          setSaveError(null)
+          setPhase('unsaved')
+          optsRef.current.onConflict?.(err.currentVersion)
+        } else if (err instanceof ReadOnlyError) {
+          pausedRef.current = true
+          setSaveError(null)
+          setPhase('unsaved')
+        } else {
+          console.error('autosave failed', err)
+          setSaveError(AUTOSAVE_ERROR_TEXT)
+          setPhase('unsaved')
+          clearRetry()
+          const delay = retryDelayRef.current
+          retryDelayRef.current = Math.min(delay * 2, AUTOSAVE_RETRY_MAX_MS)
+          retryTimerRef.current = setTimeout(() => {
+            retryTimerRef.current = null
+            if (optsRef.current.path === path) void flushRef.current()
+          }, delay)
+        }
+        return null
+      }
+    },
+    [clearRetry],
+  )
+
+  /**
+   * The next save queued while `last` ran, or null when nothing is left. On the object still
+   * shown that is its latest text; on one the editor has left (or after it was destroyed), the
+   * text it had when the save was asked for.
+   */
+  const nextQueued = useCallback((last: Job, savedVersion: string | null): Job | null => {
+    const queued = queuedRef.current
+    const o = optsRef.current
+    // The object just saved first (its save stands on the version just returned), the one shown last.
+    const order = [...queued.keys()].sort(
+      (a, b) => Number(a === o.path) - Number(b === o.path) || Number(b === last.path) - Number(a === last.path),
+    )
+    for (const path of order) {
+      const q = queued.get(path)!
+      queued.delete(path)
+      if (path === o.path) {
+        if (o.readOnly || pausedRef.current) continue
+        const latest = o.getBody() ?? q.body
+        if (latest === null || latest === savedBodyRef.current) continue
+        return { path, body: latest, version: versionRef.current, keepalive: false }
+      }
+      if (q.body === null) continue
+      if (path === last.path) {
+        // Left while its save ran. A failed save kept this text already (`saveOnce`).
+        if (savedVersion === null || q.body === last.body) continue
+        return { path, body: q.body, version: savedVersion, keepalive: false }
+      }
+      // Another object left meanwhile: its text against the version it stood on.
+      return { path, body: q.body, version: q.version, keepalive: false }
+    }
+    return null
+  }, [])
+
+  /** Save `body` to `path` against `version`, then every save queued meanwhile. */
+  const start = useCallback(
+    async (path: string, body: string, version: string, how?: SaveHow): Promise<void> => {
+      inFlightRef.current = true
       const run = (async () => {
-        let savedVersion: string | null = null
+        let job: Job | null = { path, body, version, keepalive: how?.keepalive === true }
         try {
-          const res = await api.saveBody(path, body, version)
-          savedVersion = res.version
-          if (optsRef.current.path === path) {
-            versionRef.current = res.version
-            savedBodyRef.current = body
-            retryDelayRef.current = AUTOSAVE_RETRY_MS
-            setSaveError(null)
-            // Keys pressed while this save ran wait for their own save.
-            setPhase(timerRef.current !== null ? 'unsaved' : 'saved')
-            // What is on disk is now newer than any text kept for this object
-            // earlier (e.g. by a settle while saving was paused): offering that
-            // again would revert these edits.
-            dropUnsaved(path, idsRef.current.get(path))
-            optsRef.current.onSaved(res.version)
-          }
-        } catch (err) {
-          if (!aliveRef.current || optsRef.current.path !== path) {
-            // The editor has left this object: nobody is there to resolve a conflict
-            // or see a retry, so keep the text to offer when the object opens again:
-            // the text asked for on leaving, when it is newer than this save's.
-            const q = queuedRef.current
-            keepUnsaved(path, q?.path === path && q.body !== null ? q.body : body, idsRef.current.get(path))
-          } else if (err instanceof ConflictError) {
-            pausedRef.current = true
-            setSaveError(null)
-            setPhase('unsaved')
-            optsRef.current.onConflict?.(err.currentVersion)
-          } else if (err instanceof ReadOnlyError) {
-            pausedRef.current = true
-            setSaveError(null)
-            setPhase('unsaved')
-          } else {
-            console.error('autosave failed', err)
-            setSaveError(AUTOSAVE_ERROR_TEXT)
-            setPhase('unsaved')
-            clearRetry()
-            const delay = retryDelayRef.current
-            retryDelayRef.current = Math.min(delay * 2, AUTOSAVE_RETRY_MAX_MS)
-            retryTimerRef.current = setTimeout(() => {
-              retryTimerRef.current = null
-              if (optsRef.current.path === path) void flushRef.current()
-            }, delay)
+          while (job) {
+            const savedVersion: string | null = await saveOnce(job)
+            job = nextQueued(job, savedVersion)
           }
         } finally {
           inFlightRef.current = false
-        }
-        // A save asked for while this one ran. On the object still shown, save
-        // its latest text; on one the editor has left (or after it was
-        // destroyed), the text it had when the save was asked for.
-        const queued = queuedRef.current
-        queuedRef.current = null
-        if (!queued) return
-        const o = optsRef.current
-        if (queued.path === o.path) {
-          if (o.readOnly || pausedRef.current) return
-          const latest = o.getBody() ?? queued.body
-          if (latest === null || latest === savedBodyRef.current) return
-          await startRef.current(queued.path, latest, versionRef.current)
-        } else if (savedVersion !== null && queued.path === path && queued.body !== null && queued.body !== body) {
-          await startRef.current(queued.path, queued.body, savedVersion)
+          inFlightPathRef.current = null
         }
       })()
       runningRef.current = run
@@ -169,20 +271,18 @@ export function useAutosave(opts: AutosaveOptions) {
         if (runningRef.current === run) runningRef.current = null
       }
     },
-    [clearRetry],
+    [nextQueued, saveOnce],
   )
-  const startRef = useRef(start)
-  startRef.current = start
 
   /** Save now. `pathOverride` saves under a previous path (the editor is switching objects). */
   const flush = useCallback(
-    async (pathOverride?: string): Promise<void> => {
+    async (pathOverride?: string, how?: SaveHow): Promise<void> => {
       cancel()
       const o = optsRef.current
       if (o.readOnly || pausedRef.current) return
       const path = pathOverride ?? o.path
       if (inFlightRef.current) {
-        queuedRef.current = { path, body: o.getBody() }
+        queuedRef.current.set(path, { body: o.getBody(), version: versionRef.current })
         return
       }
       const body = o.getBody()
@@ -191,7 +291,7 @@ export function useAutosave(opts: AutosaveOptions) {
         if (body !== null && path === o.path && aliveRef.current) setPhase('saved')
         return
       }
-      await start(path, body, versionRef.current)
+      await start(path, body, versionRef.current, how)
     },
     [cancel, start],
   )
@@ -225,15 +325,23 @@ export function useAutosave(opts: AutosaveOptions) {
   }, [flush])
 
   const schedule = useCallback(() => {
-    if (optsRef.current.readOnly) return
-    cancel()
-    // During a save the state stays `saving`; the save's end sees the timer and says `unsaved`.
-    if (!inFlightRef.current) setPhase('unsaved')
+    const o = optsRef.current
+    if (o.readOnly) return
+    if (timerRef.current !== null) clearTimeout(timerRef.current)
+    // During this object's save the state stays `saving`; the save's end says `unsaved`.
+    if (!(inFlightRef.current && inFlightPathRef.current === o.path)) setPhase('unsaved')
     timerRef.current = setTimeout(() => {
       timerRef.current = null
       void flush()
     }, AUTOSAVE_DELAY_MS)
-  }, [cancel, flush])
+    // M32: keys that keep coming restart the wait above; this one runs from the first of them.
+    if (maxTimerRef.current === null) {
+      maxTimerRef.current = setTimeout(() => {
+        maxTimerRef.current = null
+        void flush()
+      }, AUTOSAVE_MAX_WAIT_MS)
+    }
+  }, [flush])
 
   /** Record `body` as what is on disk (after a load), so saving it again is a no-op. */
   const markLoaded = useCallback(
@@ -266,6 +374,7 @@ export function useAutosave(opts: AutosaveOptions) {
       pausedRef.current = false
       if (saveNow) return flush()
       if (optsRef.current.getBody() !== savedBodyRef.current) schedule()
+      else if (!inFlightRef.current) setPhase('saved')
       return Promise.resolve()
     },
     [flush, schedule],
@@ -294,6 +403,39 @@ export function useAutosave(opts: AutosaveOptions) {
     },
     [cancel, flush, keepIfPaused],
   )
+
+  // M32: save at once when the window loses focus, when the document becomes hidden and on
+  // `pagehide` (the window closing, a reload, a space switch). Nothing is sent when nothing is
+  // unsaved, and a save already in flight is followed by one more, never doubled.
+  useEffect(() => {
+    /** True when a note is loaded and may be written (an editor not loaded yet reads as empty). */
+    const ready = () => savedBodyRef.current !== null && !optsRef.current.readOnly
+    const onBlur = () => {
+      if (ready()) void flushRef.current()
+    }
+    /** The page may not come back: send a request that outlives it, and keep the text until it lands. */
+    const onGoing = () => {
+      if (!ready()) return
+      const o = optsRef.current
+      const body = o.getBody()
+      if (body === null || body === savedBodyRef.current) return
+      // A conflict, a save still in flight (the queued one can't run on a closed page) or a
+      // request cut off would lose it: a reload offers it again, and a save that lands drops it.
+      keepUnsaved(o.path, body, idsRef.current.get(o.path))
+      void flushRef.current(undefined, { keepalive: true })
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') onGoing()
+    }
+    window.addEventListener('blur', onBlur)
+    window.addEventListener('pagehide', onGoing)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('blur', onBlur)
+      window.removeEventListener('pagehide', onGoing)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
 
   useEffect(() => {
     aliveRef.current = true

@@ -34,6 +34,7 @@ import {
 import { splitBlocks, type SourceBlock } from './blocks'
 import { buildTree, flattenTree, isOneLine, type TreeNode } from './blockTree'
 import { eolOf, hasPipeInCodeSpan, preserveBlock, serializeWithPreservation, type EditorBlock } from './preserve'
+import { shouldAutoLink } from './extensions/autoLink'
 import {
   BLOCK_SOURCE_META,
   BlockSource,
@@ -41,6 +42,7 @@ import {
   takeSnapshots,
 } from './extensions/blockSource'
 import { BlockSelection } from './extensions/blockSelection'
+import { DocumentEnds } from './extensions/documentEnds'
 import { FileDrop } from './extensions/fileDrop'
 import { InlineTag } from './extensions/inlineTag'
 import { MarkdownShortcuts } from './extensions/markdownShortcuts'
@@ -133,7 +135,8 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
   return [
     RegistryStarterKit.configure({
       heading: { levels: [1, 2, 3, 4] },
-      link: { openOnClick: false },
+      // M32: a bare file name (`notes.md`, `config.py`) is not auto-linked (`extensions/autoLink.ts`).
+      link: { openOnClick: false, shouldAutoLink },
       codeBlock: false,
       orderedList: false,
     }),
@@ -177,6 +180,8 @@ export function editorExtensions(opts: EditorExtensionOptions = {}): AnyExtensio
     MarkdownShortcuts.configure({ numbered }),
     // M31
     InlineTag,
+    // M32
+    DocumentEnds,
   ]
 }
 

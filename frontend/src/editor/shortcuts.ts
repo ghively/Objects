@@ -20,7 +20,7 @@ import { stepHierarchy } from './extensions/textHierarchy'
 import { toggleAllToggles } from './extensions/toggleAll'
 import { copyBlockReference } from './nodes/blockRef'
 import { runHighlightText } from './nodes/textStyle'
-import { turnIntoObject, turnIntoTask, turnTodoIntoTask } from './turnInto'
+import { turnIntoObject, turnIntoTask, turnLineIntoTask } from './turnInto'
 
 /** The editor-scope shortcuts of the plan's "Shortcut keys" table. */
 export const EDITOR_SHORTCUTS: ShortcutDef[] = M7_SHORTCUTS.filter((d) => d.scope === 'editor')
@@ -137,7 +137,8 @@ export const M8Keys = Extension.create({
       // `I` only with blocks selected; otherwise the letter is typed.
       turnIntoObject: () => !!blockSelectionKey.getState(editor.state) && runAction(() => turnIntoObject(editor)),
       turnIntoTask: () => runAction(() => turnIntoTask(editor)),
-      turnBlockIntoTaskObject: () => runAction(() => turnTodoIntoTask(editor)),
+      // M32: any text line, not only a to-do ("Make this line a task").
+      turnBlockIntoTaskObject: () => runAction(() => turnLineIntoTask(editor)),
       highlightText: () => runHighlightText(editor),
       // Arms the next paste and lets the browser fire it (the key is not consumed).
       pasteAsPlainText: () => {

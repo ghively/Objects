@@ -7,7 +7,7 @@
  *    "Group" (Ctrl+G) (`BlockStyleMenu` without its "Icon" row);
  * 2. "AI assistant..." (M10: opens the AI chat about the blocks, `aiEntries`; gone while
  *    "Hide AI features" is on), "Turn into..." ▸ (the object picker: the types, a to-do's "Turn into
- *    task object", "Turn into whiteboard"), "Copy" ▸ ("Copy blocks", "Copy as
+ *    task", "Turn into whiteboard"), "Copy" ▸ ("Copy blocks", "Copy as
  *    Markdown", "Copy block reference" for one block), "Duplicate" (Ctrl+D),
  *    "Remove" (Backspace, red trash).
  *
@@ -40,6 +40,7 @@ import { useLinkIndex } from '@/links/linkIndex'
 import { useAiHidden } from '@/ai/store'
 import { NOT_AVAILABLE, NotBuiltYet } from '@/lib/notBuilt'
 import { formatKeys, keysFor } from '@/lib/shortcuts'
+import { typeLabel } from '@/lib/typeLabel'
 import { TypeChip } from '@/shell/Sidebar'
 import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 import {
@@ -69,7 +70,7 @@ export const BLOCK_MENU_TEXT = {
   duplicate: 'Duplicate',
   remove: 'Remove',
   selected: (n: number) => `${n} selected`,
-  turnIntoTaskObject: 'Turn into task object',
+  turnIntoTaskObject: 'Turn into task', // M32 (the glossary): was "Turn into task object"
   turnIntoWhiteboard: 'Turn into whiteboard',
 }
 
@@ -139,7 +140,7 @@ export interface BlockMenuProps {
 /**
  * The object picker behind "Turn into..." (and the block-selection bar's "Turn blocks into"): the
  * writable types, "Turn into whiteboard" when no type is the whiteboard one, and a to-do's "Turn
- * into task object". Render inside a dropdown menu's content. M29: the suggested type for the
+ * into task". Render inside a dropdown menu's content. M29: the suggested type for the
  * block's title comes first, marked "Suggested"; the others keep their order.
  */
 export function TurnIntoObjectItems({ editor, todo }: { editor: Editor; todo: boolean }) {
@@ -156,7 +157,7 @@ export function TurnIntoObjectItems({ editor, todo }: { editor: Editor; todo: bo
           onSelect={() => run(() => (isWhiteboardType(t) ? turnIntoWhiteboard(editor) : turnIntoObject(editor, t.id)))}
         >
           <TypeChip type={t} size={18} />
-          {t.name}
+          {typeLabel(t)}
           {t === top && (
             <span className="ml-auto rounded bg-hover px-1.5 text-[12px] text-fg-muted">{SUGGEST_TEXT.suggested}</span>
           )}

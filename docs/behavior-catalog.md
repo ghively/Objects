@@ -443,6 +443,14 @@ Each starter template pre-fills the new type's properties.
 - **Inline code** renders as a purple monospace token with a tinted background; **tables** are bordered with a
   header row; the empty body's placeholder reads "Start writing, or type / for blocks..."; the title placeholder "Untitled".
 - **Slash menu**, **@ picker**: see audit items 41-43 and section 2.
+- **Editor wording (M32, the glossary)**: the slash groups read "Create a block", "New" (was "Create an object";
+  its rows "Create Note", "Create Task" and so on, the built-in Page type reading "Note"), "Link to a date" and
+  "Embed" (was "Reuse any content", the group and its first row; a saved search's row says "Embed this saved
+  search"). The selection toolbar's `+` reads "Make a new note out of the selected text.", its `@` "Point the
+  selected text at a note you already have.", their fields "Search types" and "Search notes", an empty list "No
+  matches". The block menu's to-do row reads "Turn into task", the selection bar's Move menu "New note" ("Move the
+  selection onto a new note"), a missing embedded saved search "Saved search not found.". The AI rows of the slash
+  menu, the block menu and both toolbars are where they were (decision 1).
 - **Markdown list shortcuts** (decision C11; `editor/extensions/markdownShortcuts.ts`, `editor/document.ts`):
   - At a block's start, typed marks followed by Space convert: `|` quote, `>` toggle, `*` or `-` bullet, `1.`
     numbered, `a)` alphabetical, `i)` roman, `[]` to-do, `()` icon, `#`-`####` heading. `---` makes a horizontal
@@ -451,9 +459,37 @@ Each starter template pre-fills the new type's properties.
     heading, icon, quote, list, toggle. Two marks of one kind (two lists, two headings) stay text.
   - A single bullet, number or heading mark is StarterKit's own rule. `> ` makes a toggle, not a quote; `[] ` makes
     a to-do list like the menus.
+  - (M32) The GitHub way of writing a to-do works too: `- [ ] ` and `* [ ] ` make an unchecked to-do, `- [x] ` (or
+    `[X]`) a checked one, and `[ ] ` / `[x] ` do the same at the start of a text line. In a bullet list that has
+    other lines only the typed line becomes a to-do. In a numbered list, a heading or a to-do the characters stay
+    text. `> ` is still a toggle and `| ` a quote (M32, our call 1).
   - `()` always gives the same icon (Object keeps no last-used icon).
   - "Turn off automatic numbered lists" removes `1.` as a mark, alone and combined.
 - **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).
+- **Markdown habits (M32)**:
+  - A bare word ending in a file extension (`notes.md`, `config.py`, `run.sh`, `main.rs`, `archive.zip`,
+    `clip.mov`; the list is `editor/extensions/autoLink.ts`) is a file name, not a web link, typed or pasted. A real
+    address still links: `example.com`, `https://…`, `www.…`, one with a path (`docs.rs/serde`), a mail address.
+  - A list that mixes bullets and to-dos (typed or pasted as `- a` / `- [ ] b`) is one list: each bullet has its
+    dot, each to-do its box in the dot's place with the text beside it; a bullet nested under a to-do keeps its dot.
+  - An image with no width set (pasted, dropped or written as `![](…)`) is shown at its own size and never
+    stretched; one wider than the text is held to the text's width. A width the user drags is kept as before
+    (`width=`). A narrow image's hover toolbar stands beside it instead of covering it.
+  - The block toolbar (the bar shown while blocks are selected, e.g. after Esc in a block) is centred under the
+    text and moved just enough to stay 16 px inside the window at any width.
+  - Ctrl+Home and Ctrl+End put the caret at the start and the end of the note (with Shift: selecting), also when
+    the note starts with a to-do (the browser's own key did nothing there).
+- **Saving (M32)**: a note is saved 1 s after the last key and, while typing continues, at most 3 s after the
+  first unsaved key. It is also saved at once when the text or the window loses focus, when the window is hidden
+  or closing (`pagehide`: a request the browser finishes after the page is gone, for a note up to 60 KB; the text
+  is also kept for a reload until the save lands), on a note or tab switch and when the editor closes. Nothing is
+  sent when nothing changed, and never two saves at once: a save asked for while one runs follows it with the
+  latest text. Conflicts, read-only files and "Changes not saved. Retrying…" are as before.
+- **Make this line a task (M32)**, Ctrl+Shift+T with the caret in a note: the line holding the caret becomes a
+  Task titled with its text and is replaced by the task's link card, whatever the line is: a paragraph, a heading,
+  a list line (the list is split around it; nested lines become the task's body) or a to-do (a ticked one is made
+  Done). With blocks selected: every to-do in them, or the first block when they hold none. A line without text
+  and a code block are left alone, and a task that can't be made changes nothing.
 - **While typing** the surrounding chrome (top bar, header buttons) fades until the pointer moves.
 - **Edited lines are written in the editor's standard Markdown form**: the line of a block you edit is rewritten
   that way (`_b_` becomes `*b*`, `[X]` becomes `[x]`, a setext heading becomes ATX `#`, a bare URL becomes
@@ -1068,6 +1104,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   a type lists the suggested type first; the palette's single create row ("Create new {type} with title "{q}"")
   uses it unless a type filter is set; Turn into object lists it first and `I` uses it. Picking a type applies
   its default template. Nothing is sent anywhere: no AI, no server round trip per keystroke.
+  (M32, "new means a note") In a note's text the type used last and the tab's list are no suggestion: "New
+  '<q>'" in the `[[` / `@` menu, Turn into object and `I` make a Note unless a type's name patterns match the
+  name or a type is picked ("Other types", the Turn into list). The built-in Page type reads "Note" there.
 - **Name patterns** (Object type settings, "Name patterns", one per line): `*` any characters but spaces, `?` one
   character, `#` a digit, `@` a letter, `\` makes the next character literal, or exactly one of `{ip}`, `{cidr}`,
   `{fqdn}` (three or more labels), `{version}` (a name, a space, a version number); the whole name must match,

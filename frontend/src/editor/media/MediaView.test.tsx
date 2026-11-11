@@ -205,4 +205,60 @@ describe('MediaView', () => {
     const card = await screen.findByTestId('bookmark-block')
     expect(card.querySelector('a')!.hasAttribute('href')).toBe(false)
   })
+
+  // M32 item 4: a small pasted or dropped image keeps its own size.
+  /** The image reports its own size, as the browser does once it has loaded. */
+  function loaded(img: HTMLImageElement, naturalWidth: number) {
+    Object.defineProperty(img, 'naturalWidth', { value: naturalWidth, configurable: true })
+    fireEvent.load(img)
+  }
+
+  test('test an image with no width set is shown at its own width, never wider (M32)', async () => {
+    const body = 'Intro\n\n![pixel](Attachments/pixel.png)\n\nOutro\n'
+    const editor = await mount(body)
+    const block = await screen.findByTestId('media-block')
+    const frame = block.querySelector<HTMLElement>('.resizable-embed-frame')!
+    const img = block.querySelector('img')!
+    expect(frame.style.width).toBe('') // before it loads: no size of its own yet
+    loaded(img, 48)
+    expect(frame.style.width).toBe('48px')
+    expect(frame.style.maxWidth).toBe('100%') // a wide image is still held to the text column
+    expect(frame.getAttribute('data-natural')).toBe('')
+    // Nothing is written for it: the size is the picture's, not an option.
+    expect(frame.hasAttribute('data-width')).toBe(false)
+    expect(serializeBody(editor)).toBe(body)
+  })
+
+  test('test a width the user set wins over the image\'s own (M32)', async () => {
+    const body = 'Intro\n\n<!-- block: width=300 -->\n![pixel](Attachments/pixel.png)\n\nOutro\n'
+    const editor = await mount(body)
+    const block = await screen.findByTestId('media-block')
+    const frame = block.querySelector<HTMLElement>('.resizable-embed-frame')!
+    loaded(block.querySelector('img')!, 48)
+    expect(frame.style.width).toBe('300px')
+    expect(frame.getAttribute('data-width')).toBe('300')
+    expect(frame.hasAttribute('data-natural')).toBe(false)
+    expect(serializeBody(editor)).toBe(body)
+  })
+
+  test('test resizing an unsized image starts from its own width and writes the new one (M32)', async () => {
+    const editor = await mount('![pixel](Attachments/pixel.png)\n')
+    const block = await screen.findByTestId('media-block')
+    loaded(block.querySelector('img')!, 200)
+    const handle = screen.getByRole('separator', { name: 'Resize width' })
+    pointer(handle, 'pointerdown', 200, 10)
+    pointer(handle, 'pointermove', 260, 10)
+    pointer(handle, 'pointerup', 260, 10)
+    expect(serializeBody(editor)).toBe('<!-- block: width=260 -->\n![pixel](Attachments/pixel.png)\n')
+  })
+
+  test('test another picture in the same block is measured again (M32)', async () => {
+    await mount('![pixel](Attachments/pixel.png)\n')
+    const block = await screen.findByTestId('media-block')
+    const frame = block.querySelector<HTMLElement>('.resizable-embed-frame')!
+    loaded(block.querySelector('img')!, 48)
+    expect(frame.style.width).toBe('48px')
+    loaded(block.querySelector('img')!, 640)
+    expect(frame.style.width).toBe('640px')
+  })
 })

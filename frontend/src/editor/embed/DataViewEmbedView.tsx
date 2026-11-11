@@ -16,7 +16,7 @@
  * then on. Changes are saved after EMBED_VIEW_SAVE_MS (our choice); the collection
  * or query itself is never changed.
  *
- * An unknown id shows "Collection not found." / "Query not found." (our strings).
+ * An unknown id shows "Collection not found." / "Saved search not found." (our strings).
  */
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
@@ -24,6 +24,7 @@ import type { Collection, Layout, Query, QueryDefinition, TypeDef, ViewState } f
 import { IconOrEmoji } from '@/components/Icon'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 import { upgradeKeys } from '@/lib/keyCompat'
+import { SAVED_SEARCH } from '@/lib/words'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useTabs } from '@/nav/tabs'
 import { queryTitle } from '@/queries/autoTitle'
@@ -39,7 +40,7 @@ import { EmbedMenu } from '../media/ResizableEmbed'
 /** Our strings. */
 export const DATA_VIEW_EMBED_TEXT = {
   collectionNotFound: 'Collection not found.',
-  queryNotFound: 'Query not found.',
+  queryNotFound: `${SAVED_SEARCH} not found.`, // M32 (the glossary): was "Query not found."
   showDetails: 'Show details',
   hideDetails: 'Hide details',
   remove: 'Remove Block',
@@ -291,7 +292,7 @@ export function DataViewEmbedView({ node, editor, getPos, selected }: NodeViewPr
     else useTabs.getState().open({ kind: 'collection', id }, { newTab })
   }
 
-  const title = collection ? collection.name : query ? queryTitle(query, titleCtx) || 'Query' : ''
+  const title = collection ? collection.name : query ? queryTitle(query, titleCtx) || SAVED_SEARCH : ''
   const icon = collection ? collection.icon : query ? query.icon : null
   const found = !!(collection || query)
   const menu = editable ? (

@@ -3,12 +3,17 @@
  *
  * - `turnIntoObject` ("Turn into object"): the block's text
  *   becomes the title of a new object of type `typeId` (default, M29: the suggested type of the
- *   title, else the Page type, our choice), its children the body, and the block becomes
+ *   title, since M32 by its name patterns only, else the Page type, our choice), its children the
+ *   body, and the block becomes
  *   `![[Title]]` shown as a Link block (`view=inline`, our choice).
  * - `turnIntoTask` ("Turn into task"): the same with the Task type.
- * - `turnTodoIntoTask` ("Turn into task object"): a
+ * - `turnTodoIntoTask` ("Turn into task"; before M32 "Turn into task object"): a
  *   to-do becomes a Task titled with its text, status Done when it was checked; with a block
  *   selection, every to-do in it (our choice). Not a to-do: nothing happens.
+ * - `turnLineIntoTask` (M32, "Make this line a task", Ctrl+Shift+T): the line holding the caret,
+ *   whatever it is (a paragraph, a heading, a list line, a to-do), becomes a Task titled with its
+ *   text, as a to-do does. With a block selection: every to-do in it, or its first block when it
+ *   holds none.
  * - `turnIntoWhiteboard` ("Turn into whiteboard"): the selected
  *   blocks become a new board (`whiteboard/turnInto.ts`' `turnBlocksIntoWhiteboard`), titled with
  *   the first block's text (our choice), and are replaced by an embed of it.
@@ -24,7 +29,7 @@ import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { api } from '@/api/client'
 import type { TypeDef } from '@/api/types'
 import { useLastType } from '@/create/lastType'
-import { suggestFor } from '@/create/suggestContext'
+import { suggestType } from '@/create/typeSuggest'
 import { invalidateLinkIndex, stemOf, summaryOf, typeOf, useLinkIndex } from '@/links/linkIndex'
 import { suggestableTypes } from '@/palette/searchOptions'
 import { turnBlocksIntoWhiteboard } from '@/whiteboard/turnInto'
@@ -248,10 +253,14 @@ export function turnTitleAt(editor: Editor, pos?: number): string {
   return turnableAt(editor, pos)?.title ?? ''
 }
 
-/** M29: the suggested type id for turning a block titled `title` (null: none). */
+/**
+ * M29: the suggested type id for turning a block titled `title` (null: none). M32 ("new means a
+ * note"): only a type whose name patterns match the title. The type made last, and the list the
+ * tab shows, are no suggestion here, so a block turned without picking a type is a Note.
+ */
 export function suggestedTurnType(title: string): string | null {
   if (!title) return null
-  return suggestFor(title, suggestableTypes(useLinkIndex.getState().types))[0] ?? null
+  return suggestType(title, { types: suggestableTypes(useLinkIndex.getState().types) })[0] ?? null
 }
 
 export async function turnIntoObject(editor: Editor, typeId?: string | null, opts: TurnIntoOptions = {}): Promise<boolean> {
@@ -284,7 +293,18 @@ export async function turnTodoIntoTask(editor: Editor, opts: TurnIntoOptions = {
   return turnWith(editor, todosAt(editor, opts.pos), (x) => ({ typeId: taskTypeId(), values: taskValues(x) }))
 }
 
-/** Is there a to-do at the selection (the block menu shows "Turn into task object" then)? */
+/**
+ * M32, "Make this line a task": the to-dos at the selection as `turnTodoIntoTask` does; with none
+ * there, the text line at the caret (`turnIntoTask`). A line without text, a code block and a
+ * read-only editor are left alone; a failed create (a space with no Task type) changes nothing.
+ */
+export async function turnLineIntoTask(editor: Editor, opts: TurnIntoOptions = {}): Promise<boolean> {
+  const todos = todosAt(editor, opts.pos)
+  if (todos.length > 0) return turnWith(editor, todos, (x) => ({ typeId: taskTypeId(), values: taskValues(x) }))
+  return turnIntoTask(editor, opts)
+}
+
+/** Is there a to-do at the selection (the block menu shows "Turn into task" then)? */
 export function hasTodoAt(editor: Editor): boolean {
   return todosAt(editor).length > 0
 }

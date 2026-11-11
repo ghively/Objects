@@ -214,3 +214,118 @@ describe('combined shortcuts (Space only after the last one)', () => {
     expect(serializeBody(ed)).toMatch(/^<!-- toggle open -->\n# Title\n<!-- \/toggle -->/)
   })
 })
+
+// M32 item 4, "Markdown habits": the GitHub way of writing a to-do.
+describe('"- [ ] " and "- [x] " make a to-do (M32)', () => {
+  const checkedOf = (ed: TiptapEditor): boolean[] => {
+    const out: boolean[] = []
+    ed.state.doc.descendants((n) => {
+      if (n.type.name === 'taskItem') out.push(!!n.attrs.checked)
+    })
+    return out
+  }
+
+  test('test "- [ ] " makes an unchecked to-do', () => {
+    const ed = fresh()
+    type(ed, '- [ ] Buy milk')
+    expect(pathTo(ed, 'Buy milk')).toEqual(['taskList', 'taskItem', 'paragraph'])
+    expect(checkedOf(ed)).toEqual([false])
+    expect(serializeBody(ed)).toBe('- [ ] Buy milk')
+  })
+
+  test('test "- [x] " makes a checked to-do, "[X]" too', () => {
+    const ed = fresh()
+    type(ed, '- [x] Paid the bill')
+    expect(pathTo(ed, 'Paid the bill')).toEqual(['taskList', 'taskItem', 'paragraph'])
+    expect(checkedOf(ed)).toEqual([true])
+    expect(serializeBody(ed)).toBe('- [x] Paid the bill')
+    const upper = fresh()
+    type(upper, '- [X] Done')
+    expect(checkedOf(upper)).toEqual([true])
+  })
+
+  test('test "* [ ] " makes a to-do', () => {
+    const ed = fresh()
+    type(ed, '* [ ] Call back')
+    expect(pathTo(ed, 'Call back')).toEqual(['taskList', 'taskItem', 'paragraph'])
+    expect(checkedOf(ed)).toEqual([false])
+  })
+
+  test('test "[] " keeps working, and "[ ] " / "[x] " work at the start of a text line', () => {
+    const old = fresh()
+    type(old, '[] Old way')
+    expect(pathTo(old, 'Old way')).toEqual(['taskList', 'taskItem', 'paragraph'])
+    expect(checkedOf(old)).toEqual([false])
+    const open = fresh()
+    type(open, '[ ] Open')
+    expect(pathTo(open, 'Open')).toEqual(['taskList', 'taskItem', 'paragraph'])
+    expect(checkedOf(open)).toEqual([false])
+    const done = fresh()
+    type(done, '[x] Done')
+    expect(pathTo(done, 'Done')).toEqual(['taskList', 'taskItem', 'paragraph'])
+    expect(checkedOf(done)).toEqual([true])
+    expect(serializeBody(done)).toBe('- [x] Done')
+  })
+
+  test('test the caret stays in the new to-do, ready to type', () => {
+    const ed = fresh()
+    type(ed, '- [ ] ')
+    expect(ed.state.selection.$from.parent.type.name).toBe('paragraph')
+    expect(ed.state.selection.$from.node(-1).type.name).toBe('taskItem')
+    expect(ed.state.doc.textContent).toBe('')
+  })
+
+  test('test in a bullet list with other lines only the typed line becomes a to-do', () => {
+    const ed = fresh()
+    type(ed, '- first')
+    ed.commands.splitListItem('listItem')
+    type(ed, '[ ] second')
+    expect(pathTo(ed, 'first')).toEqual(['bulletList', 'listItem', 'paragraph'])
+    expect(pathTo(ed, 'second')).toEqual(['bulletList', 'taskItem', 'paragraph'])
+    expect(checkedOf(ed)).toEqual([false])
+    expect(serializeBody(ed).trimEnd()).toBe('- first\n- [ ] second')
+    // The mixed list loads back as it was written.
+    const reloaded = fresh()
+    loadBody(reloaded, '- first\n- [ ] second\n')
+    expect(pathTo(reloaded, 'first')).toEqual(['bulletList', 'listItem', 'paragraph'])
+    expect(pathTo(reloaded, 'second')).toEqual(['bulletList', 'taskItem', 'paragraph'])
+    expect(serializeBody(reloaded)).toBe('- first\n- [ ] second\n')
+  })
+
+  test('test "[x] " typed before the text of a saved bullet line rewrites only that line', () => {
+    const ed = fresh()
+    loadBody(ed, 'Intro\n\n* one\n* two\n* three\n\nOutro\n')
+    let at = -1
+    ed.state.doc.descendants((n, pos) => {
+      if (n.isTextblock && n.textContent === 'two') at = pos + 1
+    })
+    ed.commands.setTextSelection(at)
+    type(ed, '[x] ')
+    expect(pathTo(ed, 'two')).toEqual(['bulletList', 'taskItem', 'paragraph'])
+    expect(checkedOf(ed)).toEqual([true])
+    const out = serializeBody(ed)
+    expect(out.split('\n').filter((l) => l.includes('two'))).toEqual([expect.stringMatching(/^[*-] \[x\] two$/)])
+    expect(out.startsWith('Intro\n\n')).toBe(true)
+    expect(out.endsWith('\n\nOutro\n')).toBe(true)
+    // What was written loads back the same.
+    const reloaded = fresh()
+    loadBody(reloaded, out)
+    expect(pathTo(reloaded, 'two')).toEqual(['bulletList', 'taskItem', 'paragraph'])
+    expect(serializeBody(reloaded)).toBe(out)
+  })
+
+  test('test "[ ] " stays text in a numbered list, in a heading and away from the start of a line', () => {
+    const numbered = fresh()
+    type(numbered, '1. [ ] x')
+    expect(pathTo(numbered, '[ ] x')).toEqual(['orderedList', 'listItem', 'paragraph'])
+    const heading = fresh()
+    type(heading, '# [ ] x')
+    expect(pathTo(heading, '[ ] x')).toEqual(['heading1'])
+    const mid = fresh()
+    type(mid, 'see [ ] x')
+    expect(pathTo(mid, 'see [ ] x')).toEqual(['paragraph'])
+    const inTodo = fresh()
+    type(inTodo, '- [ ] [x] y')
+    expect(pathTo(inTodo, '[x] y')).toEqual(['taskList', 'taskItem', 'paragraph'])
+  })
+})

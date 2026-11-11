@@ -137,7 +137,7 @@ describe('DataViewEmbedView', () => {
     const body = '![[collection:nope]]\n\n![[query:gone]]\n'
     const editor = await mount(body)
     const missing = await screen.findAllByTestId('data-view-embed-missing')
-    expect(missing.map((m) => m.textContent)).toEqual(['Collection not found.', 'Query not found.'])
+    expect(missing.map((m) => m.textContent)).toEqual(['Collection not found.', 'Saved search not found.'])
     expect(serializeBody(editor)).toBe(body)
   })
 })

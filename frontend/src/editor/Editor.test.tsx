@@ -1,10 +1,11 @@
 import { Editor as TiptapEditor } from '@tiptap/core'
-import { act, fireEvent, render } from '@testing-library/react'
+import { act, fireEvent, render, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { ConflictError } from '@/api/client'
 import { Editor } from './Editor'
 import { editorExtensions, loadBody, serializeBody } from './document'
 import { RawMode } from './RawMode'
+import { useSaveState } from './saveStateStore'
 import { AUTOSAVE_RETRY_MS, type BodyEditorHandle } from './useAutosave'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -376,6 +377,139 @@ describe('<Editor> autosave', () => {
     expect(onSaved).toHaveBeenCalledWith('v2')
     expect(queryByRole('status')).toBeNull()
   })
+
+  // M32 item 1: the editor's part of "saving you can trust".
+  const published = (path: string) => renderHook(() => useSaveState(path)).result.current
+
+  test('test typing without a pause is saved within 3 s (M32)', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const { editor } = mount()
+    for (let i = 0; i < 6; i++) {
+      act(() => {
+        editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), 'x')
+      })
+      await act(async () => vi.advanceTimersByTimeAsync(500))
+    }
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    expect(saveBody).toHaveBeenCalledWith('Pages/Notes.md', BODY.replace('First paragraph.', 'First paragraph.xxxxxx'), 'v1')
+  })
+
+  test('test the editor publishes its save state by path and forgets it on unmount (M32)', async () => {
+    const resolvers: ((v: { version: string }) => void)[] = []
+    saveBody.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)))
+    const { editor, unmount } = mount()
+    expect(published('Pages/Notes.md')).toBe('saved')
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' a')
+    })
+    expect(published('Pages/Notes.md')).toBe('unsaved')
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(published('Pages/Notes.md')).toBe('saving')
+    await act(async () => {
+      resolvers[0]({ version: 'v2' })
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(published('Pages/Notes.md')).toBe('saved')
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), 'b')
+    })
+    expect(published('Pages/Notes.md')).toBe('unsaved')
+    unmount()
+    expect(published('Pages/Notes.md')).toBe('saved') // nothing published: the store's default
+  })
+
+  test('test the editor publishes error while a save has failed (M32)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    saveBody.mockRejectedValueOnce(new Error('503')).mockResolvedValueOnce({ version: 'v2' })
+    const { editor } = mount()
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' x')
+    })
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(published('Pages/Notes.md')).toBe('error')
+    await act(async () => vi.advanceTimersByTimeAsync(AUTOSAVE_RETRY_MS))
+    expect(published('Pages/Notes.md')).toBe('saved')
+  })
+
+  test('test a note switch saves the note being left and publishes under the new path (M32)', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const { editor, rerender, onSaved, onConflict } = mount()
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' a')
+    })
+    expect(published('Pages/Notes.md')).toBe('unsaved')
+    await act(async () => {
+      rerender(<Editor path="Pages/Other.md" body={'Other.\n'} version="w1" readOnly={false} onSaved={onSaved} onConflict={onConflict} />)
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    expect(saveBody).toHaveBeenCalledWith('Pages/Notes.md', BODY.replace('First paragraph.', 'First paragraph. a'), 'v1')
+    expect(published('Pages/Notes.md')).toBe('saved') // forgotten
+    expect(published('Pages/Other.md')).toBe('saved')
+    await act(async () => vi.advanceTimersByTimeAsync(5000))
+    expect(saveBody).toHaveBeenCalledTimes(1) // the note that was opened is not written
+  })
+
+  test('test unmounting the editor saves the pending edit at once (M32)', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const { editor, unmount } = mount()
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' a')
+    })
+    unmount()
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    expect(saveBody).toHaveBeenCalledWith('Pages/Notes.md', BODY.replace('First paragraph.', 'First paragraph. a'), 'v1')
+  })
+
+  test('test window blur saves the pending edit at once, and nothing when nothing changed (M32)', async () => {
+    saveBody.mockResolvedValue({ version: 'v2' })
+    const { editor } = mount()
+    act(() => {
+      window.dispatchEvent(new Event('blur'))
+    })
+    expect(saveBody).not.toHaveBeenCalled()
+    act(() => {
+      editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' a')
+    })
+    await act(async () => {
+      window.dispatchEvent(new Event('blur'))
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    await act(async () => vi.advanceTimersByTimeAsync(5000))
+    expect(saveBody).toHaveBeenCalledTimes(1)
+  })
+
+  test('test pagehide sends the pending edit as a keepalive request (M32)', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, statusText: '', json: async () => ({ version: 'v2' }) }) as Response)
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      const { editor, onSaved } = mount()
+      act(() => {
+        editor.commands.insertContentAt(endOfNth(editor, 'paragraph', 0), ' a')
+      })
+      await act(async () => {
+        window.dispatchEvent(new Event('pagehide'))
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(saveBody).not.toHaveBeenCalled()
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+      expect(url).toBe('/api/object/body')
+      expect(init.keepalive).toBe(true)
+      expect(JSON.parse(String(init.body))).toMatchObject({
+        path: 'Pages/Notes.md',
+        body: BODY.replace('First paragraph.', 'First paragraph. a'),
+        baseVersion: 'v1',
+      })
+      expect(onSaved).toHaveBeenCalledWith('v2')
+      await act(async () => vi.advanceTimersByTimeAsync(5000))
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(saveBody).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })
 
 describe('<RawMode>', () => {
@@ -400,6 +534,33 @@ describe('<RawMode>', () => {
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     expect(saveBody).toHaveBeenCalledWith('Tasks/Fix printer.md', 'aX\r\nb\r\n', 'v1')
     expect(onSaved).toHaveBeenCalledWith('v2')
+  })
+
+  test('test raw mode publishes its save state and saves on window blur and unmount (M32)', async () => {
+    saveBody.mockImplementation(async (_p: string, _b: string, v: string) => ({ version: v + '+' }))
+    const published = (path: string) => renderHook(() => useSaveState(path)).result.current
+    const { container, unmount } = render(<RawMode path="Pages/Raw.md" text={'a\nb\n'} version="v1" onSaved={() => {}} />)
+    const { EditorView } = await import('@codemirror/view')
+    const view = EditorView.findFromDOM(container.querySelector('.cm-editor') as HTMLElement)!
+    expect(published('Pages/Raw.md')).toBe('saved')
+    act(() => {
+      view.dispatch({ changes: { from: 1, insert: 'X' } })
+    })
+    expect(published('Pages/Raw.md')).toBe('unsaved')
+    await act(async () => {
+      window.dispatchEvent(new Event('blur'))
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(saveBody).toHaveBeenCalledTimes(1)
+    expect(saveBody).toHaveBeenCalledWith('Pages/Raw.md', 'aX\nb\n', 'v1')
+    expect(published('Pages/Raw.md')).toBe('saved')
+    act(() => {
+      view.dispatch({ changes: { from: 2, insert: 'Y' } })
+    })
+    unmount()
+    expect(saveBody).toHaveBeenCalledTimes(2)
+    expect(saveBody).toHaveBeenLastCalledWith('Pages/Raw.md', 'aXY\nb\n', 'v1+')
+    expect(published('Pages/Raw.md')).toBe('saved') // forgotten with the editor
   })
 })
 

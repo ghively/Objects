@@ -97,8 +97,8 @@ describe('TokensMenu', () => {
       'Code',
       'TeX formula',
       'Highlight text',
-      'Make a new object out of the selected text.',
-      'Point the selected text at an object you already have.',
+      'Make a new note out of the selected text.',
+      'Point the selected text at a note you already have.',
       'AI', // M10
     ])
 
@@ -163,7 +163,7 @@ describe('TokensMenu', () => {
   test('test create object from selection links it', async () => {
     const editor = setup('Met Grace Hopper today\n', 'Grace Hopper')
     fireEvent.click(within(bar()).getByRole('button', { name: TOKENS_MENU_TEXT.create }))
-    expect(screen.getByRole('textbox', { name: 'Search Object Types' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Search types' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Person/ }))
     await waitFor(() => expect(mocked.createObject).toHaveBeenCalledWith('person', { title: 'Grace Hopper' }))
     expect(serializeBody(editor)).toBe('Met [[Grace Hopper]] today\n')
@@ -173,7 +173,7 @@ describe('TokensMenu', () => {
   test('test link existing object keeps the words as label', () => {
     const editor = setup('Thanks to Ada for the notes\n', 'Ada')
     fireEvent.click(within(bar()).getByRole('button', { name: TOKENS_MENU_TEXT.reuse }))
-    expect(screen.getByRole('textbox', { name: 'Search objects' })).toHaveValue('Ada')
+    expect(screen.getByRole('textbox', { name: 'Search notes' })).toHaveValue('Ada')
     fireEvent.click(screen.getByRole('button', { name: /Ada Lovelace/ }))
     expect(serializeBody(editor)).toBe('Thanks to [[Ada Lovelace|Ada]] for the notes\n')
   })

@@ -4,7 +4,7 @@
  * - "Today" / "Tomorrow": appended to that
  *   day's daily note, created when there is none (the action palette's `addToDailyNote`, with its
  *   "Sent to the daily note" toast).
- * - "New page": a new page (the Page type) holding the blocks, opened
+ * - "New note" (before M32 "New page"): a new note (the Page type) holding the blocks, opened
  *   after the blocks leave this page.
  * The blocks are removed only after the target was written; a failed write keeps them and shows
  * the error (our choice). This note's pending edits are saved first. When the target daily note

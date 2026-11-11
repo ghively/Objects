@@ -102,6 +102,35 @@
   height: auto;
   border-radius: 0.5rem;
 }
+/* M32: an image with no width set is shown at its own size, never stretched to the text column
+   (a wide one is still held to it). Its frame takes that width once the image has loaded. */
+.object-editor .resizable-embed-frame:not([data-width]) > .media-image {
+  width: auto;
+  max-width: 100%;
+}
+/* A narrow frame (a small picture): the hover toolbar stands beside it instead of covering it or
+   hanging off its left side. The strip between the two keeps the hover while the pointer crosses. */
+.object-editor .resizable-embed-frame[data-narrow] > .resizable-embed-toolbar {
+  top: 0;
+  right: auto;
+  left: calc(100% + 8px);
+}
+.object-editor .resizable-embed-frame[data-narrow] > .resizable-embed-toolbar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 100%;
+  width: 9px;
+}
+.object-editor .resizable-embed[data-align='right'] > .resizable-embed-frame[data-narrow] > .resizable-embed-toolbar {
+  left: auto;
+  right: calc(100% + 8px);
+}
+.object-editor .resizable-embed[data-align='right'] > .resizable-embed-frame[data-narrow] > .resizable-embed-toolbar::before {
+  right: auto;
+  left: 100%;
+}
 .object-editor .media-pdf {
   display: block;
   width: 100%;

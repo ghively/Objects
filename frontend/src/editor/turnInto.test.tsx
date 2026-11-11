@@ -14,7 +14,7 @@ import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { editorExtensions, loadBody, serializeBody } from './document'
 import { selectBlocks } from './extensions/blockSelection'
 import { BlockMenu } from './handles/BlockMenu'
-import { setBoardHelperForTests, turnIntoObject, turnIntoTask, turnIntoWhiteboard, turnTodoIntoTask } from './turnInto'
+import { setBoardHelperForTests, turnIntoObject, turnIntoTask, turnIntoWhiteboard, turnLineIntoTask, turnTodoIntoTask } from './turnInto'
 
 const mocked = vi.mocked(api)
 const editors: TiptapEditor[] = []
@@ -154,11 +154,11 @@ describe('turn into (M8 Task 27)', () => {
       return within(sub).getAllByRole('menuitem').map((m) => m.textContent?.replace(/(Ctrl|Alt|Shift).*$/, ''))
     }
     const view = render(<BlockMenu editor={editor} open onOpenChange={() => {}} anchor={{ left: 0, top: 0, width: 10, height: 10 }} />)
-    expect(await turnIntoNames()).toEqual(expect.arrayContaining(['Turn into task object', 'Turn into whiteboard']))
+    expect(await turnIntoNames()).toEqual(expect.arrayContaining(['Turn into task', 'Turn into whiteboard']))
     view.unmount()
     selectBlocks(editor, editor.state.doc.child(0).nodeSize)
     render(<BlockMenu editor={editor} open onOpenChange={() => {}} anchor={{ left: 0, top: 0, width: 10, height: 10 }} />)
-    expect(await turnIntoNames()).not.toContain('Turn into task object')
+    expect(await turnIntoNames()).not.toContain('Turn into task')
   })
 
   test('test turn into task from any block', async () => {
@@ -169,6 +169,89 @@ describe('turn into (M8 Task 27)', () => {
     })
     expect(mocked.createObject).toHaveBeenCalledWith('Task', { title: 'Call the bank' })
     expect(serializeBody(editor)).toBe('<!-- block: view=inline -->\n![[Call the bank]]\n')
+  })
+
+  // M32 item 3: "Make this line a task" (Ctrl+Shift+T) on any text line.
+  test('test make this line a task works on a paragraph (M32)', async () => {
+    const editor = headless('One\n\nCall the bank\n\nThree\n')
+    caretIn(editor, 'Call')
+    let ok = false
+    await act(async () => {
+      ok = await turnLineIntoTask(editor)
+    })
+    expect(ok).toBe(true)
+    expect(mocked.createObject).toHaveBeenCalledTimes(1)
+    expect(mocked.createObject).toHaveBeenCalledWith('Task', { title: 'Call the bank' })
+    expect(serializeBody(editor)).toBe('One\n\n<!-- block: view=inline -->\n![[Call the bank]]\n\nThree\n')
+  })
+
+  test('test make this line a task works on a heading (M32)', async () => {
+    const editor = headless('## Renew the passport\n\nText\n')
+    caretIn(editor, 'Renew')
+    await act(async () => {
+      await turnLineIntoTask(editor)
+    })
+    expect(mocked.createObject).toHaveBeenCalledWith('Task', { title: 'Renew the passport' })
+    expect(serializeBody(editor)).toBe('<!-- block: view=inline -->\n![[Renew the passport]]\n\nText\n')
+  })
+
+  test('test make this line a task works on a list line, keeping the lines around it (M32)', async () => {
+    const editor = headless('- one\n- Book the flights\n- three\n')
+    caretIn(editor, 'Book')
+    await act(async () => {
+      await turnLineIntoTask(editor)
+    })
+    expect(mocked.createObject).toHaveBeenCalledWith('Task', { title: 'Book the flights' })
+    expect(serializeBody(editor)).toBe('- one\n\n<!-- block: view=inline -->\n![[Book the flights]]\n\n- three\n')
+  })
+
+  test('test make this line a task on a to-do is the to-do conversion, done when it was ticked (M32)', async () => {
+    const editor = headless('- [x] Buy milk\n- [ ] Walk dog\n')
+    caretIn(editor, 'Buy milk')
+    await act(async () => {
+      await turnLineIntoTask(editor)
+    })
+    expect(mocked.createObject).toHaveBeenCalledWith('Task', { title: 'Buy milk', values: { status: ['Done'] } })
+    expect(serializeBody(editor)).toBe('<!-- block: view=inline -->\n![[Buy milk]]\n\n- [ ] Walk dog\n')
+  })
+
+  test('test make this line a task with blocks selected takes every to-do in them, else the first block (M32)', async () => {
+    const editor = headless('Intro\n\n- [ ] a\n- [ ] b\n')
+    selectBlocks(editor, 0, editor.state.doc.child(0).nodeSize)
+    await act(async () => {
+      await turnLineIntoTask(editor)
+    })
+    expect(mocked.createObject.mock.calls.map((c) => (c[1] as { title: string }).title)).toEqual(['a', 'b'])
+    mocked.createObject.mockClear()
+    const plain = headless('First\n\nSecond\n')
+    selectBlocks(plain, 0, plain.state.doc.child(0).nodeSize)
+    await act(async () => {
+      await turnLineIntoTask(plain)
+    })
+    expect(mocked.createObject.mock.calls.map((c) => (c[1] as { title: string }).title)).toEqual(['First'])
+  })
+
+  test('test make this line a task does nothing on an empty line, in code or in a read-only editor (M32)', async () => {
+    const empty = headless('\n')
+    empty.commands.setTextSelection(1)
+    expect(await turnLineIntoTask(empty)).toBe(false)
+    const code = headless('```\nlet x = 1\n```\n')
+    caretIn(code, 'let')
+    expect(await turnLineIntoTask(code)).toBe(false)
+    const locked = headless('Text\n')
+    caretIn(locked, 'Text')
+    locked.setEditable(false)
+    expect(await turnLineIntoTask(locked)).toBe(false)
+    expect(mocked.createObject).not.toHaveBeenCalled()
+  })
+
+  test('test make this line a task leaves the line alone when the task cannot be made (M32)', async () => {
+    useLinkIndex.setState({ types: [PAGE_T] }) // a space with no Task type yet
+    mocked.createObject.mockRejectedValueOnce(new Error('Unknown type'))
+    const editor = headless('Call the bank\n')
+    caretIn(editor, 'Call')
+    await expect(turnLineIntoTask(editor)).rejects.toThrow()
+    expect(serializeBody(editor)).toBe('Call the bank\n')
   })
 
   test('test turn into whiteboard calls the board helper', async () => {

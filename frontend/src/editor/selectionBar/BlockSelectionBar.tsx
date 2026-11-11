@@ -16,7 +16,7 @@
  */
 import type { Editor } from '@tiptap/core'
 import { BoldIcon, ItalicIcon, StrikethroughIcon, UnderlineIcon, XIcon } from 'lucide-react'
-import { Fragment, useEffect, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useAiHidden } from '@/ai/store'
 import type { Icon as IconValue } from '@/api/types'
@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { NEW_NOTE } from '@/lib/words'
 import { plainText, TEXT_STATS_TEXT, textStats, type TextStats } from '@/object/textStats'
 import {
   blockSelectionRange,
@@ -87,8 +88,8 @@ export const BLOCK_BAR_TEXT = {
   todayHint: "Move the selection into today's daily note",
   tomorrow: 'Tomorrow',
   tomorrowHint: "Move the selection into tomorrow's daily note",
-  newPage: 'New page',
-  newPageHint: 'Move the selection onto a new page',
+  newPage: NEW_NOTE, // M32 (the glossary): was "New page"
+  newPageHint: 'Move the selection onto a new note',
   delete: 'Delete selected blocks',
   ai: AI_TEXT.ai,
   clear: 'Clear selection',
@@ -116,6 +117,22 @@ export const BLOCK_BAR_ITEMS: readonly string[] = [
 
 /** The bar's distance from the bottom of the window, px (our choice: the old count pill's). */
 const BOTTOM = 24
+
+/** M32: the least room between the bar and either side of the window, px (the CSS `max-width` leaves the same). */
+export const BAR_EDGE_GAP = 16
+
+/**
+ * M32: where the bar's centre goes: the text column's centre (`centre`), moved just enough that a
+ * bar `width` wide stays `BAR_EDGE_GAP` inside a window `viewport` wide. A bar wider than that room
+ * (it scrolls sideways then) is centred in the window.
+ */
+export function barCentre(centre: number, width: number, viewport: number): number {
+  const half = width / 2
+  const min = BAR_EDGE_GAP + half
+  const max = viewport - BAR_EDGE_GAP - half
+  if (min > max) return viewport / 2
+  return Math.min(Math.max(centre, min), max)
+}
 
 /**
  * Run `fn` on the selected blocks, then select the blocks it left (a range command such as a mark
@@ -260,6 +277,23 @@ export function BlockSelectionBar({ editor }: { editor: Editor }) {
     }
   }, [editor])
 
+  // M32: keep the bar inside the window. It is centred under the text column, which sits off
+  // centre beside the sidebar: at 1440 px and narrower its end passed the window's edge.
+  const barRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const place = () => {
+      const bar = barRef.current
+      if (!bar || editor.isDestroyed) return
+      const rect = editor.view.dom.getBoundingClientRect()
+      const viewport = window.innerWidth
+      const centre = rect.width ? rect.left + rect.width / 2 : viewport / 2
+      bar.style.left = `${barCentre(centre, bar.offsetWidth, viewport)}px`
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  })
+
   const info = editor.isDestroyed ? null : selectionInfo(editor)
   if (!info) return null
   const style = currentBlockStyle(editor)
@@ -270,7 +304,7 @@ export function BlockSelectionBar({ editor }: { editor: Editor }) {
   const move = (target: MoveTarget) => () => void moveBlocks(editor, target).catch(() => {})
 
   return createPortal(
-    <div role="toolbar" aria-label={BLOCK_BAR_TEXT.toolbar} className="block-selection-bar" style={{ left, bottom: BOTTOM }}>
+    <div ref={barRef} role="toolbar" aria-label={BLOCK_BAR_TEXT.toolbar} className="block-selection-bar" style={{ left, bottom: BOTTOM }}>
       <BarDropdown label={BLOCK_BAR_TEXT.count(info.blocks, info.stats.words)} trigger={<span className="px-1">{BLOCK_BAR_TEXT.count(info.blocks, info.stats.words)}</span>}>
         <DropdownMenuLabel>{BLOCK_BAR_TEXT.stats}</DropdownMenuLabel>
         <StatsRows stats={info.stats} />

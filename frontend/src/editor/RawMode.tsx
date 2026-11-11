@@ -4,6 +4,7 @@ import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import { createRawFind } from '@/find/rawFind'
+import { clearSaveState, setSaveState } from './saveStateStore'
 import { useAutosave, type BodyEditorHandle } from './useAutosave'
 
 export type RawModeProps = {
@@ -54,6 +55,11 @@ export function RawMode({ path, text, version, onSaved, onConflict, objectId, re
   })
   const autosaveRef = useRef(autosave)
   autosaveRef.current = autosave
+
+  // M32: the note page's "Saving… / Saved" mark reads this (`useSaveState(path)`).
+  const saveState = autosave.saveState
+  useEffect(() => setSaveState(path, saveState), [path, saveState])
+  useEffect(() => () => clearSaveState(path), [path])
 
   useEffect(() => {
     if (!hostRef.current) return

@@ -14,6 +14,12 @@
  * `[] ` a to-do list like the menus make. The marks apply inside out: heading, icon, quote, list,
  * toggle (a toggle holds whatever the other marks made). A run with two marks of one kind (two
  * lists, two headings) is not a shortcut and stays text (our choice).
+ *
+ * M32: the GitHub way of writing a to-do works too. `[ ] ` and `[x] ` (or `[X] `) at the start of
+ * a text line make an unchecked or a checked to-do, and so `- [ ] `, `* [ ] ` and `- [x] ` do: the
+ * `- ` has made a bullet by then, and the box turns that bullet line into a to-do (only that
+ * line, when the list has others). In a numbered list, a heading or an existing to-do the
+ * characters stay text.
  */
 import { Extension, InputRule } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
@@ -82,6 +88,59 @@ export const MarkdownShortcuts = Extension.create<MarkdownShortcutsOptions>({
   addInputRules() {
     const numbered = this.options.numbered
     return [
+      // M32: `[ ] ` / `[x] ` at the start of a text line or of a bullet line.
+      new InputRule({
+        find: /^\[([ xX])\] $/,
+        handler: ({ state, range, match, chain }) => {
+          const checked = match[1] !== ' '
+          const $from = state.doc.resolve(range.from)
+          const d = $from.depth
+          if ($from.parent.type.name !== 'paragraph' || d < 1) return null
+          const holder = $from.node(d - 1)
+          const taskItem = state.schema.nodes.taskItem
+          const taskList = state.schema.nodes.taskList
+          if (!taskItem || !taskList) return null
+          if (holder.type.name === 'taskItem') return null
+          if (holder.type.name === 'listItem') {
+            // A bullet line (`- ` was typed first): this line becomes a to-do, the others stay.
+            const list = $from.node(d - 2)
+            if (list.type.name !== 'bulletList' || $from.index(d - 1) !== 0) return null
+            const itemPos = $from.before(d - 1)
+            const listPos = $from.before(d - 2)
+            chain()
+              .deleteRange(range)
+              .command(({ tr }) => {
+                const item = tr.doc.nodeAt(itemPos)
+                if (!item) return false
+                tr.setNodeMarkup(itemPos, taskItem, { ...item.attrs, checked })
+                // A list of to-dos only is a to-do list (as the menus make it).
+                const now = tr.doc.nodeAt(listPos)
+                let all = !!now
+                now?.forEach((child) => {
+                  if (child.type !== taskItem) all = false
+                })
+                if (now && all) tr.setNodeMarkup(listPos, taskList, now.attrs)
+                return true
+              })
+              .run()
+            return
+          }
+          chain()
+            .deleteRange(range)
+            .setListType('todo')
+            .command(({ tr }) => {
+              if (!checked) return true
+              const $at = tr.selection.$from
+              for (let depth = $at.depth; depth >= 1; depth--) {
+                if ($at.node(depth).type !== taskItem) continue
+                tr.setNodeMarkup($at.before(depth), undefined, { ...$at.node(depth).attrs, checked: true })
+                break
+              }
+              return true
+            })
+            .run()
+        },
+      }),
       new InputRule({
         find: /^([|>()[\]*#\-.\dai]+) $/,
         handler: ({ state, range, match, chain }) => {
