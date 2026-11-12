@@ -5,6 +5,7 @@ import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { SpacesMenu } from '@/spaces/SpacesMenu'
 import { openTodaysNote, TODAYS_NOTE_TEXT } from '@/calendar/openTodaysNote'
 import { isEditableTarget } from '@/lib/shortcuts'
+import { WindowControls } from '@/desktop/WindowControls'
 
 export const TOP_BAR_TEXT = {
   changeSpace: 'Change space',
@@ -140,8 +141,11 @@ export function TopBar({
   const spaceButtonRef = useRef<HTMLButtonElement>(null)
   const appMenu = useAppMenuShown(spaceButtonRef)
   return (
-    <header data-typing-fade="" className="flex h-[42px] shrink-0 items-center gap-1 bg-app pr-2 pl-2.5 text-fg">
-      <div className={`flex w-[348px] shrink-0 items-center ${appMenu.shown ? 'justify-between' : 'justify-end'}`}>
+    // M33: in the desktop window this row is the title bar (`app-titlebar`: the room for the
+    // window's own buttons) and moves the window (`app-drag`); both mean nothing in a browser
+    // (`desktop/desktop.css`: every rule is under a class `<html>` only has inside the shell).
+    <header data-typing-fade="" className="app-titlebar app-drag flex h-[42px] shrink-0 items-center gap-1 bg-app pr-2 pl-2.5 text-fg">
+      <div className={`app-titlebar-lead flex w-[348px] shrink-0 items-center ${appMenu.shown ? 'justify-between' : 'justify-end'}`}>
         {appMenu.shown && (
           <SpacesMenu>
             <button
@@ -174,6 +178,8 @@ export function TopBar({
         onClick={onToggleRightPanel}
         pressed={rightPanelOpen}
       />
+      {/* M33: the window's own buttons where the page draws them (the desktop window on Linux); nothing elsewhere. */}
+      <WindowControls />
     </header>
   )
 }

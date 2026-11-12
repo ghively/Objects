@@ -1,0 +1,85 @@
+/*
+ * M33: the desktop window's chrome. Every rule here is under a class that `useWindowChrome` puts on
+ * <html> only inside the desktop shell:
+ *   desktop-win32 / desktop-darwin / desktop-linux   the system
+ *   desktop-controls-overlay / -traffic / -custom / -none   where the window's buttons are
+ *   desktop-drag         the top bar moves the window (not with the system's own frame)
+ *   desktop-fullscreen   while full screen
+ * In a browser tab and in the pywebview window none of those classes exist, so nothing here
+ * applies: no drag region, no padding, nothing moved.
+ *
+ * The window has no frame of its own, so the top bar (`shell/TopBar.tsx`: `.app-titlebar
+ * .app-drag`) is its title bar. The room it keeps free follows the controls alone, never the system.
+ */
+
+/* The top bar moves the window (a double click on its free part maximises: the system's doing).
+   Its words are not selected by a drag. */
+html.desktop-drag .app-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* A drag region takes every click and right click in its box. So everything a person clicks,
+   right-clicks, types in or scrolls inside the bar stays itself: the buttons, the space menu's
+   button, the tabs (their menu) and their strip, the tab menu, fields. `.app-no-drag` marks
+   anything else. */
+html.desktop-drag .app-drag :is(button, a, input, textarea, select, summary, [role='tab'], [role='tablist'], [role='button'], [tabindex], [contenteditable='true']),
+html.desktop-drag .app-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* The same for what opens over the top bar: menus, dialogs, pop-overs and tooltips (portals at
+   the end of <body>), and the app's own fixed layers (the presentation, the space switch). */
+html.desktop-drag body > :not(#root),
+html.desktop-drag #root .fixed {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* The bar is 42px high in a browser and stays so here: never lower than the window buttons need
+   (32px for the system's on Windows, the traffic lights on macOS, ours on Linux). */
+html:is(.desktop-win32, .desktop-darwin, .desktop-linux) .app-titlebar {
+  min-height: 42px;
+}
+
+/* 'overlay' (Windows): the system draws minimise, maximise and close over the top right corner.
+   The bar keeps that corner free, measured from the Window Controls Overlay values (the part of
+   the title bar left to the page); 138px (three 46px buttons) when they are not there. The bar's
+   own 0.5rem stays between its last button and theirs. */
+html.desktop-controls-overlay .app-titlebar {
+  min-height: max(42px, env(titlebar-area-height, 42px));
+  padding-right: calc(0.5rem + 100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
+}
+
+/* Full screen: only what the system says it still covers (nothing, when it says nothing). */
+html.desktop-controls-overlay.desktop-fullscreen .app-titlebar {
+  padding-right: calc(0.5rem + 100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+}
+
+/* 'traffic' (macOS): the traffic lights sit in the bar's left end: 78px stay free for them, except
+   in full screen, where there are none. The block over the sidebar gives up that room, so the
+   sidebar button stays above the sidebar's edge and nothing after it moves; a long space name
+   shortens. */
+html.desktop-controls-traffic:not(.desktop-fullscreen) .app-titlebar {
+  padding-left: 78px;
+}
+
+html.desktop-controls-traffic:not(.desktop-fullscreen) .app-titlebar-lead {
+  width: calc(348px + 0.625rem - 78px);
+}
+
+html.desktop-controls-traffic:not(.desktop-fullscreen) .app-titlebar-lead > button:not(:last-child) {
+  min-width: 0;
+}
+
+/* Only the name gives way: not the sidebar button, not the space's icon or the menu's caret. */
+html.desktop-controls-traffic:not(.desktop-fullscreen) .app-titlebar-lead > button:last-child,
+html.desktop-controls-traffic:not(.desktop-fullscreen) .app-titlebar-lead > button:not(:last-child) > :is(:first-child, :last-child) {
+  flex-shrink: 0;
+}
+
+/* 'custom' (Linux): nothing is kept free; the three buttons (`WindowControls`) are the last things
+   in the bar's own row. 'none': nothing is kept free and nothing is drawn. */
