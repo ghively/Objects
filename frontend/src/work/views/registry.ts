@@ -90,7 +90,8 @@ export const WORK_VIEWS: WorkViewDef[] = [
     icon: WORK_ICONS.today,
     key: 't',
     // Phase 2: one Today — the day timeline and today's task list. Decision T1: the list is the
-    // Calendar Day view's, and the badge counts its open tasks (its "N open").
+    // Calendar Day view's (M33: open tasks with no date whose deadline has passed included, under
+    // Overdue), and the badge counts its open tasks (its "N open").
     count: (_d, now) => todayTaskCount(now),
     Component: TodayWithTasks,
   },

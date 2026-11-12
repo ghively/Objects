@@ -22,6 +22,7 @@ import { ensureLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { cn } from '@/lib/utils'
 import { completionToast, type TaskOutcome } from '@/tasks/taskActions'
 import { taskRowExtras, type TaskBadge } from '@/tasks/taskRowExtras'
+import { deadlineDayOf } from '@/tasks/taskTabs'
 import { DataView, type Pipeline } from '@/views/DataView'
 import { applyFilters } from '@/views/filter'
 import { groupRows } from '@/views/group'
@@ -545,7 +546,12 @@ export function DayTasksSection({ day, today, calendarDay, rows, onChanged, labe
     [rows],
   )
   const rowExtras = useCallback(
-    (row: Row) => taskRowExtras(row, typesById[row.summary.type], { badges: badges.get(row.summary.path), onResult }),
+    (row: Row) => {
+      const kinds = badges.get(row.summary.path)
+      // M33: a task with no date listed as overdue by its passed deadline: its chip is the deadline's.
+      const chip = kinds?.includes('overdue') && deadlineDayOf(row) ? 'deadline' : undefined
+      return taskRowExtras(row, typesById[row.summary.type], { badges: kinds, onResult, chip })
+    },
     [typesById, badges, onResult],
   )
 
@@ -568,7 +574,9 @@ export function DayTasksSection({ day, today, calendarDay, rows, onChanged, labe
     const movable = [...badges.entries()]
       .filter(([p, kinds]) => !doneByPath.get(p) && (kinds.includes('date') || kinds.includes('overdue')))
       .map(([p]) => rows.byPath.get(p))
-      .filter((r): r is Row => !!r)
+      // M33: a task listed as overdue only by its passed deadline has no date to move; moving it
+      // would give it one, so it is left out, as a deadline entry already is.
+      .filter((r): r is Row => !!r && !!(r.values.date as DateValue | null | undefined)?.start)
     let conflicts = 0
     let failed: string | null = null
     for (const r of movable) {

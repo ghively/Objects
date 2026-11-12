@@ -74,6 +74,21 @@ describe('DaySections', () => {
     expect(within(tasksSection()).queryAllByTestId('group-header')).toHaveLength(0)
   })
 
+  test('test a task listed as overdue by its passed deadline shows the deadline as its chip (M33)', async () => {
+    setDay(TODAY, {
+      tasks: [
+        taskEntry({ path: 'Tasks/Gone.md', kind: 'overdue', day: '2026-10-19' }),
+        taskEntry({ path: 'Tasks/Dated.md', kind: 'overdue', day: '2026-10-20' }),
+      ],
+    })
+    setRows([taskRow('Tasks/Gone.md', { deadline: day('2026-10-19') }), taskRow('Tasks/Dated.md', { date: day('2026-10-20') })])
+    render(<DayView day={TODAY} />)
+    await within(await screen.findByTestId('section-tasks')).findByText('Gone')
+    const row = (title: string) => within(tasksSection()).getByText(title).closest('[data-path]') as HTMLElement
+    expect(within(row('Gone')).getByTestId('task-date')).toHaveAccessibleName(/^Deadline: /)
+    expect(within(row('Dated')).getByTestId('task-date')).not.toHaveAccessibleName(/^Deadline: /)
+  })
+
   test('test overdue group built from entry badges via the pipeline prop', () => {
     const badges = taskBadges({
       dailyNote: null,
@@ -152,9 +167,12 @@ describe('DaySections', () => {
         taskEntry({ path: 'Tasks/C.md', day: TODAY }),
         taskEntry({ path: 'Tasks/Done.md', day: TODAY, done: true }),
         taskEntry({ path: 'Tasks/Occ.md', kind: 'occurrence', day: TODAY }),
+        // M33: listed as overdue by its passed deadline only; it has no date to move.
+        taskEntry({ path: 'Tasks/Late.md', kind: 'overdue', day: '2026-10-19' }),
       ],
     })
     setRows([
+      taskRow('Tasks/Late.md', { deadline: day('2026-10-19') }, 'vl'),
       taskRow('Tasks/A.md', { date: day(TODAY), repeat: 'every day' }, 'va'),
       taskRow('Tasks/B.md', { date: day('2026-10-20') }, 'vb'),
       taskRow('Tasks/C.md', { date: day(TODAY) }, 'vc'),
@@ -176,6 +194,7 @@ describe('DaySections', () => {
     expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/A.md', { date: day('2026-10-24') }, 'va')
     expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/B.md', { date: day('2026-10-24') }, 'vb')
     expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/C.md', { date: day('2026-10-24') }, 'vc')
+    expect(mocked.updateProperties).not.toHaveBeenCalledWith('Tasks/Late.md', expect.anything(), expect.anything())
     expect(await within(tasksSection()).findByRole('status')).toHaveTextContent('1 task changed elsewhere and was not moved.')
     await waitFor(() => expect(mocked.calendar.mock.calls.length).toBeGreaterThan(calls))
   })

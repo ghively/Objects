@@ -15,8 +15,8 @@
 // on exactly one of Today, Upcoming and Inbox (`taskPlace`). A group names the rows their deadline
 // placed (`deadlinePaths`): the list draws their chip as the deadline's.
 //
-// Today is the Calendar Day view's list for today (decision T1, `taskSections.isTaskOfDay`) plus
-// those tasks whose deadline has passed and that have no date, which the Day view does not list.
+// Today is the Calendar Day view's list for today (decision T1, `taskSections.isTaskOfDay`), which
+// (M33) includes the open tasks with no date whose deadline has passed.
 //
 // Pure: rows in, groups out. A group with a null label is drawn without a header.
 import type { DateValue, Row, TaskSectionKey, TypeDef } from '@/api/types'
