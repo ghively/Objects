@@ -32,6 +32,9 @@ Additive: `uv run objectapp` keeps working exactly as today. When the shell is i
 - **Python stays the parent.** `objectapp` starts the server as today, then starts the shell as a child process
   with the one-time open link, and stops the server when the shell exits. So every existing launcher entry keeps
   working and nothing in the shell knows how to start Python.
+- New option `--frame hidden|system` (default `hidden`; environment `OBJECT_WINDOW_FRAME`): `system` runs the shell
+  with the system's ordinary window frame on every platform, for a window manager the frameless window does not
+  suit. The bridge then reports `controls: 'none'` and `framed: true`, and the page reserves and draws nothing.
 - New option `--window auto|electron|pywebview` (default `auto`: the shell when `desktop/node_modules/electron`
   is there, else pywebview; `electron` fails with a plain message when it is not installed; `pywebview` forces
   the old window). Environment `OBJECT_WINDOW` gives the same choice.
@@ -100,6 +103,8 @@ interface ObjectDesktop {
   setTheme(t: { mode: 'light' | 'dark'; background: string; foreground: string }): void
   /** The shell is about to close the window: save, then resolve. One handler; returns an unsubscribe. */
   onBeforeClose(handler: () => Promise<void>): () => void
+  /** True when the shell runs with the system's ordinary frame (`--frame system`): `controls` is then 'none'. */
+  framed: boolean
   /** Linux only: apply the "Window buttons" setting now ('auto' | 'show' | 'hide'); resolves the controls
    *  now in force. */
   setWindowButtons(v: 'auto' | 'show' | 'hide'): Promise<'custom' | 'none'>
@@ -108,8 +113,8 @@ interface ObjectDesktop {
 
 Front end: `frontend/src/desktop/bridge.ts` (`desktop()` returns the bridge or null; types as above),
 `desktop/WindowControls.tsx`, `desktop/useWindowChrome.ts`, `desktop/beforeClose.ts`, `desktop/desktop.css`
-(`.app-drag { -webkit-app-region: drag }`, `.app-no-drag { -webkit-app-region: no-drag }`, the per-system
-padding). CSS class on `<html>`: `desktop-win32` / `desktop-darwin` / `desktop-linux`, plus
+(`.app-drag { app-region: drag; -webkit-app-region: drag }`, `.app-no-drag` likewise with `no-drag`, the
+per-system padding, all keyed off `controls`). CSS class on `<html>`: `desktop-win32` / `desktop-darwin` / `desktop-linux`, plus
 `desktop-fullscreen` while full screen.
 
 ## Part 2: the twelve choices
@@ -123,7 +128,7 @@ Rule of the pass: additive, nothing a person relies on is taken away, no file is
 | 3 | A typed note's pane lists the system rows first | The type's own properties come first, in their own order; the built-in rows (Collections, Description, Created at, Last updated, Tags, Icon, Aliases…) follow. An order the user arranged by hand is kept. Display only: no type file is rewritten. | FE-A |
 | 4 | A type made from the gallery lands on its settings | It lands on the type's own page (its list, ready for "New"), with a toast naming it and a "Type settings" action. A type made from scratch still opens its settings. | FE-B |
 | 5 | Old notes that open with `# Title` show it twice; imports add it | Imports stop adding the line (a re-run of an earlier import changes nothing because of it). For notes that already have it: Settings > Editor shows, only when there are some, "N notes begin with a heading that repeats their title." with "Remove those headings" (a confirmation; each note keeps its earlier version in history). Nothing is removed without that click, and nothing is hidden on screen. | BE, FE-B |
-| 6 | A task with only a deadline sits in Inbox for ever | Also listed where its deadline puts it: under Today's Overdue once the deadline has passed, on its day in Upcoming before that (marked as a deadline). It stays in Inbox while it has no date. A task with a date is placed by its date, as now. | FE-B |
+| 6 | A task with only a deadline sits in Inbox for ever | Also listed where its deadline puts it: under Today's Overdue once the deadline has passed, on its day in Upcoming before that (marked as a deadline). It is no longer in Inbox, which is "no date and no deadline": a task with a deadline has its place. A task with a date is placed by its date, as now; every open task is in exactly one of Today, Upcoming and Inbox. | FE-B |
 | 7 | `> ` makes a toggle | Kept as the default (two of the three apps do the same). New: Settings > Editor > "Typing "> " makes": "A toggle" (default), "A quote" (key `greaterThanMakes`: `toggle`\|`quote`). `\| ` still makes a quote either way. | BE, FE-B |
 | 8 | Property kinds read "Link", "Link to a type" | No change. | none |
 | 9 | "No date" writes `date: null` | "No date" does exactly what clearing the Date in the properties pane does. If that is already so, nothing changes. | FE-B |
@@ -176,3 +181,14 @@ mentions; the settings keys on an old file.
 1. Electron over Tauri and over a frameless pywebview window (the table above).
 2. Python stays the parent process; the shell is a child.
 3. No bundled installers in M33.
+4. The research pass of 2026-11-12 (the three apps' documentation, help centres and release notes; nothing tested
+   hands-on) and what it changed: choice 6, a task with only a deadline leaves Inbox (the app this one follows
+   treats it as triaged and shows it in Today once due); `--frame system` was added (one of the three offers a
+   "native frame" setting for window managers its frameless window does not suit). What it confirmed: two of the
+   three make a toggle from `> ` (choice 7); neither of the two that have types or databases lands on settings
+   after creating one (choice 4); the one that writes files keeps the key when a date is cleared (choice 9); all
+   three desktop apps are Electron with the tabs in a custom top bar. What it could not establish: where the
+   caret goes when a note opens in two of the three (the third puts it at the start of the text), so choice 1
+   stays the cautious one.
+5. Linux draws its own three buttons rather than the overlay Electron also offers there, so they can be left out
+   on a tiling compositor.
