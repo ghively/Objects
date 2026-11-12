@@ -192,3 +192,11 @@ mentions; the settings keys on an old file.
    stays the cautious one.
 5. Linux draws its own three buttons rather than the overlay Electron also offers there, so they can be left out
    on a tiling compositor.
+6. The two halves run together (2026-11-12, Linux under a virtual display): a press on the bar's free part moves the
+   window and a double click there maximises and restores; the Linux buttons work by real clicks, also while the
+   bar is faded for typing (they stay clickable) and at the window's right end in focus mode; closing makes focus
+   leave the field being typed in first, so a property's text is saved by the system's close too; the page's
+   `<html>` classes are set before the first paint. macOS's traffic lights go at x 14, y 13: Electron places them
+   by the button frame (AppKit's standard 14x16 points, the 12pt circle inside), so (42 - 16) / 2 centres them in
+   the 42px bar, and they end at 68px, inside the 78px the page keeps free (a test on the shell's side reads the
+   page's CSS so the two stay equal). macOS could not be run here.

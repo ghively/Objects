@@ -59,7 +59,9 @@ html.desktop-controls-overlay.desktop-fullscreen .app-titlebar {
   padding-right: calc(0.5rem + 100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
 }
 
-/* 'traffic' (macOS): the traffic lights sit in the bar's left end: 78px stay free for them, except
+/* 'traffic' (macOS): the traffic lights sit in the bar's left end (the shell puts them at x 14, y 13:
+   centred in the 42px bar, ending at 68px; `desktop/lib/windowOptions.js` TRAFFIC_LIGHTS, whose
+   test checks this 78px): 78px stay free for them, except
    in full screen, where there are none. The block over the sidebar gives up that room, so the
    sidebar button stays above the sidebar's edge and nothing after it moves; a long space name
    shortens. */
