@@ -421,7 +421,7 @@ def test_window_electron_without_a_shell_says_how_to_install_it(env, monkeypatch
         launcher.main(["--space", str(env.root), "--port", str(env.port), "--window", "electron"])
     assert exit_.value.code == 1
     err = capsys.readouterr().err
-    assert "cd desktop && npm ci" in err
+    assert 'run "npm ci" inside the "desktop" folder' in err
     assert err == launcher.SHELL_MISSING_MESSAGE + "\n"
     assert webview == [] and _port_is_free(env.port)
 

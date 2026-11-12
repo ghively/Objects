@@ -86,8 +86,8 @@ CONSOLE_END_SECONDS = 4.5
 """Windows ends a process 5 seconds after its console is closed (and at log off or shut down);
 until then the server stays up while the shell closes its windows (the page saves) and drains."""
 SHELL_MISSING_MESSAGE = (
-    'The desktop window is not installed. Run "cd desktop && npm ci" in the Object folder first, '
-    "or use --window pywebview."
+    'The desktop window is not installed. In the Object folder run "npm ci" inside the "desktop" '
+    "folder first, or use --window pywebview."
 )  # our string
 SHELL_FAILED_MESSAGE = "The desktop window could not be started."  # our string
 SHELL_FALLBACK_MESSAGE = (

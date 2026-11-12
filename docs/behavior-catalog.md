@@ -1460,8 +1460,8 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
 - **The desktop window** (M33, Object's own): `objectapp` opens a frameless window (an Electron shell in
   `desktop/`, installed once with `cd desktop && npm ci`) when it is installed, else the pywebview window as before.
   `--window auto|electron|pywebview` (default `auto`; `OBJECT_WINDOW` gives the same choice, the option wins):
-  `electron` with no shell installed stops with 'The desktop window is not installed. Run "cd desktop && npm ci" in
-  the Object folder first, or use --window pywebview.'; a shell that cannot start falls back in `auto` with one
+  `electron` with no shell installed stops with 'The desktop window is not installed. In the Object folder run "npm ci"
+  inside the "desktop" folder first, or use --window pywebview.'; a shell that cannot start falls back in `auto` with one
   line, "The desktop window could not be started; opening the pywebview window instead.", and stops in `electron`
   with "The desktop window could not be started."; when the shell wrote an error before it failed, the line goes
   on with " The desktop window said: <its last error line>" (Chromium's `[…:FATAL:…]` prefix left out, and
