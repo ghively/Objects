@@ -154,7 +154,7 @@ uv run objectapp --space /path/to/space            # opens its own window
 uv run objectapp --space /path/to/space --browser  # or in your browser
 ```
 
-The window is pywebview: Edge WebView2 on Windows (nothing to install), GTK with the system WebKit2GTK 4.1 on Linux. On Linux `uv sync` installs `pygobject` and `pycairo`, which build against the system libraries (on Arch: `webkit2gtk-4.1`, `python-gobject`, `cairo`). The Linux window keeps its web data (tabs, recents) in Object's state folder under `webview/`. Without a display (a server, an SSH session) use `--browser`.
+Until the desktop window below is installed, the window is pywebview: Edge WebView2 on Windows (nothing to install), GTK with the system WebKit2GTK 4.1 on Linux. On Linux `uv sync` installs `pygobject` and `pycairo`, which build against the system libraries (on Arch: `webkit2gtk-4.1`, `python-gobject`, `cairo`). The Linux window keeps its web data (tabs, recents) in Object's state folder under `webview/`. Without a display (a server, an SSH session) use `--browser`.
 
 ### The desktop window
 
@@ -176,7 +176,7 @@ Drag the window by the top bar. It remembers its size, position and whether it w
 
 A launcher entry (the application menu on Linux, the Start menu on Windows, `~/Applications` on macOS) is written by `uv run python scripts/install-launcher.py --space /path/to/space`; `--remove` takes it away.
 
-Installers that bundle Python (an `.exe`, `.dmg` or AppImage that needs neither `uv` nor Node) are not part of this yet: the desktop window runs from this repository, as the app does.
+What has been run: the desktop window on Linux under X11, in a virtual display (Xvfb) with the openbox window manager, driven end to end by `desktop/test/e2e/shell.e2e.js` (dragging, maximising and closing with real pointer events, saving before close, the theme, the settings). What has not: Windows, macOS, a real Wayland session and a real tiling compositor (there the tiling case was checked by setting `XDG_CURRENT_DESKTOP`). Their code paths follow Electron's documentation and are covered by unit tests of the options each system gets, but nobody has opened the window on them yet. Installers that bundle Python (an `.exe`, `.dmg` or AppImage that needs neither `uv` nor Node) are not part of this yet: the desktop window runs from this repository, as the app does.
 
 The server listens on `http://127.0.0.1:8790` only (`--port` changes the port). Only the window Object opens can use it: each launch makes a random key, and the window opens at a one-time `/_open` link that hands the key over as a session cookie. With `--browser` the launcher prints that link (it works once, for 5 minutes; press Enter in the terminal for a new one); a bare `http://127.0.0.1:8790` tab shows "This page isn't connected to Object". Other programs use the token API under `/api/v1` (see MCP below), which keeps its own tokens. Point `--space` at an empty folder to start fresh, or at an existing folder of Markdown files. A space keeps its metadata in `.object/` and a rebuildable search cache in `.object-cache/`.
 
@@ -206,7 +206,7 @@ Object must be running: the MCP server talks to it over `http://127.0.0.1:8790/a
 ```mermaid
 flowchart LR
   subgraph You
-    UI["Window (pywebview)<br/>or browser"]
+    UI["The desktop window (Electron),<br/>the pywebview window<br/>or a browser"]
     CC["Claude Code /<br/>Claude Desktop"]
   end
   subgraph Object["Object (127.0.0.1 only)"]
@@ -230,6 +230,7 @@ flowchart LR
 
 - **Back end:** Python with FastAPI, `ruamel.yaml` for frontmatter that keeps your formatting, SQLite FTS for search, `watchdog` for external edits. Every write goes through one engine: version check, only the changed lines, atomic replace, line endings and BOM kept.
 - **Front end:** React 19 and TypeScript, built with Vite, styled with Tailwind and shadcn/ui; Tiptap for the editor, xyflow for whiteboards, sigma for the graph. Fonts and icons are bundled; nothing is fetched at runtime (in the desktop window on Windows and Linux, the spell-check dictionary is downloaded once per language).
+- **Desktop window:** an Electron shell in `desktop/`, started by `objectapp` as a child process with the one-time link in its environment. It shows only the app's own origin; the page has no Node and talks to the window only through `window.objectDesktop` (move, maximise, close, the theme, saving before close). The server stops after the shell has exited.
 - **Agents:** each agent is its own Claude Code project folder, run through your own `claude` CLI. An agent sees only the tools its switches allow; apart from the Work agent, agents run without a shell and their file tools are fenced away from your space folders.
 
 ### Repository layout
@@ -238,6 +239,7 @@ flowchart LR
 backend/objectapp/   the server, the storage engine, agents, import, the MCP server
 backend/tests/       pytest suite and synthetic fixture spaces (no real data)
 frontend/src/        the React app (editor, views, calendar, graph, whiteboard, work, agents)
+desktop/             the desktop window: a small Electron shell objectapp starts (README inside)
 scripts/             acceptance scripts per milestone, and the screenshot tooling
 docs/                behaviour catalog, design specs, plans and status
 ```
