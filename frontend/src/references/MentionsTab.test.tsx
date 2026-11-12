@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { References } from '@/api/types'
@@ -160,5 +160,136 @@ describe('MentionsTab', () => {
     await user.click(document.querySelector('[data-mention="Pages/Log.md"] [data-occurrence] button') as HTMLElement)
     expect(usePeek.getState().path).toBe('Pages/Log.md')
     expect(usePeek.getState().list).toEqual(['Pages/Notes.md', 'Pages/Log.md'])
+  })
+})
+
+// M33, choice 11: a mention reads as text, and a line that names the note twice is listed once.
+describe('MentionsTab: a mention reads as text and a line is listed once (M33)', () => {
+  const NOTES = 'Pages/Notes.md'
+  /** A stand-in for the mentioning note's file: `link` rewrites it as the back end does. */
+  let file: { body: string; version: number }
+
+  /** The occurrences of "Ada" the back end sends for the body: one per match, with its line. */
+  function occurrencesOf(body: string) {
+    const out = []
+    for (const m of body.matchAll(/(?<![\w[|])Ada(?![\w\]|])/g)) {
+      const start = m.index
+      const ls = body.lastIndexOf('\n', start - 1) + 1
+      const le = body.indexOf('\n', start) < 0 ? body.length : body.indexOf('\n', start)
+      out.push({ start, end: start + 3, text: 'Ada', context: body.slice(ls, le), contextStart: ls })
+    }
+    return out
+  }
+
+  function serve(body: string) {
+    file = { body, version: 7 }
+    mocked.references.mockImplementation(async () =>
+      references({
+        tabs: ['all', 'backlinks', 'related', 'mentions'],
+        mentions: occurrencesOf(file.body).length ? [{ path: NOTES, version: `v${file.version}`, occurrences: occurrencesOf(file.body) }] : [],
+        summaries: { [NOTES]: objectSummary({ path: NOTES, title: 'Notes' }) },
+      }),
+    )
+    // The back end's link: one write that replaces exactly those characters, on the version sent.
+    mocked.linkMention.mockImplementation(async ({ start, end, text, baseVersion }) => {
+      if (baseVersion !== `v${file.version}`) throw new ConflictError(`v${file.version}`)
+      if (file.body.slice(start, end) !== text) throw new ApiError(422, 'The text has changed. Reload and try again.')
+      file = { body: `${file.body.slice(0, start)}[[${text}]]${file.body.slice(end)}`, version: file.version + 1 }
+      return { version: `v${file.version}` }
+    })
+  }
+
+  const rows = () => [...document.querySelectorAll(`[data-mention="${NOTES}"] [data-occurrence]`)] as HTMLElement[]
+  const shown = (row: HTMLElement) => row.querySelector('.search-highlights') as HTMLElement
+  const highlighted = (row: HTMLElement) => [...shown(row).querySelectorAll('b')].map((b) => b.textContent)
+
+  test('a link in the line shows its words (the alias when there is one), and the name is still highlighted', async () => {
+    serve('First.\n- Lunch with **Ada** and [[Fix printer]], see [[Alpha|the first page]].\n')
+    await setup()
+    expect(rows()).toHaveLength(1)
+    expect(shown(rows()[0]).textContent).toBe('Lunch with Ada and Fix printer, see the first page.')
+    expect(highlighted(rows()[0])).toEqual(['Ada'])
+    expect(shown(rows()[0]).textContent).not.toContain('[[')
+  })
+
+  test('a line that names the note twice is one row, both names highlighted, with one Link', async () => {
+    serve('Intro.\nAda met Ada in the mirror.\nLater Ada left.\n')
+    await setup()
+    expect(rows()).toHaveLength(2)
+    expect(shown(rows()[0]).textContent).toBe('Ada met Ada in the mirror.')
+    expect(highlighted(rows()[0])).toEqual(['Ada', 'Ada'])
+    expect(rows()[0]).toHaveAttribute('data-occurrences', '2')
+    expect(shown(rows()[1]).textContent).toBe('Later Ada left.')
+    expect(screen.getAllByRole('button', { name: 'Link' })).toHaveLength(2)
+  })
+
+  test('Link on that row links both names, the last one first, each on the version the one before answered', async () => {
+    serve('Intro.\nAda met Ada in the mirror.\nLater Ada left.\n')
+    const user = await setup()
+    await user.click(within(rows()[0]).getByRole('button', { name: 'Link' }))
+    await waitFor(() => expect(mocked.linkMention).toHaveBeenCalledTimes(2))
+    expect(mocked.linkMention.mock.calls.map(([c]) => c)).toEqual([
+      { path: NOTES, target: 'People/Ada.md', start: 15, end: 18, text: 'Ada', baseVersion: 'v7' },
+      { path: NOTES, target: 'People/Ada.md', start: 7, end: 10, text: 'Ada', baseVersion: 'v8' },
+    ])
+    // The file's line reads right, and nothing else in it changed.
+    expect(file.body).toBe('Intro.\n[[Ada]] met [[Ada]] in the mirror.\nLater Ada left.\n')
+    expect(await screen.findByRole('status')).toHaveTextContent('Link created')
+    // One reload, and the line that is left is the one row.
+    await waitFor(() => expect(rows()).toHaveLength(1))
+    expect(mocked.references).toHaveBeenCalledTimes(1)
+    expect(shown(rows()[0]).textContent).toBe('Later Ada left.')
+    expect(mocked.linkMention).toHaveBeenCalledTimes(2)
+  })
+
+  test('if the file changes between the two, the first stays linked, nothing is guessed, and the row is offered again', async () => {
+    serve('Ada met Ada in the mirror.\n')
+    const user = await setup()
+    const link = mocked.linkMention.getMockImplementation()!
+    mocked.linkMention.mockImplementationOnce(async (input) => {
+      const res = await link(input)
+      // Somebody else writes the note before the second link.
+      file = { body: `Hello. ${file.body}`, version: file.version + 1 }
+      return res
+    })
+    await user.click(screen.getByRole('button', { name: 'Link' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Changed elsewhere. Reloaded.')
+    expect(mocked.linkMention).toHaveBeenCalledTimes(2)
+    expect(file.body).toBe('Hello. Ada met [[Ada]] in the mirror.\n')
+    // Reloaded: the one mention that is left has its row and its Link.
+    await waitFor(() => expect(shown(rows()[0]).textContent).toBe('Hello. Ada met Ada in the mirror.'))
+    expect(highlighted(rows()[0])).toEqual(['Ada'])
+    expect(screen.getByRole('button', { name: 'Link' })).toBeEnabled()
+  })
+
+  test('a name inside a code span or a link is not a mention, as before: only the plain one is highlighted and linked', async () => {
+    // The back end leaves those out (it sends one occurrence here); the row shows them as written or as the link's words.
+    const body = 'In code `Ada` stays, [[Ada Lovelace|Ada]] is a link, and Ada is neither.\n'
+    file = { body, version: 7 }
+    const start = body.lastIndexOf('Ada')
+    mocked.references.mockResolvedValue(
+      references({
+        tabs: ['all', 'backlinks', 'related', 'mentions'],
+        mentions: [{ path: NOTES, version: 'v7', occurrences: [{ start, end: start + 3, text: 'Ada', context: body.trimEnd(), contextStart: 0 }] }],
+        summaries: { [NOTES]: objectSummary({ path: NOTES, title: 'Notes' }) },
+      }),
+    )
+    const user = await setup()
+    expect(rows()).toHaveLength(1)
+    expect(shown(rows()[0]).textContent).toBe('In code `Ada` stays, Ada is a link, and Ada is neither.')
+    const bold = [...shown(rows()[0]).querySelectorAll('b')]
+    expect(bold).toHaveLength(1)
+    // The highlighted one is the last "Ada" of the shown text.
+    expect(bold[0].nextSibling?.textContent).toBe(' is neither.')
+    await user.click(screen.getByRole('button', { name: 'Link' }))
+    expect(mocked.linkMention).toHaveBeenCalledTimes(1)
+    expect(mocked.linkMention).toHaveBeenCalledWith(expect.objectContaining({ start, end: start + 3, text: 'Ada' }))
+  })
+
+  test('the tab still counts notes: one note with a doubled line and another line is "1"', async () => {
+    serve('Ada met Ada in the mirror.\nLater Ada left.\n')
+    await setup()
+    expect(screen.getByRole('tab', { name: /^Mentions/ }).querySelector('[data-tab-count]')?.textContent).toBe('1')
+    expect(document.querySelectorAll('[data-mention]')).toHaveLength(1)
   })
 })

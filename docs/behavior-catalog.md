@@ -1413,6 +1413,19 @@ has Backlinks Open | Closed and Unlinked Mentions Open | Closed | Hidden. With n
 the one line "No unlinked mentions" and the Mentions tab stays; when there are any they always show, under their
 heading, each with its "Link" button.
 
+How a mention reads (M33; `frontend/src/references/mentionRows.ts`): its line is shown as text, the way a backlink
+row shows its line: a `[[link]]` in it shows the link's words (the alias when there is one), the line's markers
+(quote, heading, list item, task box) and emphasis marks are not shown; other Markdown stays as written, and a
+code span exactly as written. Every match of the name is highlighted. A line that names the note twice is listed
+once (it was listed once per match, with the same text), and its "Link" links every match in that line: one link
+request per match, the last match first, each on the version the one before answered, so the line ends up fully
+linked and nothing else in the file changes. If the file changes between two of them, the links already made
+stay, nothing more is tried, "Changed elsewhere. Reloaded." shows, and what is still unlinked is listed again with
+its own "Link". On a line longer than the 280 characters a row shows, two matches share a row when the stretches
+around them overlap. The counts are what they were: the Mentions tab and the count beside the type chip count the
+notes that mention this one (neither matches nor lines). What is a mention did not change: a name inside a link's
+own text or a code span is not one.
+
 Object builds it in full (M5): `backend/objectapp/references.py` (matching on Unicode word
 boundaries, titles and aliases of at least a minimum length, longest name first, linking a mention from the
 list), `frontend/src/references/` and the Editor settings. **Gene wants this kept**; it is a ground rule in
