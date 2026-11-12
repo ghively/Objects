@@ -78,6 +78,23 @@ Object has no accounts.
   space, Open folder…). On, that button is hidden (the sidebar toggle stays); a lone Alt tap shows it, focused, and
   another hides it, as a hidden window menu comes back with Alt (our call). The palette and Ctrl+, reach its spaces
   and settings too.
+  (M33, what is stored) Two device settings, saved like "Open notes as a full page": `greaterThanMakes` (`toggle`,
+  the default, or `quote`: Editor's "Typing "> " makes") and `windowButtons` (`auto`, the default, `show` or `hide`:
+  Appearance's "Window buttons"). Any other value is refused and nothing is saved; a settings file written before
+  M33 reads the defaults and is not rewritten until one of them is set.
+  (M33, titles written twice) "N notes begin with a heading that repeats their title." counts the notes whose title
+  is in their front matter and whose text begins (blank lines aside) with `# <that title>`: the heading a rename
+  keeps in step with the title (same case; blanks after the `#` and at the end of the line, and a closing `#`, don't
+  matter). Not counted, because that line is not a repeat that can go: a note with no `title` of its own (its title
+  *is* that heading), an AI chat, a daily note, a whiteboard, a template, an imported Source, a file that opens
+  read-only; nor a heading that repeats the title further down the text. The count reads only what the app already
+  holds and writes nothing. "Remove those headings" takes that one line and at most one blank line after it out of
+  each such note as an ordinary save of its text does (Last updated is stamped; line endings and everything else
+  stay), keeps the text as it was in version history first, always (also right after another save, when an
+  ordinary save keeps none), and leaves a note alone when it changed on disk meanwhile and no longer begins with
+  the heading, when it is in use by another program, or when its version can't be kept. Open windows refresh. A
+  second click changes nothing. The app has written no such line since M32, and an import none since M33; a
+  heading a person types, or one an imported page had itself, is counted like any other.
 - Language: interface language list (English, English (UK), Deutsch, Français, Español, Dutch, Português (BR),
   Magyar, Italian); Decimal separator (Automatic | Dot | Comma). Gene, 2026-11-10: the interface stays in English;
   the list sets date and number formatting only (translating every screen is not planned).
@@ -1173,6 +1190,16 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   failed were "not written because the import stopped"), **Changed in both** (**Take source** /
   **Keep mine**, and **Take source for all** / **Keep mine for all**), **Removed at source** (listed, never trashed).
   **Move batch to Trash** moves the objects the batch created (not the ones it only updated) to the Trash.
+- **The title is in one place** (M33): an import no longer puts `# <title>` above what it writes. Until M33 every page
+  without a first heading of its own got that line, as did an image's and an original-only file's page, a File note
+  and the Import report, so each read its title twice. Now a page's text is its own text from its first line (a
+  table row or a page with no text has none; a PDF's original comes first, then its text), and a page that opens
+  with its own heading keeps it. A re-run of an import made before M33 changes nothing because of this: a re-run
+  compares the source, so a note whose source page is as it was keeps every byte, the old heading included (Settings
+  > Editor's "Remove those headings" takes those out when asked, and a re-run does not bring them back). A source
+  page that changed is updated as before and is then written the new way, so that one note loses the added line (its
+  earlier text is in version history). After "Remove those headings" such a note counts as edited by you: when its
+  source page changes later, it is listed under **Changed in both** and not overwritten.
 - **Proposed schema** (finish step offers **Review proposed schema**; so does each row of **Settings > Import Content >
   Import history**, the open space's import batches newest first (source, date, objects; trashed batches left out), which
   reopens the same Proposed schema, Trial, Normalise and Import inbox steps after the dialog was closed or the app

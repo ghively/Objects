@@ -58,8 +58,8 @@ RESYNC_AFTER = 100
 does for more than `watcher.RESYNC_AFTER` object events), not one event each."""
 
 _GIVE_UP_AFTER = 20
-"""Refused writes in a row, with nothing written yet, after which the folder itself is taken
-to refuse writes and the removal stops (the first refusal is then the answer)."""
+"""Refused writes, with no note written yet, after which the folder itself is taken to refuse
+writes and the removal stops (the first refusal is then the answer)."""
 
 # Cheap first look: a text whose first line that isn't blank does not open a heading can't count.
 _OPENS_WITH_HEADING = re.compile(r"\s*#[ \t]")
