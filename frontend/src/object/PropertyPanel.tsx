@@ -29,6 +29,7 @@ import { useWorkOn } from '@/work/useWorkOn'
 import { DEV_INFO_TEXT, DevInfo } from '@/settings/DevInfo'
 import { LAYOUT_KEYS, removeProperty } from '@/properties/typeEdits'
 import { CounterpartRows, mergeCounterparts } from './CounterpartRows'
+import { isSystemProperty, ownFirst } from './paneOrder'
 import type { TypeEditor } from './useTypeEditor'
 
 /** Frontmatter keys shown elsewhere (header, metadata) or kept by the app, never as extra properties. */
@@ -501,7 +502,11 @@ export function PropertyPanel({
   // so the switch never hides a value (the back end keeps such a field on the type for the same
   // reason).
   const workOn = useWorkOn()
-  const rows = propertyRows(type, frontmatter).filter(
+  // M33, choice 3: the type's own properties first, then the built-in rows (`ownFirst`; null: the
+  // stored order, which is also what an order arranged by hand gets). Display only.
+  const stored = propertyRows(type, frontmatter)
+  const reordered = ownFirst(stored)
+  const rows = (reordered ?? stored).filter(
     (d) => d.type !== 'entity_title' && (workOn || !WORK_KINDS.has(d.type) || !isEmpty(cellValue(d, frontmatter, links, summary))),
   )
   const visible: PropertyDef[] = []
@@ -520,8 +525,12 @@ export function PropertyPanel({
   const filledCounterparts = merged.filter((m) => m.paths.length > 0 || m.def.visibility === 'alwaysShow').length
   const emptyCounterparts = merged.length - filledCounterparts
   const backlinksAt = visible.findIndex((d) => d.type === 'entity_backlinks')
-  const ownBefore = backlinksAt < 0 ? visible : visible.slice(0, backlinksAt)
-  const ownAfter = backlinksAt < 0 ? [] : visible.slice(backlinksAt)
+  // M33: with the own properties first the other sides still follow them directly (and still
+  // come before Backlinks), so they stay with the type's own rows, above the built-in ones.
+  const ownEnd = reordered ? visible.findLastIndex((d) => !isSystemProperty(d)) + 1 : visible.length
+  const counterpartsAt = backlinksAt < 0 ? ownEnd : Math.min(backlinksAt, ownEnd)
+  const ownBefore = visible.slice(0, counterpartsAt)
+  const ownAfter = visible.slice(counterpartsAt)
   const hiddenCount = hidden.length + emptyCounterparts
 
   // The handlers rows get are stable (they read the newest props through `latest`), so a value

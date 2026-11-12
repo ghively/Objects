@@ -515,6 +515,19 @@ Each starter template pre-fills the new type's properties.
   with text is never focused by itself. The peek's pager keeps the focus on the button a step was made with (the
   other one at an end of the list), so the same key steps on and an empty note never takes the caret from the
   pager. Placing the caret saves nothing: no request is made by opening a note, by Enter or by ArrowDown.
+- **Own properties first** (M33): the properties pane (page and peek, every layout) lists a typed note's own
+  properties first, in their own order, and the built-in rows after them (Collections, Description, Created at,
+  Last updated, Tags, Icon, Aliases, then any other system row the type was saved with), where it used to open with
+  the built-in rows: a Task shows Status, Priority, Date, Deadline first. The computed other sides stay right after
+  the type's own properties, still before Backlinks. A plain Note has no properties of its own, so nothing changes
+  for it. An order arranged by hand is kept: the order is the type's own list (Type settings, drag; saved in the
+  type's file), one list of built-in and own rows together, so the pane moves the built-in rows only while that
+  list still opens with them as it is saved (Title, Collections, Description, Created at, Last updated, Tags, Icon,
+  Aliases, as a block, in that order). Once an own property was dragged above or into that block, or its rows were
+  rearranged or one was dragged out of it, the pane shows the stored order exactly. Everything else keeps its
+  stored place: own properties among themselves, a built-in row that sits between them, and built-in rows added
+  later (after the own ones), which stay last. Display only: no type file is written, Type settings lists the
+  properties in their stored order, and "Hidden" and "hide when empty" work as before.
 - **Words on the note page** (M32, the glossary): the type chip, the "Change type" list and the type beside a
   reference read "Note" for the built-in Page type and "Daily note" for DailyNote (a renamed type keeps its
   name). The `…` menu: "Type settings" (was "Object type settings"), "Merge into note" (was "Merge into
