@@ -1502,7 +1502,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
     with the main window.
   - **A launcher entry**: `scripts/install-launcher.py --space <folder>` (`--name`, default "Object"; `--remove`;
     `--force`), run by hand, writes for the current user a Linux `.desktop` entry, a Windows Start menu shortcut or
-    a macOS `.command` file that runs `uv run objectapp --space <folder>`; it replaces only a file it wrote.
+    a macOS `.command` file that runs `uv run objectapp --space <folder>`; it replaces only a file it wrote. A
+    folder whose path holds a line break or another control character is refused plainly before anything is
+    written.
     Installers that bundle Python are not part of M33.
 - **Maintaining a running space over the token API**: type and saved-query definitions can be listed (`GET
   /api/v1/types`, `GET /api/v1/queries`, added 2026-11-09), read, made, edited and deleted while Object is open with

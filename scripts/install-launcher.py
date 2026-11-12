@@ -52,6 +52,26 @@ def _check_name(name: str) -> str:
     return name.strip()
 
 
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _shown(text: str) -> str:
+    """`text` with its control characters written as escapes (a message stays one line)."""
+    return _CONTROL.sub(lambda m: f"\\x{ord(m.group()):02x}", text)
+
+
+def _check_paths(space: Path, repo: Path, uv: str, icon: Path | None) -> None:
+    """Refuse a path with a line break or another control character, on every system: in a Linux
+    entry a line break starts a new key (``Exec=``, ``Type=``), and the other two systems' files
+    are lines too. Checked before anything is written."""
+    for what, value in (("The space folder", space), ("This repository's folder", repo), ("uv", uv), ("The icon", icon)):
+        if value is not None and _CONTROL.search(str(value)):
+            raise Refused(
+                f'{what} "{_shown(str(value))}" cannot be used in a launcher: its path holds a line break or '
+                "another control character. Rename it first."
+            )
+
+
 def _not_ours(path: Path) -> Refused:
     return Refused(f'"{path}" was not written by this script. Pass --force to replace it.')
 
@@ -221,6 +241,7 @@ def install(
     """Write the entry for `platform`; the file it wrote."""
     kind = _kind(platform)
     name = _check_name(name)
+    _check_paths(space, repo, uv, icon)
     if kind == "linux":
         return _write(linux_path(home, environ), desktop_entry(name, repo, space, icon, uv), DESKTOP_MARKER, force)
     if kind == "mac":
