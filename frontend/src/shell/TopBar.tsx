@@ -5,6 +5,7 @@ import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { SpacesMenu } from '@/spaces/SpacesMenu'
 import { openTodaysNote, TODAYS_NOTE_TEXT } from '@/calendar/openTodaysNote'
 import { isEditableTarget } from '@/lib/shortcuts'
+import { WindowControls } from '@/desktop/WindowControls'
 
 export const TOP_BAR_TEXT = {
   changeSpace: 'Change space',
@@ -177,6 +178,8 @@ export function TopBar({
         onClick={onToggleRightPanel}
         pressed={rightPanelOpen}
       />
+      {/* M33: the window's own buttons where the page draws them (the desktop window on Linux); nothing elsewhere. */}
+      <WindowControls />
     </header>
   )
 }
