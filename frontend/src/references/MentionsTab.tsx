@@ -11,7 +11,8 @@
  * one `api.linkMention` per match, the last one first (so the offsets of the ones before it
  * still hold), each on the version the one before answered. If one of them is refused (the file
  * changed in between), the ones already made stay, nothing more is tried, and the reload shows
- * what is still unlinked with its own "Link".
+ * what is still unlinked with its own "Link"; when some were made the toast says how many
+ * ("Linked 1 of 2. …"), when none were it is the one-link toast.
  */
 import { Fragment, useState } from 'react'
 import { api, ApiError, ConflictError } from '@/api/client'
@@ -66,6 +67,8 @@ export function MentionsTab({ target, entries, summaries, reload, onToast }: Men
   const link = async (entry: MentionEntry, row: MentionRow) => {
     if (busy) return
     setBusy(true)
+    const total = row.occurrences.length
+    let made = 0
     try {
       let version = entry.version
       // The last match first: a link is longer than the name, so it moves only what follows it.
@@ -79,15 +82,18 @@ export function MentionsTab({ target, entries, summaries, reload, onToast }: Men
           baseVersion: version,
         })
         version = res.version
+        made += 1
       }
       onToast(REFERENCES_TEXT.linkCreated)
       reload({ absorb: entry.path })
     } catch (err) {
-      if (err instanceof ConflictError || (err instanceof ApiError && err.status === 422)) {
-        onToast(REFERENCES_TEXT.changedElsewhere)
+      const changed = err instanceof ConflictError || (err instanceof ApiError && err.status === 422)
+      if (!changed) console.warn('Could not link the mention:', err)
+      if (made > 0) {
+        // Some links were made before the refusal: they stay, and the toast says so.
+        onToast(changed ? REFERENCES_TEXT.linkedSomeChanged(made, total) : REFERENCES_TEXT.linkedSomeFailed(made, total))
       } else {
-        console.warn('Could not link the mention:', err)
-        onToast(REFERENCES_TEXT.linkFailed)
+        onToast(changed ? REFERENCES_TEXT.changedElsewhere : REFERENCES_TEXT.linkFailed)
       }
       reload()
     } finally {

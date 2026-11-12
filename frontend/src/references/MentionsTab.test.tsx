@@ -253,13 +253,45 @@ describe('MentionsTab: a mention reads as text and a line is listed once (M33)',
       return res
     })
     await user.click(screen.getByRole('button', { name: 'Link' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('Changed elsewhere. Reloaded.')
+    // One of the two was made: the toast says so (it read "Changed elsewhere. Reloaded.").
+    expect(await screen.findByRole('status')).toHaveTextContent('Linked 1 of 2. The note changed, so it was reloaded.')
     expect(mocked.linkMention).toHaveBeenCalledTimes(2)
     expect(file.body).toBe('Hello. Ada met [[Ada]] in the mirror.\n')
     // Reloaded: the one mention that is left has its row and its Link.
     await waitFor(() => expect(shown(rows()[0]).textContent).toBe('Hello. Ada met Ada in the mirror.'))
     expect(highlighted(rows()[0])).toEqual(['Ada'])
     expect(screen.getByRole('button', { name: 'Link' })).toBeEnabled()
+  })
+
+  test('if the second link fails for another reason, the toast says how many were made, and the row is offered again', async () => {
+    serve('Ada met Ada in the mirror.\n')
+    const user = await setup()
+    const link = mocked.linkMention.getMockImplementation()!
+    mocked.linkMention.mockImplementationOnce(link).mockImplementationOnce(async () => {
+      throw new ApiError(500, 'Internal error')
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    await user.click(screen.getByRole('button', { name: 'Link' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Linked 1 of 2. Could not create the rest.')
+    expect(warn).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
+    expect(mocked.linkMention).toHaveBeenCalledTimes(2)
+    expect(file.body).toBe('Ada met [[Ada]] in the mirror.\n')
+    await waitFor(() => expect(mocked.references).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(highlighted(rows()[0])).toEqual(['Ada']))
+    expect(screen.getByRole('button', { name: 'Link' })).toBeEnabled()
+  })
+
+  test('when the first link of a row is refused, nothing was made: the toast is as before', async () => {
+    serve('Ada met Ada in the mirror.\n')
+    const user = await setup()
+    mocked.linkMention.mockImplementationOnce(async () => {
+      throw new ConflictError('v8')
+    })
+    await user.click(screen.getByRole('button', { name: 'Link' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Changed elsewhere. Reloaded.')
+    expect(mocked.linkMention).toHaveBeenCalledTimes(1)
+    expect(file.body).toBe('Ada met Ada in the mirror.\n')
   })
 
   test('a name inside a code span or a link is not a mention, as before: only the plain one is highlighted and linked', async () => {

@@ -35,6 +35,10 @@ export const REFERENCES_TEXT = {
   changedElsewhere: 'Changed elsewhere. Reloaded.',
   /** our string */
   linkFailed: 'Could not create the link.',
+  /** our string (M33): a row's "Link" made some of its links, then the note changed (409/422) */
+  linkedSomeChanged: (made: number, total: number) => `Linked ${made} of ${total}. The ${NOTE_LOWER} changed, so it was reloaded.`,
+  /** our string (M33): a row's "Link" made some of its links, then one could not be made */
+  linkedSomeFailed: (made: number, total: number) => `Linked ${made} of ${total}. Could not create the rest.`,
   /** our string */
   mentionsEmpty: 'No unlinked mentions',
   showMore: 'Show more',
