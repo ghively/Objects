@@ -107,7 +107,7 @@ async function run() {
   const keys = await page.evaluate(() => Object.keys(window.objectDesktop).sort())
   check('the bridge has exactly the Contract members', JSON.stringify(keys) === JSON.stringify([
     'close', 'controls', 'framed', 'isFullScreen', 'isMaximized', 'minimize', 'onBeforeClose', 'onWindowState',
-    'platform', 'setTheme', 'setWindowButtons', 'toggleMaximize']), keys)
+    'platform', 'setSpellCheckLanguage', 'setTheme', 'setWindowButtons', 'toggleMaximize']), keys)
   // The launch (the one-time link) is never on a command line, where other local users can read
   // it; the shell took it out of its own environment as it read it.
   const lines = H.commandLines(app.python.pid)

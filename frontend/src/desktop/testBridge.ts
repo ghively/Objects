@@ -43,6 +43,7 @@ export function fakeDesktop(
       }
     }),
     setWindowButtons: vi.fn(async (v: WindowButtons) => (v === 'show' ? 'custom' : v === 'hide' ? 'none' : auto)),
+    setSpellCheckLanguage: vi.fn(),
   }
   return {
     bridge,

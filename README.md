@@ -172,7 +172,7 @@ uv run objectapp --space /path/to/space --window pywebview     # the pywebview w
 - **macOS**: the traffic lights inside the top bar, and the standard application menu.
 - **Linux**: no frame; the top bar has minimise, maximise and close at its right end. On a tiling compositor (Hyprland, sway, i3, river, niri, bspwm, dwm, qtile, xmonad, awesome) it has none; Settings > Appearance > "Window buttons" overrides that. A Wayland session runs natively.
 
-Drag the window by the top bar. It remembers its size, position and whether it was maximised (on Wayland its size and whether it was maximised: a window cannot place itself there). Links to other sites open in your browser, a right click in text gives Cut, Copy, Paste and spelling suggestions, and closing the window saves first. Its web data is kept in Object's state folder under `desktop/`. `--frame system` (or `OBJECT_WINDOW_FRAME=system`) gives the window the system's ordinary frame instead. Spell check is Chromium's: on Windows and Linux it downloads the dictionary for your language the first time.
+Drag the window by the top bar. It remembers its size, position and whether it was maximised (on Wayland its size and whether it was maximised: a window cannot place itself there). Links to other sites open in your browser, a right click in text gives Cut, Copy, Paste and spelling suggestions, and closing the window saves first. Its web data is kept in Object's state folder under `desktop/`. `--frame system` (or `OBJECT_WINDOW_FRAME=system`) gives the window the system's ordinary frame instead. Spell check is Chromium's and follows Settings > Editor > "Spellcheck language" (on macOS the system's own spellchecker is used). On Windows and Linux the dictionary for a language is downloaded once from the browser engine's server, the first time that language is used: the one thing the desktop window fetches from the internet. Spell check is not turned off for it; "Disable spellcheck" in Settings > Editor does that.
 
 A launcher entry (the application menu on Linux, the Start menu on Windows, `~/Applications` on macOS) is written by `uv run python scripts/install-launcher.py --space /path/to/space`; `--remove` takes it away.
 
@@ -229,7 +229,7 @@ flowchart LR
 ```
 
 - **Back end:** Python with FastAPI, `ruamel.yaml` for frontmatter that keeps your formatting, SQLite FTS for search, `watchdog` for external edits. Every write goes through one engine: version check, only the changed lines, atomic replace, line endings and BOM kept.
-- **Front end:** React 19 and TypeScript, built with Vite, styled with Tailwind and shadcn/ui; Tiptap for the editor, xyflow for whiteboards, sigma for the graph. Fonts and icons are bundled; nothing is fetched at runtime.
+- **Front end:** React 19 and TypeScript, built with Vite, styled with Tailwind and shadcn/ui; Tiptap for the editor, xyflow for whiteboards, sigma for the graph. Fonts and icons are bundled; nothing is fetched at runtime (in the desktop window on Windows and Linux, the spell-check dictionary is downloaded once per language).
 - **Agents:** each agent is its own Claude Code project folder, run through your own `claude` CLI. An agent sees only the tools its switches allow; apart from the Work agent, agents run without a shell and their file tools are fenced away from your space folders.
 
 ### Repository layout

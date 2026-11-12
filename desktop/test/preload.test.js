@@ -38,7 +38,7 @@ test('exposes the bridge and nothing else', () => {
   assert.deepEqual(Object.keys(exposed), ['objectDesktop'])
   assert.deepEqual(Object.keys(exposed.objectDesktop).sort(), [
     'close', 'controls', 'framed', 'isFullScreen', 'isMaximized', 'minimize', 'onBeforeClose', 'onWindowState',
-    'platform', 'setTheme', 'setWindowButtons', 'toggleMaximize',
+    'platform', 'setSpellCheckLanguage', 'setTheme', 'setWindowButtons', 'toggleMaximize',
   ])
   assert.equal(exposed.objectDesktop.platform, 'linux')
   assert.equal(exposed.objectDesktop.controls, 'custom')
@@ -128,4 +128,16 @@ test('one handler: a new one replaces the old, and the old one\'s unsubscribe le
   listeners['object-desktop:before-close']({})
   await tick()
   assert.deepEqual(ran, ['second'])
+})
+
+test('setSpellCheckLanguage sends the tag (or null) to the shell and returns nothing', () => {
+  const { exposed, sent } = loadPreload()
+  const d = exposed.objectDesktop
+  sent.length = 0
+  assert.equal(d.setSpellCheckLanguage('de-CH'), undefined)
+  d.setSpellCheckLanguage(null)
+  assert.deepEqual(sent, [
+    ['object-desktop:set-spell-check-language', 'de-CH'],
+    ['object-desktop:set-spell-check-language', null],
+  ])
 })

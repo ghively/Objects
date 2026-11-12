@@ -1449,7 +1449,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
     link open in the default browser (web and `mailto:` links only); nothing else opens anywhere. A right click
     where the app shows no menu of its own gives Cut, Copy, Paste, Select all and, on a misspelled word, up to five
     suggestions and "Add to dictionary"; selected text that cannot be edited gives Copy and Select all. Spell check
-    is on. Downloads (exports) ask where to save through the system's dialog. Notifications, the clipboard, the
+    is on and follows Settings > Editor > "Spellcheck language" (the offered dictionary of that tag, else of the
+    same language, else the system's; macOS uses its own spellchecker); on Windows and Linux the dictionary is
+    downloaded once from the browser engine's server, and the setting's help says so there ("The dictionary for
+    this language is downloaded once from the browser engine's server."). Downloads (exports) ask where to save through the system's dialog. Notifications, the clipboard, the
     microphone and full screen (presentations) are allowed for the app's own origin; every other permission, and
     every other site, is refused. The page has no Node; it gets only `window.objectDesktop`.
   - **Closing loses nothing**: on close the shell asks the page to save and waits for its answer or 3 seconds, then

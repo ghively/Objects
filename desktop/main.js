@@ -22,6 +22,7 @@ const { lineReader, parseCommand } = require('./lib/stdinLines')
 const { createCloseGate } = require('./lib/closeGate')
 const { createPending } = require('./lib/pending')
 const { applicationMenu, contextMenu } = require('./lib/menus')
+const { spellCheckLanguagesFor } = require('./lib/spellcheck')
 
 /** `objectapp` reads this line on the shell's stdout: the window exists. */
 const READY_LINE = 'object-desktop: ready'
@@ -57,6 +58,8 @@ function start({ url, origin, stateDir, icon, frame }) {
   let focusWindow = null
   let saveTimer = null
   let quitting = false
+  /** The session's spell-check languages before the setting was applied: the system's (from its locale). */
+  let systemSpellCheckLanguages = null
 
   app.setName('Object')
   if (platform === 'win32') app.setAppUserModelId('com.objectapp.Object')
@@ -276,6 +279,19 @@ function start({ url, origin, stateDir, icon, frame }) {
     ipcMain.on('object-desktop:set-theme', (event, value) => {
       const next = cleanTheme(value)
       if (next && callerWindow(event)) applyTheme(next)
+    })
+    // "Spellcheck language": Windows and Linux pick the dictionary here; macOS uses the system's
+    // own spellchecker, so nothing is done there. Chromium downloads a language's dictionary from
+    // its vendor's server the first time it is used (said in Settings and the README).
+    ipcMain.on('object-desktop:set-spell-check-language', (event, tag) => {
+      if (platform === 'darwin' || !callerWindow(event) || (tag !== null && typeof tag !== 'string')) return
+      const ses = event.sender.session
+      if (systemSpellCheckLanguages === null) systemSpellCheckLanguages = ses.getSpellCheckerLanguages()
+      try {
+        ses.setSpellCheckerLanguages(spellCheckLanguagesFor(tag, ses.availableSpellCheckerLanguages, systemSpellCheckLanguages))
+      } catch {
+        // a language Chromium refuses: the dictionary stays as it was
+      }
     })
     ipcMain.handle('object-desktop:is-maximized', (event) => callerWindow(event)?.isMaximized() === true)
     ipcMain.handle('object-desktop:is-full-screen', (event) => callerWindow(event)?.isFullScreen() === true)

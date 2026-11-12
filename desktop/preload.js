@@ -47,4 +47,5 @@ contextBridge.exposeInMainWorld('objectDesktop', {
     return () => { if (beforeClose === handler) beforeClose = null }
   },
   setWindowButtons: (value) => ipcRenderer.invoke('object-desktop:set-window-buttons', value),
+  setSpellCheckLanguage: (tag) => { ipcRenderer.send('object-desktop:set-spell-check-language', tag) },
 })

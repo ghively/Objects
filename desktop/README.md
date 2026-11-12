@@ -8,6 +8,10 @@ when the shell exits. The shell never starts Python and is not meant to be run b
 
 - Install once: `cd desktop && npm ci` (Electron is pinned to one exact version; the install
   also fetches its binary). Then `uv run objectapp --space <folder>` uses it.
+- Spell check follows the device setting "Spellcheck language" (the page tells the shell the
+  tag; `lib/spellcheck.js` picks the dictionary: the exact language, else the same language,
+  else the system's). On Windows and Linux Chromium downloads a language's dictionary from its
+  vendor's server the first time it is used; on macOS the system's own spellchecker is used.
 - Unit tests (no display needed): `npm test`.
 - `main.js` is the wiring; everything with a decision in it is a small module in `lib/` with a
   test beside it in `test/`. `preload.js` is the bridge the page sees (`window.objectDesktop`).

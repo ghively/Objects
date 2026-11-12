@@ -110,6 +110,10 @@ interface ObjectDesktop {
   /** Linux only: apply the "Window buttons" setting now ('auto' | 'show' | 'hide'); resolves the controls
    *  now in force. */
   setWindowButtons(v: 'auto' | 'show' | 'hide'): Promise<'custom' | 'none'>
+  /** The device setting "Spellcheck language" (a tag, or null): Electron's spellchecker does not follow
+   *  `<html lang>`. The shell picks the offered dictionary (exact, else the same language, else the system's);
+   *  a no-op on macOS. (Added when the two halves were put together.) */
+  setSpellCheckLanguage(tag: string | null): void
 }
 ```
 
@@ -202,3 +206,7 @@ mentions; the settings keys on an old file.
    by the button frame (AppKit's standard 14x16 points, the 12pt circle inside), so (42 - 16) / 2 centres them in
    the 42px bar, and they end at 68px, inside the 78px the page keeps free (a test on the shell's side reads the
    page's CSS so the two stay equal). macOS could not be run here.
+7. The spell-check language reaches the shell (`setSpellCheckLanguage`): Electron's spellchecker follows the
+   session's languages, not `<html lang>`, so the device setting would otherwise do nothing in the desktop window.
+   Spell check stays on; on Windows and Linux Chromium downloads a language's dictionary once from its vendor's
+   server, which the setting's help says inside the shell on those two systems and the README says too.
