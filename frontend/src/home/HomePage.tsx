@@ -25,6 +25,7 @@ import { isOpen } from '@/tasks/statusCategory'
 import { completionToast, type TaskOutcome } from '@/tasks/taskActions'
 import { taskRowExtras } from '@/tasks/taskRowExtras'
 import { coveredDays, isTodayTask } from '@/tasks/taskSections'
+import { deadlineDayOf } from '@/tasks/taskTabs'
 import { findTaskType } from '@/tasks/useTaskRows'
 import { useRows } from '@/views/useRows'
 
@@ -63,10 +64,13 @@ export function homeTasks(rows: readonly Row[], type: TypeDef | undefined, today
   const now = new Date()
   const out: { row: Row; overdue: boolean; day: string }[] = []
   for (const row of rows) {
-    if (row.summary.template != null || !isTodayTask(row, type, now)) continue
+    // M33: a task with only a deadline that has passed is overdue here too, as on Tasks > Today.
+    const due = isOpen(row, type) ? deadlineDayOf(row) : null
+    const lateByDeadline = due !== null && due < today
+    if (row.summary.template != null || !(isTodayTask(row, type, now) || lateByDeadline)) continue
     const last = lastDayOf(row)
-    const overdue = last !== null && last < today && isOpen(row, type)
-    out.push({ row, overdue, day: last ?? today })
+    const overdue = (last !== null && last < today && isOpen(row, type)) || lateByDeadline
+    out.push({ row, overdue, day: last ?? due ?? today })
   }
   return out.sort((a, b) => Number(b.overdue) - Number(a.overdue) || a.day.localeCompare(b.day) || a.row.summary.title.localeCompare(b.row.summary.title))
 }
@@ -106,7 +110,7 @@ function TaskList({ taskType, today }: { taskType: TypeDef; today: string }) {
   return (
     <ul className="flex flex-col">
       {list.map(({ row, overdue }) => {
-        const extras = taskRowExtras(row, taskType, { onResult })
+        const extras = taskRowExtras(row, taskType, { onResult, chip: deadlineDayOf(row) ? 'deadline' : undefined })
         const done = !isOpen(row, taskType)
         return (
           <li key={row.summary.path} data-path={row.summary.path} data-overdue={overdue ? '' : undefined} className="flex items-center">

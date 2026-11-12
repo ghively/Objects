@@ -102,8 +102,12 @@ function showUpdatedToast(): void {
   const button = document.createElement('button')
   button.type = 'button'
   button.textContent = RELOAD_LABEL
-  button.style.fontWeight = '500'
-  button.style.color = 'var(--accent, inherit)'
+  // The toast's own text colour, underlined: `--accent` is a surface colour, so text in it could not be read.
+  button.style.fontWeight = '600'
+  button.style.color = 'inherit'
+  button.style.textDecoration = 'underline'
+  button.style.textUnderlineOffset = '2px'
+  button.style.cursor = 'pointer'
   // The button flushes first. If that fails again, the toast says changes may be lost and the
   // next click reloads anyway: the user asked for the reload.
   let warned = false

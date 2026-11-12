@@ -143,6 +143,21 @@ describe('HomePage (M32)', () => {
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/Due.md', { status: ['Done'] }, 'v1'))
   })
 
+  test('test a task with only a deadline that has passed is listed as overdue, with the deadline as its chip (M33)', async () => {
+    const today = todayYmd()
+    index([objectSummary({ path: 'Pages/A.md', lastUpdated: hoursAgo(1) })])
+    const missed = taskRow('Tasks/Missed.md', { status: ['Not Started'], deadline: { start: addDays(today, -3), resolution: 'day' } })
+    const coming = taskRow('Tasks/Coming.md', { status: ['Not Started'], deadline: { start: addDays(today, 3), resolution: 'day' } })
+    const doneLate = taskRow('Tasks/DoneLate.md', { status: ['Done'], deadline: { start: addDays(today, -3), resolution: 'day' } })
+    mocked.rows.mockResolvedValue([coming, missed, doneLate])
+    render(<HomePage types={TYPES} />)
+    const tasks = screen.getByRole('region', { name: 'Tasks' })
+    const rows = await within(tasks).findAllByRole('listitem')
+    expect(rows.map((r) => r.getAttribute('data-path'))).toEqual(['Tasks/Missed.md'])
+    expect(rows[0]).toHaveAttribute('data-overdue')
+    expect(within(rows[0]).getByTestId('task-date')).toHaveAccessibleName(/^Deadline: /)
+  })
+
   test('test no tasks for today: one quiet line; no Task type: the line and no rows asked for', async () => {
     index([objectSummary({ path: 'Pages/A.md', lastUpdated: hoursAgo(1) })])
     mocked.rows.mockResolvedValue([taskRow('Tasks/Someday.md', { status: ['Not Started'] })])
