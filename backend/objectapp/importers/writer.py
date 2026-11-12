@@ -13,6 +13,14 @@ stops where it happened; the report is still written. A file that can't be writt
 the file system refuses, permissions) is skipped and listed; the import goes on. New files
 are LF without a BOM, as `Space.create_object` writes them; no template is applied.
 
+M33: nothing here adds ``# <title>`` to what it writes (until then every page without a first
+heading of its own got it, M15's rule, as did an image's and an original-only file's line, a File
+object and the report): the title is in the front matter, and the app shows it above the text. A
+source page that opens with its own heading keeps it. A re-run is not touched by the change: it
+compares the source (``importSource.contentHash``), never the text it would write, so a note an
+earlier import made keeps every byte, that heading included, while its source is as it was; a
+source page that changed is written again, the new way (`_write_one`).
+
 M30 "Keep pages as Sources" (`WriteState.keep_as_sources`, recorded in ``batch.json``): the types
 phase ensures the Source type (`sources.ensure_source_type`); each page is written as a Source
 whose body is the page's own bytes after its frontmatter (BOM and line endings kept; nothing
@@ -563,14 +571,14 @@ def _image_fields(name: str, data: bytes | None, size: int, orig_rel: str | None
     return out
 
 
-def _image_body(state: WriteState, sp: str, title: str, orig_rel: str | None) -> str:
+def _image_body(state: WriteState, sp: str, orig_rel: str | None) -> str:
     if orig_rel:
         line = _media_block(orig_rel)
     elif sp in state.originals_large:
         line = "The original is larger than 100 MB and was not copied."
     else:
         line = "The original could not be kept."
-    return f"# {title}\n\n{line}\n"
+    return f"{line}\n"
 
 
 def _file_object(space: Space, state: WriteState, sp: str, orig_rel: str, size: int, scope: str | None,
@@ -625,7 +633,7 @@ def _file_object(space: Space, state: WriteState, sp: str, orig_rel: str, size: 
         },
         insert_first={"id": new_ulid()},
     )
-    data = join_object(ObjectFile(fm, f"# {name}\n", True, None)).encode("utf-8")
+    data = join_object(ObjectFile(fm, "", True, None)).encode("utf-8")  # its fields say it all
     rel = _place_unique(space, unique_path(space.root, folder, safe_filename(name)), name, data)
     if rel is None:
         return None
@@ -664,27 +672,27 @@ def _native_body(
     space: Space, state: WriteState, w: Any, page: FilePage, orig_rel: str | None, file_obj: str | None
 ) -> str:
     sp = w.read.sourcePath
-    title = w.obj.title
     media = _media_block(orig_rel) if orig_rel else None
     notes = list(page.notes)
     if page.original_only or not page.markdown.strip():
         notes = [n for n in notes if n != "Original only"]  # the line below says it once
-        lines = [f"# {title}", ""]
         if media:
-            lines.append(media)
+            line = media
         elif sp in state.originals_large:
-            lines.append("The original is larger than 100 MB and was not copied.")
+            line = "The original is larger than 100 MB and was not copied."
         else:
-            lines.append("The original could not be kept.")
+            line = "The original could not be kept."
         state.losses.append((sp, "Original only: no readable page could be made"))
-        out = "\n".join(lines) + "\n"
+        out = f"{line}\n"
     else:
         md = _place_images(space, state, page.markdown.replace("\r\n", "\n"), page.images, sp)
-        if page_heading(md) is None:
-            md = f"# {title}\n\n{md.lstrip(chr(10))}"
+        own_heading = page_heading(md) is not None
+        if not own_heading:
+            md = md.lstrip("\n")  # the page's text from its first line (M33: no title heading above it)
         if media and PurePosixPath(sp).suffix.lower() == ".pdf":
+            # the original goes under the page's own heading, or first when it has none
             first, _, rest = md.partition("\n")
-            md = f"{first}\n\n{media}\n{rest}" if first.startswith("#") else f"{media}\n\n{md}"
+            md = f"{first}\n\n{media}\n{rest}" if own_heading and first.startswith("#") else f"{media}\n\n{md}"
         out = md if md.endswith("\n") else md + "\n"
     for note in dict.fromkeys(notes):
         state.losses.append((sp, note))
@@ -722,14 +730,16 @@ def _frontmatter(w: Any, type_name: str, block: dict[str, Any] | None = None, ke
 
 
 def _body(planned: Planned, w: Any, src: Source, budget: TextBudget, state: WriteState) -> str:
+    """The text of the page as Object writes it: the source's own text, converted. M33: no
+    ``# <title>`` line is put above a page without a first heading of its own (M15's rule did;
+    the title is in the front matter), so a row or a page with no text has an empty body."""
     o = w.read
-    title = w.obj.title
     if not o.hasBody:
-        return f"# {title}\n"
+        return ""
     text = read_page_text(src, o.sourcePath, budget, None)
     if text is None:
         state.skipped.append(SkippedItem(path=o.sourcePath, reason="damaged", detail="Could not be read again; written with an empty body"))
-        return f"# {title}\n"
+        return ""
     of = split_object(text)
     body = of.body
     if o.badFrontmatter is not None:
@@ -746,9 +756,10 @@ def _body(planned: Planned, w: Any, src: Source, budget: TextBudget, state: Writ
     hooks = markdown.Hooks(planned.resolve_href, planned.resolve_wiki, planned.object_link, attachment_path)
     out = markdown.convert(body, o.sourcePath, hooks, notion_callouts=planned.plan.kind == "notion").text
     if page_heading(out) is None:
+        # the page's text from its first line, as it stood under the heading M15's rule added
         rest = out.lstrip("\n")
-        out = f"# {title}\n" + (f"\n{rest}" if rest.strip() else "")
-    if not out.endswith("\n"):
+        out = rest if rest.strip() else ""
+    if out and not out.endswith("\n"):
         out += "\n"
     return out
 
@@ -869,7 +880,7 @@ def _write_one(planned: Planned, space: Space, state: WriteState, src: Source, b
             state.originals_large.append(sp)
         type_name = _media_type(space, state, "Image").name
         extra_fm = _image_fields(name, data, entry.size if entry is not None else 0, orig_rel)
-        body = _image_body(state, sp, w.obj.title, orig_rel)
+        body = _image_body(state, sp, orig_rel)
     elif o.native:
         name = PurePosixPath(sp).name
         if data is not None:
@@ -1179,7 +1190,6 @@ def _report(planned: Planned, space: Space, state: WriteState) -> None:
         return f"[[{rel[:-3]}]]" if any(c in summary.title for c in "[]|#\n") else f"[[{summary.title}]]"
 
     body = build_report(
-        title=title,
         source_path=planned.plan.sourcePath,
         kind=planned.plan.kind,
         when=when,

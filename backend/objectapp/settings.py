@@ -5,7 +5,7 @@ separator, time zone, backlink defaults, presentation), M22's ``activityName`` (
 name in a work item's Activity, 1-60 characters, one line; M32: or empty, the default, which
 reads as "You", `activity_name`) and M23's ``workAlertFolder``
 and ``workAlertIntervals`` (the Work section's monitoring folder watch) and ``ocrLanguages`` (the
-import's OCR languages, 2026-11-09); `read` merges the file over
+import's OCR languages, 2026-11-09) and M33's ``greaterThanMakes`` and ``windowButtons``; `read` merges the file over
 `DEFAULTS` (a missing file reads as the defaults, revision ``''``, and is not
 created). `patch` checks each key's shape, replaces the patched top-level keys,
 keeps unknown keys already in the file, and writes atomically against the
@@ -137,6 +137,11 @@ DEFAULTS: dict[str, Any] = {
     "fullExportScope": "current",
     "fullExportFolder": None,
     "fullExportInterval": "daily",
+    # M33: Settings > Editor > "Typing "> " makes" (a toggle, as before, or a quote; ``| `` makes a
+    # quote either way), and Settings > Appearance > "Window buttons" (the desktop window's own
+    # minimise, maximise and close buttons on Linux: by the desktop in use, always, or never).
+    "greaterThanMakes": "toggle",
+    "windowButtons": "auto",
 }
 
 # A model name or alias for ``claude --model``: the one rule, in `aimodels` (M16).
@@ -167,6 +172,8 @@ _CHOICES: dict[str, tuple[str, ...]] = {
     "fullExportInterval": ("daily", "weekly"),
     "nestedBacklinkView": ("showBlockContainingBacklink", "showFullPathAbove"),
     "highlightStyle": ("default", "minimal"),
+    "greaterThanMakes": ("toggle", "quote"),
+    "windowButtons": ("auto", "show", "hide"),
 }
 _BOOLS = frozenset(k for k, v in DEFAULTS.items() if isinstance(v, bool))
 _OPEN_ON_START_MODES = ("lastOpenedPage", "today", "calendar", "specificObject", "home")  # M32: home

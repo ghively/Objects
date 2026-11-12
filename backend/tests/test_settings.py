@@ -68,6 +68,9 @@ CONTRACT_DEFAULTS = {
     "fullExportScope": "current",
     "fullExportFolder": None,
     "fullExportInterval": "daily",
+    # M33 (`test_m33_settings.py` checks them)
+    "greaterThanMakes": "toggle",
+    "windowButtons": "auto",
 }
 
 

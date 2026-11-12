@@ -61,6 +61,9 @@ Routes (all JSON):
 - M28 (T3): ``POST /api/spaces`` and ``POST /api/space/setup`` take ``setup: 'itops'`` (IT
   operations); the IT ops pick announces ``types`` ``*`` and each template and seed Tag as
   ``created``, and ``POST /api/types`` announces the default template an IT ops gallery type gets.
+- M33: ``GET /api/space/title-headings`` -> ``{count}`` and ``POST
+  /api/space/title-headings/remove`` -> ``{changed}`` (`api_titleheadings`: notes that begin with a
+  heading repeating their title; the removal announces ``changed`` per note, or one resync).
 - ``GET /api/trash`` -> ``TrashItem[]``; ``POST /api/trash/{id}/restore?clientId=`` ->
   ``{paths, typeIds, rewritten}`` (plus ``collectionIds``, ``queryIds``, ``skipped`` for a
   collection or query entry; ``rewritten``: other files written back, announced ``changed``;
@@ -210,6 +213,7 @@ from . import (
     api_spaces_m8,
     api_storage,
     api_tasks,
+    api_titleheadings,
     api_v1,
     api_v1_tools,
     api_vcs,
@@ -2494,6 +2498,8 @@ def create_app(
     api.include_router(api_references.router(ctx))
     api.include_router(api_graph.router(ctx))
     api.include_router(api_storage.router(ctx))  # M31: Offline & Sync's Local Storage, Clear media cache
+    # M33: notes that begin with a heading repeating their title (the count, and its removal)
+    api.include_router(api_titleheadings.router(ctx))
     # M8: each router is filled by its own task (see the plan's "Shared files").
     for module in (api_tasks, api_history, api_blocks, api_merge, api_spaces_m8):
         api.include_router(module.router(ctx))
