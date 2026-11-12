@@ -146,10 +146,14 @@ Every feature is simply available. Nothing is gated.
 
 You need **Python 3.13+** with [uv](https://docs.astral.sh/uv/), and **Node 22+**.
 
+One command per line, so the steps work the same in a POSIX shell and in Windows PowerShell:
+
 ```sh
 uv sync
-cd frontend && npm ci && npm run build && cd ..
-
+cd frontend
+npm ci
+npm run build
+cd ..
 uv run objectapp --space /path/to/space            # opens its own window
 uv run objectapp --space /path/to/space --browser  # or in your browser
 ```
@@ -161,12 +165,14 @@ Until the desktop window below is installed, the window is pywebview: Edge WebVi
 Install the desktop window once, and Object opens in a frameless window that fits the system:
 
 ```sh
-cd desktop && npm ci && cd ..                                  # once (Electron, pinned to one version)
+cd desktop
+npm ci                                                         # once (Electron, pinned to one version)
+cd ..
 uv run objectapp --space /path/to/space                        # now opens the frameless window
 uv run objectapp --space /path/to/space --window pywebview     # the pywebview window, as before
 ```
 
-`--window auto` (the default) uses the desktop window when it is installed, and the pywebview window when it is not or when it cannot start (it says so in one line). `--window electron` insists on it. `OBJECT_WINDOW` sets the same choice; the option wins. What each system shows:
+`--window auto` (the default) uses the desktop window when it is installed, and the pywebview window when it is not or when it cannot start (it says so in one line, with the last error the desktop window gave). `--window electron` insists on it. On Ubuntu 23.10 and later, if the desktop window falls back to the old window with a "SUID sandbox helper" message, run `sudo chown root desktop/node_modules/electron/dist/chrome-sandbox && sudo chmod 4755 desktop/node_modules/electron/dist/chrome-sandbox` once (or allow it through an AppArmor profile). `OBJECT_WINDOW` sets the same choice; the option wins. What each system shows:
 
 - **Windows**: the system's own minimise, maximise (with snap layouts) and close at the top right, in the app's colours.
 - **macOS**: the traffic lights inside the top bar, and the standard application menu.
@@ -248,8 +254,11 @@ docs/                behaviour catalog, design specs, plans and status
 
 ```sh
 uv run pytest backend/tests -q                          # back end (~3,200 tests)
-cd frontend && npx vitest run                           # front end (~3,900 tests)
-npx tsc -b --noEmit && npx oxlint && npm run build      # types, lint, build
+cd frontend
+npx vitest run                                          # front end (~3,900 tests)
+npx tsc -b --noEmit                                     # types
+npx oxlint                                              # lint
+npm run build                                           # build
 ```
 
 Every milestone has an acceptance script that runs on a copy of a fixture space, for example:

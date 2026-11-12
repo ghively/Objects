@@ -14,8 +14,14 @@ for the shell's whole life, so the end of stdin means it is gone: the shell then
 way. (An end that comes before the window is ready is ignored: that is a stdin that was never
 connected, not `objectapp` going.)
 
-- Install once: `cd desktop && npm ci` (Electron is pinned to one exact version; the install
+- Install once: `npm ci` in this folder (Electron is pinned to one exact version; the install
   also fetches its binary). Then `uv run objectapp --space <folder>` uses it.
+- When it cannot start, `objectapp` says so in one line with the last error line the shell wrote
+  (never anything of the one-time link), and in `auto` opens the pywebview window instead. On
+  Ubuntu 23.10 and later that error can be Chromium's "SUID sandbox helper": run
+  `sudo chown root node_modules/electron/dist/chrome-sandbox && sudo chmod 4755 node_modules/electron/dist/chrome-sandbox`
+  here once (or allow it through an AppArmor profile). What the shell writes on stderr once its
+  window is ready is passed on, without lines holding a one-time link.
 - Spell check follows the device setting "Spellcheck language" (the page tells the shell the
   tag; `lib/spellcheck.js` picks the dictionary: the exact language, else the same language,
   else the system's). On Windows and Linux Chromium downloads a language's dictionary from its
@@ -32,7 +38,9 @@ It is not part of `npm test`: it needs a display, the built front end (`frontend
 Python. From the repository root:
 
 ```sh
-cd frontend && npm run build && cd ..
+cd frontend
+npm run build
+cd ..
 node desktop/test/e2e/shell.e2e.js                 # on a desktop
 xvfb-run -a -s "-screen 0 1920x1080x24" node desktop/test/e2e/shell.e2e.js   # without one (Linux)
 ```

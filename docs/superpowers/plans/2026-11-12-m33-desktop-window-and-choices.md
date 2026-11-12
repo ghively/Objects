@@ -210,3 +210,18 @@ mentions; the settings keys on an old file.
    session's languages, not `<html lang>`, so the device setting would otherwise do nothing in the desktop window.
    Spell check stays on; on Windows and Linux Chromium downloads a language's dictionary once from its vendor's
    server, which the setting's help says inside the shell on those two systems and the README says too.
+8. The fix pass's desktop calls (2026-11-12). Stopping `objectapp` (Ctrl-C, SIGTERM, SIGHUP) asks the shell to
+   quit with one stdin line, `{"kind": "quit"}`, and waits 6 seconds (the page's 3, the shell's 2, one spare)
+   before it terminates it; the shell closes on the quit line or on the end of its stdin, but not on an end that
+   comes before its window is ready (`objectapp` keeps the pipe open for the shell's life, which a test shows on
+   POSIX; on Windows it was not run, and an early end there is then not taken for `objectapp` going, so a
+   stdin quirk cannot close the window at launch). On Windows a console control handler keeps the server up
+   for up to 4.5 seconds after a closed console, log off or shut down (Windows ends the process at 5), and
+   `query-session-end` asks the page to save without holding the shutdown up; neither was run on Windows. A link
+   reaches the default browser only within a second of a person's click or key in that window (Electron's
+   `input-event`, which a page cannot fake) and only from the app's own page; `window.open` names no frame in
+   Electron 45, so its referrer is the sign used (an embedded page of another site that also drops its referrer
+   could still open a link within a second of a person's click in the app: the narrow case left). The launcher
+   script refuses a path with a control character on every system. A shell that cannot start is reported with
+   its last stderr line (without Chromium's prefix, never a line holding a one-time link); its stderr before the
+   window is ready is otherwise not shown, and after it is passed on.

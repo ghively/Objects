@@ -83,7 +83,8 @@ class FakeChild:
 
     created: ClassVar[list[FakeChild]] = []
 
-    def __init__(self, argv, *, script=None, output=(READY,), exits=None, quits=True, **kwargs) -> None:
+    def __init__(self, argv, *, script=None, output=(READY,), exits=None, quits=True, err_lines=(),
+                 err_after: threading.Event | None = None, **kwargs) -> None:
         self.argv = list(argv)
         self.kwargs = kwargs
         self.events: list[str] = []
@@ -95,6 +96,10 @@ class FakeChild:
             self._done.set()
         self._output = list(output)
         self.stdout = self._lines()
+        # Its stderr: `err_lines`, written once `err_after` is set (at once without it).
+        self._errors = list(err_lines)
+        self._errors_after = err_after
+        self.stderr = self._error_lines()
         self.terminated = False
         self.error: BaseException | None = None
         FakeChild.created.append(self)
@@ -104,6 +109,11 @@ class FakeChild:
     def _lines(self):
         yield from self._output
         self._done.wait()
+
+    def _error_lines(self):
+        if self._errors_after is not None:
+            self._errors_after.wait(5)
+        yield from self._errors
 
     def _run(self, script) -> None:
         try:
@@ -443,6 +453,75 @@ def test_auto_falls_back_to_pywebview_and_says_so_in_one_line(env, monkeypatch, 
     assert _port_is_free(env.port)
 
 
+SANDBOX_FATAL = (
+    "[4242:1112/090000.000000:FATAL:sandbox/linux/suid/client/setuid_sandbox_host.cc:163] The SUID sandbox "
+    "helper binary was found, but is not configured correctly. Rather than run without sandboxing I'm aborting "
+    "now. You need to make sure that /x/desktop/node_modules/electron/dist/chrome-sandbox is owned by root and "
+    "has mode 4755.\n"
+)
+
+
+def test_the_fallback_line_says_what_the_shell_last_said(env, monkeypatch, capsys) -> None:
+    """Chromium's raw FATAL text is not left on the terminal: the one line says what went wrong."""
+    _install_shell(env.desktop)
+    _fake_webview(monkeypatch)
+    _popen(monkeypatch, output=(), exits=133, err_lines=("[4242:WARNING:bus.cc(408)] Failed to connect to the bus\n",
+                                                      SANDBOX_FATAL, "\n"))
+    launcher.main(["--space", str(env.root), "--port", str(env.port)])
+    out, err = capsys.readouterr()
+    assert out == (
+        launcher.SHELL_FALLBACK_MESSAGE + " The desktop window said: The SUID sandbox helper binary was found, but "
+        "is not configured correctly. Rather than run without sandboxing I'm aborting now. You need to make sure "
+        "that /x/desktop/node_modules/electron/dist/chrome-sandbox is owned by root and has mode 4755.\n"
+    )
+    assert err == ""  # the raw lines are not repeated
+
+
+def test_the_fallback_line_never_repeats_the_launch_link(env, monkeypatch, capsys) -> None:
+    _install_shell(env.desktop)
+    _fake_webview(monkeypatch)
+    _popen(monkeypatch, output=(), exits=1, err_lines=(
+        "Object: the launch could not be read.\n",
+        f"[1:ERROR:x.cc(1)] Failed to load http://127.0.0.1:{env.port}/_open?code=leak&next=/\n",
+    ))
+    launcher.main(["--space", str(env.root), "--port", str(env.port)])
+    out, err = capsys.readouterr()
+    assert out == launcher.SHELL_FALLBACK_MESSAGE + " The desktop window said: Object: the launch could not be read.\n"
+    assert "leak" not in out + err and "_open" not in out + err
+
+
+def test_window_electron_that_cannot_start_says_what_the_shell_last_said(env, monkeypatch, capsys) -> None:
+    _install_shell(env.desktop)
+    _popen(monkeypatch, output=(), exits=133, err_lines=(SANDBOX_FATAL,))
+    with pytest.raises(SystemExit):
+        launcher.main(["--space", str(env.root), "--port", str(env.port), "--window", "electron"])
+    err = capsys.readouterr().err
+    assert err.startswith(launcher.SHELL_FAILED_MESSAGE + " The desktop window said: The SUID sandbox helper")
+    assert err.count("\n") == 1
+
+
+def test_what_the_shell_writes_on_stderr_once_its_window_is_ready_is_passed_on_without_the_link(
+    env, monkeypatch, capsys
+) -> None:
+    _install_shell(env.desktop)
+    ready = threading.Event()
+
+    def script(child: FakeChild) -> None:
+        deadline = time.monotonic() + 5
+        while not windowhost.can_open() and time.monotonic() < deadline:  # the window is ready
+            time.sleep(0.01)
+        ready.set()
+        time.sleep(0.3)
+
+    _popen(monkeypatch, script=script, err_after=ready, err_lines=(
+        "Object: the window could not load the app.\n",
+        f"[1:ERROR:x.cc(1)] Failed to load http://127.0.0.1:{env.port}/_open?code=leak&next=/\n",
+    ))
+    launcher.main(["--space", str(env.root), "--port", str(env.port)])
+    out, err = capsys.readouterr()
+    assert out == "" and err == "Object: the window could not load the app.\n"
+
+
 def test_window_electron_that_cannot_start_stops_with_a_plain_message(env, monkeypatch, capsys) -> None:
     _install_shell(env.desktop)
     webview = _fake_webview(monkeypatch)
@@ -638,6 +717,22 @@ def test_a_second_stop_signal_does_not_cut_the_save_short(env, monkeypatch) -> N
     (child,) = FakeChild.created
     assert child.events == ['stdin {"kind": "quit"}', "exit 0"]
     assert events == ["server stop"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a POSIX script stands in for the shell")
+def test_a_real_shell_that_fails_at_once_is_reported_by_its_last_error_line(env, tmp_path) -> None:
+    shell = tmp_path / "shell.py"
+    shell.write_text(
+        f"#!{sys.executable}\n"
+        "import sys\n"
+        f"sys.stderr.write({SANDBOX_FATAL!r})\n"
+        "sys.exit(133)\n",
+        encoding="utf-8",
+    )
+    shell.chmod(0o755)
+    said: list[str] = []
+    assert launcher.start_shell(shell, {"url": "http://127.0.0.1:1/_open?code=k"}, ready_timeout=10, said=said) is None
+    assert len(said) == 1 and said[0].startswith("The SUID sandbox helper binary was found")
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="a POSIX script stands in for the shell")

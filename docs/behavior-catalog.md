@@ -1463,7 +1463,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   `electron` with no shell installed stops with 'The desktop window is not installed. Run "cd desktop && npm ci" in
   the Object folder first, or use --window pywebview.'; a shell that cannot start falls back in `auto` with one
   line, "The desktop window could not be started; opening the pywebview window instead.", and stops in `electron`
-  with "The desktop window could not be started.". `--browser` is unchanged.
+  with "The desktop window could not be started."; when the shell wrote an error before it failed, the line goes
+  on with " The desktop window said: <its last error line>" (Chromium's `[…:FATAL:…]` prefix left out, and
+  never a line holding a one-time link), instead of Chromium's raw text. `--browser` is unchanged.
   - **Per system**: Windows shows the system's own minimise, maximise (snap layouts) and close over the top bar's
     right end, in the theme's colours; macOS shows the traffic lights in the top bar's left end and the standard
     application menu (App, Edit, View, Window); Linux has no frame, and the top bar draws minimise,

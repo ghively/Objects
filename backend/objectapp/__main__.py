@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -92,6 +93,8 @@ SHELL_FAILED_MESSAGE = "The desktop window could not be started."  # our string
 SHELL_FALLBACK_MESSAGE = (
     "The desktop window could not be started; opening the pywebview window instead."
 )  # our string
+SHELL_SAID = " The desktop window said: {}"  # our string
+"""Added to the two messages above: the last line the shell wrote on its stderr before it failed."""
 
 
 def build_server_config(
@@ -353,6 +356,54 @@ def _watch_ready(stream: Any, ready: threading.Event) -> None:
         pass
 
 
+_CHROMIUM_PREFIX = re.compile(r"^\[[^\]]*\]\s*")
+
+
+def _shell_said(line: str, link: str) -> str | None:
+    """A line of the shell's stderr as it may be shown, without Chromium's ``[pid:…:FATAL:file]``
+    prefix; None when it is empty or holds anything of a one-time link."""
+    text = line.strip()
+    if not text or "_open" in text or "code=" in text or (link and link in text):
+        return None
+    return _CHROMIUM_PREFIX.sub("", text) or None
+
+
+class _ShellErrors:
+    """Reads the shell's stderr to its end. Until its window is ready the lines are kept, not
+    printed (`last`: what a start that failed said last, instead of Chromium's raw text); once it
+    is ready each line is passed on to this stderr as it was. A line holding anything of a
+    one-time link is never kept or passed on."""
+
+    def __init__(self, ready: threading.Event, link: str) -> None:
+        self.ready = ready
+        self.link = link
+        self.last: str | None = None
+        self.done = threading.Event()
+
+    def read(self, stream: Any) -> None:
+        try:
+            for line in stream:
+                shown = _shell_said(line, self.link)
+                if shown is None:
+                    continue
+                if not self.ready.is_set():
+                    self.last = shown
+                    continue
+                try:
+                    print(line.rstrip("\r\n"), file=sys.stderr, flush=True)
+                except (OSError, ValueError):
+                    pass
+        except (OSError, ValueError):
+            pass
+        finally:
+            self.done.set()
+
+
+def _with_said(message: str, said: list[str]) -> str:
+    """`message`, and what the shell said last when it said anything (one line)."""
+    return message + (SHELL_SAID.format(said[-1]) if said else "")
+
+
 def _ask_shell_to_quit(stream: Any) -> bool:
     """Write the quit line on the shell's stdin, then close it; False when the pipe is gone."""
     asked = True
@@ -495,19 +546,20 @@ def _install_console_handler(
 
 def start_shell(
     binary: Path, launch: dict[str, Any], *, popen: Callable[..., Any] | None = None,
-    ready_timeout: float = SHELL_READY_SECONDS,
+    ready_timeout: float = SHELL_READY_SECONDS, said: list[str] | None = None,
 ) -> Any | None:
     """Start the desktop shell as a child; None when it cannot be started (it does not run, or
-    it exits or stays silent before its window exists). Its stdout is read for the ready line
-    only. Its launch (it holds the one-time link) is never printed and never on its command line:
-    it is in the child's own environment, which only this user can read, and the shell removes it
-    from its environment as it reads it."""
+    it exits or stays silent before its window exists); then `said` gets the last line of its
+    stderr, when it wrote one without a link in it. Its stdout is read for the ready line only.
+    Its launch (it holds the one-time link) is never printed and never on its command line: it is
+    in the child's own environment, which only this user can read, and the shell removes it from
+    its environment as it reads it."""
     environ = {k: v for k, v in os.environ.items() if k != "ELECTRON_RUN_AS_NODE"}
     environ[SHELL_LAUNCH_ENV] = json.dumps(launch)
     argv = [str(binary), str(DESKTOP_DIR)]
     try:
         child = (popen or subprocess.Popen)(
-            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=environ,
+            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environ,
             text=True, encoding="utf-8", errors="replace",
         )
     except OSError:
@@ -516,12 +568,26 @@ def start_shell(
     threading.Thread(
         target=_watch_ready, args=(child.stdout, ready), name="objectapp-shell-output", daemon=True
     ).start()
+    errors = _ShellErrors(ready, str(launch.get("url") or ""))
+    stderr = getattr(child, "stderr", None)
+    if stderr is not None:
+        threading.Thread(target=errors.read, args=(stderr,), name="objectapp-shell-errors", daemon=True).start()
+    else:
+        errors.done.set()
+
+    def failed() -> None:
+        errors.done.wait(1.0)  # the last lines it wrote before it exited
+        if said is not None and errors.last is not None:
+            said.append(errors.last)
+
     deadline = time.monotonic() + ready_timeout
     while not ready.wait(0.05):
         if child.poll() is not None:
+            failed()
             return None
         if time.monotonic() >= deadline:
             _stop_shell(child, ask=False)
+            failed()
             return None
     return child
 
@@ -595,11 +661,12 @@ def main(argv: list[str] | None = None) -> None:
         else:
             child = None
             if shell is not None:
-                child = start_shell(shell, shell_launch(host.ui_key, url, args.port, frame))
+                said: list[str] = []
+                child = start_shell(shell, shell_launch(host.ui_key, url, args.port, frame), said=said)
                 if child is None:
                     if window == "electron":
-                        parser.exit(1, SHELL_FAILED_MESSAGE + "\n")
-                    print(SHELL_FALLBACK_MESSAGE, flush=True)
+                        parser.exit(1, _with_said(SHELL_FAILED_MESSAGE, said) + "\n")
+                    print(_with_said(SHELL_FALLBACK_MESSAGE, said), flush=True)
             if child is not None:
                 # SIGTERM / SIGHUP: as Ctrl-C, the shell is stopped (and the page saves) before
                 # the server (`finally` below). Windows: a closed console, log off or shut down.
