@@ -109,6 +109,14 @@ def _search_cache_stays_in_the_sandbox(tmp_path_factory, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_real_desktop_shell(monkeypatch):
+    """M33: `--window auto` is the launcher's default, and it starts the desktop shell wherever
+    `desktop/node_modules/electron` holds a binary. No test may open a real window: tests that
+    exercise the choice set or delete `OBJECT_WINDOW` themselves."""
+    monkeypatch.setenv("OBJECT_WINDOW", "pywebview")
+
+
+@pytest.fixture(autouse=True)
 def _no_frontmatter_cache_timer_outlives_its_test():
     """A cache flush timer armed by one test must not fire into a later one."""
     yield
