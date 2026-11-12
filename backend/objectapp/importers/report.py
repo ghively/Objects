@@ -70,7 +70,6 @@ def _section(title: str, lines: list[str]) -> list[str]:
 
 def build_report(
     *,
-    title: str,
     source_path: str,
     kind: str,
     when: str,
@@ -87,14 +86,15 @@ def build_report(
 ) -> str:
     """The report's body. ``link_for(source path)`` is the ``[[…]]`` of the object imported
     from it (None when there is none); ``stopped`` says why the import stopped early and
-    ``not_written`` how many planned objects it didn't write (links to them stay unresolved)."""
+    ``not_written`` how many planned objects it didn't write (links to them stay unresolved).
+    M33: it no longer opens with ``# <title>`` (the report page shows its title above its text;
+    the batch's ``report.md`` is the same text)."""
 
     def obj(src: str) -> str:
         link = link_for(src)
         return f"{link} ({code(src)})" if link else code(src)
 
-    lines = [f"# {title}", ""]
-    lines.append(f"- Source: {code(source_path)}")
+    lines = [f"- Source: {code(source_path)}"]
     lines.append(f"- Exported from: {KIND_NAMES.get(kind, kind)}")
     lines.append(f"- Imported: {when}")
     if stopped:

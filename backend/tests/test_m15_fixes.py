@@ -590,13 +590,14 @@ def test_o2_singular(plural, singular):
 
 def test_o5_report_counts_singular():
     body = build_report(
-        title="Import report", source_path="/x", kind="obsidian", when="now",
+        source_path="/x", kind="obsidian", when="now",
         counts={"objects": 1, "types": 1, "attachments": 1, "tags": 1},
         skipped=[], renamed=[], unresolved=[], not_converted=[], link_for=lambda _s: None,
     )
     assert "Imported 1 object, 1 type, 1 attachment and 1 tag." in body
+    assert body.startswith("- Source: ")  # M33: the report no longer opens with "# <title>"
     body = build_report(
-        title="Import report", source_path="/x", kind="obsidian", when="now",
+        source_path="/x", kind="obsidian", when="now",
         counts={"objects": 2, "types": 0, "attachments": 3, "tags": 1000},
         skipped=[SkippedItem(path="a", reason="emptyFile")], renamed=[], unresolved=[], not_converted=[],
         link_for=lambda _s: None,
