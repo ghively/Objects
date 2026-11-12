@@ -30,23 +30,30 @@ export interface MentionsTabProps {
   onToast(message: string): void
 }
 
+/** A row's text cut at its matches: what stands before each match, the match, and what follows the last. */
+function rowPieces(row: MentionRow): { parts: { before: string; match: string }[]; rest: string } {
+  const { text, marks } = rowDisplay(row)
+  const parts: { before: string; match: string }[] = []
+  let at = 0
+  for (const [start, end] of marks) {
+    parts.push({ before: text.slice(at, start), match: text.slice(start, end) })
+    at = end
+  }
+  return { parts, rest: text.slice(at) }
+}
+
 /** A row's text with every match in bold, through the search-highlight style. */
 function RowContext({ row }: { row: MentionRow }) {
-  const { text, marks } = rowDisplay(row)
-  let at = 0
+  const { parts, rest } = rowPieces(row)
   return (
     <span className="search-highlights whitespace-pre-wrap break-words">
-      {marks.map(([start, end], i) => {
-        const before = text.slice(at, start)
-        at = end
-        return (
-          <Fragment key={i}>
-            {before}
-            {end > start && <b>{text.slice(start, end)}</b>}
-          </Fragment>
-        )
-      })}
-      {text.slice(at)}
+      {parts.map(({ before, match }, i) => (
+        <Fragment key={i}>
+          {before}
+          {match && <b>{match}</b>}
+        </Fragment>
+      ))}
+      {rest}
     </span>
   )
 }
