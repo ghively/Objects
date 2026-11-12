@@ -993,6 +993,9 @@ function defaults(): Api {
     }),
     settings: async () => ({ settings: deviceSettings(), revision: '' }),
     patchSettings: async (patch: Partial<DeviceSettings>) => ({ settings: deviceSettings(patch), revision: 'r1' }),
+    // M33: no note begins with a heading that repeats its title.
+    titleHeadings: async () => ({ count: 0 }),
+    removeTitleHeadings: async () => ({ changed: 0 }),
     spaces: async () => [spaceEntry({ path: '/space', name: 'space', current: true })],
     spaceSetup: async () => ({ name: 'space', root: '/space', types: [], needsSetup: false }),
     createSpace: async (name: string, location: string) => ({ path: `${location.replace(/[\\/]+$/, '')}/${name}` }),

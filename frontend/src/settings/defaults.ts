@@ -72,4 +72,7 @@ export const settingsDefaults: DeviceSettings = Object.freeze({
   fullExportScope: 'current',
   fullExportFolder: null,
   fullExportInterval: 'daily',
+  // M33
+  greaterThanMakes: 'toggle',
+  windowButtons: 'auto',
 }) as DeviceSettings

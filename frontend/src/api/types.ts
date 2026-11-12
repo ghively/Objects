@@ -583,6 +583,11 @@ export interface DeviceSettings {
   fullExportScope: 'current' | 'all'
   fullExportFolder: string | null
   fullExportInterval: 'daily' | 'weekly'
+  // ---- M33 ----
+  /** Editor 'Typing "> " makes': a toggle (the default) or a quote block. */
+  greaterThanMakes: 'toggle' | 'quote'
+  /** Appearance "Window buttons" (the desktop shell on Linux): by the desktop, always, never. */
+  windowButtons: 'auto' | 'show' | 'hide'
 }
 
 /** M31 Appearance "App icon" colours. */
