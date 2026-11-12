@@ -108,6 +108,15 @@ async function run() {
   check('the bridge has exactly the Contract members', JSON.stringify(keys) === JSON.stringify([
     'close', 'controls', 'framed', 'isFullScreen', 'isMaximized', 'minimize', 'onBeforeClose', 'onWindowState',
     'platform', 'setTheme', 'setWindowButtons', 'toggleMaximize']), keys)
+  // The launch (the one-time link) is never on a command line, where other local users can read
+  // it; the shell took it out of its own environment as it read it.
+  const lines = H.commandLines(app.python.pid)
+  check('no command line of objectapp or the shell holds the launch or its link',
+    lines.length > 1 && lines.every((l) => !l.argv.some((a) => /_open|code=|object-launch|OBJECT_DESKTOP_LAUNCH/.test(a))),
+    lines.length)
+  const shellEnv = await main.evaluate('({ argv: process.argv, kept: "OBJECT_DESKTOP_LAUNCH" in process.env })')
+  check('the shell\'s argv holds nothing of the link, and its environment no longer has the launch',
+    !shellEnv.argv.some((a) => /_open|code=|object-launch/.test(a)) && shellEnv.kept === false, shellEnv.argv)
   check('the page has no Node', await page.evaluate(() =>
     typeof window.require === 'undefined' && typeof window.process === 'undefined' && typeof window.module === 'undefined'))
 
@@ -217,6 +226,7 @@ async function run() {
   check('the window still shows the app, alone', page.url() === `http://127.0.0.1:${PORT}/` &&
     (await main.evaluate('electron.BrowserWindow.getAllWindows().length')) === 1, browser.opened())
   check('only web links went to the default browser', browser.opened().length === 3, browser.opened())
+  check('the default browser did not inherit the launch variable', !browser.inherited())
 
   // Keep on top: `objectapp` writes the stdin line, the shell opens the small window.
   const status = await page.evaluate(async () => (await fetch('/api/work/keep-on-top', {

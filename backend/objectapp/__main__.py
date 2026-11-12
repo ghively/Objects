@@ -8,9 +8,10 @@ The window (M33): ``--window auto`` (the default; ``OBJECT_WINDOW`` gives the sa
 option wins) uses the frameless desktop shell in ``desktop/`` (Electron) when it is installed
 (``cd desktop && npm ci``), else the pywebview window; ``electron`` insists on the shell;
 ``pywebview`` forces the old window. The launcher stays the parent: it starts the shell as a
-child with one JSON argument (``--object-launch=``: ``url``, ``origin``, ``stateDir``, ``icon``,
-``title``, ``frame``) and stops the server only when the shell has exited, so the page's last
-saves land. ``--frame system`` (``OBJECT_WINDOW_FRAME``) gives the shell's window the system's
+child with its launch JSON (``url``, ``origin``, ``stateDir``, ``icon``, ``title``, ``frame``) in
+the child's environment (``OBJECT_DESKTOP_LAUNCH``), never on its command line, where other local
+users could read the one-time link in the process list; and it stops the server only when the
+shell has exited, so the page's last saves land. ``--frame system`` (``OBJECT_WINDOW_FRAME``) gives the shell's window the system's
 ordinary frame.
 
 Which space opens: ``--space PATH`` when given; else the device setting's
@@ -61,6 +62,8 @@ WINDOWS = ("auto", "electron", "pywebview")
 FRAMES = ("hidden", "system")
 SHELL_READY_LINE = "object-desktop: ready"
 """What the shell writes on its stdout once its window exists (``desktop/main.js``)."""
+SHELL_LAUNCH_ENV = "OBJECT_DESKTOP_LAUNCH"
+"""The variable of the shell's environment that holds its launch JSON (``desktop/lib/launch.js``)."""
 SHELL_READY_SECONDS = 30.0
 SHELL_STOP_SECONDS = 8.0
 """On Ctrl-C: how long the shell gets to close (it lets the page save first) before it is killed."""
@@ -308,7 +311,7 @@ def electron_binary(
 
 
 def shell_launch(key: LaunchKey, url: str, port: int, frame: str) -> dict[str, Any]:
-    """What the shell is started with (``--object-launch=<json>``): its one-time link, the only
+    """What the shell is started with (``OBJECT_DESKTOP_LAUNCH``): its one-time link, the only
     origin it may show, where its own state lives, the "App icon" file and the frame."""
     from .appicon import desktop_icon
 
@@ -351,9 +354,12 @@ def start_shell(
 ) -> Any | None:
     """Start the desktop shell as a child; None when it cannot be started (it does not run, or
     it exits or stays silent before its window exists). Its stdout is read for the ready line
-    only and its launch argument is never printed (it holds the one-time link)."""
+    only. Its launch (it holds the one-time link) is never printed and never on its command line:
+    it is in the child's own environment, which only this user can read, and the shell removes it
+    from its environment as it reads it."""
     environ = {k: v for k, v in os.environ.items() if k != "ELECTRON_RUN_AS_NODE"}
-    argv = [str(binary), str(DESKTOP_DIR), "--object-launch=" + json.dumps(launch)]
+    environ[SHELL_LAUNCH_ENV] = json.dumps(launch)
+    argv = [str(binary), str(DESKTOP_DIR)]
     try:
         child = (popen or subprocess.Popen)(
             argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=environ,

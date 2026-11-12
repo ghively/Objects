@@ -38,7 +38,9 @@ Additive: `uv run objectapp` keeps working exactly as today. When the shell is i
 - New option `--window auto|electron|pywebview` (default `auto`: the shell when `desktop/node_modules/electron`
   is there, else pywebview; `electron` fails with a plain message when it is not installed; `pywebview` forces
   the old window). Environment `OBJECT_WINDOW` gives the same choice.
-- Python hands the shell, as one JSON argument (`--object-launch=<json>`): `url` (the one-time `/_open?code=…`
+- Python hands the shell, as one JSON object in the child's environment (`OBJECT_DESKTOP_LAUNCH`; never on its
+  command line, where other local users could read the link in the process list; the shell removes the variable
+  as it reads it, so nothing it starts inherits it): `url` (the one-time `/_open?code=…`
   link), `origin` (`http://127.0.0.1:<port>`), `stateDir`, `icon` (the device setting "App icon" file, or null),
   `title` ("Object").
 - **Keep on top** (M23): `windowhost.set_opener` writes one JSON line to the shell's stdin,
@@ -147,7 +149,7 @@ Rule of the pass: additive, nothing a person relies on is taken away, no file is
   it) from each such note through the ordinary body write (atomic, CRLF/BOM kept, version history keeps the
   earlier text, `lastUpdated` as any body save). Refused with the space's usual answer when the space is read-only.
 - The bridge and the front-end `desktop/` module names above.
-- The launch argument, the stdin line and `--window` / `OBJECT_WINDOW` above.
+- The launch (`OBJECT_DESKTOP_LAUNCH`), the stdin line and `--window` / `OBJECT_WINDOW` above.
 
 ## Lanes and file ownership
 

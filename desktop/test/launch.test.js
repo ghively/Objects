@@ -1,7 +1,7 @@
 'use strict'
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { parseLaunch } = require('../lib/launch')
+const { LAUNCH_ENV, parseLaunch, takeLaunch } = require('../lib/launch')
 
 const GOOD = {
   url: 'http://127.0.0.1:8891/_open?code=abc&next=/',
@@ -11,27 +11,45 @@ const GOOD = {
   title: 'Object',
   frame: 'hidden',
 }
-const arg = (o) => `--object-launch=${JSON.stringify(o)}`
+/** An environment holding the launch JSON `o` (a string is used as it is). */
+const env = (o, more = {}) => ({ PATH: '/usr/bin', ...more, [LAUNCH_ENV]: typeof o === 'string' ? o : JSON.stringify(o) })
 
-test('reads the launch argument wherever it is on the command line', () => {
-  assert.deepEqual(parseLaunch(['electron', '.', '--no-sandbox', arg(GOOD)]), GOOD)
-  assert.equal(parseLaunch([arg({ ...GOOD, icon: '/s/app-icon/app-icon-red.png' })]).icon, '/s/app-icon/app-icon-red.png')
+test('reads the launch from OBJECT_DESKTOP_LAUNCH in the environment', () => {
+  assert.equal(LAUNCH_ENV, 'OBJECT_DESKTOP_LAUNCH')
+  assert.deepEqual(parseLaunch(env(GOOD)), GOOD)
+  assert.equal(parseLaunch(env({ ...GOOD, icon: '/s/app-icon/app-icon-red.png' })).icon, '/s/app-icon/app-icon-red.png')
+})
+
+test('the command line is never read: the link would be in the process list there', () => {
+  assert.throws(() => parseLaunch({}, ['electron', '.', `--object-launch=${JSON.stringify(GOOD)}`]), /OBJECT_DESKTOP_LAUNCH/)
+})
+
+test('takeLaunch removes the variable as it reads it, so nothing the shell starts inherits it', () => {
+  const e = env(GOOD, { HOME: '/home/x' })
+  assert.deepEqual(takeLaunch(e), GOOD)
+  assert.equal(LAUNCH_ENV in e, false)
+  assert.equal(e.HOME, '/home/x')
+  // Removed even when it is refused.
+  const bad = env({ ...GOOD, origin: 'http://example.com' })
+  assert.throws(() => takeLaunch(bad))
+  assert.equal(LAUNCH_ENV in bad, false)
 })
 
 test('the title defaults to Object, the icon to none and the frame to hidden', () => {
   const { url, origin, stateDir } = GOOD
-  assert.deepEqual(parseLaunch([arg({ url, origin, stateDir })]), GOOD)
+  assert.deepEqual(parseLaunch(env({ url, origin, stateDir })), GOOD)
 })
 
 test('the system frame can be asked for', () => {
-  assert.equal(parseLaunch([arg({ ...GOOD, frame: 'system' })]).frame, 'system')
+  assert.equal(parseLaunch(env({ ...GOOD, frame: 'system' })).frame, 'system')
 })
 
-test('refuses a missing or broken argument without repeating it', () => {
-  assert.throws(() => parseLaunch(['electron', '.']), /--object-launch/)
-  assert.throws(() => parseLaunch(['--object-launch={not json']), (e) => !/not json/.test(e.message))
-  assert.throws(() => parseLaunch(['--object-launch=[]']))
-  assert.throws(() => parseLaunch(['--object-launch=null']))
+test('refuses a missing or broken launch without repeating it', () => {
+  assert.throws(() => parseLaunch({}), /OBJECT_DESKTOP_LAUNCH/)
+  assert.throws(() => parseLaunch(env('')), /OBJECT_DESKTOP_LAUNCH/)
+  assert.throws(() => parseLaunch(env('{not json')), (e) => !/not json/.test(e.message))
+  assert.throws(() => parseLaunch(env('[]')))
+  assert.throws(() => parseLaunch(env('null')))
 })
 
 test('the origin must be this computer and the link must be on it', () => {
@@ -51,6 +69,6 @@ test('the origin must be this computer and the link must be on it', () => {
     { ...GOOD, frame: 'none' },
     { ...GOOD, frame: true },
   ]) {
-    assert.throws(() => parseLaunch([arg(bad)]), (e) => !e.message.includes('code=abc'), JSON.stringify(bad))
+    assert.throws(() => parseLaunch(env(bad)), (e) => !e.message.includes('code=abc'), JSON.stringify(bad))
   }
 })

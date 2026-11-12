@@ -47,14 +47,41 @@ function wrapperDist(dir, { cdpPort, inspectPort }) {
   return dir
 }
 
-/** A folder with a fake `xdg-open` that records what the shell hands to the default browser. */
+/**
+ * A folder with a fake `xdg-open` that records what the shell hands to the default browser, and
+ * whether the launch variable (OBJECT_DESKTOP_LAUNCH, which holds the one-time link) reached it.
+ */
 function fakeBrowser(dir) {
   fs.mkdirSync(dir, { recursive: true })
   const log = path.join(dir, 'opened.txt')
+  const leaks = path.join(dir, 'inherited.txt')
   const file = path.join(dir, 'xdg-open')
-  fs.writeFileSync(file, `#!/bin/sh\nprintf '%s\\n' "$1" >> "${log}"\n`)
+  fs.writeFileSync(file, `#!/bin/sh\nprintf '%s\\n' "$1" >> "${log}"\n` +
+    `if [ -n "\${OBJECT_DESKTOP_LAUNCH+set}" ]; then printf 'inherited\\n' >> "${leaks}"; fi\n`)
   fs.chmodSync(file, 0o755)
-  return { dir, opened: () => (fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean) : []) }
+  const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean) : [])
+  return { dir, opened: () => lines(log), inherited: () => lines(leaks).length > 0 }
+}
+
+/** The command lines of `pid` and every process under it (Linux, /proc). */
+function commandLines(pid) {
+  const out = []
+  const walk = (p) => {
+    try {
+      out.push({ pid: p, argv: fs.readFileSync(`/proc/${p}/cmdline`, 'utf8').split('\0').filter(Boolean) })
+    } catch {
+      return
+    }
+    let kids = []
+    try {
+      kids = fs.readFileSync(`/proc/${p}/task/${p}/children`, 'utf8').trim().split(/\s+/).filter(Boolean)
+    } catch {
+      // no children listed
+    }
+    for (const k of kids) walk(Number(k))
+  }
+  walk(pid)
+  return out
 }
 
 function pythonCommand() {
@@ -213,6 +240,6 @@ function ensureWindowManager() {
 }
 
 module.exports = {
-  REPO, DESKTOP, launch, until, listening, fakeBrowser, xprop, ensureWindowManager,
+  REPO, DESKTOP, launch, until, listening, fakeBrowser, commandLines, xprop, ensureWindowManager,
   tmpdir: (prefix) => fs.mkdtempSync(path.join(os.tmpdir(), prefix)),
 }

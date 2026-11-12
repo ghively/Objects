@@ -1,5 +1,6 @@
 """M33: the desktop window. ``objectapp`` picks the frameless Electron shell (``desktop/``) or the
-pywebview window, starts the shell as a child with one JSON launch argument, writes the
+pywebview window, starts the shell as a child with its launch JSON in the child's environment
+(``OBJECT_DESKTOP_LAUNCH``, never on its command line), writes the
 keep-on-top line to its stdin, and stops the server when it exits. No Electron is needed here: the
 child is a fake."""
 
@@ -24,6 +25,12 @@ from objectapp.uikey import HEADER
 from objectapp.workseams import SeamUnavailable
 
 READY = "object-desktop: ready\n"
+LAUNCH_ENV = "OBJECT_DESKTOP_LAUNCH"
+
+
+def _launch_of(child) -> dict:
+    """What the shell was started with: the JSON in its environment."""
+    return json.loads(child.kwargs["env"][LAUNCH_ENV])
 
 
 def _free_port() -> int:
@@ -221,7 +228,7 @@ def test_auto_starts_the_shell_and_stops_the_server_when_it_exits(env, monkeypat
     seen: dict = {}
 
     def script(child: FakeChild) -> None:
-        launch = json.loads(child.argv[2].removeprefix("--object-launch="))
+        launch = _launch_of(child)
         seen["launch"] = launch
         # The server is up while the window is open, and the link gives the cookie once.
         opener = urllib.request.build_opener(_NoRedirect)
@@ -247,8 +254,11 @@ def test_auto_starts_the_shell_and_stops_the_server_when_it_exits(env, monkeypat
 
     (child,) = FakeChild.created
     assert child.error is None
-    assert child.argv[:2] == [str(binary), str(env.desktop)]
-    assert len(child.argv) == 3 and child.argv[2].startswith("--object-launch=")
+    # Nothing of the launch (the one-time link) is on the command line, where other local users
+    # can read it in the process list: it is in the child's environment only.
+    assert child.argv == [str(binary), str(env.desktop)]
+    assert not any("_open" in a or "code=" in a or "object-launch" in a for a in child.argv)
+    assert LAUNCH_ENV in child.kwargs["env"]
     assert child.kwargs["stdin"] == subprocess.PIPE and child.kwargs["stdout"] == subprocess.PIPE
     launch = seen["launch"]
     assert set(launch) == {"url", "origin", "stateDir", "icon", "title", "frame"}
@@ -310,7 +320,7 @@ def test_frame_system_reaches_the_shell(env, monkeypatch) -> None:
     monkeypatch.setenv("OBJECT_WINDOW_FRAME", "system")
     launcher.main(["--space", str(env.root), "--port", str(env.port)])
     launcher.main(["--space", str(env.root), "--port", str(env.port), "--frame", "hidden"])
-    frames = [json.loads(c.argv[2].removeprefix("--object-launch="))["frame"] for c in FakeChild.created]
+    frames = [_launch_of(c)["frame"] for c in FakeChild.created]
     assert frames == ["system", "system", "hidden"]
 
 
@@ -321,7 +331,7 @@ def test_the_app_icon_setting_reaches_the_shell(env, monkeypatch) -> None:
     (state / "settings.json").write_text(json.dumps({"appIcon": "purple"}), encoding="utf-8")
     _popen(monkeypatch, script=lambda child: None)
     launcher.main(["--space", str(env.root), "--port", str(env.port)])
-    launch = json.loads(FakeChild.created[0].argv[2].removeprefix("--object-launch="))
+    launch = _launch_of(FakeChild.created[0])
     assert launch["icon"] == str(state / "app-icon" / "app-icon-purple.png")
 
 
@@ -333,6 +343,18 @@ def test_the_shell_never_runs_as_plain_node(env, monkeypatch) -> None:
     launcher.main(["--space", str(env.root), "--port", str(env.port)])
     assert "ELECTRON_RUN_AS_NODE" not in FakeChild.created[0].kwargs["env"]
     assert FakeChild.created[0].kwargs["env"]["OBJECT_STATE_DIR"] == str(env.tmp / "state")
+
+
+def test_the_launch_is_not_left_in_the_launchers_own_environment(env, monkeypatch) -> None:
+    """Only the shell gets it: the launcher's environment (and anything else it starts) does not."""
+    import os
+
+    _install_shell(env.desktop)
+    monkeypatch.delenv(LAUNCH_ENV, raising=False)
+    _popen(monkeypatch, script=lambda child: None)
+    launcher.main(["--space", str(env.root), "--port", str(env.port)])
+    assert LAUNCH_ENV not in os.environ
+    assert _launch_of(FakeChild.created[0])["url"].startswith(f"http://127.0.0.1:{env.port}/_open?code=")
 
 
 # -- no shell, or a shell that does not start ---------------------------------------------------

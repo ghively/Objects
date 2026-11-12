@@ -1,8 +1,10 @@
 # Object's desktop window
 
 A small Electron shell that shows Object in a frameless window. `objectapp` (Python) is the
-parent: it starts the server, starts this shell with `--object-launch=<json>`, and stops the
-server when the shell exits. The shell never starts Python and is not meant to be run by hand.
+parent: it starts the server, starts this shell with its launch JSON in the environment
+(`OBJECT_DESKTOP_LAUNCH`, never on the command line, where other local users could read the
+one-time link in the process list; the shell removes it as it reads it), and stops the server
+when the shell exits. The shell never starts Python and is not meant to be run by hand.
 
 - Install once: `cd desktop && npm ci` (Electron is pinned to one exact version; the install
   also fetches its binary). Then `uv run objectapp --space <folder>` uses it.
