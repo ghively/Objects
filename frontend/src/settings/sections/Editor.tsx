@@ -3,11 +3,27 @@
 // view, the types whose pages hide related content and how nested backlinks show. Every change is
 // a device setting (`useSettings().patch`); "When this space opens" is stored per space root in
 // `openOnStart`.
+//
+// M33: when notes begin with a heading that repeats their title (older notes, earlier imports),
+// a row under the header says how many and offers "Remove those headings" behind a confirmation.
+// The count is asked once when the section opens; with none, while it loads or if it fails, no
+// row shows.
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/api/client'
 import type { DeviceSettings, OpenOnStartMode, SpaceEntry, Tri } from '@/api/types'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Icon } from '@/components/Icon'
+import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { showToast } from '@/editor/media/upload'
 import { typeLabel, typePlural } from '@/lib/typeLabel'
 import { HOME } from '@/lib/words'
 import { ensureLinkIndex, useLinkIndex } from '@/links/linkIndex'
@@ -113,6 +129,18 @@ export const EDITOR_TEXT = {
     default: { name: 'Default', description: 'A colored rail marks the highlight, and its notes sit below in smaller type.' },
     minimal: { name: 'Minimal', description: 'No rail; the highlight reads as ordinary text.' },
   },
+  // M33 (choice 5): notes whose first heading repeats their title.
+  titleHeadings: (n: number) =>
+    n === 1
+      ? '1 note begins with a heading that repeats its title.'
+      : `${n} notes begin with a heading that repeats their title.`,
+  titleHeadingsRemove: 'Remove those headings',
+  titleHeadingsConfirmTitle: (n: number) => (n === 1 ? 'Remove 1 heading?' : `Remove ${n} headings?`),
+  titleHeadingsConfirmBody:
+    'The first heading of each of these notes repeats its title, so the title shows twice. This removes that one line from each note. Each note keeps its earlier version in its history.',
+  titleHeadingsCancel: 'Cancel',
+  titleHeadingsConfirm: 'Remove',
+  titleHeadingsRemoved: (n: number) => (n === 1 ? 'Removed 1 heading.' : `Removed ${n} headings.`),
 } as const
 
 const T = EDITOR_TEXT
@@ -238,6 +266,74 @@ function SpellCheckLangInput({ value, onSave }: { value: string | null; onSave(n
   )
 }
 
+/**
+ * M33 (choice 5): "N notes begin with a heading that repeats their title." with "Remove those
+ * headings". Shown only while the space has such notes: the count is asked when the section opens
+ * (not on every render), and nothing shows while it loads or if it fails. The button asks first;
+ * "Remove" removes that one line from each note (`POST /api/space/title-headings/remove`), a toast
+ * says how many, and the count is read again, so the row goes (or shows what is left). A failed
+ * removal shows the error as a toast and leaves the row.
+ */
+function TitleHeadingsRow() {
+  const [count, setCount] = useState(0)
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    let live = true
+    api
+      .titleHeadings()
+      .then((res) => {
+        if (live) setCount(Math.max(0, Math.floor(Number(res?.count) || 0)))
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [])
+
+  const remove = async () => {
+    setBusy(true)
+    try {
+      const res = await api.removeTitleHeadings()
+      showToast(T.titleHeadingsRemoved(res?.changed ?? 0))
+      setCount(0)
+      setConfirming(false)
+      // What is left, if anything (a note the removal could not write).
+      api
+        .titleHeadings()
+        .then((left) => setCount(Math.max(0, Math.floor(Number(left?.count) || 0))))
+        .catch(() => undefined)
+    } catch (e) {
+      showToast(errorText(e))
+      setConfirming(false)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (count <= 0) return null
+  return (
+    <section data-title-headings="" className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line py-4">
+      <p className="min-w-0 flex-1 text-[14px] text-fg">{T.titleHeadings(count)}</p>
+      <SecondaryButton onClick={() => setConfirming(true)}>{T.titleHeadingsRemove}</SecondaryButton>
+      <AlertDialog open={confirming} onOpenChange={(o) => !o && !busy && setConfirming(false)}>
+        <AlertDialogContent className="border-line bg-raised-2 text-fg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[17px]">{T.titleHeadingsConfirmTitle(count)}</AlertDialogTitle>
+            <AlertDialogDescription className="text-[14px] text-fg-muted">{T.titleHeadingsConfirmBody}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{T.titleHeadingsCancel}</AlertDialogCancel>
+            <Button disabled={busy} onClick={() => void remove()}>
+              {T.titleHeadingsConfirm}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
+  )
+}
+
 // M32: Home follows "Where I left off" (which itself falls back to Home when nothing was open).
 const OPEN_MODES: OpenOnStartMode[] = ['lastOpenedPage', 'home', 'calendar', 'today', 'specificObject']
 
@@ -338,6 +434,7 @@ export function EditorSection() {
   return (
     <div>
       <SectionHeader icon="ph-text-aa" heading={T.heading} description={T.description} />
+      <TitleHeadingsRow />
       <SettingGroup title={T.toggleStyle} help={T.toggleStyleDescription}>
         <OptionCards
           label={T.toggleStyle}

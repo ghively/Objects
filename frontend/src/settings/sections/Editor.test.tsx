@@ -21,7 +21,16 @@ beforeEach(() => {
   resetSpaceInfo()
   resetLinkIndex()
   useSettings.setState({ settings: settingsDefaults, revision: 'r0', loaded: true })
+  // M33: back to the shared mock's answers (no note repeats its title).
+  mocked.titleHeadings.mockReset()
+  mocked.titleHeadings.mockResolvedValue({ count: 0 })
+  mocked.removeTitleHeadings.mockReset()
+  mocked.removeTitleHeadings.mockResolvedValue({ changed: 0 })
+  document.querySelectorAll('.editor-toast').forEach((t) => t.remove())
 })
+
+const toasts = () => [...document.querySelectorAll('.editor-toast')].map((t) => t.textContent)
+const ROW = /begins? with a heading that repeats/
 
 describe('EditorSection', () => {
   test('test editor controls patch device settings; show icons switch is inverted', async () => {
@@ -281,5 +290,101 @@ describe('EditorSection', () => {
     render(<EditorSection />)
     const group = screen.getByRole('group', { name: 'Types without related content' })
     expect(within(group).getAllByRole('checkbox').map((c) => c.getAttribute('aria-label'))).toEqual(['Notes', 'Daily notes', 'Books'])
+  })
+
+  // ---- M33 (choice 5): titles written twice ----
+
+  test('test the title-headings row is not shown when no note repeats its title, and is asked once (M33)', async () => {
+    const user = userEvent.setup()
+    render(<EditorSection />)
+    await waitFor(() => expect(mocked.titleHeadings).toHaveBeenCalledTimes(1))
+    expect(screen.queryByText(ROW)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove those headings' })).toBeNull()
+    // A change that renders the section again does not ask again.
+    await user.click(screen.getByRole('switch', { name: 'Hide outliner lines' }))
+    expect(mocked.titleHeadings).toHaveBeenCalledTimes(1)
+  })
+
+  test('test nothing shows while the count loads or when it fails (M33)', async () => {
+    let answer: (v: { count: number }) => void = () => undefined
+    mocked.titleHeadings.mockReturnValueOnce(new Promise((r) => (answer = r)))
+    const first = render(<EditorSection />)
+    expect(screen.queryByText(ROW)).toBeNull()
+    answer({ count: 2 })
+    expect(await screen.findByText('2 notes begin with a heading that repeats their title.')).toBeInTheDocument()
+    first.unmount()
+
+    mocked.titleHeadings.mockRejectedValueOnce(new Error('nope'))
+    render(<EditorSection />)
+    await waitFor(() => expect(mocked.titleHeadings).toHaveBeenCalledTimes(2))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(screen.queryByText(ROW)).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(toasts()).toEqual([])
+  })
+
+  test('test "Remove those headings" asks first, removes on Remove, says how many and the row goes (M33)', async () => {
+    const user = userEvent.setup()
+    mocked.titleHeadings.mockResolvedValueOnce({ count: 3 })
+    mocked.removeTitleHeadings.mockResolvedValueOnce({ changed: 3 })
+    render(<EditorSection />)
+    expect(await screen.findByText('3 notes begin with a heading that repeats their title.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Remove those headings' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(within(dialog).getByRole('heading', { name: 'Remove 3 headings?' })).toBeInTheDocument()
+    expect(dialog).toHaveTextContent(
+      'The first heading of each of these notes repeats its title, so the title shows twice. This removes that one line from each note. Each note keeps its earlier version in its history.',
+    )
+    expect(within(dialog).getAllByRole('button').map((b) => b.textContent)).toEqual(['Cancel', 'Remove'])
+    // Cancel removes nothing and the row stays.
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(mocked.removeTitleHeadings).not.toHaveBeenCalled()
+    expect(screen.getByText('3 notes begin with a heading that repeats their title.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove those headings' }))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(mocked.removeTitleHeadings).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(toasts()).toEqual(['Removed 3 headings.']))
+    await waitFor(() => expect(screen.queryByText(ROW)).toBeNull())
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove those headings' })).toBeNull()
+  })
+
+  test('test one note is said in the singular: the row, the question and the toast (M33)', async () => {
+    const user = userEvent.setup()
+    mocked.titleHeadings.mockResolvedValueOnce({ count: 1 })
+    mocked.removeTitleHeadings.mockResolvedValueOnce({ changed: 1 })
+    render(<EditorSection />)
+    expect(await screen.findByText('1 note begins with a heading that repeats its title.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Remove those headings' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(within(dialog).getByRole('heading', { name: 'Remove 1 heading?' })).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(toasts()).toEqual(['Removed 1 heading.']))
+  })
+
+  test('test notes that still repeat their title after a removal are shown again with their number (M33)', async () => {
+    const user = userEvent.setup()
+    mocked.titleHeadings.mockResolvedValueOnce({ count: 3 }).mockResolvedValueOnce({ count: 1 })
+    mocked.removeTitleHeadings.mockResolvedValueOnce({ changed: 2 })
+    render(<EditorSection />)
+    await user.click(await screen.findByRole('button', { name: 'Remove those headings' }))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(toasts()).toEqual(['Removed 2 headings.']))
+    expect(await screen.findByText('1 note begins with a heading that repeats its title.')).toBeInTheDocument()
+  })
+
+  test('test a removal that fails shows the error toast and the row stays (M33)', async () => {
+    const user = userEvent.setup()
+    mocked.titleHeadings.mockResolvedValueOnce({ count: 2 })
+    mocked.removeTitleHeadings.mockRejectedValueOnce(new Error('This space is read-only.'))
+    render(<EditorSection />)
+    await user.click(await screen.findByRole('button', { name: 'Remove those headings' }))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(toasts()).toEqual(['This space is read-only.']))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(screen.getByText('2 notes begin with a heading that repeats their title.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove those headings' })).toBeEnabled()
   })
 })

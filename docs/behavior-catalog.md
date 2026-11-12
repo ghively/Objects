@@ -78,6 +78,16 @@ Object has no accounts.
   space, Open folder…). On, that button is hidden (the sidebar toggle stays); a lone Alt tap shows it, focused, and
   another hides it, as a hidden window menu comes back with Alt (our call). The palette and Ctrl+, reach its spaces
   and settings too.
+  (M33) Titles written twice: only while the space has notes whose first heading repeats their title, a row under
+  the section's header reads "N notes begin with a heading that repeats their title." ("1 note begins with a
+  heading that repeats its title.") with the button "Remove those headings". The count is asked when the section
+  opens (`GET /api/space/title-headings`); with none, while it loads or if it fails, no row shows. The button asks
+  first: "Remove N headings?" ("Remove 1 heading?"), "The first heading of each of these notes repeats its title,
+  so the title shows twice. This removes that one line from each note. Each note keeps its earlier version in its
+  history.", "Cancel" and "Remove". "Remove" removes that line from each note
+  (`POST /api/space/title-headings/remove`), a toast says "Removed N headings." ("Removed 1 heading."), open lists
+  and notes are read again, and the row goes (it shows what is left if a note could not be written). A removal
+  that fails shows the error as a toast and the row stays. Nothing is removed without that click.
 - Language: interface language list (English, English (UK), Deutsch, Français, Español, Dutch, Português (BR),
   Magyar, Italian); Decimal separator (Automatic | Dot | Comma). Gene, 2026-11-10: the interface stays in English;
   the list sets date and number formatting only (translating every screen is not planned).
