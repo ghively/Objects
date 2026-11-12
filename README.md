@@ -156,6 +156,28 @@ uv run objectapp --space /path/to/space --browser  # or in your browser
 
 The window is pywebview: Edge WebView2 on Windows (nothing to install), GTK with the system WebKit2GTK 4.1 on Linux. On Linux `uv sync` installs `pygobject` and `pycairo`, which build against the system libraries (on Arch: `webkit2gtk-4.1`, `python-gobject`, `cairo`). The Linux window keeps its web data (tabs, recents) in Object's state folder under `webview/`. Without a display (a server, an SSH session) use `--browser`.
 
+### The desktop window
+
+Install the desktop window once, and Object opens in a frameless window that fits the system:
+
+```sh
+cd desktop && npm ci && cd ..                                  # once (Electron, pinned to one version)
+uv run objectapp --space /path/to/space                        # now opens the frameless window
+uv run objectapp --space /path/to/space --window pywebview     # the pywebview window, as before
+```
+
+`--window auto` (the default) uses the desktop window when it is installed, and the pywebview window when it is not or when it cannot start (it says so in one line). `--window electron` insists on it. `OBJECT_WINDOW` sets the same choice; the option wins. What each system shows:
+
+- **Windows**: the system's own minimise, maximise (with snap layouts) and close at the top right, in the app's colours.
+- **macOS**: the traffic lights inside the top bar, and the standard application menu.
+- **Linux**: no frame; the top bar has minimise, maximise and close at its right end. On a tiling compositor (Hyprland, sway, i3, river, niri, bspwm, dwm, qtile, xmonad, awesome) it has none; Settings > Appearance > "Window buttons" overrides that. A Wayland session runs natively.
+
+Drag the window by the top bar. It remembers its size, position and whether it was maximised (on Wayland its size and whether it was maximised: a window cannot place itself there). Links to other sites open in your browser, a right click in text gives Cut, Copy, Paste and spelling suggestions, and closing the window saves first. Its web data is kept in Object's state folder under `desktop/`. `--frame system` (or `OBJECT_WINDOW_FRAME=system`) gives the window the system's ordinary frame instead. Spell check is Chromium's: on Windows and Linux it downloads the dictionary for your language the first time.
+
+A launcher entry (the application menu on Linux, the Start menu on Windows, `~/Applications` on macOS) is written by `uv run python scripts/install-launcher.py --space /path/to/space`; `--remove` takes it away.
+
+Installers that bundle Python (an `.exe`, `.dmg` or AppImage that needs neither `uv` nor Node) are not part of this yet: the desktop window runs from this repository, as the app does.
+
 The server listens on `http://127.0.0.1:8790` only (`--port` changes the port). Only the window Object opens can use it: each launch makes a random key, and the window opens at a one-time `/_open` link that hands the key over as a session cookie. With `--browser` the launcher prints that link (it works once, for 5 minutes; press Enter in the terminal for a new one); a bare `http://127.0.0.1:8790` tab shows "This page isn't connected to Object". Other programs use the token API under `/api/v1` (see MCP below), which keeps its own tokens. Point `--space` at an empty folder to start fresh, or at an existing folder of Markdown files. A space keeps its metadata in `.object/` and a rebuildable search cache in `.object-cache/`.
 
 AI features need the [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) CLI (`claude`) installed and signed in. Everything else works without it.

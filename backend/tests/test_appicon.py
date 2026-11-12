@@ -83,3 +83,26 @@ def test_launcher_passes_the_window_icon(state):
     state.mkdir()
     (state / "settings.json").write_text(json.dumps({"appIcon": "purple"}), encoding="utf-8")
     assert launcher._window_icon_options("linux") == {"icon": str(state / "app-icon" / "app-icon-purple.png")}
+
+
+def test_desktop_shell_always_gets_an_icon_file(state):
+    """M33: the desktop shell would show its own icon with none, so `default` is Object's bolt."""
+    path = appicon.desktop_icon("linux")
+    assert path == state / "app-icon" / "app-icon-default.png"
+    with Image.open(path) as img:
+        r, g, b, a = img.convert("RGBA").getpixel((appicon.ICON_SIZE // 2, appicon.ICON_SIZE // 2))
+        assert a == 255 and "#{:02x}{:02x}{:02x}".format(r, g, b) == appicon.DEFAULT_FILL
+    assert appicon.desktop_icon("win32") == state / "app-icon" / "app-icon-default.ico"
+
+    (state / "settings.json").write_text(json.dumps({"appIcon": "green"}), encoding="utf-8")
+    assert appicon.desktop_icon("linux") == state / "app-icon" / "app-icon-green.png"
+    assert appicon.desktop_icon("darwin") == state / "app-icon" / "app-icon-green.png"
+    # The pywebview window is as it was: no icon for `default`.
+    (state / "settings.json").write_text(json.dumps({"appIcon": "default"}), encoding="utf-8")
+    assert appicon.startup_icon("linux") is None
+
+
+def test_desktop_icon_never_fails_the_launch(state):
+    state.mkdir()
+    (state / "settings.json").write_text("{not json", encoding="utf-8")
+    assert appicon.desktop_icon("linux") is None
