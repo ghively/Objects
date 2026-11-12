@@ -2,7 +2,7 @@
 
 Status (2026-11-12): built by lanes on file ownership (the desktop shell, its chrome in the page, the note page,
 tasks with the editor and settings, the back end), the desktop window's two halves joined and run together, reviewed
-by two reviewers (the choices; the desktop window), fixed in one pass and gated at `GATE_HEAD` (see "The gate"
+by two reviewers (the choices; the desktop window), fixed in one pass and gated at `48db5538` (see "The gate"
 below); on `master`. Gene's hand checks below are unticked.
 
 Plan: `2026-11-12-m33-desktop-window-and-choices.md` (Gene, 2026-11-12: the twelve choices M32 left are decided as
@@ -97,16 +97,16 @@ failure. `--keep` keeps the temporary folder. What it checks (33 checks):
 
 ### The gate
 
-Run on 2026-11-12 at `GATE_HEAD`, after the review and the fix pass:
+Run on 2026-11-12 at `48db5538`, after the review and the fix pass:
 
 | What | Result |
 |---|---|
-| The back-end suite | GATE_BACKEND |
-| The front-end suite | GATE_FRONTEND |
+| The back-end suite | 4440 passed, 20 skipped, 3 xpassed (28 minutes) |
+| The front-end suite | 629 files, 5294 passed, 1 skipped |
 | `tsc`, lint, build | clean |
-| The desktop shell's tests (`cd desktop && npm test`) | GATE_DESKTOP |
+| The desktop shell's tests (`cd desktop && npm test`) | 82 passed |
 | The desktop window end to end (`desktop/test/e2e/shell.e2e.js`, Linux X11 under Xvfb) | 84 of 84, three runs in a row (in the fix pass) |
-| The acceptance sweep | GATE_SWEEP |
+| The acceptance sweep | 59 of 59 PASS |
 | M33 acceptance | RESULT: PASS |
 
 ## Our calls
