@@ -53,7 +53,8 @@ Object has no accounts.
   the left sidebar collapsed, "Toggle sidebar" or Ctrl+Shift+Left shows it; device setting `showSidebarOnStart`).
   App icon (M31): a row of swatches (Default, Red, Orange, Green, Blue, Purple, Pink, Gray; device setting
   `appIcon`), each showing the bolt in its colour; the choice recolours the browser tab's icon at once and the
-  app window's from the next start (the window takes an icon only when it opens).
+  app window's from the next start (the window takes an icon only when it opens; the desktop window of M33 shows
+  Object's own bolt for Default).
 - AI Assistant: "Hide AI features" switch.
 - Editor: Disable spellcheck; Spellcheck language (Experimental); Open notes as a full page (M32: was "Open objects
   as a full page"; on by default now; Alt+Shift click opens the preview instead); Show properties by default (ours,
@@ -1316,6 +1317,45 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   at <url> (opened in your browser)."; the link is printed only when no browser could be opened, with `--print-link`,
   or on Enter in the terminal (which prints and opens a new one; it works once, for 5 minutes). `/api/v1` with a
   token keeps its own auth; the run fence stays as a second layer.
+- **The desktop window** (M33, Object's own): `objectapp` opens a frameless window (an Electron shell in
+  `desktop/`, installed once with `cd desktop && npm ci`) when it is installed, else the pywebview window as before.
+  `--window auto|electron|pywebview` (default `auto`; `OBJECT_WINDOW` gives the same choice, the option wins):
+  `electron` with no shell installed stops with 'The desktop window is not installed. Run "cd desktop && npm ci" in
+  the Object folder first, or use --window pywebview.'; a shell that cannot start falls back in `auto` with one
+  line, "The desktop window could not be started; opening the pywebview window instead.", and stops in `electron`
+  with "The desktop window could not be started.". `--browser` is unchanged.
+  - **Per system**: Windows shows the system's own minimise, maximise (snap layouts) and close over the top bar's
+    right end, in the theme's colours; macOS shows the traffic lights in the top bar's left end and the standard
+    application menu (App, Edit, View, Window); Linux has no frame, and the top bar draws minimise,
+    maximise/restore and close, or none on a tiling compositor (`XDG_CURRENT_DESKTOP` / `XDG_SESSION_DESKTOP`
+    naming Hyprland, sway, i3, river, niri, bspwm, dwm, qtile, xmonad or awesome) unless the device setting "Window
+    buttons" says otherwise. Windows and Linux have no menu bar, so Ctrl+N and Ctrl+U reach the app there (as
+    Alt+N and Alt+Shift+N do everywhere). `--frame system` (`OBJECT_WINDOW_FRAME`; default `hidden`) gives the
+    window the system's ordinary frame on every system, and the page then draws and reserves nothing.
+  - **The window**: one per launch; its title is the page's; the taskbar, dock or launcher shows Object's name and
+    the "App icon" colour (Object's own bolt for Default; Windows `AppUserModelID` `com.objectapp.Object`; Linux
+    window class `object`). Its size, position and maximised state are kept per device in
+    `<state>/desktop/window.json` and it comes back on a screen that still exists (on Wayland the size and
+    maximised state only). Web storage lives in `<state>/desktop`; the launch key stays a session cookie.
+  - **What it shows**: only the app's own origin. A link to another site, `window.open` and a `target="_blank"`
+    link open in the default browser (web and `mailto:` links only); nothing else opens anywhere. A right click
+    where the app shows no menu of its own gives Cut, Copy, Paste, Select all and, on a misspelled word, up to five
+    suggestions and "Add to dictionary"; selected text that cannot be edited gives Copy and Select all. Spell check
+    is on. Downloads (exports) ask where to save through the system's dialog. Notifications, the clipboard, the
+    microphone and full screen (presentations) are allowed for the app's own origin; every other permission, and
+    every other site, is refused. The page has no Node; it gets only `window.objectDesktop`.
+  - **Closing loses nothing**: on close the shell asks the page to save and waits for its answer or 3 seconds, then
+    closes; it then waits up to 2 seconds for requests still on their way (the page's last keep-alive saves) before
+    it exits, and only then does `objectapp` stop the server. (With pywebview the server stops as the window
+    closes.)
+  - **Keep on top** (M23) in the shell: `objectapp` writes one line to the shell's stdin (`{"open": "<one-time
+    url>", "kind": "focus"}`) and the shell opens the 360x470 always-on-top window "Object focus", with the
+    system's frame so it can be moved and closed; asked again while it is open, it comes to the front. It closes
+    with the main window.
+  - **A launcher entry**: `scripts/install-launcher.py --space <folder>` (`--name`, default "Object"; `--remove`;
+    `--force`), run by hand, writes for the current user a Linux `.desktop` entry, a Windows Start menu shortcut or
+    a macOS `.command` file that runs `uv run objectapp --space <folder>`; it replaces only a file it wrote.
+    Installers that bundle Python are not part of M33.
 - **Maintaining a running space over the token API**: type and saved-query definitions can be listed (`GET
   /api/v1/types`, `GET /api/v1/queries`, added 2026-11-09), read, made, edited and deleted while Object is open with
   a `read-write` token (or the `objectapp-mcp` tools `type_definition`, `create_type`, `edit_type`, `delete_type`,
