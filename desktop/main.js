@@ -161,6 +161,9 @@ function start({ url, origin, stateDir, icon, frame }) {
       proceed: () => { if (!win.isDestroyed()) win.close() },
     })
     gates.set(id, gate)
+    // Windows shutting down or logging off closes no window first: the page is asked to save
+    // now (its blur and `pagehide` keep-alive saves), and the shutdown is not held up.
+    if (platform === 'win32') win.on('query-session-end', () => { gate.sessionEnding() })
     win.on('close', (event) => {
       if (!gate.onClose()) event.preventDefault()
       else if (win === mainWindow) saveStateNow()

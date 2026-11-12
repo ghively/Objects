@@ -667,6 +667,109 @@ def test_the_shell_sees_its_stdin_open_until_it_is_asked_to_quit(env, tmp_path) 
     assert record.read_text(encoding="utf-8") == 'line {"kind": "quit"}\nend\n'
 
 
+# -- Windows: the console closed, log off, shut down ---------------------------------------------
+# The handler's logic, with a fake clock, a fake shell and a fake server. Not run on Windows.
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+class _ClockedShell:
+    """Exits `takes` seconds (of `clock`) after the quit line reaches it; never, with None."""
+
+    def __init__(self, clock: _Clock, takes: float | None) -> None:
+        self.clock = clock
+        self.takes = takes
+        self.exit_at: float | None = None
+        self.stdin = _Stdin(on_line=self._line)
+        self.terminated = False
+        self.events: list[tuple[str, float]] = []
+
+    def _line(self, line: str) -> None:
+        self.events.append((line, self.clock.now))
+        if self.takes is not None:
+            self.exit_at = self.clock.now + self.takes
+
+    def poll(self) -> int | None:
+        return 0 if self.exit_at is not None and self.clock.now >= self.exit_at else None
+
+    def terminate(self) -> None:
+        self.terminated = True
+
+
+class _Host:
+    def __init__(self, clock: _Clock) -> None:
+        self.clock = clock
+        self.stopped_at: float | None = None
+
+    def stop(self) -> None:
+        self.stopped_at = self.clock.now
+
+
+@pytest.mark.parametrize("event", [launcher.CTRL_CLOSE_EVENT, launcher.CTRL_LOGOFF_EVENT, launcher.CTRL_SHUTDOWN_EVENT])
+def test_the_console_ending_keeps_the_server_up_while_the_shell_closes(event) -> None:
+    clock = _Clock()
+    shell = _ClockedShell(clock, takes=2.5)
+    host = _Host(clock)
+    handler = launcher._ConsoleEnd(shell, host, clock=clock, sleep=clock.sleep)
+    assert handler(event) is True  # handled: the process may end now
+    assert shell.events == [('{"kind": "quit"}', 0.0)] and shell.stdin.closed
+    assert host.stopped_at is not None and host.stopped_at >= 2.5
+    assert host.stopped_at < launcher.CONSOLE_END_SECONDS
+    assert shell.terminated is False
+
+
+def test_the_console_ending_stops_the_server_in_time_when_the_shell_does_not_close() -> None:
+    clock = _Clock()
+    shell = _ClockedShell(clock, takes=None)
+    host = _Host(clock)
+    assert launcher._ConsoleEnd(shell, host, clock=clock, sleep=clock.sleep)(launcher.CTRL_CLOSE_EVENT) is True
+    assert launcher.CONSOLE_END_SECONDS <= host.stopped_at < 5.0  # Windows ends the process at 5 s
+    assert launcher.CONSOLE_END_SECONDS >= 3 + 1  # the page's 3 seconds, and some of the drain
+
+
+def test_ctrl_c_and_ctrl_break_are_left_to_python() -> None:
+    clock = _Clock()
+    shell = _ClockedShell(clock, takes=0.0)
+    host = _Host(clock)
+    handler = launcher._ConsoleEnd(shell, host, clock=clock, sleep=clock.sleep)
+    assert handler(0) is False and handler(1) is False  # CTRL_C_EVENT, CTRL_BREAK_EVENT
+    assert shell.events == [] and host.stopped_at is None
+
+
+def test_the_console_handler_is_set_on_windows_only() -> None:
+    calls: list[tuple] = []
+
+    class Kernel32:
+        def SetConsoleCtrlHandler(self, callback, add):  # noqa: N802 - the Windows name
+            calls.append((callback, add))
+            return 1
+
+    def functype(fn):
+        return ("callback", fn)
+
+    seen: list[int] = []
+    assert launcher._install_console_handler(seen.append, "linux", kernel32=Kernel32(), functype=functype) is None
+    assert calls == []
+    remove = launcher._install_console_handler(
+        lambda event: seen.append(event) or event == 2, "win32", kernel32=Kernel32(), functype=functype
+    )
+    assert remove is not None
+    (callback, add), = calls
+    assert add is True and callback[0] == "callback"
+    assert callback[1](2) is True and callback[1](0) is False and seen == [2, 0]
+    remove()
+    assert calls[1] == (callback, False)
+
+
 # -- the keep-on-top line ----------------------------------------------------------------------
 
 

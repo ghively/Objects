@@ -77,6 +77,13 @@ SHELL_KILL_SECONDS = 2.0
 """After `terminate`, how long before the shell is killed."""
 STOP_SIGNALS = ("SIGTERM", "SIGHUP")
 """While the shell runs these take Ctrl-C's path (where the system has them)."""
+# Windows console control events (wincon.h). Ctrl-C and Ctrl-Break (0, 1) stay Python's own.
+CTRL_CLOSE_EVENT = 2
+CTRL_LOGOFF_EVENT = 5
+CTRL_SHUTDOWN_EVENT = 6
+CONSOLE_END_SECONDS = 4.5
+"""Windows ends a process 5 seconds after its console is closed (and at log off or shut down);
+until then the server stays up while the shell closes its windows (the page saves) and drains."""
 SHELL_MISSING_MESSAGE = (
     'The desktop window is not installed. Run "cd desktop && npm ci" in the Object folder first, '
     "or use --window pywebview."
@@ -423,6 +430,69 @@ class _StopSignals:
         self._old.clear()
 
 
+class _ConsoleEnd:
+    """Windows: the console window is closed, or the user logs off or shuts down. Windows ends
+    this process when the handler returns (and 5 seconds on at the latest), so the handler asks
+    the shell to quit and keeps the server up until the shell has exited (its page saved, its
+    last requests drained) or `seconds` have gone, then stops the server and lets the process
+    end. Ctrl-C and Ctrl-Break are left to Python (KeyboardInterrupt). Not run on Windows here:
+    only its logic is tested."""
+
+    EVENTS = (CTRL_CLOSE_EVENT, CTRL_LOGOFF_EVENT, CTRL_SHUTDOWN_EVENT)
+
+    def __init__(
+        self, child: Any, host: Any, *, seconds: float = CONSOLE_END_SECONDS,
+        clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self.child = child
+        self.host = host
+        self.seconds = seconds
+        self.clock = clock
+        self.sleep = sleep
+        self._lock = threading.Lock()
+
+    def __call__(self, event: int) -> bool:
+        if event not in self.EVENTS:
+            return False
+        with self._lock:  # a second event waits for the first one's work, then ends too
+            deadline = self.clock() + self.seconds
+            if self.child.poll() is None and self.child.stdin is not None:
+                _ask_shell_to_quit(self.child.stdin)
+            while self.child.poll() is None and self.clock() < deadline:
+                self.sleep(0.05)
+            self.host.stop()
+        return True
+
+
+def _install_console_handler(
+    handler: Callable[[int], bool], platform: str = sys.platform, *, kernel32: Any = None, functype: Any = None,
+) -> Callable[[], None] | None:
+    """Windows: `handler` becomes a console control handler (``SetConsoleCtrlHandler``); returns
+    what removes it. Elsewhere, and when Windows refuses it: None."""
+    if not platform.startswith("win"):
+        return None
+    try:
+        if kernel32 is None or functype is None:
+            import ctypes
+            from ctypes import wintypes
+
+            kernel32 = kernel32 or ctypes.WinDLL("kernel32", use_last_error=True)
+            functype = functype or ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+        callback = functype(lambda event: bool(handler(int(event))))
+        if not kernel32.SetConsoleCtrlHandler(callback, True):
+            return None
+    except (AttributeError, OSError):
+        return None
+
+    def remove() -> None:
+        try:
+            kernel32.SetConsoleCtrlHandler(callback, False)  # `callback` is kept alive until here
+        except OSError:
+            pass
+
+    return remove
+
+
 def start_shell(
     binary: Path, launch: dict[str, Any], *, popen: Callable[..., Any] | None = None,
     ready_timeout: float = SHELL_READY_SECONDS,
@@ -532,9 +602,14 @@ def main(argv: list[str] | None = None) -> None:
                     print(SHELL_FALLBACK_MESSAGE, flush=True)
             if child is not None:
                 # SIGTERM / SIGHUP: as Ctrl-C, the shell is stopped (and the page saves) before
-                # the server (`finally` below).
+                # the server (`finally` below). Windows: a closed console, log off or shut down.
                 signals.install()
-                _run_shell(child, host.ui_key)
+                remove_console_handler = _install_console_handler(_ConsoleEnd(child, host))
+                try:
+                    _run_shell(child, host.ui_key)
+                finally:
+                    if remove_console_handler is not None:
+                        remove_console_handler()
                 return
 
             import webview
