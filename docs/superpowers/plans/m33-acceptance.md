@@ -137,7 +137,64 @@ failure. `--keep` keeps the temporary folder. What it checks (33 checks):
     line (the earlier text is in version history, as for any update).
 13. **Settings.** The two keys are choices like "Toggle style": the file stores a key only once it is set.
 
-LANE_NOTES
+**The desktop window (the shell, its page side, and joining them)**
+
+14. **Electron, beside the old window.** All three widely used apps compared are Electron with the tabs in a custom
+    top bar; it is the only option that keeps each system's own controls (snap layouts on Windows, the traffic lights
+    on macOS) and runs the same engine everywhere. `uv run objectapp` uses it when `desktop/node_modules` holds the
+    shell, and otherwise opens the pywebview window as before (`--window pywebview` forces the old one).
+15. **Python stays the parent.** `objectapp` starts the server, then the shell as a child, and stops the server only
+    after the shell has exited, so the window's last saves land. Every launcher entry made before keeps working.
+16. **The one-time open link travels in the child's environment** (`OBJECT_DESKTOP_LAUNCH`), never on its command
+    line, and the shell deletes it after reading. It is never logged or written under the state folder.
+17. **Linux draws its own three buttons** (Electron's overlay exists there too, but its buttons could not be left
+    out on a tiling desktop). "Automatic" leaves them out when `XDG_CURRENT_DESKTOP`/`XDG_SESSION_DESKTOP` names
+    Hyprland, sway, i3, river, niri, bspwm, dwm, qtile, xmonad or awesome.
+18. **`--frame system`** (or `OBJECT_WINDOW_FRAME=system`) gives the system's ordinary frame on every system, for a
+    window manager the frameless window does not suit (one of the three apps offers the same).
+19. **Closing saves first.** The shell asks the page, waits for its answer or 3 seconds, closes the window (the
+    page's own `pagehide` saves still run), then waits up to 2 seconds for requests still in flight. The page blurs
+    the field being typed in, sends its saves, and counts the writes still on their way (a wrapper around `fetch`,
+    installed only in the desktop window), at most 2.5 seconds.
+20. **Permissions.** Notifications, the clipboard, the microphone (audio only) and full screen (presentations) for
+    the app's own page; everything else, the camera included, is refused. Links to other sites open in the default
+    browser (http, https and mailto only); the window only ever shows the app.
+21. **Remembered per device:** size, place (not on Wayland, where a window cannot place itself: size and maximised
+    are kept), maximised, the last "Window buttons" choice and theme, so the next start draws right before the page
+    loads.
+22. **The keep-on-top window keeps the system's frame** (its page has no top bar to drag) and closes with the main
+    window.
+23. **Spell check** follows Settings > Editor > "Spellcheck language" in the desktop window too. On Windows and
+    Linux the browser engine downloads the dictionary for a language once from its vendor's server; the setting
+    says so there. Spell check stays on.
+24. **macOS traffic lights** at x 14, y 13 (centred in the 42 px top bar, from the system's standard button size;
+    not seen on a Mac), with 78 px kept free on their left except in full screen.
+25. **No installers yet** and no single-instance lock (two launches share the window's stored web data, as the old
+    Linux window did).
+26. **The page is asked again after a rebuild:** `index.html` goes out with `Cache-Control: no-cache`, since the
+    desktop window keeps its cache between starts.
+
+**The note page (choices 1, 3, 11)**
+
+27. **Choice 1's rule:** a focused button, row or field always keeps its keys, so a note opened by a click on the
+    sidebar or a tab takes Enter only once the focus is back on the page. A key still held when a note opens types
+    nothing. A layer that is closing (the palette's last 200 ms) no longer counts as open. Raw mode does the same.
+28. **Choice 3's rule:** the built-in rows move below the type's own only while the type's stored list still opens
+    with them as a block in their default order; any arrangement by hand is shown exactly. Display only.
+29. **Choice 11:** a row is one stretch of text (a line up to 280 characters); "Link" makes one link per match, last
+    first; if the note changes between two, the links made stay and the toast says how many. The mentions count
+    (notes, not matches) is unchanged.
+
+**Tasks, the editor, settings (choices 4, 5, 6, 7, 9)**
+
+30. **Choice 6:** a task with a future date and a deadline today is on Today only (every open task is on exactly
+    one of Today, Upcoming and Inbox). The deadline chip shows on Today, Upcoming, Home and the Day view; elsewhere
+    the row keeps its date chip, so dating it stays one click. "Move all open tasks" in the Day view leaves a task
+    with no date alone.
+31. **Choice 7:** with "A quote", `>` is the quote mark in combined runs too (`>#` makes a quoted heading).
+32. **Choice 9:** "No date" on a row now does what the pane's "Remove date" does: the repeat, reminder and
+    occurrence log go with the date, and it asks first when a log is on record. Both write `date: null`, as before.
+33. **Choice 4:** the gallery's toast stays 8 seconds (it carries a button).
 
 ## Known limits
 
@@ -181,6 +238,9 @@ On a copy of a space, or a new one. The window first, then the choices in the pl
 - [ ] Ctrl+N makes a new note and Ctrl+U opens the New menu in the window; in a browser tab Alt+N and Alt+Shift+N still do (choice 12, unchanged).
 - [ ] With Work on, "Keep on top" opens the small "Object focus" window, and it stays above other windows.
 - [ ] `uv run objectapp --window pywebview --space <folder>` opens the old window, with the system's title bar, and everything works as before. So does the plain command on a machine where `desktop/node_modules` is not there. `--browser` opens a browser tab as before, and the top bar there looks and works as it did (nothing shifted, no place that refuses a click).
+- [ ] `uv run objectapp --frame system --space <folder>`: the window has the system's ordinary frame and title bar, and the top bar keeps no room and draws no buttons.
+- [ ] In the desktop window on Windows or Linux, Settings > Editor > "Spellcheck language" says the dictionary is downloaded once; change the language: a misspelled word in that language is marked.
+- [ ] Close the terminal that started `uv run objectapp` (or log out) with a property half typed: start again, it is there.
 - [ ] `python scripts/install-launcher.py` adds Object to the system's launcher (the Start menu, the applications list, or a `.command` file on macOS), and starting it from there opens the same window.
 
 **Opening a note (choice 1)**
