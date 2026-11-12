@@ -1,6 +1,6 @@
 # Object: remaining work
 
-Status as of 2026-11-11: **M1-M32 are built, gated and on `master`.** M32 (notes first; Gene's direction of 2026-11-11, now `CLAUDE.md`'s "Notes first" rule; analysis `notes-first-analysis-2026-11-11.md`, plan `2026-11-11-m32-notes-first.md`, record and hand checks `m32-acceptance.md`; see "Done on 2026-11-11" below) is built, reviewed (three reviewers), fixed in one pass and gated at `aeda6e71`. **Next: Gene's hand checks of M32 and his choices** (`m32-acceptance.md`, "Hand checks (Gene)" and "Choices left for Gene"). Earlier status, 2026-11-10: **M1-M31 are built, gated and on `master`** (M28-M30, the IT ops type model, and M31, completion: everything the audit listed as not built, all on 2026-11-10; `m31-acceptance.md`); a full milestone audit the same day is `milestone-audit-2026-11-10.md`, whose "Remaining work" is the current to-do list. Earlier status, 2026-11-09: **M1-M27 and everything built on 2026-11-08 and 2026-11-09 are on `master`**, the only live branch (`integrate/2026-11-08` was merged on 2026-11-09; Gene wants everything on `master`). That day: the sidebar redesign, the Tasks dashboard, git-backed spaces, the decisions memo (`decisions-memo-2026-11-08.md`, approved by Gene) built, live checks of the real CLI, OCR and MCP, and an automated run of all 435 acceptance boxes (`auto-acceptance-2026-11-08.md`). The current list is "What remains" below; the history follows it.
+Status as of 2026-11-12: **M1-M33 are built, gated and on `master`.** M33 (the frameless desktop window, an Electron shell beside the old window, and the twelve choices M32 left, decided as recommended at Gene's request of 2026-11-12; plan `2026-11-12-m33-desktop-window-and-choices.md`, record and hand checks `m33-acceptance.md`; see "Done on 2026-11-12" below) is built, reviewed, fixed in one pass and gated at `GATE_HEAD`. **Next: Gene's hand checks of M32 and M33** (`m32-acceptance.md` and `m33-acceptance.md`, "Hand checks (Gene)"; the desktop window's Windows and macOS parts have never run). Earlier status, 2026-11-11: **M1-M32 are built, gated and on `master`.** M32 (notes first; Gene's direction of 2026-11-11, now `CLAUDE.md`'s "Notes first" rule; analysis `notes-first-analysis-2026-11-11.md`, plan `2026-11-11-m32-notes-first.md`, record and hand checks `m32-acceptance.md`; see "Done on 2026-11-11" below) is built, reviewed (three reviewers), fixed in one pass and gated at `aeda6e71`. **Next: Gene's hand checks of M32 and his choices** (`m32-acceptance.md`, "Hand checks (Gene)" and "Choices left for Gene"). Earlier status, 2026-11-10: **M1-M31 are built, gated and on `master`** (M28-M30, the IT ops type model, and M31, completion: everything the audit listed as not built, all on 2026-11-10; `m31-acceptance.md`); a full milestone audit the same day is `milestone-audit-2026-11-10.md`, whose "Remaining work" is the current to-do list. Earlier status, 2026-11-09: **M1-M27 and everything built on 2026-11-08 and 2026-11-09 are on `master`**, the only live branch (`integrate/2026-11-08` was merged on 2026-11-09; Gene wants everything on `master`). That day: the sidebar redesign, the Tasks dashboard, git-backed spaces, the decisions memo (`decisions-memo-2026-11-08.md`, approved by Gene) built, live checks of the real CLI, OCR and MCP, and an automated run of all 435 acceptance boxes (`auto-acceptance-2026-11-08.md`). The current list is "What remains" below; the history follows it.
 
 **Gate on `integrate/2026-11-08` (Linux, 2026-11-09, after lanes A-F, G1-G5, H1-H3 and the acceptance fixes; vitest and pytest run one after the other):** back end 3391 passed, 16 skipped, 3 xpassed, 0 failed; front end 4074 passed, 1 skipped (537 files); lint 0 errors; `npm run build` clean. One frontend timing flake under load (`BrainDumpBar` "M23 seam") was fixed by waiting for the refusal text instead of one flush.
 
@@ -239,9 +239,39 @@ The history below is in the order it was written: the per-milestone sections new
   (`m32-acceptance.md`, "Hand checks (Gene)", 54 boxes) and the twelve choices left for him (the same file, "Choices
   left for Gene").
 
+### Done on 2026-11-12
+
+- **M33: the frameless desktop window and the choices M32 left** (Gene, 2026-11-12: "answer those questions … I'll
+  just accept your recommendations as long as those recommendations are additive and not destructive", checked
+  against widely used notes apps; and a frameless window that fits Windows, macOS and Linux). Plan
+  `2026-11-12-m33-desktop-window-and-choices.md`; record, calls and hand checks `m33-acceptance.md`.
+  - **The desktop window:** an Electron shell in `desktop/` (`cd desktop && npm ci` once), used by `uv run objectapp`
+    when installed, else the pywebview window as before (`--window`, `--frame system`). The top bar is the title
+    bar: Windows keeps the system's caption buttons and snap layouts, macOS the traffic lights, Linux draws three
+    buttons (none on a tiling desktop; Settings > Appearance > "Window buttons"). Closing saves first; size and place
+    are remembered; links open in the default browser; spell check follows the setting. Python stays the parent and
+    stops the server only after the window's last saves. `scripts/install-launcher.py` adds a launcher entry.
+  - **The choices:** Enter / ArrowDown reach an open note's text and an empty note opens ready to type (1); a typed
+    note's own properties come first (3); a gallery type lands on its page (4); imports no longer add a title
+    heading and Settings > Editor removes those already there on a confirmed click (5); a task with only a deadline
+    is listed where the deadline puts it, not in Inbox, in Tasks, Home and the Day view (6); 'Typing "> " makes' (7);
+    "No date" does what "Remove date" does (9); a mention reads as text and a line is listed once (11). 2, 8, 10 and
+    12 unchanged.
+  - **Review and fix pass:** two reviewers (the choices; the desktop window as an attacker and for lost words). Fixed:
+    a passed deadline-only task missing from the Day view; Link's toast; stopping `objectapp` (SIGTERM, a closed
+    terminal, logout) now closes the window as a person would; Windows shutdown asks the page to save; links leave
+    for the browser only after a person's click; the launcher refuses control characters; run steps that work in
+    PowerShell; the page is asked again after a rebuild.
+  - **The gate at `GATE_HEAD`:** back end GATE_BACKEND; front end GATE_FRONTEND; `tsc`, lint and build clean; the
+    desktop shell's tests GATE_DESKTOP; the acceptance sweep GATE_SWEEP; `scripts/m33_acceptance.py` RESULT: PASS.
+    Only Linux (X11, under a virtual display) was run; the end-to-end script `desktop/test/e2e/shell.e2e.js` passed
+    84 of 84 three times.
+
 ### Needs Gene
 
-0. **M32 first:** the hand checks in `m32-acceptance.md`, "Hand checks (Gene)" (54 boxes, by journey), and the twelve
+0. **M33 and M32 first:** M33's hand checks in `m33-acceptance.md`, "Hand checks (Gene)" (34 boxes: the desktop
+   window on each system first, since Windows and macOS were never run where it was built; then one or two per choice).
+   M32's twelve choices are decided (M33's plan, Part 2), so only its hand checks remain: the hand checks in `m32-acceptance.md`, "Hand checks (Gene)" (54 boxes, by journey), and the twelve
    choices in the same file, "Choices left for Gene" (each says what happens now and what the other choice would
    be).
 1. **Hand-checks:** the list in `auto-acceptance-2026-11-08.md`, "What needs Gene by hand" (Windows and pywebview,

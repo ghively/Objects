@@ -12,7 +12,7 @@ The 2026-11-02 backlog (`docs/superpowers/plans/polish-audit-2026-11-02.md`, "Co
 
 ## The next step, in order
 
-1. **Work the open list** at the top of `docs/superpowers/plans/remaining-work.md` (Gene's M32 hand checks and choices first, then his decisions and the open review items), then **fix what Gene's hand-checks find** (both audit lists, the polish backlog and M1-M32 are done and merged).
+1. **Work the open list** at the top of `docs/superpowers/plans/remaining-work.md` (Gene's M33 and M32 hand checks first, then his decisions and the open review items), then **fix what Gene's hand-checks find** (both audit lists, the polish backlog and M1-M33 are done and merged).
    - Do one finding per commit, each with a regression test that fails before the fix.
 2. **Gate.** Run `uv run pytest backend/tests -q` and `cd frontend && npx vitest run && npx tsc -b --noEmit && npm run build`. Run `scripts/m1_roundtrip.py` on a copy of `backend/tests/fixtures/space-sample`, and `scripts/m2_acceptance.py` through `m32_acceptance.py` on `space-sample` and `space-v1` (they copy the space themselves; some use their own default space; the exact command is in each `mN-acceptance.md`, e.g. `PYTHONPATH=scripts:backend uv run python scripts/m24_acceptance.py`). Then start the app on a scratch copy and look at what changed.
 3. **Write it down.** Update `remaining-work.md` and `HANDOFF.md`, and commit (push only when Gene asks).
@@ -26,7 +26,7 @@ Build workflows (they need the Workflow tool) are in `scripts/workflows/`:
 - `object-milestone-build.js`: the M1–M3 script, with two tracks (backend, frontend) and the three-lens review. Its args look like `{"plan":"…","base":"<sha>","backend":[…],"frontend":[…],"integrate":N,"milestone":"Milestone N","perTaskReview":false}`.
 - `object-milestone-review-gate.js`: review, fix and gate only, for an already-built milestone.
 - `object-milestones-lanes.js`: the M4–M7 script. It reads a plan's "## Build lanes" section, so each lane runs its first tasks in order and then its sub-lanes in parallel. It builds two milestones at once when one only creates new files until its integrate task. It runs one combined review, a gate and a push per milestone.
-- **M10-M32** were built on parallel tracks by file ownership (see `HANDOFF.md` for how Gene wants it built): per milestone a plan, the tasks with their own tests, an integrate task (`scripts/mN_acceptance.py` and `mN-acceptance.md`), then one review, one fix pass and a gate per track.
+- **M10-M33** were built on parallel tracks by file ownership (see `HANDOFF.md` for how Gene wants it built): per milestone a plan, the tasks with their own tests, an integrate task (`scripts/mN_acceptance.py` and `mN-acceptance.md`), then one review, one fix pass and a gate per track.
 - **The 2026-11-01 audit and its fix pass** ran the same way as M9: eight read-only auditors in parallel (six areas plus two measured performance audits), one audit doc with Gene's decisions, then seven fix lanes in worktrees by file ownership, a two-half review, a two-agent review fix pass, the gate, a re-measurement.
 - **M9 was built without a workflow script:** Task 1 by hand, then one background agent per lane, each in its own git worktree (`isolation: worktree`, `node_modules` symlinked from the main checkout), merged with `--no-ff`; then acceptance and a two-half review in parallel, a two-agent fix pass split by file ownership, and the gate run serially by hand.
 - `object-m8-build.js`: the M8 script. One agent writes the plan with a "## Coverage" table, one installs the dependencies up front, then it builds the lanes, integrates, reviews once, fixes, gates and pushes.
@@ -43,4 +43,4 @@ A space keeps its metadata in `.object/` (types, collections, queries, UI state,
 
 ## Out of scope (by design)
 
-Accounts, login, billing, sync, sharing, mobile, telemetry, migrating `C:\Git\wiki` (a separate project). The network integrations (calendar feeds, Readwise, Kindle, Telegram, WhatsApp, email, Raycast) are wanted later at lower priority. AI, the local API and MCP server, agents, the Work section, import, the IT ops type model and the notes-first default path are built (M10-M32). Object Team (`docs/superpowers/specs/2026-10-28-object-team-design.md`) is parked.
+Accounts, login, billing, sync, sharing, mobile, telemetry, migrating `C:\Git\wiki` (a separate project). The network integrations (calendar feeds, Readwise, Kindle, Telegram, WhatsApp, email, Raycast) are wanted later at lower priority. AI, the local API and MCP server, agents, the Work section, import, the IT ops type model and the notes-first default path and the frameless desktop window are built (M10-M33). Object Team (`docs/superpowers/specs/2026-10-28-object-team-design.md`) is parked.

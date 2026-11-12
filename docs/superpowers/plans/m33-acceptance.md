@@ -1,8 +1,9 @@
 # M33 acceptance: the frameless desktop window, and the choices M32 left
 
 Status (2026-11-12): built by lanes on file ownership (the desktop shell, its chrome in the page, the note page,
-tasks with the editor and settings, the back end); the whole-milestone review, the fix pass and the gate come next.
-Gene's hand checks below are unticked.
+tasks with the editor and settings, the back end), the desktop window's two halves joined and run together, reviewed
+by two reviewers (the choices; the desktop window), fixed in one pass and gated at `GATE_HEAD` (see "The gate"
+below); on `master`. Gene's hand checks below are unticked.
 
 Plan: `2026-11-12-m33-desktop-window-and-choices.md` (Gene, 2026-11-12: the twelve choices M32 left are decided as
 recommended "as long as those recommendations are additive and not destructive"; the window on the desktop is
@@ -93,6 +94,20 @@ failure. `--keep` keeps the temporary folder. What it checks (33 checks):
 - **The count on a larger space.** `space-sample` grown to 3,000 notes (12 MB of text, 1,493 of them beginning with
   their title): `GET /api/space/title-headings` took 45 to 60 ms (it reads no file); the removal of all 1,493 took
   12 seconds (8 ms a note: each is a kept version and an atomic write); a second call took 8 ms and changed 0.
+
+### The gate
+
+Run on 2026-11-12 at `GATE_HEAD`, after the review and the fix pass:
+
+| What | Result |
+|---|---|
+| The back-end suite | GATE_BACKEND |
+| The front-end suite | GATE_FRONTEND |
+| `tsc`, lint, build | clean |
+| The desktop shell's tests (`cd desktop && npm test`) | GATE_DESKTOP |
+| The desktop window end to end (`desktop/test/e2e/shell.e2e.js`, Linux X11 under Xvfb) | 84 of 84, three runs in a row (in the fix pass) |
+| The acceptance sweep | GATE_SWEEP |
+| M33 acceptance | RESULT: PASS |
 
 ## Our calls
 
