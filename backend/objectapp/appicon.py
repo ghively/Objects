@@ -8,6 +8,10 @@ starts (``webview.start(icon=...)``), so a new colour shows from the next start.
 ``default`` keeps the window as it was (no icon passed). A colour is drawn once into the state
 folder (``<state>/app-icon/app-icon-<colour>.png``, ``.ico`` on Windows, which Edge WebView2's
 window needs) and reused; nothing in a space is touched.
+
+The desktop shell (M33, ``desktop/``) always gets an icon file (`desktop_icon`): with ``default``
+it is Object's own bolt (``app-icon-default``), since a window with no icon there would show the
+shell's, not Object's.
 """
 
 from __future__ import annotations
@@ -20,7 +24,9 @@ from pathlib import Path
 from .appstate import state_dir
 from .textfile import atomic_write
 
-__all__ = ["BOLT_PATH", "COLORS", "DEFAULT_FILL", "ICON_SIZE", "icon_svg", "startup_icon", "window_icon"]
+__all__ = [
+    "BOLT_PATH", "COLORS", "DEFAULT_FILL", "ICON_SIZE", "desktop_icon", "icon_svg", "startup_icon", "window_icon",
+]
 
 _log = logging.getLogger(__name__)
 
@@ -93,20 +99,25 @@ def _ico(png: bytes) -> bytes:
     return out.getvalue()
 
 
-def window_icon(color: str, folder: Path, platform: str = sys.platform) -> Path | None:
-    """The window icon file for ``color`` in ``folder`` (drawn when missing), or None for the
-    default icon (or a colour Object doesn't know)."""
-    fill = COLORS.get(color)
-    if fill is None:
-        return None
+def _icon_file(name: str, fill: str, folder: Path, platform: str) -> Path:
+    """``app-icon-<name>`` in ``folder``, the bolt in ``fill`` (drawn when missing)."""
     ext = ".ico" if platform.startswith("win") else ".png"
-    path = Path(folder) / f"app-icon-{color}{ext}"
+    path = Path(folder) / f"app-icon-{name}{ext}"
     if path.is_file():
         return path
     png = _draw(fill)
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(path, _ico(png) if ext == ".ico" else png)
     return path
+
+
+def window_icon(color: str, folder: Path, platform: str = sys.platform) -> Path | None:
+    """The window icon file for ``color`` in ``folder`` (drawn when missing), or None for the
+    default icon (or a colour Object doesn't know)."""
+    fill = COLORS.get(color)
+    if fill is None:
+        return None
+    return _icon_file(color, fill, folder, platform)
 
 
 def startup_icon(platform: str = sys.platform) -> Path | None:
@@ -117,6 +128,24 @@ def startup_icon(platform: str = sys.platform) -> Path | None:
 
         merged, _revision = settings.read()
         return window_icon(str(merged.get("appIcon") or "default"), state_dir() / "app-icon", platform)
+    except Exception:  # noqa: BLE001 - the window opens with its usual icon
+        _log.warning("The app icon could not be made; the window keeps its usual icon", exc_info=True)
+        return None
+
+
+def desktop_icon(platform: str = sys.platform) -> Path | None:
+    """The icon file the desktop shell (M33) shows in the taskbar, dock or launcher: the device
+    setting ``appIcon``'s colour, or Object's own bolt (``app-icon-default``) for ``default``.
+    None when it could not be made (the shell then keeps its usual icon)."""
+    try:
+        from . import settings
+
+        merged, _revision = settings.read()
+        color = str(merged.get("appIcon") or "default")
+        folder = state_dir() / "app-icon"
+        if color in COLORS:
+            return _icon_file(color, COLORS[color], folder, platform)
+        return _icon_file("default", DEFAULT_FILL, folder, platform)
     except Exception:  # noqa: BLE001 - the window opens with its usual icon
         _log.warning("The app icon could not be made; the window keeps its usual icon", exc_info=True)
         return None

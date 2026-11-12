@@ -1,7 +1,17 @@
-"""Launcher: ``objectapp [--space PATH] [--port 8790] [--browser [--print-link]]``.
+"""Launcher: ``objectapp [--space PATH] [--port 8790] [--browser [--print-link]]
+[--window auto|electron|pywebview] [--frame hidden|system]``.
 
 Serves the API and the built front end on ``127.0.0.1`` only, then opens a
-native window (pywebview) or, with ``--browser``, the default web browser.
+native window or, with ``--browser``, the default web browser.
+
+The window (M33): ``--window auto`` (the default; ``OBJECT_WINDOW`` gives the same choice, the
+option wins) uses the frameless desktop shell in ``desktop/`` (Electron) when it is installed
+(``cd desktop && npm ci``), else the pywebview window; ``electron`` insists on the shell;
+``pywebview`` forces the old window. The launcher stays the parent: it starts the shell as a
+child with one JSON argument (``--object-launch=``: ``url``, ``origin``, ``stateDir``, ``icon``,
+``title``, ``frame``) and stops the server only when the shell has exited, so the page's last
+saves land. ``--frame system`` (``OBJECT_WINDOW_FRAME``) gives the shell's window the system's
+ordinary frame.
 
 Which space opens: ``--space PATH`` when given; else the device setting's
 specific start-up space (``startupSpace: 'specific'``) when that folder exists;
@@ -20,13 +30,17 @@ a new one (a browser that was closed lost its cookie).
 from __future__ import annotations
 
 import argparse
+import json
+import os
+import subprocess
 import sys
 import threading
 import time
 import urllib.request
 import webbrowser
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 
@@ -40,6 +54,24 @@ from .uikey import HEADER, LaunchKey
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8790
 DEFAULT_STATIC_DIR = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+# M33: the desktop shell (Electron), beside the pywebview window.
+DESKTOP_DIR = Path(__file__).resolve().parents[2] / "desktop"
+WINDOWS = ("auto", "electron", "pywebview")
+FRAMES = ("hidden", "system")
+SHELL_READY_LINE = "object-desktop: ready"
+"""What the shell writes on its stdout once its window exists (``desktop/main.js``)."""
+SHELL_READY_SECONDS = 30.0
+SHELL_STOP_SECONDS = 8.0
+"""On Ctrl-C: how long the shell gets to close (it lets the page save first) before it is killed."""
+SHELL_MISSING_MESSAGE = (
+    'The desktop window is not installed. Run "cd desktop && npm ci" in the Object folder first, '
+    "or use --window pywebview."
+)  # our string
+SHELL_FAILED_MESSAGE = "The desktop window could not be started."  # our string
+SHELL_FALLBACK_MESSAGE = (
+    "The desktop window could not be started; opening the pywebview window instead."
+)  # our string
 
 
 def build_server_config(
@@ -224,6 +256,135 @@ def _window_icon_options(platform: str) -> dict:
     return {"icon": str(icon)} if icon is not None else {}
 
 
+def _choice(option: str | None, environ: Mapping[str, str], name: str, values: tuple[str, ...]) -> str:
+    """`option` when given, else the environment's `name`, else the first of `values`."""
+    if option is not None:
+        return option
+    given = (environ.get(name) or "").strip().lower()
+    if not given:
+        return values[0]
+    if given not in values:
+        raise ValueError(f"{name} must be {', '.join(values[:-1])} or {values[-1]}.")
+    return given
+
+
+def window_choice(option: str | None, environ: Mapping[str, str]) -> str:
+    """``--window`` (it wins), else ``OBJECT_WINDOW``, else ``auto``."""
+    return _choice(option, environ, "OBJECT_WINDOW", WINDOWS)
+
+
+def frame_choice(option: str | None, environ: Mapping[str, str]) -> str:
+    """``--frame`` (it wins), else ``OBJECT_WINDOW_FRAME``, else ``hidden``."""
+    return _choice(option, environ, "OBJECT_WINDOW_FRAME", FRAMES)
+
+
+def _electron_name(platform: str) -> str:
+    """The executable inside the ``electron`` package's ``dist`` (its ``install.js``)."""
+    if platform.startswith("win"):
+        return "electron.exe"
+    if platform == "darwin":
+        return "Electron.app/Contents/MacOS/Electron"
+    return "electron"
+
+
+def electron_binary(
+    desktop_dir: Path | None = None, platform: str = sys.platform, environ: Mapping[str, str] | None = None
+) -> Path | None:
+    """The desktop shell's Electron executable, or None when the shell is not installed.
+
+    Found the way the ``electron`` npm package finds it (its ``index.js``): ``path.txt`` under
+    ``desktop/node_modules/electron`` names the file inside ``dist`` (the platform's usual name
+    when there is no ``path.txt``); ``ELECTRON_OVERRIDE_DIST_PATH`` replaces ``dist``.
+    """
+    package = (DESKTOP_DIR if desktop_dir is None else Path(desktop_dir)) / "node_modules" / "electron"
+    try:
+        name = (package / "path.txt").read_text(encoding="utf-8").strip()
+    except OSError:
+        name = ""
+    override = (os.environ if environ is None else environ).get("ELECTRON_OVERRIDE_DIST_PATH")
+    dist = Path(override) if override else package / "dist"
+    binary = dist / (name or _electron_name(platform))
+    return binary if binary.is_file() else None
+
+
+def shell_launch(key: LaunchKey, url: str, port: int, frame: str) -> dict[str, Any]:
+    """What the shell is started with (``--object-launch=<json>``): its one-time link, the only
+    origin it may show, where its own state lives, the "App icon" file and the frame."""
+    from .appicon import desktop_icon
+
+    icon = desktop_icon(sys.platform)
+    return {
+        "url": key.open_url(url),
+        "origin": f"http://{HOST}:{port}",
+        "stateDir": str(state_dir()),
+        "icon": str(icon) if icon is not None else None,
+        "title": "Object",
+        "frame": frame,
+    }
+
+
+def _watch_ready(stream: Any, ready: threading.Event) -> None:
+    """Read the shell's stdout to its end: the ready line sets `ready`; nothing is printed."""
+    try:
+        for line in stream:
+            if line.strip() == SHELL_READY_LINE:
+                ready.set()
+    except (OSError, ValueError):
+        pass
+
+
+def _stop_shell(child: Any) -> None:
+    """Ask a running shell to close (it lets the page save first), then make sure it is gone."""
+    if child.poll() is not None:
+        return
+    child.terminate()
+    try:
+        child.wait(timeout=SHELL_STOP_SECONDS)
+    except subprocess.TimeoutExpired:
+        child.kill()
+        child.wait()
+
+
+def start_shell(
+    binary: Path, launch: dict[str, Any], *, popen: Callable[..., Any] | None = None,
+    ready_timeout: float = SHELL_READY_SECONDS,
+) -> Any | None:
+    """Start the desktop shell as a child; None when it cannot be started (it does not run, or
+    it exits or stays silent before its window exists). Its stdout is read for the ready line
+    only and its launch argument is never printed (it holds the one-time link)."""
+    environ = {k: v for k, v in os.environ.items() if k != "ELECTRON_RUN_AS_NODE"}
+    argv = [str(binary), str(DESKTOP_DIR), "--object-launch=" + json.dumps(launch)]
+    try:
+        child = (popen or subprocess.Popen)(
+            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=environ,
+            text=True, encoding="utf-8", errors="replace",
+        )
+    except OSError:
+        return None
+    ready = threading.Event()
+    threading.Thread(
+        target=_watch_ready, args=(child.stdout, ready), name="objectapp-shell-output", daemon=True
+    ).start()
+    deadline = time.monotonic() + ready_timeout
+    while not ready.wait(0.05):
+        if child.poll() is not None:
+            return None
+        if time.monotonic() >= deadline:
+            _stop_shell(child)
+            return None
+    return child
+
+
+def _run_shell(child: Any, key: LaunchKey) -> None:
+    """Wait for the shell to exit. Meanwhile Keep on top (M23) is one JSON line on its stdin."""
+    windowhost.set_opener(windowhost.line_opener(child.stdin, key.open_url))
+    try:
+        child.wait()
+    finally:
+        windowhost.set_opener(None)
+        _stop_shell(child)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="objectapp", description=__doc__)
     parser.add_argument("--space", type=Path, help="space folder to open")
@@ -233,13 +394,32 @@ def main(argv: list[str] | None = None) -> None:
         "--print-link", action="store_true",
         help="with --browser, also print the one-time link (anyone reading the terminal could use it)",
     )
+    parser.add_argument(
+        "--window", choices=WINDOWS,
+        help="which window: auto (the desktop shell when it is installed, else pywebview), "
+        "electron or pywebview; OBJECT_WINDOW gives the same choice",
+    )
+    parser.add_argument(
+        "--frame", choices=FRAMES,
+        help="the desktop shell's window: hidden (frameless, the default) or system (the system's "
+        "ordinary frame); OBJECT_WINDOW_FRAME gives the same choice",
+    )
     args = parser.parse_args(argv)
+    try:
+        window = window_choice(args.window, os.environ)
+        frame = frame_choice(args.frame, os.environ)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     space_root = startup_root(args.space)
     if space_root is None:
         parser.error("Pass --space PATH the first time.")
     if not space_root.is_dir():
         parser.error(f'"{space_root}" is not a folder.')
+
+    shell = None if args.browser or window == "pywebview" else electron_binary()
+    if shell is None and window == "electron" and not args.browser:
+        parser.exit(1, SHELL_MISSING_MESSAGE + "\n")
 
     host = SpaceHost(args.port, DEFAULT_STATIC_DIR)
     thread = threading.Thread(
@@ -261,6 +441,17 @@ def main(argv: list[str] | None = None) -> None:
                 threading.Thread(target=_reopen_on_enter, args=(host.ui_key, url), daemon=True).start()
             thread.join()
         else:
+            child = None
+            if shell is not None:
+                child = start_shell(shell, shell_launch(host.ui_key, url, args.port, frame))
+                if child is None:
+                    if window == "electron":
+                        parser.exit(1, SHELL_FAILED_MESSAGE + "\n")
+                    print(SHELL_FALLBACK_MESSAGE, flush=True)
+            if child is not None:
+                _run_shell(child, host.ui_key)
+                return
+
             import webview
 
             webview.create_window("Object", host.ui_key.open_url(url), width=1440, height=900)
