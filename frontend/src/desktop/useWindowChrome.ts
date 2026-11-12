@@ -14,7 +14,7 @@
  * On Linux it also applies the device setting "Window buttons" (`windowButtons`: Automatic, Show,
  * Hide; Settings > Appearance) once the settings are read and whenever it changes.
  */
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import { create } from 'zustand'
 import type { DeviceSettings } from '@/api/types'
 import { useSettings } from '@/settings/useSettings'
@@ -37,22 +37,9 @@ export function resetChrome(): void {
   useChrome.setState(INITIAL)
 }
 
-/**
- * The device settings with the "Window buttons" key. The key's own type is added to
- * `DeviceSettings` by its owner (`api/types.ts`); read and written through this, the code here is
- * right before and after that, and an older settings file (no key) reads as Automatic.
- */
-type WithWindowButtons = Partial<DeviceSettings> & { windowButtons?: unknown }
-
-/** The stored "Window buttons" choice ('auto' when there is none). */
-export function storedWindowButtons(settings: WithWindowButtons): WindowButtons {
+/** The stored "Window buttons" choice; 'auto' when a settings file holds none, or none of the three. */
+export function storedWindowButtons(settings: Partial<Pick<DeviceSettings, 'windowButtons'>>): WindowButtons {
   return windowButtonsValue(settings.windowButtons)
-}
-
-/** The settings patch that stores `v`. */
-export function windowButtonsPatch(v: WindowButtons): Partial<DeviceSettings> {
-  const patch: Partial<DeviceSettings> & { windowButtons?: WindowButtons } = { windowButtons: v }
-  return patch
 }
 
 /** Whether "Window buttons" means anything here: the desktop window on Linux, without the system's frame. */
@@ -94,7 +81,9 @@ export function useWindowChrome(): void {
     if (loaded) void applyWindowButtons(buttons)
   }, [loaded, buttons])
 
-  useEffect(() => {
+  // In the layout phase: the classes (the room for the system's buttons, the drag region) are on
+  // `<html>` before the top bar is painted for the first time, so no frame shows it un-padded.
+  useLayoutEffect(() => {
     const d = desktop()
     if (!d) return
     const root = document.documentElement

@@ -2,8 +2,9 @@
  * M33: closing the desktop window loses nothing. The shell asks the page before it closes the
  * window (`onBeforeClose`) and waits for the answer, 3 seconds at most. The handler here:
  *
- * 1. makes everything save, the way a closing browser window does: it dispatches `pagehide` on the
- *    window, which every saver already listens for (`editor/useAutosave.ts` sends unsaved text and
+ * 1. makes everything save: focus leaves the field being typed in (`leaveField`: a property's text
+ *    saves when focus leaves it), then, the way a closing browser window does, it dispatches
+ *    `pagehide` on the window, which every saver already listens for (`editor/useAutosave.ts` sends unsaved text and
  *    keeps it for the next open until the save lands; `object/ObjectView.tsx` commits a typed
  *    title; `whiteboard/useBoard.ts` and `whiteboard/ink/useInkDoc.ts` flush). None of those files
  *    is touched, and the real `pagehide` that follows the close finds nothing left to send;
@@ -51,9 +52,25 @@ function pageHideEvent(): Event {
   return typeof PageTransitionEvent === 'function' ? new PageTransitionEvent('pagehide', { persisted: false }) : new Event('pagehide')
 }
 
+/**
+ * A field that saves when focus leaves it (a property's text, an alias, a name being edited) has
+ * not saved what is being typed in it. The page's own Close button takes the focus as it is
+ * clicked; the system's buttons, Alt+F4 and the window manager do not. So focus leaves the field
+ * here, as it would on a click elsewhere, and its save is one of the writes waited for.
+ */
+function leaveField(): void {
+  try {
+    const active = document.activeElement
+    if (active instanceof HTMLElement && active !== document.body) active.blur()
+  } catch {
+    // A blur handler that throws must not keep the window open.
+  }
+}
+
 /** Save everything now and resolve when it is saved, or after `limitMs`. Never rejects. */
 export async function saveEverything(limitMs: number = BEFORE_CLOSE_LIMIT_MS): Promise<void> {
   const started = Date.now()
+  leaveField()
   try {
     window.dispatchEvent(pageHideEvent())
   } catch {

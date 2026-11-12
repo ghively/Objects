@@ -5,7 +5,7 @@ import { useState } from 'react'
 import type { AppIconColor, DeviceSettings } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { cn } from '@/lib/utils'
-import { applyWindowButtons, storedWindowButtons, windowButtonsApply, windowButtonsPatch } from '@/desktop/useWindowChrome'
+import { applyWindowButtons, storedWindowButtons, windowButtonsApply } from '@/desktop/useWindowChrome'
 import { APP_ICON_CHOICES, appIconHref } from '@/settings/appIcon'
 import { useSettings } from '@/settings/useSettings'
 import { nextZoom, validZoom, zoomPercent } from '@/settings/zoom'
@@ -236,7 +236,7 @@ export function AppearanceSection() {
             onChange={(v) => {
               // The buttons appear or go at once; the choice is stored for the next start.
               void applyWindowButtons(v)
-              set(windowButtonsPatch(v))
+              set({ windowButtons: v })
             }}
           />
         </SettingGroup>

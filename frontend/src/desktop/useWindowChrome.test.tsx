@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { useLayoutEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.mock('@/api/client', async (orig) => ({
@@ -69,6 +70,28 @@ describe('useWindowChrome', () => {
     await waitFor(() => expect(fake.bridge.isFullScreen).toHaveBeenCalled())
     unmount()
     expect(desktopClasses()).toEqual([])
+  })
+
+  test.each(['win32', 'darwin', 'linux'] as const)('test the classes are on html before the first paint (%s): no frame shows the bar un-padded', (platform) => {
+    window.objectDesktop = fakeDesktop({ platform }).bridge
+    // What is on <html> when the layout effects of the same commit run: that is before the
+    // browser paints. An effect that ran after the paint would not have been seen here.
+    const seen: string[] = []
+    function Probe() {
+      useLayoutEffect(() => {
+        seen.push(...desktopClasses())
+      }, [])
+      return null
+    }
+    render(
+      <>
+        <Shell />
+        <Probe />
+      </>,
+    )
+    expect(seen).toContain(`desktop-${platform}`)
+    expect(seen).toContain('desktop-drag')
+    expect(seen.some((c) => c.startsWith('desktop-controls-'))).toBe(true)
   })
 
   test.each(['win32', 'darwin', 'linux'] as const)('test with the system frame (%s) nothing is reserved and the bar does not drag', (platform) => {
@@ -267,5 +290,24 @@ describe('desktop.css', () => {
     }
     // The bar is never lower than the controls need.
     expect(bodies((s) => s.endsWith('.desktop-linux) .app-titlebar'))).toContain('min-height: 42px')
+  })
+
+  test('test the window buttons take clicks while the rest of the bar is faded for typing', async () => {
+    // `focus/TypingFade` turns pointer events off for everything in the fading bar, with
+    // `!important`; the window buttons stay shown, so they must stay clickable. The rule here
+    // has to win over that one: more specific, and `!important` too.
+    const { TYPING_ATTR, TYPING_FADE_ATTR, TYPING_FADE_CSS } = await import('@/focus/TypingFade')
+    const mine = rules.find((r) => r.selectors.some((s) => s.includes('[data-window-controls]')))
+    expect(mine?.body).toMatch(/pointer-events: auto !important/)
+    expect(mine?.selectors).toHaveLength(2)
+    const attrs = (s: string) => (s.match(/\[[^\]]+\]/g) ?? []).length
+    for (const s of mine!.selectors) {
+      expect(s).toContain(`[${TYPING_ATTR}]`)
+      expect(s).toContain(`[${TYPING_FADE_ATTR}]`)
+      // The fade's own rule names two attributes; this one names three.
+      expect(attrs(s)).toBe(3)
+    }
+    expect(mine!.selectors.some((s) => s.endsWith('[data-window-controls] *'))).toBe(true)
+    expect(TYPING_FADE_CSS).toContain(`html[${TYPING_ATTR}] [${TYPING_FADE_ATTR}] * { pointer-events: none !important; }`)
   })
 })

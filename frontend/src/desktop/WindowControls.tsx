@@ -7,7 +7,8 @@
  *
  * They look like the bar's other buttons (its size, its hover) and are reachable by Tab after
  * everything else in it; Close takes the theme's danger colour under the pointer. They stay while the rest
- * of the bar fades for typing (`focus/TypingFade`), as the system's buttons do on the other two.
+ * of the bar fades for typing (`focus/TypingFade`), as the system's buttons do on the other two, and
+ * they stay clickable then (`desktop.css`).
  */
 import { Icon } from '@/components/Icon'
 import { cn } from '@/lib/utils'
@@ -56,7 +57,9 @@ export function WindowControls() {
   const d = desktop()
   if (!d || (stored ?? d.controls) !== 'custom') return null
   return (
-    <div role="group" aria-label={T.group} data-window-controls="" data-typing-stay="" className="app-no-drag -mr-2 ml-1.5 flex shrink-0 items-stretch self-stretch">
+    // `ml-auto`: at the window's right end even when the tab strip, the bar's only part that
+    // grows, is hidden (focus mode); the gap to the bar's last button is the group's own padding.
+    <div role="group" aria-label={T.group} data-window-controls="" data-typing-stay="" className="app-no-drag -mr-2 ml-auto flex shrink-0 items-stretch self-stretch pl-1.5">
       <ControlButton label={T.minimize} icon="ph-minus" size={16} onClick={() => d.minimize()} />
       {maximized ? (
         <ControlButton label={T.restore} icon="ph-copy-simple" size={16} onClick={() => d.toggleMaximize()} />

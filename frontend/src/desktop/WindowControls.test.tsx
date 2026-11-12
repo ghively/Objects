@@ -90,6 +90,17 @@ describe('WindowControls', () => {
     expect(screen.getByRole('button', { name: 'Close' })).toHaveClass('pr-2')
   })
 
+  test('test the buttons keep to the window\'s right end when the tabs are hidden (focus mode)', () => {
+    window.objectDesktop = fakeDesktop({ platform: 'linux', controls: 'custom' }).bridge
+    render(<Shell />)
+    // Focus mode hides the tab strip, the bar's only part that grows: the free room then goes
+    // before the window buttons, never after them. The gap to the bar's last button is inside
+    // the group, so it stays when there is no free room.
+    const group = screen.getByRole('group', { name: 'Window' })
+    expect(group).toHaveClass('ml-auto', 'pl-1.5')
+    expect(group).not.toHaveClass('ml-1.5')
+  })
+
   test('test the buttons are reachable by keyboard and last in the bar', () => {
     window.objectDesktop = fakeDesktop({ platform: 'linux', controls: 'custom' }).bridge
     render(<Shell />)
