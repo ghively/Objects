@@ -23,6 +23,12 @@
  * (`starterSetMissing`) and, for the IT set, says when the Work page gets turned on (the switch
  * was never set and Work is off: what the server does). A set with nothing left to add reads
  * "Added" and cannot be clicked.
+ *
+ * M33 (choice 4): where a new type lands. One made from a gallery entry is ready to use, so the
+ * dialog opens the type's own page (its list, with "New") and a toast names it, '"Recipes" added.',
+ * with a "Type settings" action that opens its settings; `onCreated` is not called for it. One
+ * made from scratch has nothing but a name, so it goes to the caller (`onCreated`), which opens
+ * its settings, as before.
  */
 import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { api } from '@/api/client'
@@ -42,9 +48,10 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { showToast } from '@/editor/media/upload'
-import { typeLabel } from '@/lib/typeLabel'
+import { typeLabel, typePlural } from '@/lib/typeLabel'
 import { ADD_A_TYPE } from '@/lib/words'
 import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
+import { useTabs } from '@/nav/tabs'
 import { KIND_META, kindIcon } from '@/properties/kinds'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { CREATE_SPACE_TEXT, SETUPS } from '@/spaces/CreateSpaceDialog'
@@ -104,6 +111,50 @@ export const CREATE_TYPE_TEXT = {
   starterConfirmWork: 'The Work page is turned on for this space.',
   starterConfirmCancel: 'Cancel',
   starterConfirmAdd: 'Add',
+  // M33 (choice 4): the toast after a gallery type was made, and its action.
+  typeAdded: (plural: string) => `"${plural}" added.`,
+  typeSettings: 'Type settings',
+}
+
+/** How long the "added" toast stays: longer than a plain toast (4 s), since it has a button to reach. */
+export const TYPE_ADDED_TOAST_MS = 8000
+
+/**
+ * A toast in the app's toast host (`editor/media/upload.ts`) with one action button, built as the
+ * "Object was updated" toast is (`lib/lazyReload.ts`). The button runs `onAction` and takes the
+ * toast away; otherwise it goes by itself after `TYPE_ADDED_TOAST_MS`.
+ */
+function showActionToast(text: string, action: string, onAction: () => void): void {
+  if (typeof document === 'undefined') return
+  let host = document.querySelector<HTMLElement>('[data-editor-toasts]')
+  if (!host) {
+    host = document.createElement('div')
+    host.setAttribute('data-editor-toasts', '')
+    host.className = 'editor-toasts'
+    document.body.appendChild(host)
+  }
+  const el = document.createElement('div')
+  el.className = 'editor-toast'
+  el.setAttribute('role', 'status')
+  el.setAttribute('data-type-added-toast', '')
+  el.style.pointerEvents = 'auto'
+  el.style.display = 'flex'
+  el.style.alignItems = 'center'
+  el.style.gap = '12px'
+  const label = document.createElement('span')
+  label.textContent = text
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.textContent = action
+  button.style.fontWeight = '500'
+  button.style.color = 'var(--accent, inherit)'
+  button.addEventListener('click', () => {
+    el.remove()
+    onAction()
+  })
+  el.append(label, button)
+  host.appendChild(el)
+  setTimeout(() => el.remove(), TYPE_ADDED_TOAST_MS)
 }
 
 type StarterSetup = 'basic' | 'itops'
@@ -245,7 +296,10 @@ export function gallerySections(gallery: readonly TypeTemplate[]): GallerySectio
 export interface CreateTypeDialogProps {
   open: boolean
   onOpenChange?(open: boolean): void
-  /** The new type (the caller opens its settings). */
+  /**
+   * A type made from scratch ("Create your own"): the caller opens its settings. Not called for a
+   * type made from a gallery entry, which the dialog lands on its own page (M33).
+   */
   onCreated?(type: TypeDef): void
 }
 
@@ -331,7 +385,14 @@ export function CreateTypeDialog({ open, onOpenChange, onCreated }: CreateTypeDi
         revision: s.revision + 1,
       }))
       onOpenChange?.(false)
-      onCreated?.(type)
+      if (input.template) {
+        // M33: a gallery type is ready to use: its own page, and a way to its settings.
+        const { open: openTarget } = useTabs.getState()
+        openTarget({ kind: 'type', typeId: type.id })
+        showActionToast(CREATE_TYPE_TEXT.typeAdded(typePlural(type) || typeLabel(type)), CREATE_TYPE_TEXT.typeSettings, () =>
+          useTabs.getState().open({ kind: 'typeSettings', typeId: type.id }),
+        )
+      } else onCreated?.(type)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {

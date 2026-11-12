@@ -329,6 +329,10 @@ cannot be clicked.
   Organizations and Areas, then IT operations last, closed until it is opened (the gallery data's `collapsed`).
   The Projects entry carries the ticket and work fields only while Work is on for the space (M32).
 Each starter template pre-fills the new type's properties.
+(M33) Where a new type lands: one made from a gallery entry ("Create type" on Personal, the other groups or an IT
+operations one) opens the type's own page (its list, ready for "New"), with the toast '"Recipes" added.' (the
+type's plural) carrying the action "Type settings", which opens its settings; the toast goes after 8 seconds or
+with the click. A type made from scratch ("Create your own") still opens its settings, with no toast.
 
 ## 4. Sidebar details
 
