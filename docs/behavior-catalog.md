@@ -438,11 +438,12 @@ with the click. A type made from scratch ("Create your own") still opens its set
   the task as it will be saved (`Adds "Call the bank" on Nov 13, 2026`). Backspace at the start of the field, or
   the chip's ×, removes the chip, and the words then stay in the title as typed. The new task's file has an empty
   body: the title is not repeated in it (a default template's body is kept). Tabs: **Today** (two groups,
-  "Overdue (n)" — open tasks whose date ended before today — then "Today (n)" — the date covers today or the
-  deadline is today, done ones kept under the open ones; together the Calendar Day view's list for today,
-  decision T1), **Upcoming** (open tasks dated after today, one group per day for the next 14 days — "Tomorrow",
-  then the weekday and date — then "Later"), **Inbox** (open tasks with no date, newest first), **All** (every
-  task, open ones first) and **Done** (latest first); then a "More" menu with the other plain lists as they were
+  "Overdue (n)" — open tasks whose date ended before today, and (M33) open tasks with no date whose deadline has
+  passed — then "Today (n)" — the date covers today or the deadline is today, done ones kept under the open
+  ones), **Upcoming** (open tasks dated after today, and (M33) open tasks with no date whose deadline is after
+  today, on the deadline's day; one group per day for the next 14 days — "Tomorrow", then the weekday and date —
+  then "Later"), **Inbox** (open tasks with no date and (M33) no deadline, newest first; empty it reads "No tasks
+  without a date or a deadline"), **All** (every task, open ones first) and **Done** (latest first); then a "More" menu with the other plain lists as they were
   (Status, Deadline, Recurring, Reminders, Tags, Context: each a list view with its own layouts, filters and
   saved view). The tab row is one stop for the Tab key; Left and Right move to the next tab and show its list,
   Home and End go to the first and the last. The sidebar's Tasks entry opens the page on Today, also when the page is
@@ -457,6 +458,22 @@ with the click. A type made from scratch ("Create your own") still opens its set
   offers "Add a Done status" — one click adds it to the type and completes the task — instead of "This type has
   no status for that." A space with no Task type yet can still add: the type is made with the first task. The
   Task rows load once for the page.
+  (M33; replaces M32's acceptance call "a task with only a deadline sits in Inbox, also when the deadline has
+  passed") **A deadline places a task that has no date**: a not-done task with no date and a deadline is listed
+  where its deadline puts it — under Today's "Overdue" once the deadline has passed, under "Today" on the day, on
+  the deadline's day in Upcoming for the next 14 days and under "Later" beyond — and not in Inbox, which holds the
+  tasks with neither. A task with a date is placed by its date, whatever its deadline (a passed deadline does not
+  make it Overdue, a later one does not move it); the one case its deadline decides is a deadline today, which
+  lists it under Today (as before) and then not in Upcoming too. So every not-done task is on exactly one of
+  Today, Upcoming and Inbox; All lists every task as before. Within a day the dated tasks come first, in their
+  order, then the ones the deadline placed; Overdue and Later run from the earliest day. Where a task is listed by
+  its deadline its chip is the deadline's: an hourglass and the deadline, named "Deadline: Nov 13, 2026" (the
+  chip's tooltip and its name for a screen reader), in the danger colour once the deadline has passed. A click
+  opens Today / Tomorrow / Next week / No deadline and "Pick a date", which write the deadline, not the date; the
+  "Missed" / "N days left" label still follows it. In All (and every other list) the same task keeps its date
+  chip, so a date is still one click away. Decision T1 changes with it: Tasks › Today is the Calendar Day view's
+  list for today plus the tasks with no date whose deadline has passed, which the Day view does not list (it
+  shows a deadline on its own day). The Work page's task lists and its Today badge are as they were.
 - **Work** (M32; optional): the dashboard that used to be the Tasks page is its own page, off until "Use the Work
   page in this space" is turned on (Settings > Work; a space that already holds work data reads as on). On: a
   "Work" entry under Tasks opens it (the `work` target), unchanged apart from its heading ("Work"). Off: nothing

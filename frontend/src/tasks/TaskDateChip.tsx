@@ -3,6 +3,11 @@
 // date picker of the property panel. A task with no date has the chip too (the calendar icon), so
 // a date is one click and a pick away. Like the checkbox it owns no row state: it writes the date
 // (`taskActions.setDate`) and hands the outcome to the owner, which patches its list.
+//
+// M33 (choice 6): `property="deadline"` makes it the deadline's chip, for a row a list shows by its
+// deadline (a task with no date). It shows the deadline, says so (the hourglass, the tooltip and
+// the name "Deadline: Nov 13, 2026"), is in the danger colour once the deadline has passed, and
+// its picker writes the deadline: Today, Tomorrow, Next week, No deadline, "Pick a date".
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type SyntheticEvent } from 'react'
 import type { DateValue, Row, TypeDef } from '@/api/types'
 import { addDays, parseYmd, ymd } from '@/calendar/dates'
@@ -13,7 +18,7 @@ import { fromWallClock, wallClock, zonedToday } from '@/lib/zonedTime'
 import { DatePicker } from '@/properties/DatePicker'
 import { formatDate } from '@/properties/format'
 import { isOpen } from './statusCategory'
-import { DEFAULT_TASK_API, setDate, type TaskApi, type TaskOutcome } from './taskActions'
+import { DEFAULT_TASK_API, setDateProperty, type TaskApi, type TaskDateKey, type TaskOutcome } from './taskActions'
 import { coveredDays } from './taskSections'
 
 export const TASK_DATE_TEXT = {
@@ -25,6 +30,16 @@ export const TASK_DATE_TEXT = {
   noDate: 'No date',
   /** As the Calendar's "Move all open tasks to" (our string). */
   pickDate: 'Pick a date',
+  /** M33: the chip of a row listed by its deadline ("Deadline: Nov 13, 2026"), and its "none" row (our string). */
+  deadlineLabel: 'Deadline',
+  noDeadline: 'No deadline',
+}
+
+/** What the chip says per property: its name, its "none" choice and its icon. */
+const CHIP: Record<TaskDateKey, { label: string; none: string; icon: string }> = {
+  date: { label: TASK_DATE_TEXT.label, none: TASK_DATE_TEXT.noDate, icon: 'ph-calendar' },
+  // The Deadline list's icon.
+  deadline: { label: TASK_DATE_TEXT.deadlineLabel, none: TASK_DATE_TEXT.noDeadline, icon: 'ph-hourglass-medium' },
 }
 
 const asDate = (v: unknown): DateValue | null =>
@@ -70,6 +85,13 @@ export function isOverdue(row: Row, type: TypeDef | undefined, today: string = z
   return !!span && span.last < today && isOpen(row, type)
 }
 
+/** M33: an open task whose deadline's day was before `today` (`YYYY-MM-DD`; default: today in the Time zone setting). */
+export function isDeadlinePassed(row: Row, type: TypeDef | undefined, today: string = zonedToday()): boolean {
+  const deadline = asDate(row.values.deadline)
+  const day = deadline ? coveredDays(deadline)?.first : null
+  return !!day && day < today && isOpen(row, type)
+}
+
 /** Clicks and drags on the chip never reach the row or card around it (open, peek, drag). */
 const stop = (e: SyntheticEvent) => e.stopPropagation()
 
@@ -81,10 +103,13 @@ export function TaskDateChip({
   onResult,
   taskApi = DEFAULT_TASK_API,
   today: todayProp,
+  property = 'date',
   children,
 }: {
   row: Row
   type: TypeDef | undefined
+  /** Which of the task's dates the chip shows and edits: its date (the default) or its deadline (M33). */
+  property?: TaskDateKey
   /** The date was written and the row reloaded: the owner patches its list and shows the toast. */
   onResult?(outcome: TaskOutcome): void
   /** Injected in tests; the real `api` otherwise. */
@@ -106,15 +131,20 @@ export function TaskDateChip({
     field?.focus()
     field?.select()
   }, [picking])
-  const date = asDate(row.values.date)
+  const date = asDate(row.values[property])
   const today = todayProp ? ymd(todayProp) : zonedToday()
-  const overdue = isOverdue(row, type, today)
+  const isDeadline = property === 'deadline'
+  const overdue = isDeadline ? isDeadlinePassed(row, type, today) : isOverdue(row, type, today)
   const text = formatDate(date)
+  const chip = CHIP[property]
+  const name = `${chip.label}: ${text || chip.none}`
+  /** The deadline chip says what it is on hover too; the date chip is as it was. */
+  const mark = isDeadline ? { 'data-chip': 'deadline', title: name } : {}
 
   if (row.summary.readOnly) {
     if (!date) return null
     return (
-      <span data-testid="task-date" className="inline-flex items-center gap-1 text-[13px] text-fg-muted">
+      <span data-testid="task-date" {...mark} className="inline-flex items-center gap-1 text-[13px] text-fg-muted">
         {text}
         {children}
       </span>
@@ -125,7 +155,7 @@ export function TaskDateChip({
     if (busy) return
     setBusy(true)
     try {
-      const outcome = await setDate(taskApi, row, next)
+      const outcome = await setDateProperty(taskApi, row, property, next)
       onResult?.(outcome)
     } finally {
       setBusy(false)
@@ -153,7 +183,7 @@ export function TaskDateChip({
     [TASK_DATE_TEXT.today, dateOnDay(date, today)],
     [TASK_DATE_TEXT.tomorrow, dateOnDay(date, addDays(today, 1))],
     [TASK_DATE_TEXT.nextWeek, dateOnDay(date, addDays(today, 7))],
-    [TASK_DATE_TEXT.noDate, null],
+    [chip.none, null],
   ]
 
   return (
@@ -170,13 +200,14 @@ export function TaskDateChip({
             type="button"
             data-testid="task-date"
             data-overdue={overdue || undefined}
-            aria-label={`${TASK_DATE_TEXT.label}: ${text || TASK_DATE_TEXT.noDate}`}
+            {...mark}
+            aria-label={name}
             className={cn(
               'inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[13px] hover:bg-hover',
               overdue ? 'text-[var(--danger)]' : 'text-fg-muted',
             )}
           >
-            <Icon name="ph-calendar" size={13} />
+            <Icon name={chip.icon} size={13} />
             {text}
             {children}
           </button>
@@ -187,7 +218,7 @@ export function TaskDateChip({
           <div ref={pickerRef}>
             <DatePicker
               value={date}
-              constraints={type?.propertyDefinitions.find((d) => d.key === 'date')?.options.constraints}
+              constraints={type?.propertyDefinitions.find((d) => d.key === property)?.options.constraints}
               now={todayProp}
               onChange={(next) => {
                 void write(next)
@@ -198,7 +229,7 @@ export function TaskDateChip({
             />
           </div>
         ) : (
-          <div role="menu" aria-label={TASK_DATE_TEXT.label} onKeyDown={onMenuKeyDown} className="flex w-44 flex-col p-1.5">
+          <div role="menu" aria-label={chip.label} onKeyDown={onMenuKeyDown} className="flex w-44 flex-col p-1.5">
             {choices.map(([label, value]) => (
               <button key={label} type="button" role="menuitem" disabled={busy} onClick={() => pick(value)} className={ITEM}>
                 {label}

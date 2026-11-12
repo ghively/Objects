@@ -103,10 +103,21 @@ export async function addDoneStatus(type: TypeDef): Promise<TypeDef> {
  * M32, a row's date chip: write the task's `date` (null: no date) with the row's version, then one
  * reload. The date alone, as a table cell writes it; a 409 reloads only.
  */
-export async function setDate(api: TaskApi, row: Row, date: DateValue | null): Promise<TaskOutcome> {
+export function setDate(api: TaskApi, row: Row, date: DateValue | null): Promise<TaskOutcome> {
+  return setDateProperty(api, row, 'date', date)
+}
+
+/** The date properties a task row's chip edits. */
+export type TaskDateKey = 'date' | 'deadline'
+
+/**
+ * M33: write one of the task's dates (`date`, or `deadline` where the row is listed by its
+ * deadline) with the row's version, then one reload. That key alone; a 409 reloads only.
+ */
+export async function setDateProperty(api: TaskApi, row: Row, key: TaskDateKey, date: DateValue | null): Promise<TaskOutcome> {
   const path = row.summary.path
   try {
-    const res = await api.updateProperties(path, { date }, row.version)
+    const res = await api.updateProperties(path, { [key]: date }, row.version)
     return { result: res.task ?? undefined, row: await reload(api, path), conflict: false }
   } catch (err) {
     if (err instanceof ConflictError) return { result: undefined, row: await reload(api, path), conflict: true }

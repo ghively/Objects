@@ -435,7 +435,66 @@ describe('TasksPage (M32)', () => {
     await user.click(within(row).getByRole('button', { name: 'Date: No date' }))
     await user.click(await screen.findByRole('menuitem', { name: 'Today' }))
     await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/Fresh.md', { date: day(0) }, 'v1'))
-    await waitFor(() => expect(screen.getByText('No tasks without a date')).toBeInTheDocument())
+    // M33: Inbox is "no date and no deadline" (the empty text read "No tasks without a date").
+    await waitFor(() => expect(screen.getByText('No tasks without a date or a deadline')).toBeInTheDocument())
+  })
+
+  // M33 (choice 6): a task with only a deadline is listed where its deadline puts it.
+  test('test a task with only a deadline is under Overdue, Today or its day in Upcoming, not in Inbox, and its chip edits the deadline', async () => {
+    const user = userEvent.setup()
+    const titles = /^(Fresh|Overdue|Working|Waiting|Finished|Weekly|Slipped|Due now|Due soon|Due far|Done due)$/
+    const shown = () =>
+      [...document.querySelectorAll('[data-task-group]')].map((g) => [
+        g.querySelector('h2')?.textContent ?? null,
+        within(g as HTMLElement).queryAllByText(titles).map((n) => n.textContent),
+      ])
+    mocked.rows.mockResolvedValue([
+      ...ROWS,
+      taskRow('Tasks/Slipped.md', { status: ['Not Started'], deadline: day(-7) }, 'm1'),
+      taskRow('Tasks/Due now.md', { status: ['Not Started'], deadline: day(0) }, 'm2'),
+      taskRow('Tasks/Due soon.md', { status: ['Not Started'], deadline: day(5) }, 'm3'),
+      taskRow('Tasks/Due far.md', { status: ['Not Started'], deadline: day(30) }, 'm4'),
+      taskRow('Tasks/Done due.md', { status: ['Done'], deadline: day(-7) }, 'm5'),
+    ])
+    render(<TasksPage />)
+    await waitFor(() =>
+      expect(shown()).toEqual([
+        ['Overdue (2)', ['Slipped', 'Overdue']],
+        ['Today (3)', ['Working', 'Due now', 'Finished']],
+      ]),
+    )
+    // The row its deadline placed shows the deadline, named one, in the danger colour.
+    const missed = screen.getByText('Slipped').closest('li') as HTMLElement
+    const chip = within(missed).getByTestId('task-date')
+    expect(chip).toHaveAttribute('data-chip', 'deadline')
+    expect(chip.getAttribute('aria-label')).toMatch(/^Deadline: /)
+    expect(chip.getAttribute('title')).toMatch(/^Deadline: /)
+    expect(chip.className).toContain('var(--danger)')
+    // A dated row keeps its date chip.
+    expect(within(screen.getByText('Overdue').closest('li') as HTMLElement).getByTestId('task-date').getAttribute('aria-label')).toMatch(/^Date: /)
+
+    await user.click(screen.getByRole('tab', { name: 'Upcoming' }))
+    const upcoming = shown()
+    // Weekly (dated tomorrow, deadline in four days) is placed by its date; on the fifth day the dated one first.
+    expect(upcoming.map(([, t]) => t)).toEqual([['Weekly'], ['Waiting', 'Due soon'], ['Due far']])
+    expect(upcoming[2][0]).toBe('Later (1)')
+    await user.click(screen.getByRole('tab', { name: 'Inbox' }))
+    expect(shown()).toEqual([[null, ['Fresh']]])
+    await user.click(screen.getByRole('tab', { name: 'All' }))
+    expect(within(screen.getByTestId('task-list')).queryAllByText(titles)).toHaveLength(11)
+    // In All the same task has its date chip (nothing placed it there by its deadline).
+    expect(within(screen.getByText('Slipped').closest('li') as HTMLElement).getByTestId('task-date')).toHaveAccessibleName('Date: No date')
+
+    // The deadline chip writes the deadline, and the task moves with it.
+    await user.click(screen.getByRole('tab', { name: 'Today' }))
+    mocked.updateProperties.mockResolvedValueOnce({ version: 'm1b', frontmatter: {}, links: {}, synced: [], skipped: [], task: null })
+    mocked.rows.mockResolvedValueOnce([taskRow('Tasks/Slipped.md', { status: ['Not Started'], deadline: day(1) }, 'm1b')])
+    await user.click(within(screen.getByText('Slipped').closest('li') as HTMLElement).getByTestId('task-date'))
+    await user.click(await screen.findByRole('menuitem', { name: 'Tomorrow' }))
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledWith('Tasks/Slipped.md', { deadline: day(1) }, 'm1'))
+    await waitFor(() => expect(shown()[0]).toEqual(['Overdue (1)', ['Overdue']]))
+    await user.click(screen.getByRole('tab', { name: 'Upcoming' }))
+    expect(shown()[0]).toEqual(['Tomorrow (2)', ['Weekly', 'Slipped']])
   })
 
   test('test Search tasks filters the shown list as you type', async () => {
