@@ -146,8 +146,13 @@ function showActionToast(text: string, action: string, onAction: () => void): vo
   const button = document.createElement('button')
   button.type = 'button'
   button.textContent = action
-  button.style.fontWeight = '500'
-  button.style.color = 'var(--accent, inherit)'
+  // The toast's own text colour, underlined: readable in every theme (`--accent` is a surface
+  // colour here, so text in it disappears on the toast).
+  button.style.fontWeight = '600'
+  button.style.color = 'inherit'
+  button.style.textDecoration = 'underline'
+  button.style.textUnderlineOffset = '2px'
+  button.style.cursor = 'pointer'
   button.addEventListener('click', () => {
     el.remove()
     onAction()

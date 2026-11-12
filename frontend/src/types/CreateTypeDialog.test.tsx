@@ -439,6 +439,9 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     expect(toast).toHaveAttribute('role', 'status')
     expect(toast?.querySelector('span')?.textContent).toBe('"Films" added.')
     const action = within(toast as HTMLElement).getByRole('button', { name: 'Type settings' })
+    // It can be read on the toast: the toast's own text colour, underlined (not a surface colour).
+    expect(action.style.color).toBe('inherit')
+    expect(action.style.textDecoration).toBe('underline')
     await user.click(action)
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'typeSettings', typeId: 'film' })
     // Used once: the toast goes with the click.
