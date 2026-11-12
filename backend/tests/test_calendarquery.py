@@ -265,6 +265,66 @@ def test_overdue_only_today_and_open(calendar_space_dir: Path):
     assert all(e["kind"] != "overdue" for d in later["days"].values() for e in d["tasks"])
 
 
+def _deadline_tasks(root: Path) -> None:
+    """M33 (choice 6): tasks placed by a deadline, written beside the fixture's own."""
+    base = "type: 'Task'\ncreatedAt: 2026-10-01T10:00:00.000Z\nlastUpdated: 2026-10-01T10:00:00.000Z\n"
+    _write(root, "Tasks/Late form.md", base + "title: Late form\nstatus: Not Started\ndeadline: 2026-10-20")
+    _write(root, "Tasks/Late done.md", base + "title: Late done\nstatus: Done\ndeadline: 2026-10-20")
+    _write(root, "Tasks/Due today.md", base + "title: Due today\nstatus: Not Started\ndeadline: 2026-10-23")
+    _write(
+        root,
+        "Tasks/Dated late.md",
+        base + "title: Dated late\nstatus: Not Started\ndate: 2026-10-25\ndeadline: 2026-10-20",
+    )
+
+
+def test_passed_deadline_without_date_is_overdue_on_today_only(calendar_space_dir: Path):
+    _deadline_tasks(calendar_space_dir)
+    before = _hashes(calendar_space_dir)
+    space = _space(calendar_space_dir)  # today is 2026-10-23
+    days = space.calendar("2026-10-14", "2026-10-31")["days"]
+    path = "Tasks/Late form.md"
+    # today: under Overdue, its day the deadline's (as a dated overdue task's is its date's)
+    assert _tasks(days["2026-10-23"], path) == [(path, "overdue", "2026-10-20", False)]
+    # its deadline's own day keeps the deadline entry; no other day, past or future, lists it
+    assert _tasks(days["2026-10-20"], path) == [(path, "deadline", "2026-10-20", False)]
+    for d, v in days.items():
+        if d not in ("2026-10-20", "2026-10-23"):
+            assert _tasks(v, path) == [], d
+    # a range without today has no overdue entry for it
+    for f, t in (("2026-10-14", "2026-10-22"), ("2026-10-24", "2026-10-31")):
+        r = space.calendar(f, t)["days"]
+        assert all(e["kind"] != "overdue" for v in r.values() for e in v["tasks"] if e["path"] == path)
+    # the route answers the same, and reading writes nothing
+    with TestClient(create_app(space, None, watch=False)) as c:
+        res = c.get("/api/calendar?from=2026-10-23&to=2026-10-23")
+        assert res.status_code == 200
+        body = res.json()
+        assert {"path": path, "kind": "overdue", "day": "2026-10-20", "done": False} in body["days"][
+            "2026-10-23"
+        ]["tasks"]
+        assert path in body["summaries"]
+    assert _hashes(calendar_space_dir) == before
+
+
+def test_passed_deadline_done_or_dated_or_today_not_overdue(calendar_space_dir: Path):
+    _deadline_tasks(calendar_space_dir)
+    space = _space(calendar_space_dir)
+    days = space.calendar("2026-10-14", "2026-10-31")["days"]
+    # a done task is never overdue; its deadline's day still lists it, done
+    done = "Tasks/Late done.md"
+    assert _tasks(days["2026-10-23"], done) == []
+    assert _tasks(days["2026-10-20"], done) == [(done, "deadline", "2026-10-20", True)]
+    # a deadline today: listed once on today, as its deadline
+    today = "Tasks/Due today.md"
+    assert _tasks(days["2026-10-23"], today) == [(today, "deadline", "2026-10-23", False)]
+    # a task with a date is placed by its date as before, whatever its deadline
+    dated = "Tasks/Dated late.md"
+    assert _tasks(days["2026-10-23"], dated) == []
+    assert _tasks(days["2026-10-25"], dated) == [(dated, "date", "2026-10-25", False)]
+    assert _tasks(days["2026-10-20"], dated) == [(dated, "deadline", "2026-10-20", False)]
+
+
 def test_occurrences_not_duplicated(calendar_space_dir: Path):
     space = _space(calendar_space_dir)
     r = space.calendar("2026-10-14", "2026-11-15")

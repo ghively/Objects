@@ -198,13 +198,15 @@ On a copy of a space, or a new one. The window first, then the choices in the pl
 
 **Titles written twice (choice 5)**
 
-- [ ] In a space with notes made before M32: Settings > Editor shows "N notes begin with a heading that repeats their title." and "Remove those headings". In a space with none, the line is not there.
+- [ ] In a space with notes whose text begins with `# <their title>` (notes made by older versions, pages imported before M33): Settings > Editor shows "N notes begin with a heading that repeats their title." and "Remove those headings". In a space with none, the line is not there.
 - [ ] Click "Remove those headings" and confirm: those notes show their title once, and nothing else in them changed. A note's version history has the version from just before, heading included; restoring it brings the heading back.
 - [ ] Import a Markdown folder: each page shows its title once, and a page that had its own first heading still has it. Import the same folder again: every page is "unchanged" and nothing is doubled.
 
 **A task with only a deadline (choice 6)**
 
-- [ ] A task with a deadline next week and no date: it is in Inbox, and also on its day in Upcoming, marked as a deadline. With a deadline that has passed: it is also under Today's Overdue. Give it a date: it is placed by its date, as before.
+- [ ] A task with a deadline next week and no date: it is not in Inbox (Inbox holds the open tasks with neither a date nor a deadline); it is on its day in Upcoming, marked as a deadline (its chip is an hourglass and the deadline, and a click on it changes the deadline, not the date).
+- [ ] Set that deadline to a day before today: the task is under Today's "Overdue" on the Tasks page, under Home's Tasks as overdue, and under "Overdue (n)" in the Calendar's Day view for today ("No tasks today" is not shown for it); no other day lists it as overdue (the deadline's own day still lists it, with "Deadline"). With Work on, Work's Today badge counts it. Complete it: it leaves Overdue on the Tasks page and on Home.
+- [ ] Give it a date: it is placed by its date, as before (a passed deadline does not make a dated task overdue). Each open task is on exactly one of Today, Upcoming and Inbox.
 
 **Typing `> ` (choice 7)**
 
@@ -212,12 +214,12 @@ On a copy of a space, or a new one. The window first, then the choices in the pl
 
 **"No date" (choice 9)**
 
-- [ ] On a task with a date, choose "No date"; on another, clear the Date in the properties pane. Both tasks end up the same (in the app, and their `date` line in the file).
+- [ ] On a task with a date, a repeat and a reminder, choose "No date" on its row's chip; on another like it, open its Date in the properties pane and choose "Remove date". Both tasks end up the same: no date, and the repeat and the reminder gone with it (in the app, and in the file: `date: null`, no `repeat` or `remind` line). A task with done or skipped repeats asks first ("Remove date?") in both places.
 
 **Mentions (choice 11)**
 
-- [ ] On a note named in another note's text without a link: the Mentions section lists that line once, also when the line names the note twice, and its context reads as text (a link in the line shows its words, not `[[…]]`).
-- [ ] "Link" on that line links every unlinked mention of the title in it. Unlinked mentions are as easy to find as before: the Mentions section and its count are where they were.
+- [ ] On a note named in another note's text without a link: the Mentions tab (and "All") lists that line once, also when the line names the note twice, and its context reads as text (a link in the line shows its words, not `[[…]]`).
+- [ ] "Link" on that line links every unlinked mention of the title in it. Unlinked mentions are as easy to find as before: the Mentions tab and its count are where they were.
 
 **Left as they were on purpose (choices 2, 8, 10)**
 
