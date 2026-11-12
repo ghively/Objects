@@ -96,6 +96,11 @@ export interface ObjectHeaderProps {
    * when the body can't take it; Enter then leaves the field as before.
    */
   onEnterBody?(): boolean
+  /**
+   * M33: this header took a brand-new note's mark, so its title gets the focus, selected. Called
+   * in the header's mount effect (before its owner's), so the owner leaves the focus to the title.
+   */
+  onFreshTitle?(): void
   /** Shown after the type chip, on its row (the note page's count of backlinks and mentions). */
   beside?: ReactNode
   /** Shown before the title, on its row (a task's tick). */
@@ -138,6 +143,7 @@ export function ObjectHeader({
   onPropertiesChange,
   onOpenTag,
   onEnterBody,
+  onFreshTitle,
   beside,
   beforeTitle,
 }: ObjectHeaderProps) {
@@ -232,13 +238,14 @@ export function ObjectHeader({
   const path = summary.path
   useEffect(() => {
     if (!takeFresh(path) || !titleEditable) return
+    onFreshTitle?.()
     requestAnimationFrame(() => {
       const el = titleRef.current
       if (!el) return
       el.focus()
       el.select()
     })
-  }, [path, titleEditable])
+  }, [path, titleEditable, onFreshTitle])
 
   // "Add description" reveals the field and puts the caret in it.
   const descriptionRef = useRef<HTMLDivElement | null>(null)

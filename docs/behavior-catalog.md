@@ -500,6 +500,21 @@ Each starter template pre-fills the new type's properties.
   at the end of the text (under a last block that holds no text, a divider or an image, on a new empty line). In a
   narrow layout (the side panel open, a small window) the properties card follows the text, before the
   references, where it used to sit above the text; the 60% minimum does not apply there, so the card stays near.
+- **The keyboard reaches the text** (M33): with a note open as the page or in the peek and nothing focused (the
+  focus on the page itself or on the peek's frame, as after opening it from the palette, a list or a link),
+  **Enter** puts the caret at the end of the text and **ArrowDown** at its start, scrolled into view; raw Markdown
+  the same (its end is the end of the raw text). Nothing else changes: Space and Page Down scroll, a letter does
+  nothing, a key with a modifier is not taken, and a field, a button or the editor that has the focus keeps its
+  keys. Only the view in front takes them: the active tab's page (not a note in the side panel), or the open peek,
+  which wins while it is open; never while a dialog, a pop-over, the palette, a menu or a list is open over it (a
+  key pressed into the palette's field while it closes, right after it opened the note, is the note's). Enter held
+  down does not go on to break lines: its repeats are dropped until the key is let go. A note whose text is empty
+  (white space only counts as empty) opens with the caret in the text, on the page and in the peek, unless it is
+  brand new (its title is selected, as before), the open asked for its own caret (Today's note), something else
+  holds the focus (a field, a button, a row of a list), it can't be edited, or it is not the view in front. A note
+  with text is never focused by itself. The peek's pager keeps the focus on the button a step was made with (the
+  other one at an end of the list), so the same key steps on and an empty note never takes the caret from the
+  pager. Placing the caret saves nothing: no request is made by opening a note, by Enter or by ArrowDown.
 - **Words on the note page** (M32, the glossary): the type chip, the "Change type" list and the type beside a
   reference read "Note" for the built-in Page type and "Daily note" for DailyNote (a renamed type keeps its
   name). The `…` menu: "Type settings" (was "Object type settings"), "Merge into note" (was "Merge into
