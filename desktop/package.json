@@ -1,0 +1,15 @@
+{
+  "name": "object-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Object's desktop window: a frameless Electron shell started by `objectapp`.",
+  "main": "main.js",
+  "scripts": {
+    "postinstall": "node install-binary.js",
+    "start": "electron .",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "devDependencies": {
+    "electron": "45.3.0"
+  }
+}
