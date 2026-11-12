@@ -1,7 +1,8 @@
 'use strict'
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { lineReader, parseCommand } = require('../lib/stdinLines')
+const { PassThrough } = require('node:stream')
+const { lineReader, parseCommand, listenToParent } = require('../lib/stdinLines')
 
 const ORIGIN = 'http://127.0.0.1:8891'
 
@@ -45,7 +46,65 @@ test('ignores anything else', () => {
     JSON.stringify({ open: 'http://127.0.0.1:9999/', kind: 'focus' }),
     JSON.stringify({ open: 'http://127.0.0.1:8891/', kind: 'other' }),
     JSON.stringify({ open: 7, kind: 'focus' }),
+    JSON.stringify({ kind: 'Quit' }),
   ]) {
     assert.equal(parseCommand(line, ORIGIN), null, line)
   }
+})
+
+test('reads the quit line', () => {
+  assert.deepEqual(parseCommand('{"kind": "quit"}', ORIGIN), { kind: 'quit' })
+  assert.deepEqual(parseCommand(JSON.stringify({ kind: 'quit', open: 'x' }), ORIGIN), { kind: 'quit' })
+})
+
+function parent(started = () => true) {
+  const stream = new PassThrough()
+  const calls = []
+  listenToParent(stream, ORIGIN, { open: (url) => calls.push(['open', url]), quit: () => calls.push(['quit']), started })
+  const settle = async () => {
+    for (let i = 0; i < 5; i++) await new Promise((resolve) => setImmediate(resolve))
+  }
+  return { stream, calls, settle }
+}
+
+test('objectapp asks the shell to quit with the quit line, once', async () => {
+  const { stream, calls, settle } = parent()
+  const open = 'http://127.0.0.1:8891/_open?code=abc&next=/%3Fmini%3Dwork'
+  stream.write(`${JSON.stringify({ open, kind: 'focus' })}\n`)
+  stream.write('{"kind": "quit"}\n')
+  stream.end()
+  await settle()
+  assert.deepEqual(calls, [['open', open], ['quit']])
+})
+
+test('after the quit line, a keep-on-top line opens nothing', async () => {
+  const { stream, calls, settle } = parent()
+  stream.write('{"kind": "quit"}\n')
+  stream.write(`${JSON.stringify({ open: `${ORIGIN}/_open?code=x`, kind: 'focus' })}\n`)
+  await settle()
+  assert.deepEqual(calls, [['quit']])
+})
+
+test('the end of stdin means objectapp is gone: the shell quits', async () => {
+  const { stream, calls, settle } = parent()
+  stream.end()
+  await settle()
+  assert.deepEqual(calls, [['quit']])
+})
+
+test('an end of stdin before the window said it was ready is not taken for objectapp going', async () => {
+  let ready = false
+  const { stream, calls, settle } = parent(() => ready)
+  stream.end()
+  await settle()
+  ready = true
+  await settle()
+  assert.deepEqual(calls, [])
+})
+
+test('a stdin that fails is objectapp gone, not a crash', async () => {
+  const { stream, calls, settle } = parent()
+  stream.destroy(new Error('EPIPE'))
+  await settle()
+  assert.deepEqual(calls, [['quit']])
 })

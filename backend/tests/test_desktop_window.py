@@ -7,6 +7,8 @@ child is a fake."""
 from __future__ import annotations
 
 import json
+import os
+import signal
 import socket
 import subprocess
 import sys
@@ -49,16 +51,24 @@ def _port_is_free(port: int) -> bool:
 
 
 class _Stdin:
-    def __init__(self) -> None:
+    def __init__(self, on_line=None) -> None:
         self.text = ""
         self.flushed = 0
         self.broken = False
+        self.closed = False
+        self._on_line = on_line
 
     def write(self, text: str) -> int:
-        if self.broken:
+        if self.broken or self.closed:
             raise BrokenPipeError
         self.text += text
+        if self._on_line is not None:
+            for line in text.splitlines():
+                self._on_line(line)
         return len(text)
+
+    def close(self) -> None:
+        self.closed = True
 
     def flush(self) -> None:
         if self.broken:
@@ -68,14 +78,17 @@ class _Stdin:
 
 class FakeChild:
     """A stand-in for the shell: prints `output`, then runs `script(child)` (the test's part,
-    while the launcher waits) and exits with what `finish` was given."""
+    while the launcher waits) and exits with what `finish` was given. Like the shell, it closes
+    when the quit line reaches its stdin (`quits=False`: it never does)."""
 
     created: ClassVar[list[FakeChild]] = []
 
-    def __init__(self, argv, *, script=None, output=(READY,), exits=None, **kwargs) -> None:
+    def __init__(self, argv, *, script=None, output=(READY,), exits=None, quits=True, **kwargs) -> None:
         self.argv = list(argv)
         self.kwargs = kwargs
-        self.stdin = _Stdin()
+        self.events: list[str] = []
+        self.stdin = _Stdin(on_line=self._line)
+        self._quits = quits
         self.returncode: int | None = exits
         self._done = threading.Event()
         if exits is not None:
@@ -100,9 +113,15 @@ class FakeChild:
         finally:
             self.finish(0)
 
+    def _line(self, line: str) -> None:
+        self.events.append(f"stdin {line}")
+        if self._quits and json.loads(line) == {"kind": "quit"}:
+            self.finish(0)
+
     def finish(self, code: int) -> None:
         if self.returncode is None:
             self.returncode = code
+            self.events.append(f"exit {code}")
         self._done.set()
 
     def poll(self) -> int | None:
@@ -115,9 +134,12 @@ class FakeChild:
 
     def terminate(self) -> None:
         self.terminated = True
+        self.events.append("terminate")
         self.finish(-15)
 
-    kill = terminate
+    def kill(self) -> None:
+        self.events.append("kill")
+        self.finish(-9)
 
 
 @pytest.fixture
@@ -468,19 +490,181 @@ def test_browser_mode_never_starts_the_shell(env, monkeypatch) -> None:
     assert calls == [f"http://127.0.0.1:{env.port}/"]
 
 
+def _record_server_stop(monkeypatch: pytest.MonkeyPatch, events: list[str]) -> None:
+    """`SpaceHost.stop` adds "server stop" to `events`."""
+    real_stop = launcher.SpaceHost.stop
+
+    def stop(self) -> None:
+        events.append("server stop")
+        real_stop(self)
+
+    monkeypatch.setattr(launcher.SpaceHost, "stop", stop)
+
+
 def test_ctrl_c_stops_the_shell_before_the_server(env, monkeypatch) -> None:
+    """Ctrl-C: the shell is asked to quit (it lets the page save), and only once it has exited
+    is the server stopped. (Changed in the M33 fix pass: it was terminated at once.)"""
     _install_shell(env.desktop)
 
     class Interrupted(FakeChild):
+        interrupted = False
+
         def wait(self, timeout=None):
-            if not self.terminated:
+            if not self.interrupted:
+                self.interrupted = True
                 raise KeyboardInterrupt
             return super().wait(timeout)
 
+    events: list[str] = []
+    _record_server_stop(monkeypatch, events)
     monkeypatch.setattr(launcher.subprocess, "Popen", lambda argv, **kw: Interrupted(argv, **kw))
     launcher.main(["--space", str(env.root), "--port", str(env.port)])
-    assert FakeChild.created[0].terminated is True
+    (child,) = FakeChild.created
+    assert child.terminated is False
+    assert child.events == ['stdin {"kind": "quit"}', "exit 0"]
+    assert child.stdin.closed is True
+    assert events == ["server stop"]
     assert _port_is_free(env.port)
+
+
+# -- stopping the shell ------------------------------------------------------------------------
+
+
+def test_the_stop_wait_fits_the_pages_save_and_the_shells_drain() -> None:
+    """The page gets 3 seconds to save, then the shell waits up to 2 for the last requests."""
+    assert launcher.SHELL_STOP_SECONDS >= 3 + 2 + 0.5
+
+
+def test_stopping_the_shell_asks_it_to_quit_first() -> None:
+    child = FakeChild(["electron"])
+    launcher._stop_shell(child)
+    assert child.events == ['stdin {"kind": "quit"}', "exit 0"]
+    assert child.stdin.text == '{"kind": "quit"}\n' and child.stdin.flushed >= 1
+    assert child.stdin.closed is True  # and then its stdin ends: the parent is done with it
+    assert child.terminated is False
+
+
+def test_a_shell_that_does_not_quit_is_terminated_only_after_the_wait(monkeypatch) -> None:
+    monkeypatch.setattr(launcher, "SHELL_STOP_SECONDS", 0.3)
+    child = FakeChild(["electron"], quits=False)
+    started = time.monotonic()
+    launcher._stop_shell(child)
+    assert child.events == ['stdin {"kind": "quit"}', "terminate", "exit -15"]
+    assert time.monotonic() - started >= 0.3
+
+
+def test_a_shell_that_ignores_terminate_is_killed(monkeypatch) -> None:
+    monkeypatch.setattr(launcher, "SHELL_STOP_SECONDS", 0.1)
+    monkeypatch.setattr(launcher, "SHELL_KILL_SECONDS", 0.1)
+
+    class Stubborn(FakeChild):
+        def terminate(self) -> None:
+            self.terminated = True
+            self.events.append("terminate")
+
+    child = Stubborn(["electron"], quits=False)
+    launcher._stop_shell(child)
+    assert child.events == ['stdin {"kind": "quit"}', "terminate", "kill", "exit -9"]
+
+
+def test_a_shell_whose_stdin_is_gone_is_still_stopped(monkeypatch) -> None:
+    monkeypatch.setattr(launcher, "SHELL_STOP_SECONDS", 0.1)
+    child = FakeChild(["electron"], quits=False)
+    child.stdin.broken = True
+    launcher._stop_shell(child)
+    assert child.events == ["terminate", "exit -15"]
+
+
+def test_a_shell_that_already_exited_is_left_alone() -> None:
+    child = FakeChild(["electron"], exits=0)
+    launcher._stop_shell(child)
+    assert child.stdin.text == "" and child.terminated is False
+
+
+def _until_the_launcher_waits(number: int, before) -> None:
+    """Until the launcher has put its own handler on `number` (it does once the shell is ready)."""
+    deadline = time.monotonic() + 5
+    while signal.getsignal(number) is before and time.monotonic() < deadline:
+        time.sleep(0.01)
+    time.sleep(0.05)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals")
+@pytest.mark.parametrize("name", ["SIGTERM", "SIGHUP"])
+def test_a_stop_signal_stops_the_shell_before_the_server(env, monkeypatch, name) -> None:
+    """`kill <objectapp>` (or its terminal going away) takes Ctrl-C's path: the shell is asked to
+    quit and has exited before the server stops; the signal's own handler is put back after."""
+    _install_shell(env.desktop)
+    number = getattr(signal, name)
+    before = signal.getsignal(number)
+    events: list[str] = []
+    _record_server_stop(monkeypatch, events)
+
+    def script(child: FakeChild) -> None:
+        _until_the_launcher_waits(number, before)
+        os.kill(os.getpid(), number)
+        child._done.wait(5)  # the launcher asks it to quit; nothing else ends it
+
+    _popen(monkeypatch, script=script)
+    launcher.main(["--space", str(env.root), "--port", str(env.port)])
+    (child,) = FakeChild.created
+    assert child.events == ['stdin {"kind": "quit"}', "exit 0"]
+    assert child.terminated is False
+    assert events == ["server stop"]
+    assert _port_is_free(env.port)
+    assert signal.getsignal(number) is before
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals")
+def test_a_second_stop_signal_does_not_cut_the_save_short(env, monkeypatch) -> None:
+    _install_shell(env.desktop)
+    before = signal.getsignal(signal.SIGTERM)
+    events: list[str] = []
+    _record_server_stop(monkeypatch, events)
+
+    class Slow(FakeChild):
+        def _line(self, line: str) -> None:
+            self.events.append(f"stdin {line}")
+            os.kill(os.getpid(), signal.SIGTERM)  # again, while it closes
+            threading.Timer(0.3, self.finish, args=(0,)).start()
+
+    def script(child: FakeChild) -> None:
+        _until_the_launcher_waits(signal.SIGTERM, before)
+        os.kill(os.getpid(), signal.SIGTERM)
+        child._done.wait(5)
+
+    monkeypatch.setattr(launcher.subprocess, "Popen", lambda argv, **kw: Slow(argv, script=script, **kw))
+    launcher.main(["--space", str(env.root), "--port", str(env.port)])
+    (child,) = FakeChild.created
+    assert child.events == ['stdin {"kind": "quit"}', "exit 0"]
+    assert events == ["server stop"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a POSIX script stands in for the shell")
+def test_the_shell_sees_its_stdin_open_until_it_is_asked_to_quit(env, tmp_path) -> None:
+    """The real pipe: a started shell does not see its stdin end at launch; it gets the quit
+    line, then the end."""
+    record = tmp_path / "stdin.txt"
+    shell = tmp_path / "shell.py"
+    shell.write_text(
+        f"#!{sys.executable}\n"
+        "import sys\n"
+        f"out = open({str(record)!r}, 'a', buffering=1)\n"
+        "print('object-desktop: ready', flush=True)\n"
+        "for line in sys.stdin:\n"
+        "    out.write('line ' + line)\n"
+        "out.write('end\\n')\n",
+        encoding="utf-8",
+    )
+    shell.chmod(0o755)
+    child = launcher.start_shell(shell, {"url": "x"}, ready_timeout=10)
+    assert child is not None
+    time.sleep(1.0)
+    assert child.poll() is None
+    assert not record.exists() or record.read_text(encoding="utf-8") == ""
+    launcher._stop_shell(child)
+    assert child.poll() == 0
+    assert record.read_text(encoding="utf-8") == 'line {"kind": "quit"}\nend\n'
 
 
 # -- the keep-on-top line ----------------------------------------------------------------------

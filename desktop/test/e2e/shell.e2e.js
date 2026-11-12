@@ -165,6 +165,58 @@ async function openSettings(page, section) {
   await sleep(400)
 }
 
+/**
+ * On the note the window opens on: clicks into its Description field with the pointer (adding
+ * it when the note has none), selects what is there and types `text` with real keys. The caret
+ * stays in the field.
+ */
+async function typeDescription(page, main, text) {
+  await present(page, '#root header')
+  const show = page.getByRole('button', { name: 'Show properties' })
+  if (await H.until('the note page', () => page.evaluate(() =>
+    [...document.querySelectorAll('button')].some((x) => /^(Show|Hide) properties$/.test(x.getAttribute('aria-label') || ''))))) {
+    if (await show.count()) await show.click()
+  }
+  const desc = page.getByRole('button', { name: 'Add description' })
+  const field = await H.until('the Description field', () => page.evaluate(() => {
+    const el = [...document.querySelectorAll('textarea, input, [contenteditable="true"]')].find((e) => /short summary/i.test(e.getAttribute('placeholder') || ''))
+    if (!el) return null
+    const q = el.getBoundingClientRect()
+    return { x: q.x + 20, y: q.y + q.height / 2 }
+  }), { timeout: 5000 }).catch(() => null)
+  if (field === null && (await desc.count())) await desc.first().click()
+  const at = field || await H.until('the Description field', () => page.evaluate(() => {
+    const el = document.activeElement
+    if (!el || el === document.body) return null
+    const q = el.getBoundingClientRect()
+    return { x: q.x + 20, y: q.y + q.height / 2 }
+  }))
+  const win = await main.evaluate(`${mainWindow}.getBounds()`)
+  xdo('mousemove', Math.round(win.x + at.x), Math.round(win.y + at.y))
+  await sleep(200)
+  xdo('click', 1)
+  await sleep(300)
+  xdo('key', 'ctrl+a')
+  xdo('type', '--delay', 15, text)
+  await sleep(100)
+}
+
+/** The shell's main process under `objectapp` (`pid`), or null. */
+function shellProcess(pid) {
+  const found = H.commandLines(pid).find((l) => l.pid !== pid && /electron$/.test(l.argv[0] || '') &&
+    !l.argv.some((a) => a.startsWith('--type=')))
+  return found ? found.pid : null
+}
+
+function alive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Presses Escape until no dialog is open (Settings, menus). */
 async function closeDialogs(page) {
   for (let i = 0; i < 4; i++) {
@@ -593,37 +645,25 @@ async function run() {
   if (real) {
     app = await H.launch({ ...base, env: env({ XDG_CURRENT_DESKTOP: 'GNOME' }) })
     ;({ page, main } = app)
-    await present(page, '#root header')
-    const show = page.getByRole('button', { name: 'Show properties' })
-    if (await H.until('the note page', () => page.evaluate(() =>
-      [...document.querySelectorAll('button')].some((x) => /^(Show|Hide) properties$/.test(x.getAttribute('aria-label') || ''))))) {
-      if (await show.count()) await show.click()
-    }
-    const desc = page.getByRole('button', { name: 'Add description' })
-    const field = await H.until('the Description field', () => page.evaluate(() => {
-      const el = [...document.querySelectorAll('textarea, input, [contenteditable="true"]')].find((e) => /short summary/i.test(e.getAttribute('placeholder') || ''))
-      if (!el) return null
-      const q = el.getBoundingClientRect()
-      return { x: q.x + 20, y: q.y + q.height / 2 }
-    }), { timeout: 5000 }).catch(() => null)
-    if (field === null && (await desc.count())) await desc.first().click()
-    const at = field || await H.until('the Description field', () => page.evaluate(() => {
-      const el = document.activeElement
-      if (!el || el === document.body) return null
-      const q = el.getBoundingClientRect()
-      return { x: q.x + 20, y: q.y + q.height / 2 }
-    }))
-    const win = await main.evaluate(`${mainWindow}.getBounds()`)
-    xdo('mousemove', Math.round(win.x + at.x), Math.round(win.y + at.y))
-    await sleep(200)
-    xdo('click', 1)
-    await sleep(300)
-    xdo('type', '--delay', 15, 'Described just before closing')
-    await sleep(100)
+    await typeDescription(page, main, 'Described just before closing')
     closed = await app.closeWith(() => xdo('key', 'alt+F4'))
     const described = fs.readFileSync(titled[0], 'utf8')
     check('a property typed just before the window manager\'s close (Alt+F4) is saved',
       /\ndescription: Described just before closing\n/.test(described) && closed.code === 0, described.slice(0, 400))
+  }
+
+  // -- 3c. a property typed, then `objectapp` is stopped by a signal (kill, a closed terminal) --
+  if (real) {
+    app = await H.launch({ ...base, env: env({ XDG_CURRENT_DESKTOP: 'GNOME' }) })
+    ;({ page, main } = app)
+    await typeDescription(page, main, 'Described just before SIGTERM')
+    const shellPid = shellProcess(app.python.pid)
+    closed = await app.closeWith(() => app.python.kill('SIGTERM'))
+    const described = fs.readFileSync(titled[0], 'utf8')
+    check('SIGTERM to objectapp while a property is typed: it is saved',
+      /\ndescription: Described just before SIGTERM\n/.test(described), described.slice(0, 400))
+    check('SIGTERM to objectapp: objectapp exits, the shell exits, the port is free',
+      closed.code === 0 && shellPid !== null && !alive(shellPid) && !(await H.listening(PORT)), { ...closed, shellPid })
   }
 
   // -- 4. maximised comes back maximised; a handler that never answers is cut off at 3 s -------

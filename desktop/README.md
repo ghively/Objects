@@ -6,6 +6,14 @@ parent: it starts the server, starts this shell with its launch JSON in the envi
 one-time link in the process list; the shell removes it as it reads it), and stops the server
 when the shell exits. The shell never starts Python and is not meant to be run by hand.
 
+`objectapp` talks to the shell on its stdin, one JSON line at a time (`lib/stdinLines.js`):
+`{"open": "<one-time url>", "kind": "focus"}` opens Keep on top's window, and `{"kind": "quit"}`
+(written when `objectapp` is stopped: Ctrl-C, SIGTERM, SIGHUP, a closed console) closes every
+window the way a person's close does, so the page saves first. `objectapp` keeps the pipe open
+for the shell's whole life, so the end of stdin means it is gone: the shell then closes the same
+way. (An end that comes before the window is ready is ignored: that is a stdin that was never
+connected, not `objectapp` going.)
+
 - Install once: `cd desktop && npm ci` (Electron is pinned to one exact version; the install
   also fetches its binary). Then `uv run objectapp --space <folder>` uses it.
 - Spell check follows the device setting "Spellcheck language" (the page tells the shell the

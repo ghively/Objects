@@ -11,7 +11,8 @@ option wins) uses the frameless desktop shell in ``desktop/`` (Electron) when it
 child with its launch JSON (``url``, ``origin``, ``stateDir``, ``icon``, ``title``, ``frame``) in
 the child's environment (``OBJECT_DESKTOP_LAUNCH``), never on its command line, where other local
 users could read the one-time link in the process list; and it stops the server only when the
-shell has exited, so the page's last saves land. ``--frame system`` (``OBJECT_WINDOW_FRAME``) gives the shell's window the system's
+shell has exited, so the page's last saves land. Stopped itself (Ctrl-C, SIGTERM, SIGHUP), it asks
+the shell to close first (``{"kind": "quit"}`` on its stdin) and waits for it. ``--frame system`` (``OBJECT_WINDOW_FRAME``) gives the shell's window the system's
 ordinary frame.
 
 Which space opens: ``--space PATH`` when given; else the device setting's
@@ -33,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -65,8 +67,16 @@ SHELL_READY_LINE = "object-desktop: ready"
 SHELL_LAUNCH_ENV = "OBJECT_DESKTOP_LAUNCH"
 """The variable of the shell's environment that holds its launch JSON (``desktop/lib/launch.js``)."""
 SHELL_READY_SECONDS = 30.0
-SHELL_STOP_SECONDS = 8.0
-"""On Ctrl-C: how long the shell gets to close (it lets the page save first) before it is killed."""
+SHELL_QUIT_LINE = json.dumps({"kind": "quit"}) + "\n"
+"""Written on the shell's stdin to ask it to close its windows as a person's close does
+(``desktop/lib/stdinLines.js``): the page saves first, then the last requests are waited for."""
+SHELL_STOP_SECONDS = 6.0
+"""How long the shell gets to close once asked: the page's 3 seconds to save, the shell's 2 for
+the requests still on their way, and one to spare. Only then is it terminated."""
+SHELL_KILL_SECONDS = 2.0
+"""After `terminate`, how long before the shell is killed."""
+STOP_SIGNALS = ("SIGTERM", "SIGHUP")
+"""While the shell runs these take Ctrl-C's path (where the system has them)."""
 SHELL_MISSING_MESSAGE = (
     'The desktop window is not installed. Run "cd desktop && npm ci" in the Object folder first, '
     "or use --window pywebview."
@@ -336,16 +346,81 @@ def _watch_ready(stream: Any, ready: threading.Event) -> None:
         pass
 
 
-def _stop_shell(child: Any) -> None:
-    """Ask a running shell to close (it lets the page save first), then make sure it is gone."""
+def _ask_shell_to_quit(stream: Any) -> bool:
+    """Write the quit line on the shell's stdin, then close it; False when the pipe is gone."""
+    asked = True
+    try:
+        stream.write(SHELL_QUIT_LINE)
+        stream.flush()
+    except (OSError, ValueError):
+        asked = False
+    try:
+        stream.close()
+    except (OSError, ValueError):
+        pass
+    return asked
+
+
+def _stop_shell(child: Any, ask: bool = True) -> None:
+    """Make sure the shell is gone. With `ask` it is asked first (the quit line: it closes its
+    windows as a person's close does, so the page saves) and given `SHELL_STOP_SECONDS`; only
+    then is it terminated, and killed if that does not end it. Without `ask` (a shell whose
+    window never said it was ready) it is terminated at once."""
     if child.poll() is not None:
         return
+    if ask and child.stdin is not None and _ask_shell_to_quit(child.stdin):
+        try:
+            child.wait(timeout=SHELL_STOP_SECONDS)
+            return
+        except subprocess.TimeoutExpired:
+            pass
     child.terminate()
     try:
-        child.wait(timeout=SHELL_STOP_SECONDS)
+        child.wait(timeout=SHELL_KILL_SECONDS)
     except subprocess.TimeoutExpired:
         child.kill()
         child.wait()
+
+
+class _StopSignals:
+    """While the shell runs, SIGTERM and SIGHUP (where they exist) raise KeyboardInterrupt in the
+    main thread, so `kill <objectapp>` or a closed terminal takes Ctrl-C's path: the shell is
+    asked to quit and waited for, then the server stops. Only the first one does: a second one
+    while the shell closes is ignored, and so is one that comes once the stopping has begun
+    (`quiet`). `restore` puts the old handlers back."""
+
+    def __init__(self) -> None:
+        self._old: dict[int, Any] = {}
+        self._quiet = False
+
+    def _handle(self, _signum: int, _frame: Any) -> None:
+        if self._quiet:
+            return
+        self._quiet = True
+        raise KeyboardInterrupt
+
+    def install(self) -> None:
+        if threading.current_thread() is not threading.main_thread():
+            return
+        for name in STOP_SIGNALS:
+            number = getattr(signal, name, None)
+            if number is None or number in self._old:
+                continue
+            try:
+                self._old[number] = signal.signal(number, self._handle)
+            except (OSError, ValueError):
+                pass
+
+    def quiet(self) -> None:
+        self._quiet = True
+
+    def restore(self) -> None:
+        for number, previous in self._old.items():
+            try:
+                signal.signal(number, previous)
+            except (OSError, ValueError, TypeError):
+                pass
+        self._old.clear()
 
 
 def start_shell(
@@ -376,7 +451,7 @@ def start_shell(
         if child.poll() is not None:
             return None
         if time.monotonic() >= deadline:
-            _stop_shell(child)
+            _stop_shell(child, ask=False)
             return None
     return child
 
@@ -440,6 +515,7 @@ def main(argv: list[str] | None = None) -> None:
         host.stop()
         parser.exit(1, _port_taken_message(args.port) + "\n")
 
+    signals = _StopSignals()
     try:
         if args.browser:
             _open_in_browser(host.ui_key, url, print_link=args.print_link)
@@ -455,6 +531,9 @@ def main(argv: list[str] | None = None) -> None:
                         parser.exit(1, SHELL_FAILED_MESSAGE + "\n")
                     print(SHELL_FALLBACK_MESSAGE, flush=True)
             if child is not None:
+                # SIGTERM / SIGHUP: as Ctrl-C, the shell is stopped (and the page saves) before
+                # the server (`finally` below).
+                signals.install()
                 _run_shell(child, host.ui_key)
                 return
 
@@ -472,8 +551,10 @@ def main(argv: list[str] | None = None) -> None:
     except KeyboardInterrupt:
         pass
     finally:
+        signals.quiet()
         host.stop()
         thread.join(timeout=5)
+        signals.restore()
 
 
 if __name__ == "__main__":

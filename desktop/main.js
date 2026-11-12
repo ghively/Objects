@@ -18,7 +18,7 @@ const { cleanTheme, overlayFor, windowOptions, focusWindowOptions, webPreference
 const { loadState, saveState, placeOnDisplays, isWayland } = require('./lib/windowState')
 const { sameOrigin, navigation, windowOpen } = require('./lib/guard')
 const { permissionAllowed } = require('./lib/permissions')
-const { lineReader, parseCommand } = require('./lib/stdinLines')
+const { listenToParent } = require('./lib/stdinLines')
 const { createCloseGate } = require('./lib/closeGate')
 const { createPending } = require('./lib/pending')
 const { applicationMenu, contextMenu } = require('./lib/menus')
@@ -58,6 +58,8 @@ function start({ url, origin, stateDir, icon, frame }) {
   let focusWindow = null
   let saveTimer = null
   let quitting = false
+  /** The ready line went out: from now on the end of stdin means `objectapp` is gone. */
+  let toldParentReady = false
   /** The session's spell-check languages before the setting was applied: the system's (from its locale). */
   let systemSpellCheckLanguages = null
 
@@ -325,20 +327,34 @@ function start({ url, origin, stateDir, icon, frame }) {
 
   // -- `objectapp` on stdin -------------------------------------------------------------------
 
-  function listenToParent() {
-    const feed = lineReader((line) => {
-      const command = parseCommand(line, origin)
-      if (command && mainWindow !== null) openFocusWindow(command.open)
-    })
+  /**
+   * `objectapp` is stopping (the quit line) or gone (stdin ended): every window closes the way a
+   * person's close does, through its gate (the page saves first), and the shell quits once they
+   * have, after the requests still on their way (`quitWhenDone`).
+   */
+  function closeEverything() {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length === 0) {
+      quitWhenDone()
+      return
+    }
+    for (const win of windows) win.close()
+  }
+
+  function watchParent() {
     try {
-      process.stdin.on('error', () => {})
-      process.stdin.on('data', feed)
+      listenToParent(process.stdin, origin, {
+        open: (target) => { if (mainWindow !== null) openFocusWindow(target) },
+        quit: closeEverything,
+        started: () => toldParentReady,
+      })
     } catch {
-      // no stdin (started by hand): there is no keep-on-top line to read
+      // no stdin: there is no line to read
     }
   }
 
   function tellParentReady() {
+    toldParentReady = true
     try {
       process.stdout.on('error', () => {})
       process.stdout.write(`${READY_LINE}\n`)
@@ -367,7 +383,7 @@ function start({ url, origin, stateDir, icon, frame }) {
     prepareSession(session.defaultSession)
     registerBridge()
     createMainWindow()
-    listenToParent()
+    watchParent()
     tellParentReady()
   })
 }

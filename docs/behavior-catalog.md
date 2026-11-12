@@ -1490,7 +1490,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   - **Closing loses nothing**: on close the shell asks the page to save and waits for its answer or 3 seconds, then
     closes; it then waits up to 2 seconds for requests still on their way (the page's last keep-alive saves) before
     it exits, and only then does `objectapp` stop the server. (With pywebview the server stops as the window
-    closes.)
+    closes.) When `objectapp` itself is stopped (Ctrl-C, SIGTERM, SIGHUP), it asks the shell to close the same
+    way (`{"kind": "quit"}` on its stdin), waits up to 6 seconds for it, and only then stops the server; a shell
+    whose `objectapp` is gone (its stdin ended) closes its windows the same way and exits.
   - **Keep on top** (M23) in the shell: `objectapp` writes one line to the shell's stdin (`{"open": "<one-time
     url>", "kind": "focus"}`) and the shell opens the 360x470 always-on-top window "Object focus", with the
     system's frame so it can be moved and closed; asked again while it is open, it comes to the front. It closes
