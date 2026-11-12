@@ -3,6 +3,9 @@
 // danger colour), the deadline label, the priority pill and one badge per calendar entry kind.
 // Owners pass `rowExtras={(row) => taskRowExtras(row, typesById[row.summary.type], …)}`: the Tasks
 // page's rows (`TaskList`), the task lists and the Calendar's day list all draw these.
+//
+// M33 (choice 6): with `chip: 'deadline'` (a row the Tasks page lists by its deadline: the task has
+// no date) the chip is the deadline's: it shows and edits the deadline, marked as one.
 import type { DateValue, LabelOption, PropertyDef, Row, TypeDef } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { LabelPill } from '@/properties/LabelMenu'
@@ -26,6 +29,8 @@ export interface TaskRowExtrasOptions {
   onResult?(outcome: TaskOutcome): void
   /** The day "N days left" counts from (tests); now otherwise. */
   today?: Date
+  /** M33: which date the row's chip shows and edits: the task's date (the default) or its deadline. */
+  chip?: 'date' | 'deadline'
 }
 
 const asDate = (v: unknown): DateValue | null =>
@@ -59,7 +64,8 @@ export function taskRowExtras(row: Row, type: TypeDef | undefined, opts: TaskRow
           </span>
         ),
       )}
-      <TaskDateChip row={row} type={type} onResult={opts.onResult} today={opts.today}>
+      {/* The repeat and reminder icons belong to the date: a row shown by its deadline has no date. */}
+      <TaskDateChip property={opts.chip === 'deadline' ? 'deadline' : 'date'} row={row} type={type} onResult={opts.onResult} today={opts.today}>
         {date && repeat && (
           <span data-testid="task-repeat" title={describeRepeat(repeat, date.start)} className="inline-flex">
             <Icon name="ph-repeat" size={13} />

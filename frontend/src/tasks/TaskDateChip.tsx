@@ -3,6 +3,16 @@
 // date picker of the property panel. A task with no date has the chip too (the calendar icon), so
 // a date is one click and a pick away. Like the checkbox it owns no row state: it writes the date
 // (`taskActions.setDate`) and hands the outcome to the owner, which patches its list.
+//
+// M33 (choice 6): `property="deadline"` makes it the deadline's chip, for a row a list shows by its
+// deadline (a task with no date). It shows the deadline, says so (the hourglass, the tooltip and
+// the name "Deadline: Nov 13, 2026"), is in the danger colour once the deadline has passed, and
+// its picker writes the deadline: Today, Tomorrow, Next week, No deadline, "Pick a date".
+//
+// M33 (choice 9): "No date" does what the properties pane's "Remove date" does for a task
+// (`taskActions.dateRemovalOf`): the repeat and the reminder go with the date in the same write,
+// and a task with done or skipped repeats on record asks first, in the pane's own words. On a
+// task that has no date it writes nothing.
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type SyntheticEvent } from 'react'
 import type { DateValue, Row, TypeDef } from '@/api/types'
 import { addDays, parseYmd, ymd } from '@/calendar/dates'
@@ -13,7 +23,7 @@ import { fromWallClock, wallClock, zonedToday } from '@/lib/zonedTime'
 import { DatePicker } from '@/properties/DatePicker'
 import { formatDate } from '@/properties/format'
 import { isOpen } from './statusCategory'
-import { DEFAULT_TASK_API, setDate, type TaskApi, type TaskOutcome } from './taskActions'
+import { DEFAULT_TASK_API, dateRemovalOf, setDateProperty, type TaskApi, type TaskDateKey, type TaskOutcome } from './taskActions'
 import { coveredDays } from './taskSections'
 
 export const TASK_DATE_TEXT = {
@@ -25,6 +35,21 @@ export const TASK_DATE_TEXT = {
   noDate: 'No date',
   /** As the Calendar's "Move all open tasks to" (our string). */
   pickDate: 'Pick a date',
+  /** M33: the chip of a row listed by its deadline ("Deadline: Nov 13, 2026"), and its "none" row (our string). */
+  deadlineLabel: 'Deadline',
+  noDeadline: 'No deadline',
+  /** M33: the question before a date with a history of repeats is removed (the date picker's own words). */
+  removeTitle: 'Remove date?',
+  removeBody: 'Some repeats of this task are already done or skipped. Clearing the date throws that history away.',
+  removeKeep: 'Keep date',
+  removeConfirm: 'Remove date',
+}
+
+/** What the chip says per property: its name, its "none" choice and its icon. */
+const CHIP: Record<TaskDateKey, { label: string; none: string; icon: string }> = {
+  date: { label: TASK_DATE_TEXT.label, none: TASK_DATE_TEXT.noDate, icon: 'ph-calendar' },
+  // The Deadline list's icon.
+  deadline: { label: TASK_DATE_TEXT.deadlineLabel, none: TASK_DATE_TEXT.noDeadline, icon: 'ph-hourglass-medium' },
 }
 
 const asDate = (v: unknown): DateValue | null =>
@@ -70,6 +95,13 @@ export function isOverdue(row: Row, type: TypeDef | undefined, today: string = z
   return !!span && span.last < today && isOpen(row, type)
 }
 
+/** M33: an open task whose deadline's day was before `today` (`YYYY-MM-DD`; default: today in the Time zone setting). */
+export function isDeadlinePassed(row: Row, type: TypeDef | undefined, today: string = zonedToday()): boolean {
+  const deadline = asDate(row.values.deadline)
+  const day = deadline ? coveredDays(deadline)?.first : null
+  return !!day && day < today && isOpen(row, type)
+}
+
 /** Clicks and drags on the chip never reach the row or card around it (open, peek, drag). */
 const stop = (e: SyntheticEvent) => e.stopPropagation()
 
@@ -81,10 +113,13 @@ export function TaskDateChip({
   onResult,
   taskApi = DEFAULT_TASK_API,
   today: todayProp,
+  property = 'date',
   children,
 }: {
   row: Row
   type: TypeDef | undefined
+  /** Which of the task's dates the chip shows and edits: its date (the default) or its deadline (M33). */
+  property?: TaskDateKey
   /** The date was written and the row reloaded: the owner patches its list and shows the toast. */
   onResult?(outcome: TaskOutcome): void
   /** Injected in tests; the real `api` otherwise. */
@@ -96,6 +131,8 @@ export function TaskDateChip({
 }) {
   const [open, setOpen] = useState(false)
   const [picking, setPicking] = useState(false)
+  /** "No date" on a task with a history of repeats: the question is showing. */
+  const [asking, setAsking] = useState(false)
   const [busy, setBusy] = useState(false)
   /** "Pick a date" opened the picker: its date field takes the caret, the date shown selected, so
    * a date typed at once ("friday", Enter) replaces it. */
@@ -106,15 +143,20 @@ export function TaskDateChip({
     field?.focus()
     field?.select()
   }, [picking])
-  const date = asDate(row.values.date)
+  const date = asDate(row.values[property])
   const today = todayProp ? ymd(todayProp) : zonedToday()
-  const overdue = isOverdue(row, type, today)
+  const isDeadline = property === 'deadline'
+  const overdue = isDeadline ? isDeadlinePassed(row, type, today) : isOverdue(row, type, today)
   const text = formatDate(date)
+  const chip = CHIP[property]
+  const name = `${chip.label}: ${text || chip.none}`
+  /** The deadline chip says what it is on hover too; the date chip is as it was. */
+  const mark = isDeadline ? { 'data-chip': 'deadline', title: name } : {}
 
   if (row.summary.readOnly) {
     if (!date) return null
     return (
-      <span data-testid="task-date" className="inline-flex items-center gap-1 text-[13px] text-fg-muted">
+      <span data-testid="task-date" {...mark} className="inline-flex items-center gap-1 text-[13px] text-fg-muted">
         {text}
         {children}
       </span>
@@ -125,7 +167,7 @@ export function TaskDateChip({
     if (busy) return
     setBusy(true)
     try {
-      const outcome = await setDate(taskApi, row, next)
+      const outcome = await setDateProperty(taskApi, row, property, next)
       onResult?.(outcome)
     } finally {
       setBusy(false)
@@ -134,8 +176,20 @@ export function TaskDateChip({
 
   /** A quick choice: write it and close. */
   const pick = (next: DateValue | null) => {
+    if (next === null && !isDeadline) return removeDate()
     setOpen(false)
     void write(next)
+  }
+
+  /** "No date" (and the picker's "Remove date"): the pane's removal; it asks first when repeats are on record. */
+  const removeDate = (confirmed = false) => {
+    const removal = dateRemovalOf(row)
+    if (removal.hasHistory && !confirmed) return setAsking(true)
+    setAsking(false)
+    setOpen(false)
+    // No date and nothing that goes with one: nothing to write.
+    if (Object.keys(removal.updates).length === 0 && removal.remove.length === 0) return
+    void write(null)
   }
 
   /** A menu's keys: Up and Down move through its items (round the ends), Home and End jump. */
@@ -153,7 +207,7 @@ export function TaskDateChip({
     [TASK_DATE_TEXT.today, dateOnDay(date, today)],
     [TASK_DATE_TEXT.tomorrow, dateOnDay(date, addDays(today, 1))],
     [TASK_DATE_TEXT.nextWeek, dateOnDay(date, addDays(today, 7))],
-    [TASK_DATE_TEXT.noDate, null],
+    [chip.none, null],
   ]
 
   return (
@@ -162,6 +216,7 @@ export function TaskDateChip({
       onOpenChange={(o) => {
         setOpen(o)
         if (o) setPicking(false)
+        setAsking(false)
       }}
     >
       <span className="inline-flex shrink-0 items-center" onPointerDown={stop} onMouseDown={stop} onKeyDown={stop} onClick={stop}>
@@ -170,26 +225,46 @@ export function TaskDateChip({
             type="button"
             data-testid="task-date"
             data-overdue={overdue || undefined}
-            aria-label={`${TASK_DATE_TEXT.label}: ${text || TASK_DATE_TEXT.noDate}`}
+            {...mark}
+            aria-label={name}
             className={cn(
               'inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-[13px] hover:bg-hover',
               overdue ? 'text-[var(--danger)]' : 'text-fg-muted',
             )}
           >
-            <Icon name="ph-calendar" size={13} />
+            <Icon name={chip.icon} size={13} />
             {text}
             {children}
           </button>
         </PopoverTrigger>
       </span>
       <PopoverContent align="end" className="w-auto border-line bg-raised p-0 text-fg" onClick={stop} onPointerDown={stop} onKeyDown={stop}>
-        {picking ? (
+        {asking ? (
+          <div role="alertdialog" aria-label={TASK_DATE_TEXT.removeTitle} className="flex w-72 flex-col gap-2 p-3">
+            <h2 className="text-[15px] font-semibold">{TASK_DATE_TEXT.removeTitle}</h2>
+            <p className="text-[13px] text-fg-muted">{TASK_DATE_TEXT.removeBody}</p>
+            <div className="flex justify-end gap-2">
+              <button type="button" autoFocus onClick={() => setAsking(false)} className="rounded-md px-3 py-1 text-[14px] hover:bg-hover">
+                {TASK_DATE_TEXT.removeKeep}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => removeDate(true)}
+                className="rounded-md bg-[var(--danger)] px-3 py-1 text-[14px] font-medium text-white hover:opacity-90"
+              >
+                {TASK_DATE_TEXT.removeConfirm}
+              </button>
+            </div>
+          </div>
+        ) : picking ? (
           <div ref={pickerRef}>
             <DatePicker
               value={date}
-              constraints={type?.propertyDefinitions.find((d) => d.key === 'date')?.options.constraints}
+              constraints={type?.propertyDefinitions.find((d) => d.key === property)?.options.constraints}
               now={todayProp}
               onChange={(next) => {
+                if (next === null && !isDeadline) return removeDate()
                 void write(next)
                 if (next === null) setOpen(false)
               }}
@@ -198,7 +273,7 @@ export function TaskDateChip({
             />
           </div>
         ) : (
-          <div role="menu" aria-label={TASK_DATE_TEXT.label} onKeyDown={onMenuKeyDown} className="flex w-44 flex-col p-1.5">
+          <div role="menu" aria-label={chip.label} onKeyDown={onMenuKeyDown} className="flex w-44 flex-col p-1.5">
             {choices.map(([label, value]) => (
               <button key={label} type="button" role="menuitem" disabled={busy} onClick={() => pick(value)} className={ITEM}>
                 {label}

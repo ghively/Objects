@@ -1,7 +1,8 @@
 // M32: the plain Tasks page's list. Groups of task rows, each row the shared task row: the tick,
 // the title (a click opens the task; a done task's is struck through), then the date chip, the
 // deadline label and the priority (`taskRowExtras`, which the Calendar's day list draws too). A
-// group's header shows its label and its count once ("Overdue (1)").
+// group's header shows its label and its count once ("Overdue (1)"). M33: a row its group lists by
+// its deadline (`TaskGroup.deadlinePaths`) shows the deadline as its chip.
 import { memo, useState, type MouseEvent } from 'react'
 import type { Row, TypeDef } from '@/api/types'
 import { openObject } from '@/create/createAndOpen'
@@ -17,12 +18,15 @@ const TaskRow = memo(function TaskRow({
   row,
   type,
   onResult,
+  chip,
 }: {
   row: Row
   type: TypeDef | undefined
   onResult?(outcome: TaskOutcome): void
+  /** M33: `deadline` where the row is listed by its deadline. */
+  chip?: 'date' | 'deadline'
 }) {
-  const extras = taskRowExtras(row, type, { onResult })
+  const extras = taskRowExtras(row, type, { onResult, chip })
   const done = !isOpen(row, type)
   const open = (e: MouseEvent) =>
     openObject(row.summary.path, { ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey }, row.summary.type)
@@ -77,7 +81,13 @@ export function TaskList({ groups, type, onResult, empty }: TaskListProps) {
             )}
             <ul role="list" className="flex flex-col">
               {shown.map((row) => (
-                <TaskRow key={row.summary.path} row={row} type={type} onResult={onResult} />
+                <TaskRow
+                  key={row.summary.path}
+                  row={row}
+                  type={type}
+                  onResult={onResult}
+                  chip={g.deadlinePaths?.has(row.summary.path) ? 'deadline' : undefined}
+                />
               ))}
             </ul>
           </section>

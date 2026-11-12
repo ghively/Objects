@@ -99,14 +99,61 @@ export async function addDoneStatus(type: TypeDef): Promise<TypeDef> {
   return saved
 }
 
+/** What the properties pane's "Remove date" removes with a task's date (`properties/cells/DateCell.tsx`). */
+const GOES_WITH_DATE = ['repeat', 'remind', 'occurrenceLog'] as const
+
+const isSet = (v: unknown): boolean => v !== undefined && v !== null
+
+export interface DateRemoval {
+  /** `{ date: null }` when the task has a date, else nothing. */
+  updates: Record<string, unknown>
+  /** The keys that go with the date: those of `repeat`, `remind` and `occurrenceLog` the task has. */
+  remove: string[]
+  /** The task has done or skipped repeats on record: the pane asks before throwing them away. */
+  hasHistory: boolean
+}
+
 /**
- * M32, a row's date chip: write the task's `date` (null: no date) with the row's version, then one
- * reload. The date alone, as a table cell writes it; a 409 reloads only.
+ * M33 (choice 9): what removing a task's date writes, the same as the properties pane's "Remove
+ * date" for a task (`DateCell`'s `commit` with no date): `date: null` when there is a date, and
+ * the repeat, the reminder and the occurrence log removed with it. Nothing at all for a task with
+ * none of them.
  */
-export async function setDate(api: TaskApi, row: Row, date: DateValue | null): Promise<TaskOutcome> {
+export function dateRemovalOf(row: Row): DateRemoval {
+  const log = row.values.occurrenceLog
+  return {
+    updates: isSet(row.values.date) ? { date: null } : {},
+    remove: GOES_WITH_DATE.filter((k) => isSet(row.values[k])),
+    hasHistory: typeof log === 'string' && log.trim() !== '',
+  }
+}
+
+/**
+ * M32, a row's date chip: write the task's `date` with the row's version, then one reload. A date
+ * is written alone, as a table cell writes it. M33: `null` (the chip's "No date") is the pane's
+ * "Remove date" (`dateRemovalOf`). A 409 reloads only.
+ */
+export function setDate(api: TaskApi, row: Row, date: DateValue | null): Promise<TaskOutcome> {
+  return setDateProperty(api, row, 'date', date)
+}
+
+/** The date properties a task row's chip edits. */
+export type TaskDateKey = 'date' | 'deadline'
+
+/**
+ * M33: write one of the task's dates (`date`, or `deadline` where the row is listed by its
+ * deadline) with the row's version, then one reload. That key alone; a 409 reloads only.
+ */
+export async function setDateProperty(api: TaskApi, row: Row, key: TaskDateKey, date: DateValue | null): Promise<TaskOutcome> {
   const path = row.summary.path
+  const removal = key === 'date' && date === null ? dateRemovalOf(row) : null
+  // No date and nothing that goes with one: there is nothing to write (the pane writes nothing either).
+  if (removal && Object.keys(removal.updates).length === 0 && removal.remove.length === 0) return { result: undefined, row: undefined, conflict: false }
   try {
-    const res = await api.updateProperties(path, { date }, row.version)
+    const res =
+      removal && removal.remove.length > 0
+        ? await api.updateProperties(path, removal.updates, row.version, removal.remove)
+        : await api.updateProperties(path, { [key]: date }, row.version)
     return { result: res.task ?? undefined, row: await reload(api, path), conflict: false }
   } catch (err) {
     if (err instanceof ConflictError) return { result: undefined, row: await reload(api, path), conflict: true }

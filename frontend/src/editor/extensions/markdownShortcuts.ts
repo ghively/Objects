@@ -20,9 +20,16 @@
  * `- ` has made a bullet by then, and the box turns that bullet line into a to-do (only that
  * line, when the list has others). In a numbered list, a heading or an existing to-do the
  * characters stay text.
+ *
+ * M33: Settings > Editor > 'Typing "> " makes' (`greaterThanMakes`). With "A toggle" (the default)
+ * nothing here changes. With "A quote" the `>` mark is the quote mark, as `|` is: `> ` makes the
+ * quote block `| ` makes, and in a combined run it quotes too (`>#` a quoted heading; `>|` is two
+ * marks of one kind and stays text). The toggle keeps its other ways in (the slash menu, the
+ * menus). The setting is read when the Space is typed, so changing it needs no reload.
  */
 import { Extension, InputRule } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
+import { useSettings } from '@/settings/useSettings'
 import type { Hierarchy, ListType } from '../nodes/blockOptions'
 import { listItemAt } from '../nodes/listItemOptions'
 
@@ -36,8 +43,14 @@ type Parsed = { heading?: number; list?: ListType; quote?: boolean; toggle?: boo
 
 const TOKEN = /\||>|\(\)|\[\]|[*-]|\d+\.|a\)|i\)|#{1,4}/y
 
-/** The marks in `run`, or null when it is not a run of marks (or repeats a kind). */
-export function parseMarks(run: string, numbered = true): Parsed | null {
+/** What the `>` mark makes (the device setting `greaterThanMakes`). */
+export type GreaterThanMakes = 'toggle' | 'quote'
+
+/**
+ * The marks in `run`, or null when it is not a run of marks (or repeats a kind). `greaterThan`:
+ * what `>` is, a toggle (the default) or a second way to write the quote mark.
+ */
+export function parseMarks(run: string, numbered = true, greaterThan: GreaterThanMakes = 'toggle'): Parsed | null {
   const out: Parsed = { count: 0 }
   TOKEN.lastIndex = 0
   while (TOKEN.lastIndex < run.length) {
@@ -45,7 +58,7 @@ export function parseMarks(run: string, numbered = true): Parsed | null {
     if (!m) return null
     const t = m[0]
     out.count++
-    if (t === '|') {
+    if (t === '|' || (t === '>' && greaterThan === 'quote')) {
       if (out.quote) return null
       out.quote = true
     } else if (t === '>') {
@@ -74,6 +87,16 @@ function builtIn(run: string): boolean {
 export type MarkdownShortcutsOptions = {
   /** `false` when numbered-list detection is off (`1.` is then no mark, alone or combined). */
   numbered: boolean
+  /**
+   * M33: what `>` makes, asked each time a run is typed. The default reads the device setting
+   * `greaterThanMakes` then, so a change in Settings applies to the next key.
+   */
+  greaterThanMakes: () => GreaterThanMakes
+}
+
+/** The device setting, as it is now (anything but `quote` is the default, a toggle). */
+function greaterThanSetting(): GreaterThanMakes {
+  return useSettings.getState().settings.greaterThanMakes === 'quote' ? 'quote' : 'toggle'
 }
 
 export const MarkdownShortcuts = Extension.create<MarkdownShortcutsOptions>({
@@ -82,11 +105,12 @@ export const MarkdownShortcuts = Extension.create<MarkdownShortcutsOptions>({
   priority: 200,
 
   addOptions() {
-    return { numbered: true }
+    return { numbered: true, greaterThanMakes: greaterThanSetting }
   },
 
   addInputRules() {
     const numbered = this.options.numbered
+    const greaterThan = this.options.greaterThanMakes
     return [
       // M32: `[ ] ` / `[x] ` at the start of a text line or of a bullet line.
       new InputRule({
@@ -146,7 +170,7 @@ export const MarkdownShortcuts = Extension.create<MarkdownShortcutsOptions>({
         handler: ({ state, range, match, chain }) => {
           const run = match[1]
           if (builtIn(run)) return null
-          const marks = parseMarks(run, numbered)
+          const marks = parseMarks(run, numbered, greaterThan())
           if (!marks) return null
           const $from = state.doc.resolve(range.from)
           const block = $from.parent

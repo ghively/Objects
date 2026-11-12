@@ -48,6 +48,37 @@ describe('TaskList', () => {
     expect(within(plain).getByRole('listitem')).toHaveAttribute('data-done')
   })
 
+  // M33 (choice 6): a row its deadline placed shows the deadline as its chip.
+  test('test a row listed by its deadline shows the deadline chip, in the danger colour once passed; the others keep the date chip', () => {
+    const missed = taskRow('Tasks/Missed.md', { status: ['Next Up'], deadline: day('2020-01-02') })
+    const late = taskRow('Tasks/Late.md', { status: ['Next Up'], date: day('2020-01-02'), deadline: day('2020-01-05') })
+    const coming = taskRow('Tasks/Coming.md', { status: ['Next Up'], deadline: day('2999-01-02') })
+    render(
+      <TaskList
+        groups={[
+          { id: 'overdue', label: 'Overdue', rows: [late, missed], deadlinePaths: new Set(['Tasks/Missed.md']) },
+          { id: 'later', label: 'Later', rows: [coming], deadlinePaths: new Set(['Tasks/Coming.md']) },
+          // The same task where its deadline did not place it (All): the date chip, as before.
+          { id: 'all', label: null, rows: [missed] },
+        ]}
+        type={TASK_TYPE}
+        empty="Nothing"
+      />,
+    )
+    const rowsOf = (id: string) => within(document.querySelector(`[data-task-group="${id}"]`) as HTMLElement).getAllByRole('listitem')
+    const [lateRow, missedRow] = rowsOf('overdue')
+    expect(within(lateRow).getByRole('button', { name: 'Date: Jan 2, 2020' })).not.toHaveAttribute('data-chip')
+    const chip = within(missedRow).getByRole('button', { name: 'Deadline: Jan 2, 2020' })
+    expect(chip).toHaveAttribute('data-chip', 'deadline')
+    expect(chip).toHaveAttribute('title', 'Deadline: Jan 2, 2020')
+    expect(chip.className).toContain('var(--danger)')
+    expect(within(missedRow).queryByRole('button', { name: /^Date:/ })).toBeNull()
+    const comingChip = within(rowsOf('later')[0]).getByRole('button', { name: 'Deadline: Jan 2, 2999' })
+    expect(comingChip.className).not.toContain('var(--danger)')
+    expect(within(rowsOf('all')[0]).getByRole('button', { name: 'Date: No date' })).toBeInTheDocument()
+    expect(within(rowsOf('all')[0]).queryByRole('button', { name: /^Deadline:/ })).toBeNull()
+  })
+
   test('a click on the title opens the task; Ctrl-click in a new tab', async () => {
     const user = userEvent.setup()
     useSettings.setState((s) => ({ settings: { ...s.settings, alwaysOpenAsFullPage: true } }))

@@ -78,6 +78,20 @@ Object has no accounts.
   space, Open folder…). On, that button is hidden (the sidebar toggle stays); a lone Alt tap shows it, focused, and
   another hides it, as a hidden window menu comes back with Alt (our call). The palette and Ctrl+, reach its spaces
   and settings too.
+  (M33) 'Typing "> " makes' (a row after "Toggle style"; device setting `greaterThanMakes`): "A toggle" (the
+  default, `toggle`) or "A quote" (`quote`). It explains 'What ">" and a space turn the start of a line into. "|"
+  and a space make a quote either way, and the slash menu has both.'. The editor reads it when the key is typed,
+  so a change applies to the next line without a reload. What it changes is under "Markdown list shortcuts".
+  (M33) Titles written twice: only while the space has notes whose first heading repeats their title, a row under
+  the section's header reads "N notes begin with a heading that repeats their title." ("1 note begins with a
+  heading that repeats its title.") with the button "Remove those headings". The count is asked when the section
+  opens (`GET /api/space/title-headings`); with none, while it loads or if it fails, no row shows. The button asks
+  first: "Remove N headings?" ("Remove 1 heading?"), "The first heading of each of these notes repeats its title,
+  so the title shows twice. This removes that one line from each note. Each note keeps its earlier version in its
+  history.", "Cancel" and "Remove". "Remove" removes that line from each note
+  (`POST /api/space/title-headings/remove`), a toast says "Removed N headings." ("Removed 1 heading."), open lists
+  and notes are read again, and the row goes (it shows what is left if a note could not be written). A removal
+  that fails shows the error as a toast and the row stays. Nothing is removed without that click.
 - Language: interface language list (English, English (UK), Deutsch, Français, Español, Dutch, Português (BR),
   Magyar, Italian); Decimal separator (Automatic | Dot | Comma). Gene, 2026-11-10: the interface stays in English;
   the list sets date and number formatting only (translating every screen is not planned).
@@ -329,6 +343,10 @@ cannot be clicked.
   Organizations and Areas, then IT operations last, closed until it is opened (the gallery data's `collapsed`).
   The Projects entry carries the ticket and work fields only while Work is on for the space (M32).
 Each starter template pre-fills the new type's properties.
+(M33) Where a new type lands: one made from a gallery entry ("Create type" on Personal, the other groups or an IT
+operations one) opens the type's own page (its list, ready for "New"), with the toast '"Recipes" added.' (the
+type's plural) carrying the action "Type settings", which opens its settings; the toast goes after 8 seconds or
+with the click. A type made from scratch ("Create your own") still opens its settings, with no toast.
 
 ## 4. Sidebar details
 
@@ -420,11 +438,12 @@ Each starter template pre-fills the new type's properties.
   the task as it will be saved (`Adds "Call the bank" on Nov 13, 2026`). Backspace at the start of the field, or
   the chip's ×, removes the chip, and the words then stay in the title as typed. The new task's file has an empty
   body: the title is not repeated in it (a default template's body is kept). Tabs: **Today** (two groups,
-  "Overdue (n)" — open tasks whose date ended before today — then "Today (n)" — the date covers today or the
-  deadline is today, done ones kept under the open ones; together the Calendar Day view's list for today,
-  decision T1), **Upcoming** (open tasks dated after today, one group per day for the next 14 days — "Tomorrow",
-  then the weekday and date — then "Later"), **Inbox** (open tasks with no date, newest first), **All** (every
-  task, open ones first) and **Done** (latest first); then a "More" menu with the other plain lists as they were
+  "Overdue (n)" — open tasks whose date ended before today, and (M33) open tasks with no date whose deadline has
+  passed — then "Today (n)" — the date covers today or the deadline is today, done ones kept under the open
+  ones), **Upcoming** (open tasks dated after today, and (M33) open tasks with no date whose deadline is after
+  today, on the deadline's day; one group per day for the next 14 days — "Tomorrow", then the weekday and date —
+  then "Later"), **Inbox** (open tasks with no date and (M33) no deadline, newest first; empty it reads "No tasks
+  without a date or a deadline"), **All** (every task, open ones first) and **Done** (latest first); then a "More" menu with the other plain lists as they were
   (Status, Deadline, Recurring, Reminders, Tags, Context: each a list view with its own layouts, filters and
   saved view). The tab row is one stop for the Tab key; Left and Right move to the next tab and show its list,
   Home and End go to the first and the last. The sidebar's Tasks entry opens the page on Today, also when the page is
@@ -439,6 +458,30 @@ Each starter template pre-fills the new type's properties.
   offers "Add a Done status" — one click adds it to the type and completes the task — instead of "This type has
   no status for that." A space with no Task type yet can still add: the type is made with the first task. The
   Task rows load once for the page.
+  (M33; replaces M32's acceptance call "a task with only a deadline sits in Inbox, also when the deadline has
+  passed") **A deadline places a task that has no date**: a not-done task with no date and a deadline is listed
+  where its deadline puts it — under Today's "Overdue" once the deadline has passed, under "Today" on the day, on
+  the deadline's day in Upcoming for the next 14 days and under "Later" beyond — and not in Inbox, which holds the
+  tasks with neither. A task with a date is placed by its date, whatever its deadline (a passed deadline does not
+  make it Overdue, a later one does not move it); the one case its deadline decides is a deadline today, which
+  lists it under Today (as before) and then not in Upcoming too. So every not-done task is on exactly one of
+  Today, Upcoming and Inbox; All lists every task as before. Within a day the dated tasks come first, in their
+  order, then the ones the deadline placed; Overdue and Later run from the earliest day. Where a task is listed by
+  its deadline its chip is the deadline's: an hourglass and the deadline, named "Deadline: Nov 13, 2026" (the
+  chip's tooltip and its name for a screen reader), in the danger colour once the deadline has passed. A click
+  opens Today / Tomorrow / Next week / No deadline and "Pick a date", which write the deadline, not the date; the
+  "Missed" / "N days left" label still follows it. In All (and every other list) the same task keeps its date
+  chip, so a date is still one click away. Decision T1 changes with it: Tasks › Today is the Calendar Day view's
+  list for today plus the tasks with no date whose deadline has passed, which the Day view does not list (it
+  shows a deadline on its own day). The Work page's task lists and its Today badge are as they were.
+  (M33) **"No date"** on a row's chip does what "Remove date" in the properties pane does for a task, with the same
+  one write: `date: null`, and the task's `repeat`, `remind` and `occurrenceLog` keys removed with it (before, the
+  chip wrote `date: null` alone and left a repeat and a reminder behind with no date to act on). A task with done
+  or skipped repeats on record asks first, in the pane's words: "Remove date?", "Some repeats of this task are
+  already done or skipped. Clearing the date throws that history away.", "Keep date" / "Remove date". On a task
+  with no date, "No date" writes nothing. For a task with neither a repeat nor a reminder nothing changed: both
+  write `date: null` (the `date` line stays, holding `null`). "Remove date" in the chip's own date picker does
+  the same. "No deadline" writes `deadline: null` alone, as clearing the Deadline in the pane does.
 - **Work** (M32; optional): the dashboard that used to be the Tasks page is its own page, off until "Use the Work
   page in this space" is turned on (Settings > Work; a space that already holds work data reads as on). On: a
   "Work" entry under Tasks opens it (the `work` target), unchanged apart from its heading ("Work"). Off: nothing
@@ -628,6 +671,13 @@ Each starter template pre-fills the new type's properties.
     `[X]`) a checked one, and `[ ] ` / `[x] ` do the same at the start of a text line. In a bullet list that has
     other lines only the typed line becomes a to-do. In a numbered list, a heading or a to-do the characters stay
     text. `> ` is still a toggle and `| ` a quote (M32, our call 1).
+  - (M33) With Settings > Editor > 'Typing "> " makes' set to "A quote", the `>` mark is the quote mark, as `|` is:
+    `> ` at the start of a text line makes the quote block `| ` makes (saved as `> text`), and in a combined run it
+    quotes too (`>#` + Space = a quoted heading 1); `>|` is then two marks of one kind and stays text. The toggle
+    keeps its other ways in (the slash menu's "Toggle", the block menus). With "A toggle" (the default) nothing
+    changes. `| ` makes a quote either way; in a code block the characters stay text; one undo gives the typed
+    `> ` back, as for the other marks. The setting changes typing only: a saved note's quotes and toggles are read
+    and written the same with either choice.
   - `()` always gives the same icon (Object keeps no last-used icon).
   - "Turn off automatic numbered lists" removes `1.` as a mark, alone and combined.
 - **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).
@@ -942,7 +992,8 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   DailyNote default template, if any) and the typing goes into its own paragraph after the template content (or
   into the template's first empty paragraph) — never onto the end of the template's last heading.
 - **Day view** on today: the header's right side has a "Tasks dashboard" link to Tasks › Today, which lists the
-  same tasks as the Day view's Tasks section (decision T1); other days have no link. (M32) The link reads "Open
+  same tasks as the Day view's Tasks section (decision T1; (M33) the Tasks page's Today also lists, under Overdue,
+  the tasks with no date whose deadline has passed, which the Day view does not); other days have no link. (M32) The link reads "Open
   Tasks" and opens the Tasks page on its Today list; while the Work page is on for the space it reads "Open Work"
   and opens Work's Today. In the Tasks section the `+` menu's first row reads "New task" (was "Create task"), and
   the "Overdue (n)" group shows its count once (it read "Overdue (1) 1").

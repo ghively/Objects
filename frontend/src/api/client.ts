@@ -1329,6 +1329,22 @@ export const api = {
     return request<SpaceInfo>('/space', json('PUT', { patch, baseRevision: opts.baseRevision, clientId: CLIENT_ID }))
   },
 
+  /** M33: how many notes begin with a heading that repeats their title. Read-only. */
+  titleHeadings(): Promise<{ count: number }> {
+    return request<{ count: number }>('/space/title-headings')
+  },
+
+  /**
+   * M33: remove that one heading line from each such note (each keeps its earlier text in its
+   * history). The notes it wrote are not named, so this window is told everything may have changed
+   * (as when an import ends): open lists and notes refresh. Refused when the space is read-only.
+   */
+  async removeTitleHeadings(): Promise<{ changed: number }> {
+    const res = await request<{ changed: number }>('/space/title-headings/remove', json('POST', {}))
+    if ((res?.changed ?? 0) > 0) announceResync()
+    return res
+  },
+
   /** This device's settings, defaults merged (revision `''` when no file exists). */
   settings(): Promise<SettingsResponse> {
     return request<SettingsResponse>('/settings')

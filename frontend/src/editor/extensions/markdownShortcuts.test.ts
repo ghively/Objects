@@ -6,13 +6,15 @@
 import { Editor as TiptapEditor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { afterEach, describe, expect, test } from 'vitest'
+import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import type { Option } from '../annotations'
 import { editorExtensions, loadBody, serializeBody } from '../document'
-import { BLOCK_ICON_DEFAULT } from './markdownShortcuts'
+import { BLOCK_ICON_DEFAULT, parseMarks } from './markdownShortcuts'
 
 const editors: TiptapEditor[] = []
 afterEach(() => {
   while (editors.length) editors.pop()!.destroy()
+  useSettings.setState({ settings: settingsDefaults })
 })
 
 function fresh(opts?: Parameters<typeof editorExtensions>[0]): TiptapEditor {
@@ -327,5 +329,155 @@ describe('"- [ ] " and "- [x] " make a to-do (M32)', () => {
     const inTodo = fresh()
     type(inTodo, '- [ ] [x] y')
     expect(pathTo(inTodo, '[x] y')).toEqual(['taskList', 'taskItem', 'paragraph'])
+  })
+})
+
+// M33 (choice 7): Settings > Editor > 'Typing "> " makes': "A toggle" (default) or "A quote".
+describe('the "> " setting (M33)', () => {
+  const greaterThan = (v: 'toggle' | 'quote') => useSettings.setState({ settings: { ...settingsDefaults, greaterThanMakes: v } })
+
+  test('test with "A toggle" (the default) "> " makes a toggle, exactly as before', () => {
+    expect(settingsDefaults.greaterThanMakes).toBe('toggle')
+    const ed = fresh()
+    type(ed, '> Head')
+    expect(pathTo(ed, 'Head')).toEqual(['toggle', 'paragraph'])
+    expect(serializeBody(ed)).toBe('<!-- toggle open -->\nHead\n<!-- /toggle -->')
+    const combined = fresh()
+    type(combined, '># Title')
+    expect(pathTo(combined, 'Title')).toEqual(['toggle', 'heading1'])
+  })
+
+  test('test with "A quote" "> " makes the quote block "| " makes', () => {
+    greaterThan('quote')
+    const ed = fresh()
+    type(ed, '> Said')
+    expect(pathTo(ed, 'Said')).toEqual(['blockquote', 'paragraph'])
+    expect(serializeBody(ed)).toBe('> Said')
+    const bar = fresh()
+    type(bar, '| Said')
+    expect(ed.state.doc.toJSON()).toEqual(bar.state.doc.toJSON())
+    // The caret is in the quote, ready to type.
+    expect(ed.state.selection.$from.parent.textContent).toBe('Said')
+  })
+
+  test('test "| " makes a quote with either setting', () => {
+    for (const v of ['toggle', 'quote'] as const) {
+      greaterThan(v)
+      const ed = fresh()
+      type(ed, '| Said')
+      expect(pathTo(ed, 'Said')).toEqual(['blockquote', 'paragraph'])
+      expect(serializeBody(ed)).toBe('> Said')
+    }
+  })
+
+  test('test the setting is read when the key is typed: changing it needs no new editor', () => {
+    const ed = fresh()
+    type(ed, '> One')
+    expect(pathTo(ed, 'One')).toEqual(['toggle', 'paragraph'])
+    greaterThan('quote')
+    // A new empty line after the toggle, in the same editor.
+    const end = ed.state.doc.content.size
+    ed.commands.insertContentAt(end, { type: 'paragraph' })
+    ed.commands.setTextSelection(ed.state.doc.content.size - 1)
+    type(ed, '> Two')
+    expect(pathTo(ed, 'Two')).toEqual(['blockquote', 'paragraph'])
+    expect(pathTo(ed, 'One')).toEqual(['toggle', 'paragraph'])
+    greaterThan('toggle')
+    ed.commands.insertContentAt(ed.state.doc.content.size, { type: 'paragraph' })
+    ed.commands.setTextSelection(ed.state.doc.content.size - 1)
+    type(ed, '> Three')
+    expect(pathTo(ed, 'Three')).toEqual(['toggle', 'paragraph'])
+  })
+
+  test('test with "A quote" the ">" mark is the quote mark in a combined run too', () => {
+    greaterThan('quote')
+    const heading = fresh()
+    type(heading, '># Title')
+    expect(pathTo(heading, 'Title')).toEqual(['blockquote', 'heading1'])
+    expect(serializeBody(heading)).toBe('> # Title')
+    const list = fresh()
+    type(list, '>a) One')
+    expect(pathTo(list, 'One')).toEqual(['blockquote', 'orderedList', 'listItem', 'paragraph'])
+    // Two quote marks are two marks of one kind: not a shortcut, the characters stay text.
+    const twice = fresh()
+    type(twice, '>| x')
+    expect(pathTo(twice, '>| x')).toEqual(['paragraph'])
+    expect(parseMarks('>|', true, 'quote')).toBeNull()
+    expect(parseMarks('>', true, 'quote')).toEqual({ quote: true, count: 1 })
+    expect(parseMarks('>', true, 'toggle')).toEqual({ toggle: true, count: 1 })
+    expect(parseMarks('>')).toEqual({ toggle: true, count: 1 })
+  })
+
+  test('test "> " stays text in a code block and away from the start of a line, with either setting', () => {
+    for (const v of ['toggle', 'quote'] as const) {
+      greaterThan(v)
+      const code = fresh()
+      loadBody(code, '```\n\n```')
+      code.commands.setTextSelection(1)
+      expect(code.state.selection.$from.parent.type.name).toBe('codeBlock')
+      const kinds = (ed: TiptapEditor) => {
+        const out: string[] = []
+        ed.state.doc.forEach((n) => out.push(n.type.name))
+        return out
+      }
+      const before = kinds(code)
+      type(code, '> x')
+      expect(code.state.doc.firstChild?.type.name).toBe('codeBlock')
+      expect(code.state.doc.firstChild?.textContent).toBe('> x')
+      expect(kinds(code)).toEqual(before)
+      const mid = fresh()
+      type(mid, 'a > b')
+      expect(pathTo(mid, 'a > b')).toEqual(['paragraph'])
+    }
+  })
+
+  test('test one undo gives the typed characters back, as for the toggle', () => {
+    const text = (ed: TiptapEditor) => ({ types: pathTo(ed, ed.state.doc.textContent), text: ed.state.doc.textContent })
+    greaterThan('toggle')
+    const toggle = fresh()
+    type(toggle, '> ')
+    expect(toggle.state.doc.firstChild?.type.name).toBe('toggle')
+    toggle.commands.undo()
+    greaterThan('quote')
+    const quote = fresh()
+    type(quote, '> ')
+    expect(quote.state.doc.firstChild?.type.name).toBe('blockquote')
+    quote.commands.undo()
+    // The block is a plain text line again holding what was typed, the same as after the toggle's undo.
+    expect(text(quote)).toEqual(text(toggle))
+    expect(quote.state.doc.firstChild?.type.name).toBe('paragraph')
+    expect(quote.state.doc.textContent).toBe('> ')
+    expect(quote.state.doc.childCount).toBe(1)
+  })
+
+  test('test a note with a quote and a toggle round-trips byte for byte with either setting', () => {
+    const body = [
+      'Before',
+      '',
+      '> A quote',
+      '> on two lines',
+      '',
+      '<!-- toggle open -->',
+      'Head',
+      '',
+      'Inside',
+      '<!-- /toggle -->',
+      '',
+      '<!-- toggle -->',
+      '> A quote in a closed toggle',
+      '<!-- /toggle -->',
+      '',
+      'After',
+      '',
+    ].join('\n')
+    for (const eol of ['\n', '\r\n']) {
+      const source = body.replace(/\n/g, eol)
+      for (const v of ['toggle', 'quote'] as const) {
+        greaterThan(v)
+        const ed = fresh()
+        loadBody(ed, source)
+        expect(serializeBody(ed)).toBe(source)
+      }
+    }
   })
 })

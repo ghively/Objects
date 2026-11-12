@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TypeDef, TypeTemplate } from '@/api/types'
 import { typeDef } from '@/test/mockApi'
@@ -14,7 +15,7 @@ import { resetLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { currentTarget, useTabs } from '@/nav/tabs'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { THEME_COLORS } from '@/theme/palette'
-import { CreateTypeDialog } from './CreateTypeDialog'
+import { CreateTypeDialog, TYPE_ADDED_TOAST_MS } from './CreateTypeDialog'
 import { DeleteTypeDialog } from './DeleteTypeDialog'
 
 const mocked = vi.mocked(api)
@@ -397,20 +398,111 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     )
   })
 
-  test('a template shows its properties and creates the type from it', async () => {
+  // M33 (choice 4): was "…creates the type from it" with `onCreated` called (the caller opened the
+  // type's settings). A gallery type now lands on its own page, and the caller is not asked.
+  test('test a type made from the gallery lands on its own page, with a toast naming it and a "Type settings" action (M33)', async () => {
     withGallery()
     const user = userEvent.setup()
-    const onCreated = vi.fn()
-    mocked.createType.mockImplementationOnce(async () => typeDef({ id: 'film', name: 'Film' }))
-    render(<CreateTypeDialog open onCreated={onCreated} />)
+    const onCreated = vi.fn((t: TypeDef) => useTabs.getState().open({ kind: 'typeSettings', typeId: t.id }))
+    const onOpenChange = vi.fn()
+    mocked.createType.mockImplementationOnce(async () => typeDef({ id: 'film', name: 'Film', pluralName: 'Films' }))
+    // As the app mounts it: the dialog closes when it asks to.
+    function Host() {
+      const [open, setOpen] = useState(true)
+      return (
+        <CreateTypeDialog
+          open={open}
+          onOpenChange={(o) => {
+            onOpenChange(o)
+            setOpen(o)
+          }}
+          onCreated={onCreated}
+        />
+      )
+    }
+    render(<Host />)
     await user.click(await screen.findByRole('button', { name: /Film/ }))
     expect(screen.getByRole('heading', { name: 'Film' })).toBeInTheDocument()
     expect(screen.getByText('Films you have seen, with director, genre and a rating.')).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Properties' })).toHaveTextContent('Genre')
     await user.click(screen.getByRole('button', { name: 'Create type' }))
-    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'type', typeId: 'film' }))
     expect(mocked.createType.mock.calls[0][0]).toMatchObject({ template: 'film' })
     expect(useLinkIndex.getState().types.map((t) => t.id)).toEqual(['film'])
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // The caller's "open its settings" is for a type made from scratch only.
+    expect(onCreated).not.toHaveBeenCalled()
+    // The toast names the type by its plural (its page's name) and offers its settings.
+    const toast = document.querySelector<HTMLElement>('.editor-toast')
+    expect(toast).not.toBeNull()
+    expect(toast).toHaveAttribute('role', 'status')
+    expect(toast?.querySelector('span')?.textContent).toBe('"Films" added.')
+    const action = within(toast as HTMLElement).getByRole('button', { name: 'Type settings' })
+    // It can be read on the toast: the toast's own text colour, underlined (not a surface colour).
+    expect(action.style.color).toBe('inherit')
+    expect(action.style.textDecoration).toBe('underline')
+    await user.click(action)
+    expect(currentTarget(useTabs.getState())).toEqual({ kind: 'typeSettings', typeId: 'film' })
+    // Used once: the toast goes with the click.
+    expect(document.querySelector('.editor-toast')).toBeNull()
+  })
+
+  test('test the gallery toast goes by itself after a while (M33)', async () => {
+    withGallery()
+    const user = userEvent.setup()
+    mocked.createType.mockImplementationOnce(async () => typeDef({ id: 'film', name: 'Film', pluralName: 'Films' }))
+    render(<CreateTypeDialog open />)
+    await user.click(await screen.findByRole('button', { name: /Film/ }))
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      await user.click(screen.getByRole('button', { name: 'Create type' }))
+      await waitFor(() => expect(document.querySelector('.editor-toast')).not.toBeNull())
+      // Still there after a plain toast would have gone (4 s); gone after its own time.
+      vi.advanceTimersByTime(TYPE_ADDED_TOAST_MS - 3000)
+      expect(document.querySelector('.editor-toast')).not.toBeNull()
+      vi.advanceTimersByTime(3001)
+      expect(document.querySelector('.editor-toast')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('test an IT operations type from the gallery lands on its own page too (M33)', async () => {
+    const it: TypeTemplate = {
+      key: 'host',
+      section: 'itOperations',
+      name: 'Host',
+      pluralName: 'Hosts',
+      description: 'A server or device.',
+      icon: { type: 'iconify', val: 'ph-hard-drives' },
+      color: 'blue',
+      properties: [{ name: 'Notes', type: 'blocks' }],
+      added: false,
+    }
+    ;(api as unknown as { typeGallery: () => Promise<TypeTemplate[]> }).typeGallery = vi.fn(async () => [...GALLERY, it])
+    const user = userEvent.setup()
+    const onCreated = vi.fn()
+    mocked.createType.mockImplementationOnce(async () => typeDef({ id: 'host', name: 'Host', pluralName: 'Hosts' }))
+    render(<CreateTypeDialog open onCreated={onCreated} />)
+    await user.click(await screen.findByRole('button', { name: 'IT operations' }))
+    await user.click(await screen.findByRole('button', { name: /Hosts/ }))
+    await user.click(screen.getByRole('button', { name: 'Create type' }))
+    await waitFor(() => expect(currentTarget(useTabs.getState())).toEqual({ kind: 'type', typeId: 'host' }))
+    expect(toasts()).toEqual(['"Hosts" added.Type settings'])
+    expect(onCreated).not.toHaveBeenCalled()
+  })
+
+  test('test a gallery type that could not be made shows the error, opens nothing and says nothing (M33)', async () => {
+    withGallery()
+    const user = userEvent.setup()
+    mocked.createType.mockRejectedValueOnce(new Error('A type named "Film" already exists.'))
+    render(<CreateTypeDialog open />)
+    await user.click(await screen.findByRole('button', { name: /Film/ }))
+    await user.click(screen.getByRole('button', { name: 'Create type' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('A type named "Film" already exists.')
+    expect(currentTarget(useTabs.getState())).toBeNull()
+    expect(toasts()).toEqual([])
   })
 
   test('an added template cannot be created again', async () => {
@@ -452,6 +544,8 @@ describe('CreateTypeDialog', () => {
     // The new type is known at once, and its settings are open.
     expect(useLinkIndex.getState().types.map((t) => t.id)).toEqual(['book'])
     expect(currentTarget(useTabs.getState())).toEqual({ kind: 'typeSettings', typeId: 'book' })
+    // M33: a type made from scratch still opens its settings, and no toast says it was added.
+    expect(document.querySelector('.editor-toast')).toBeNull()
   })
 })
 
