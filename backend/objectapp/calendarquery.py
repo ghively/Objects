@@ -9,7 +9,9 @@ the API contract's ``CalendarRange``:
 - ``tasks``: Tasks whose ``date`` covers the day (``date``), whose
   ``deadline`` is the day (``deadline``), virtual future occurrences of open
   recurring by-due-date Tasks (``occurrence``), and on today only the open
-  Tasks dated before today (``overdue``, ``day`` = their own date).
+  Tasks dated before today (``overdue``, ``day`` = their own date) and (M33)
+  the open Tasks with no date whose ``deadline`` is before today (``overdue``,
+  ``day`` = the deadline's).
 - ``dated``: every other date property value that covers the day, except
   hidden properties, ``hideCalendarEvents`` properties, types with
   ``hideFromCalendarSidebar``, the system stamps, DailyNote's own ``date`` and
@@ -287,9 +289,11 @@ class _Query:
         date_def, deadline_def = t.prop("date"), t.prop("deadline")
         value = decode_value(date_def, fm.get("date"), fm) if date_def else None
         mentioned = False
+        dated = False
         if value and isinstance(value.get("start"), str):
             first, last = self.span(value)
             if first is not None:
+                dated = True
                 if value.get("resolution") != "day":
                     self.timed(path, "task", value["start"])
                 real_days = set()
@@ -310,6 +314,12 @@ class _Query:
                 if d is not None and self.in_range(d):
                     self.add(d, "tasks", _task_entry(path, "deadline", d, done))
                     mentioned = True
+                # M33 (choice 6): with no date, a passed deadline puts an open task under
+                # today's Overdue (``day`` = the deadline's), as a passed date does.
+                if d is not None and not dated and not done and d < self.today:
+                    if self.in_range(self.today):
+                        self.add(self.today, "tasks", _task_entry(path, "overdue", d, False))
+                        mentioned = True
         if mentioned:
             self.mentioned.add(path)
 

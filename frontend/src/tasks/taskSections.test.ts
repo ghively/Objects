@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { Row } from '@/api/types'
 import { FULL_VIEW_LAYOUTS } from '@/views/model'
-import { DEFAULT_TASK_SECTION, TASK_SECTIONS, TASK_SECTION_KEYS, sectionRows, todayOpenCount } from './taskSections'
+import { DEFAULT_TASK_SECTION, TASK_SECTIONS, TASK_SECTION_KEYS, isTaskOfDay, sectionRows, todayOpenCount } from './taskSections'
 import { groupRows } from '@/views/group'
 import { useSettings } from '@/settings/useSettings'
 import { TASK_TYPE, taskRow } from './taskFixtures'
@@ -116,6 +116,28 @@ describe('taskSections', () => {
     // The count badge is the list's open ones ("N open, M done").
     expect(todayOpenCount(rows, TASK_TYPE, NOW)).toBe(5)
     expect(TASK_SECTIONS.today.preset(NOW).sorts).toEqual([{ propertyId: 'date', option: 'ascending' }])
+  })
+
+  test('M33 (choice 6): an open task with no date and a passed deadline is on today only, and counted once', () => {
+    const late = taskRow('Tasks/LateDeadline.md', { status: ['Not Started'], deadline: day('2026-10-20') })
+    const lateDone = taskRow('Tasks/LateDeadlineDone.md', { status: ['Done'], deadline: day('2026-10-20') })
+    const dueToday = taskRow('Tasks/DeadlineToday.md', { status: ['Not Started'], deadline: day('2026-10-26') })
+    // A task with a date is placed by its date, whatever its deadline.
+    const dated = taskRow('Tasks/DatedLate.md', { status: ['Not Started'], date: day('2026-10-28'), deadline: day('2026-10-20') })
+    // `today` is the viewer's day: any day after the deadline lists it, the deadline's own day lists
+    // it as due that day, a day before it does not.
+    expect(isTaskOfDay(late, TASK_TYPE, '2026-10-26')).toBe(true)
+    expect(isTaskOfDay(late, TASK_TYPE, '2026-10-21')).toBe(true)
+    expect(isTaskOfDay(late, TASK_TYPE, '2026-10-20')).toBe(true)
+    expect(isTaskOfDay(late, TASK_TYPE, '2026-10-19')).toBe(false)
+    expect(isTaskOfDay(lateDone, TASK_TYPE, '2026-10-26')).toBe(false)
+    expect(isTaskOfDay(dated, TASK_TYPE, '2026-10-26')).toBe(false)
+    expect(isTaskOfDay(dueToday, TASK_TYPE, '2026-10-26')).toBe(true)
+    const rows = [late, lateDone, dueToday, dated]
+    expect(sectionRows('today', rows, TASK_TYPE, NOW).map((r) => r.summary.path.slice(6, -3))).toEqual(['LateDeadline', 'DeadlineToday'])
+    // Work's Today count: the late one and the one due today, each once.
+    expect(todayOpenCount(rows, TASK_TYPE, NOW)).toBe(2)
+    expect(todayOpenCount([...ROWS, late], TASK_TYPE, NOW)).toBe(todayOpenCount(ROWS, TASK_TYPE, NOW) + 1)
   })
 
   test('test inbox preset: no status or no date', () => {

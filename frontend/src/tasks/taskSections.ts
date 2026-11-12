@@ -77,7 +77,9 @@ export function coveredDays(v: DateValue): { first: string; last: string } | nul
 /**
  * Decision T1: a task is on today's list when the Calendar Day view lists it on today: its `date`
  * covers today, its `deadline` is today (done or not), or it is open and its `date` ended before
- * today (Overdue). Recurring occurrences are only ever future days, so never today.
+ * today (Overdue). M33 (choice 6): an open task with no date whose `deadline` was before today is
+ * Overdue too (the Day view lists it on today only). Recurring occurrences are only ever future
+ * days, so never today.
  */
 export function isTodayTask(row: Row, type: TypeDef | undefined, now: Date): boolean {
   return isTaskOfDay(row, type, zonedParts(now).date)
@@ -90,7 +92,10 @@ export function isTaskOfDay(row: Row, type: TypeDef | undefined, today: string):
   if (span && span.first <= today && today <= span.last) return true
   if (span && span.last < today && isOpen(row, type)) return true
   const deadline = asDate(row.values.deadline)
-  return !!deadline && coveredDays(deadline)?.first === today
+  const due = deadline ? (coveredDays(deadline)?.first ?? null) : null
+  if (due === today) return true
+  // M33 (choice 6): no date and a passed deadline: Overdue (a dated task is placed by its date).
+  return !span && due !== null && due < today && isOpen(row, type)
 }
 
 const hasRepeat = (row: Row) => !!asDate(row.values.date) && parseRepeat(row.values.repeat) !== null
@@ -123,7 +128,8 @@ export const TASK_SECTIONS: Record<TaskSectionKey, TaskSection> = {
     description: 'Tasks that matter today',
     icon: 'ph-sun',
     preset: () => view('list', { sorts: [{ propertyId: 'date', option: 'ascending' }] }),
-    // Decision T1: the Calendar Day view's list for today (done tasks stay, struck).
+    // Decision T1: the Calendar Day view's list for today (done tasks stay, struck), (M33) open
+    // tasks with no date whose deadline has passed included.
     match: isTodayTask,
   },
   inbox: {

@@ -512,9 +512,11 @@ with the click. A type made from scratch ("Create your own") still opens its set
   chip's tooltip and its name for a screen reader), in the danger colour once the deadline has passed. A click
   opens Today / Tomorrow / Next week / No deadline and "Pick a date", which write the deadline, not the date; the
   "Missed" / "N days left" label still follows it. In All (and every other list) the same task keeps its date
-  chip, so a date is still one click away. Decision T1 changes with it: Tasks › Today is the Calendar Day view's
-  list for today plus the tasks with no date whose deadline has passed, which the Day view does not list (it
-  shows a deadline on its own day). The Work page's task lists and its Today badge are as they were.
+  chip, so a date is still one click away. Decision T1 stands: Tasks › Today is the Calendar Day view's list for
+  today, which (M33) also lists, under "Overdue (n)" on today only, the open tasks with no date whose deadline
+  has passed (`GET /api/calendar` gives them an `overdue` entry on today, `day` the deadline's; on the deadline's
+  own day they keep their `deadline` entry, and a deadline today is listed once). Home, the Calendar's Day view,
+  Tasks › Today and the Work page's Today badge (`todayOpenCount`) count them alike.
   (M33) **"No date"** on a row's chip does what "Remove date" in the properties pane does for a task, with the same
   one write: `date: null`, and the task's `repeat`, `remind` and `occurrenceLog` keys removed with it (before, the
   chip wrote `date: null` alone and left a repeat and a reminder behind with no date to act on). A task with done
@@ -540,7 +542,7 @@ with the click. A type made from scratch ("Create your own") still opens its set
   the now-line, deadline countdowns; it spans 07:00-17:30 at least and widens to the whole hour of any earlier or
   later meeting, so evening meetings are on it) with **Today's tasks** under it — the Calendar Day view's Tasks section for
   today (decision T1, one list in both places): tasks whose date covers today, whose deadline is today, and the
-  open overdue ones under "Overdue (n)"; done ones stay, struck; "N open, M done" and the `+` menu (Create task,
+  open overdue ones under "Overdue (n)" ((M33) a task with no date whose deadline has passed included); done ones stay, struck; "N open, M done" and the `+` menu (Create task,
   Move all open tasks to); "Open in Calendar" under it opens the Calendar's Day view on today. Today's badge
   counts that list's open tasks, Inbox's counts the inbox. While the space hides task management ("Hide Task
   Management"), the Work page leaves out the task lists (the list views and Today's tasks); the work views and
@@ -1068,8 +1070,8 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   DailyNote default template, if any) and the typing goes into its own paragraph after the template content (or
   into the template's first empty paragraph) — never onto the end of the template's last heading.
 - **Day view** on today: the header's right side has a "Tasks dashboard" link to Tasks › Today, which lists the
-  same tasks as the Day view's Tasks section (decision T1; (M33) the Tasks page's Today also lists, under Overdue,
-  the tasks with no date whose deadline has passed, which the Day view does not); other days have no link. (M32) The link reads "Open
+  same tasks as the Day view's Tasks section (decision T1; (M33) on today both list, under Overdue, the open tasks
+  with no date whose deadline has passed; other days do not); other days have no link. (M32) The link reads "Open
   Tasks" and opens the Tasks page on its Today list; while the Work page is on for the space it reads "Open Work"
   and opens Work's Today. In the Tasks section the `+` menu's first row reads "New task" (was "Create task"), and
   the "Overdue (n)" group shows its count once (it read "Overdue (1) 1").
