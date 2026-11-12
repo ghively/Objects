@@ -14,7 +14,7 @@ export interface FakeDesktop {
 }
 
 export function fakeDesktop(
-  over: { platform?: DesktopPlatform; controls?: DesktopControls; maximized?: boolean; fullScreen?: boolean } = {},
+  over: { platform?: DesktopPlatform; controls?: DesktopControls; framed?: boolean; maximized?: boolean; fullScreen?: boolean } = {},
 ): FakeDesktop {
   const listeners = new Set<(s: { maximized: boolean; fullScreen: boolean }) => void>()
   let state = { maximized: !!over.maximized, fullScreen: !!over.fullScreen }
@@ -24,7 +24,8 @@ export function fakeDesktop(
   const auto: 'custom' | 'none' = over.controls === 'none' ? 'none' : 'custom'
   const bridge: ObjectDesktop = {
     platform,
-    controls: over.controls ?? (platform === 'win32' ? 'overlay' : platform === 'darwin' ? 'traffic' : 'custom'),
+    controls: over.controls ?? (over.framed ? 'none' : platform === 'win32' ? 'overlay' : platform === 'darwin' ? 'traffic' : 'custom'),
+    ...(over.framed === undefined ? {} : { framed: over.framed }),
     minimize: vi.fn(),
     toggleMaximize: vi.fn(),
     close: vi.fn(),
