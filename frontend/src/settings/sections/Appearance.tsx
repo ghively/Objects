@@ -5,6 +5,7 @@ import { useState } from 'react'
 import type { AppIconColor, DeviceSettings } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { cn } from '@/lib/utils'
+import { applyWindowButtons, storedWindowButtons, windowButtonsApply, windowButtonsPatch } from '@/desktop/useWindowChrome'
 import { APP_ICON_CHOICES, appIconHref } from '@/settings/appIcon'
 import { useSettings } from '@/settings/useSettings'
 import { nextZoom, validZoom, zoomPercent } from '@/settings/zoom'
@@ -63,6 +64,13 @@ export const APPEARANCE_TEXT = {
   layoutDescription: 'How the window looks when Object opens.', // our string
   sidebarOnStart: 'Show the sidebar when Object opens', // our string
   sidebarOnStartDescription: 'Off: Object opens with the sidebar collapsed. Ctrl+Shift+Left shows it.', // our string
+  // M33: only in the desktop window on Linux, where Object draws the window's own buttons.
+  windowButtons: 'Window buttons',
+  windowButtonsDescription:
+    'The minimize, maximize and close buttons at the end of the top bar. Automatic leaves them out on a tiling window manager, where windows have none.', // our string
+  windowButtonsAuto: 'Automatic',
+  windowButtonsShow: 'Show',
+  windowButtonsHide: 'Hide',
 } as const
 
 const T = APPEARANCE_TEXT
@@ -84,6 +92,8 @@ export const APPEARANCE_SEARCH: string[] = [
   T.zoomIn,
   T.zoomOut,
   T.resetZoom,
+  // Only where the setting is shown.
+  ...(windowButtonsApply() ? [T.windowButtons] : []),
 ]
 
 const ZOOM_BUTTON =
@@ -212,6 +222,25 @@ export function AppearanceSection() {
         checked={settings.showSidebarOnStart !== false}
         onChange={(showSidebarOnStart) => set({ showSidebarOnStart })}
       />
+      {/* M33: the desktop window on Linux only (the system draws the buttons everywhere else). */}
+      {windowButtonsApply() && (
+        <SettingGroup title={T.windowButtons} help={T.windowButtonsDescription}>
+          <OptionCards
+            label={T.windowButtons}
+            value={storedWindowButtons(settings)}
+            options={[
+              { value: 'auto', label: T.windowButtonsAuto },
+              { value: 'show', label: T.windowButtonsShow },
+              { value: 'hide', label: T.windowButtonsHide },
+            ]}
+            onChange={(v) => {
+              // The buttons appear or go at once; the choice is stored for the next start.
+              void applyWindowButtons(v)
+              set(windowButtonsPatch(v))
+            }}
+          />
+        </SettingGroup>
+      )}
       <SettingGroup title={T.textSize} help={T.textSizeDescription}>
         <TextSize zoom={validZoom(settings.zoom) ? settings.zoom : 1} onChange={(zoom) => set({ zoom })} />
       </SettingGroup>

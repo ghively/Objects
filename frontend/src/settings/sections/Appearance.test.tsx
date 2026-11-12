@@ -1,6 +1,6 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 vi.mock('@/api/client', async (orig) => ({
   ...(await orig()),
@@ -10,6 +10,11 @@ vi.mock('@/api/client', async (orig) => ({
 import { api } from '@/api/client'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { appIconHref } from '@/settings/appIcon'
+import { DesktopChrome } from '@/desktop/DesktopChrome'
+import { fakeDesktop } from '@/desktop/testBridge'
+import { resetChrome, useChrome } from '@/desktop/useWindowChrome'
+import { resetSpaceInfo } from '@/settings/useSpaceInfo'
+import { TopBar } from '@/shell/TopBar'
 import { APPEARANCE_SEARCH, AppearanceSection } from './Appearance'
 
 const mocked = vi.mocked(api)
@@ -129,4 +134,90 @@ describe('AppearanceSection', () => {
     expect(APPEARANCE_SEARCH).toContain('App icon')
   })
 
+})
+
+// M33: the desktop window on Linux draws its own buttons; the setting says whether.
+describe('AppearanceSection: Window buttons', () => {
+  beforeEach(() => {
+    resetChrome()
+    resetSpaceInfo()
+  })
+  afterEach(() => {
+    delete window.objectDesktop
+  })
+
+  const stored = () => (useSettings.getState().settings as { windowButtons?: string }).windowButtons
+
+  test('test in a browser there is no Window buttons setting', () => {
+    render(<AppearanceSection />)
+    expect(screen.queryByText('Window buttons')).toBeNull()
+    expect(screen.queryByRole('radiogroup', { name: 'Window buttons' })).toBeNull()
+    expect(APPEARANCE_SEARCH).not.toContain('Window buttons')
+  })
+
+  test.each(['win32', 'darwin'] as const)('test in the desktop window on %s there is none either: the system draws its own', (platform) => {
+    window.objectDesktop = fakeDesktop({ platform }).bridge
+    render(<AppearanceSection />)
+    expect(screen.queryByRole('radiogroup', { name: 'Window buttons' })).toBeNull()
+  })
+
+  test('test with the system frame on Linux there is none: the frame has the buttons', () => {
+    window.objectDesktop = fakeDesktop({ platform: 'linux', framed: true }).bridge
+    render(<AppearanceSection />)
+    expect(screen.queryByRole('radiogroup', { name: 'Window buttons' })).toBeNull()
+  })
+
+  test('test in the desktop window on Linux: Automatic, Show, Hide; a change is stored and the buttons go and come at once', async () => {
+    const user = userEvent.setup()
+    const fake = fakeDesktop({ platform: 'linux', controls: 'custom' })
+    window.objectDesktop = fake.bridge
+    render(
+      <>
+        <TopBar spaceName="space" onToggleSidebar={() => {}} onToggleRightPanel={() => {}} rightPanelOpen={false} />
+        <DesktopChrome />
+        <AppearanceSection />
+      </>,
+    )
+    const group = screen.getByRole('radiogroup', { name: 'Window buttons' })
+    expect(within(group).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['Automatic', 'Show', 'Hide'])
+    // No stored value (an older settings file), or the default: Automatic.
+    expect(stored() ?? 'auto').toBe('auto')
+    expect(within(group).getByRole('radio', { name: 'Automatic' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('heading', { name: 'Window buttons' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+
+    await user.click(within(group).getByRole('radio', { name: 'Hide' }))
+    expect(fake.bridge.setWindowButtons).toHaveBeenLastCalledWith('hide')
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ windowButtons: 'hide' }, expect.anything())
+    expect(stored()).toBe('hide')
+    expect(within(group).getByRole('radio', { name: 'Hide' })).toHaveAttribute('aria-checked', 'true')
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Close' })).toBeNull())
+    expect(useChrome.getState().controls).toBe('none')
+
+    await user.click(within(group).getByRole('radio', { name: 'Show' }))
+    expect(fake.bridge.setWindowButtons).toHaveBeenLastCalledWith('show')
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ windowButtons: 'show' }, expect.anything())
+    expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Minimize' })).toBeInTheDocument()
+
+    await user.click(within(group).getByRole('radio', { name: 'Automatic' }))
+    expect(fake.bridge.setWindowButtons).toHaveBeenLastCalledWith('auto')
+    expect(stored()).toBe('auto')
+  })
+
+  test('test Automatic on a tiling compositor: no buttons until Show', async () => {
+    const user = userEvent.setup()
+    const fake = fakeDesktop({ platform: 'linux', controls: 'none' })
+    window.objectDesktop = fake.bridge
+    render(
+      <>
+        <TopBar spaceName="space" onToggleSidebar={() => {}} onToggleRightPanel={() => {}} rightPanelOpen={false} />
+        <DesktopChrome />
+        <AppearanceSection />
+      </>,
+    )
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
+    await user.click(screen.getByRole('radio', { name: 'Show' }))
+    expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument()
+  })
 })

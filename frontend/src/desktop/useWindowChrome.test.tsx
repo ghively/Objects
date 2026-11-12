@@ -14,7 +14,7 @@ import { TopBar } from '@/shell/TopBar'
 import { DesktopChrome } from './DesktopChrome'
 import { fakeDesktop } from './testBridge'
 import { barDragsWindow } from './bridge'
-import { resetChrome, useChrome } from './useWindowChrome'
+import { applyWindowButtons, resetChrome, useChrome } from './useWindowChrome'
 
 function Shell() {
   return (
@@ -145,6 +145,77 @@ describe('useWindowChrome', () => {
     // Its height in a browser is what it was.
     expect(bar).toHaveClass('h-[42px]')
     expect(screen.getByRole('button', { name: 'Toggle sidebar' }).parentElement).toHaveClass('app-titlebar-lead')
+  })
+})
+
+describe('the stored Window buttons setting', () => {
+  const withButtons = (v: string) => ({ ...settingsDefaults, windowButtons: v }) as typeof settingsDefaults
+
+  test('test on Linux the stored choice is applied at start', async () => {
+    const fake = fakeDesktop({ platform: 'linux', controls: 'custom' })
+    window.objectDesktop = fake.bridge
+    useSettings.setState({ settings: withButtons('hide'), loaded: true })
+    render(<Shell />)
+    await waitFor(() => expect(fake.bridge.setWindowButtons).toHaveBeenCalledWith('hide'))
+    await waitFor(() => expect(useChrome.getState().controls).toBe('none'))
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
+    expect(root.classList.contains('desktop-controls-none')).toBe(true)
+  })
+
+  test('test nothing is applied before the settings are read, then the stored choice is', async () => {
+    const fake = fakeDesktop({ platform: 'linux', controls: 'none' })
+    window.objectDesktop = fake.bridge
+    useSettings.setState({ settings: settingsDefaults, loaded: false })
+    render(<Shell />)
+    expect(fake.bridge.setWindowButtons).not.toHaveBeenCalled()
+    act(() => useSettings.setState({ settings: withButtons('show'), loaded: true }))
+    await waitFor(() => expect(fake.bridge.setWindowButtons).toHaveBeenCalledWith('show'))
+    expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument()
+  })
+
+  test('test a change made in another window is followed', async () => {
+    const fake = fakeDesktop({ platform: 'linux', controls: 'custom' })
+    window.objectDesktop = fake.bridge
+    render(<Shell />)
+    await waitFor(() => expect(fake.bridge.setWindowButtons).toHaveBeenCalledWith('auto'))
+    act(() => useSettings.setState({ settings: withButtons('hide') }))
+    await waitFor(() => expect(fake.bridge.setWindowButtons).toHaveBeenLastCalledWith('hide'))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Close' })).toBeNull())
+  })
+
+  test('test a value that is none of the three reads as Automatic', async () => {
+    const fake = fakeDesktop({ platform: 'linux', controls: 'custom' })
+    window.objectDesktop = fake.bridge
+    useSettings.setState({ settings: withButtons('sometimes'), loaded: true })
+    render(<Shell />)
+    await waitFor(() => expect(fake.bridge.setWindowButtons).toHaveBeenCalledWith('auto'))
+  })
+
+  test.each([
+    ['win32', false],
+    ['darwin', false],
+    ['linux', true],
+  ] as const)('test on %s (framed: %s) the setting is never applied', async (platform, framed) => {
+    const fake = fakeDesktop({ platform, framed })
+    window.objectDesktop = fake.bridge
+    useSettings.setState({ settings: withButtons('show'), loaded: true })
+    render(<Shell />)
+    await applyWindowButtons('show')
+    expect(fake.bridge.setWindowButtons).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
+  })
+
+  test('test the latest choice wins when answers come back out of order', async () => {
+    const fake = fakeDesktop({ platform: 'linux', controls: 'custom' })
+    const answers: ((v: 'custom' | 'none') => void)[] = []
+    vi.mocked(fake.bridge.setWindowButtons).mockImplementation(() => new Promise((r) => answers.push(r)))
+    window.objectDesktop = fake.bridge
+    const first = applyWindowButtons('hide')
+    const second = applyWindowButtons('show')
+    answers[1]('custom')
+    answers[0]('none')
+    await Promise.all([first, second])
+    expect(useChrome.getState().controls).toBe('custom')
   })
 })
 

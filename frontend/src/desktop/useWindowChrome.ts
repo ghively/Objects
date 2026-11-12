@@ -10,10 +10,15 @@
  * - `desktop-fullscreen` while the window is full screen.
  * `desktop.css` hangs everything on those classes. `useChrome` holds the same facts for
  * `WindowControls`.
+ *
+ * On Linux it also applies the device setting "Window buttons" (`windowButtons`: Automatic, Show,
+ * Hide; Settings > Appearance) once the settings are read and whenever it changes.
  */
 import { useEffect } from 'react'
 import { create } from 'zustand'
-import { barDragsWindow, desktop, type DesktopControls } from './bridge'
+import type { DeviceSettings } from '@/api/types'
+import { useSettings } from '@/settings/useSettings'
+import { barDragsWindow, desktop, windowButtonsValue, type DesktopControls, type WindowButtons } from './bridge'
 import './desktop.css'
 
 export interface ChromeState {
@@ -32,6 +37,48 @@ export function resetChrome(): void {
   useChrome.setState(INITIAL)
 }
 
+/**
+ * The device settings with the "Window buttons" key. The key's own type is added to
+ * `DeviceSettings` by its owner (`api/types.ts`); read and written through this, the code here is
+ * right before and after that, and an older settings file (no key) reads as Automatic.
+ */
+type WithWindowButtons = Partial<DeviceSettings> & { windowButtons?: unknown }
+
+/** The stored "Window buttons" choice ('auto' when there is none). */
+export function storedWindowButtons(settings: WithWindowButtons): WindowButtons {
+  return windowButtonsValue(settings.windowButtons)
+}
+
+/** The settings patch that stores `v`. */
+export function windowButtonsPatch(v: WindowButtons): Partial<DeviceSettings> {
+  const patch: Partial<DeviceSettings> & { windowButtons?: WindowButtons } = { windowButtons: v }
+  return patch
+}
+
+/** Whether "Window buttons" means anything here: the desktop window on Linux, without the system's frame. */
+export function windowButtonsApply(): boolean {
+  const d = desktop()
+  return !!d && d.platform === 'linux' && d.framed !== true
+}
+
+let asked = 0
+
+/**
+ * Apply a "Window buttons" choice now: the shell answers with the buttons in force and the top
+ * bar draws them or not at once. The latest call wins. Nothing outside the Linux desktop window.
+ */
+export async function applyWindowButtons(v: WindowButtons): Promise<void> {
+  const d = desktop()
+  if (!d || !windowButtonsApply()) return
+  const mine = ++asked
+  try {
+    const controls = await d.setWindowButtons(v)
+    if (mine === asked) useChrome.setState({ controls })
+  } catch {
+    // The shell could not say: the buttons stay as they are.
+  }
+}
+
 export const FULLSCREEN_CLASS = 'desktop-fullscreen'
 export const DRAG_CLASS = 'desktop-drag'
 const CONTROLS: readonly DesktopControls[] = ['overlay', 'traffic', 'custom', 'none']
@@ -39,6 +86,14 @@ export const controlsClass = (c: DesktopControls) => `desktop-controls-${c}`
 
 /** Mounted once (`DesktopChrome`). */
 export function useWindowChrome(): void {
+  // Linux: the stored "Window buttons" choice, once the settings are read and when it changes
+  // (here or in another window).
+  const loaded = useSettings((s) => s.loaded)
+  const buttons = useSettings((s) => storedWindowButtons(s.settings))
+  useEffect(() => {
+    if (loaded) void applyWindowButtons(buttons)
+  }, [loaded, buttons])
+
   useEffect(() => {
     const d = desktop()
     if (!d) return
