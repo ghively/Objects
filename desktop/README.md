@@ -44,10 +44,14 @@ or the space switcher does not move it), double-clicks the bar to maximise and r
 Minimize, Maximize, Restore and the corner's Close, right-clicks, picks each "Window buttons"
 choice in Settings (and sees "Hide" honoured on the next launch), types a title and three
 sentences and closes at once with the page's own before-close handler, and types a property
-before the window manager's close (Alt+F4). It also checks the theme reaches the shell on load
+before the window manager's close (Alt+F4) and before SIGTERM to `objectapp` (the shell and
+`objectapp` exit, the port is free). It also checks the theme reaches the shell on load
 and on a change, "Spellcheck language" reaches its spellchecker (with the dictionary download
-pointed at nothing), and that no command line holds the one-time link. Environment: `OBJECT_E2E_PYTHON` (a Python that has
+pointed at nothing), that no command line holds the one-time link, and that links reach the
+default browser only on a person's click: not when the page follows one by itself, not from an
+embedded page of another site (served on the port above the app's), and yes for a click on a
+Web link block in a note and on a button that calls `window.open`. Environment: `OBJECT_E2E_PYTHON` (a Python that has
 Object's dependencies; default `uv run python`), `OBJECT_E2E_PLAYWRIGHT` (the `playwright`
 package's folder when it is not installed beside the front end), `OBJECT_E2E_PORT` (default
-8891; the two ports 100 and 200 above it are used for debugging), `OBJECT_E2E_SHOTS` (a folder
-for two screenshots).
+8891; the port 1 above it serves the other site, and the two ports 100 and 200 above it are used
+for debugging), `OBJECT_E2E_SHOTS` (a folder for two screenshots).

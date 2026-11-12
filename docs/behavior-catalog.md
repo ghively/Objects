@@ -1478,7 +1478,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
     `<state>/desktop/window.json` and it comes back on a screen that still exists (on Wayland the size and
     maximised state only). Web storage lives in `<state>/desktop`; the launch key stays a session cookie.
   - **What it shows**: only the app's own origin. A link to another site, `window.open` and a `target="_blank"`
-    link open in the default browser (web and `mailto:` links only); nothing else opens anywhere. A right click
+    link open in the default browser (web and `mailto:` links only) when a person has just clicked or pressed a key
+    in the window (within a second; a server's redirect after such a click too), and only from the app's own page:
+    a page that tries it by itself, or an embedded page of another site, opens nothing and is told nothing;
+    nothing else opens anywhere. A right click
     where the app shows no menu of its own gives Cut, Copy, Paste, Select all and, on a misspelled word, up to five
     suggestions and "Add to dictionary"; selected text that cannot be edited gives Copy and Select all. Spell check
     is on and follows Settings > Editor > "Spellcheck language" (the offered dictionary of that tag, else of the

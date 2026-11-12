@@ -217,6 +217,53 @@ function alive(pid) {
   }
 }
 
+/** Longer than the shell's GESTURE_MS (desktop/lib/guard.js): no person's input is that recent. */
+const GESTURE_SLACK_MS = 1500
+/** The Web link block of the note "Links in a note". */
+const NOTE_LINK = 'https://example.com/clicked-in-a-note'
+
+/** Opens the note `title` through the search palette (Ctrl+K), with real keys. */
+async function openNote(page, title) {
+  await page.keyboard.press('Control+k')
+  await H.until('the search palette', () => page.evaluate(() => {
+    const input = document.querySelector('[role=dialog] input')
+    return input !== null && document.activeElement === input
+  }))
+  await page.keyboard.type(title)
+  await H.until(`"${title}" in the palette`, () => page.evaluate((t) =>
+    [...document.querySelectorAll('[role=dialog] [role=option]')].some((o) => o.textContent.includes(t)), title))
+  await sleep(200)
+  await page.keyboard.press('Enter')
+}
+
+/**
+ * Another site on 127.0.0.1:`port` (another origin than the app's): its page, shown in a frame
+ * of the app, calls window.open as it loads, opens a mailto, sets top.location, and keeps
+ * calling window.open for 6 seconds.
+ */
+function otherSite(port) {
+  const http = require('node:http')
+  const hits = []
+  const page = `<!doctype html><html><body>another site<script>
+window.open('https://example.com/nogesture-popup');
+setTimeout(() => window.open('mailto:probe@example.com'), 300);
+setTimeout(() => { try { top.location = 'https://example.com/framebust' } catch (e) {} }, 600);
+const again = setInterval(() => window.open('https://example.com/frame-after-click'), 100);
+setTimeout(() => clearInterval(again), 6000);
+</script></body></html>`
+  const server = http.createServer((req, res) => {
+    hits.push(req.url)
+    res.writeHead(200, { 'content-type': 'text/html' })
+    res.end(page)
+  })
+  return new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(port, '127.0.0.1', () => resolve({
+      origin: `http://127.0.0.1:${port}`, hits: () => hits.slice(), close: () => server.close(),
+    }))
+  })
+}
+
 /** Presses Escape until no dialog is open (Settings, menus). */
 async function closeDialogs(page) {
   for (let i = 0; i < 4; i++) {
@@ -247,16 +294,18 @@ async function run() {
   }))
   check('window.objectDesktop is there, platform linux', bridge.platform === 'linux', bridge)
   check('XDG_CURRENT_DESKTOP=Hyprland: controls is none', bridge.controls === 'none' && bridge.framed === false, bridge)
-  // The page sending itself elsewhere stays put too. (Last in this launch: Playwright then
-  // waits for a navigation that the shell refused.)
+  // The page sending itself elsewhere, with nobody's click, stays put and opens nothing. (Last in
+  // this launch: Playwright then waits for a navigation that the shell refused.)
   await page.evaluate(() => { window.location.href = 'https://example.com/from-location' })
-  await H.until('location handed to the browser', () => browser.opened().includes('https://example.com/from-location'))
-  check('the page cannot send the window to another site', page.url() === `http://127.0.0.1:${PORT}/`, page.url())
+  await sleep(1500)
+  check('the page cannot send the window to another site, nor the browser there by itself',
+    page.url() === `http://127.0.0.1:${PORT}/` && browser.opened().length === 0, { url: page.url(), opened: browser.opened() })
   let closed = await app.closeWith(() => page.evaluate(() => { window.objectDesktop.close() }))
   check('close() from the page ends objectapp', closed.code === 0, closed)
   check('the port is free after the window closed', !(await H.listening(PORT)))
 
   // -- 2. an ordinary desktop: the page draws the buttons -------------------------------------
+  fs.writeFileSync(path.join(space, 'Links in a note.md'), `<!-- block: bookmark -->\n[Example](${NOTE_LINK})\n`)
   app = await H.launch({ ...base, env: env({ XDG_CURRENT_DESKTOP: 'GNOME' }) })
   ;({ page, main } = app)
   await page.getByRole('heading', { name: 'Home' }).waitFor()
@@ -486,7 +535,9 @@ async function run() {
   check('an empty Spellcheck language gives the system\'s languages again', back !== null && JSON.stringify(back) === JSON.stringify(systemLanguages), back)
   await closeDialogs(page)
 
-  // Links to other sites never load in the window.
+  // Links to other sites never load in the window, and go to the default browser only on a
+  // person's click. First the page by itself (nobody's input for a while): nothing opens.
+  await sleep(GESTURE_SLACK_MS)
   await page.evaluate(() => {
     const a = document.createElement('a')
     a.href = 'https://example.com/from-a-link'
@@ -495,15 +546,44 @@ async function run() {
     a.click()
     a.remove()
   })
-  await H.until('the link handed to the browser', () => browser.opened().includes('https://example.com/from-a-link'))
-  check('a link to another site does not load in the window', page.url() === `http://127.0.0.1:${PORT}/`, page.url())
   check('window.open gives no second window', await page.evaluate(() => window.open('https://example.com/from-window-open') === null))
-  await H.until('window.open handed to the browser', () => browser.opened().includes('https://example.com/from-window-open'))
   await page.evaluate(() => { window.open('file:///etc/passwd'); window.open(`${window.location.origin}/`) })
+  await sleep(500)
+  check('a link or window.open the page follows by itself loads nothing and opens nothing',
+    page.url() === `http://127.0.0.1:${PORT}/` && browser.opened().length === 0, browser.opened())
+
+  // An embedded page of another site (the review's probe): window.open as it loads, a mailto,
+  // top.location, and window.open again and again while a person clicks in the app.
+  const other = await otherSite(PORT + 1)
+  await page.evaluate((src) => {
+    const f = document.createElement('iframe')
+    f.id = 'e2e-other-site'
+    f.src = src
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:200px;height:120px;z-index:99999'
+    document.body.appendChild(f)
+  }, `${other.origin}/frame`)
+  await sleep(1200)
+  const spot = await page.evaluate(() => {
+    const d = document.createElement('div')
+    d.id = 'e2e-spot'
+    d.style.cssText = 'position:fixed;left:0;bottom:0;width:40px;height:40px;z-index:99999'
+    document.body.appendChild(d)
+    return { x: 20, y: window.innerHeight - 20 }
+  })
+  for (let i = 0; i < 4; i++) {
+    await page.mouse.click(spot.x, spot.y)
+    await sleep(300)
+  }
+  await sleep(1500)
+  check('an embedded page of another site opens nothing: not by itself, not just after a person\'s click in the app',
+    page.url() === `http://127.0.0.1:${PORT}/` && browser.opened().length === 0 && other.hits().includes('/frame'),
+    { opened: browser.opened(), hits: other.hits() })
+  await page.evaluate(() => { document.getElementById('e2e-other-site')?.remove(); document.getElementById('e2e-spot')?.remove() })
+  other.close()
+
   await sleep(300)
   check('the window still shows the app, alone', page.url() === `http://127.0.0.1:${PORT}/` &&
     (await main.evaluate('electron.BrowserWindow.getAllWindows().length')) === 1, browser.opened())
-  check('only web links went to the default browser', browser.opened().length === 3, browser.opened())
   check('the default browser did not inherit the launch variable', !browser.inherited())
 
   // Keep on top: `objectapp` writes the stdin line, the shell opens the small window.
@@ -681,6 +761,44 @@ async function run() {
     })
     check('and restores to the size it had before', true, normal)
   }
+  // A person's click (real pointer events): the Web link block in a note, then a button of the
+  // page that calls window.open.
+  await openNote(page, 'Links in a note')
+  const link = await H.until('the Web link block, uncovered', () => page.evaluate((href) => {
+    if (document.querySelector('[role=dialog]')) return null
+    const a = [...document.querySelectorAll(`a[href="${href}"]`)].find((x) => x.getBoundingClientRect().width > 0)
+    if (!a) return null
+    a.scrollIntoView({ block: 'center' })
+    const r = a.getBoundingClientRect()
+    const at = { x: r.x + Math.min(30, r.width / 2), y: r.y + r.height / 2 }
+    return document.elementFromPoint(at.x, at.y)?.closest('a') === a ? at : null
+  }, NOTE_LINK))
+  await sleep(300)
+  const under = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('a')?.href ?? null, link)
+  await page.mouse.click(link.x, link.y)
+  const clicked = await H.until('the clicked link handed to the browser', () => browser.opened().includes(NOTE_LINK),
+    { timeout: 5000 }).catch(() => false)
+  check('a click on a link in a note opens it in the default browser, not in the window',
+    clicked && page.url() === `http://127.0.0.1:${PORT}/`, { url: page.url(), under, opened: browser.opened() })
+  const button = await page.evaluate(() => {
+    const b = document.createElement('button')
+    b.id = 'e2e-open'
+    b.textContent = 'open'
+    b.style.cssText = 'position:fixed;left:0;top:50%;width:60px;height:30px;z-index:99999'
+    b.addEventListener('click', () => { window.open('https://example.com/from-a-click', '_blank', 'noopener,noreferrer') })
+    document.body.appendChild(b)
+    const r = b.getBoundingClientRect()
+    return { x: r.x + 30, y: r.y + 15 }
+  })
+  await page.mouse.click(button.x, button.y)
+  check('window.open on a person\'s click goes to the default browser', await H.until('window.open on a click handed to the browser',
+    () => browser.opened().includes('https://example.com/from-a-click'), { timeout: 5000 }).catch(() => false), browser.opened())
+  await page.evaluate(() => document.getElementById('e2e-open')?.remove())
+  await sleep(300)
+  check('the window still shows the app, alone', page.url() === `http://127.0.0.1:${PORT}/` &&
+    (await main.evaluate('electron.BrowserWindow.getAllWindows().length')) === 1, browser.opened())
+  check('only what a person clicked went to the default browser',
+    JSON.stringify(browser.opened()) === JSON.stringify([NOTE_LINK, 'https://example.com/from-a-click']), browser.opened())
   await page.evaluate(() => { window.objectDesktop.onBeforeClose(() => new Promise(() => {})) })
   closed = await app.closeWith(() => page.evaluate(() => { window.objectDesktop.close() }))
   check('a handler that never answers holds the window 3 seconds, no longer', closed.ms >= 3000 && closed.ms < 6000, closed)
