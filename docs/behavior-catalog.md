@@ -992,7 +992,8 @@ Where it exists; tabs do not drag (`shell/TabStrip.tsx`).
   DailyNote default template, if any) and the typing goes into its own paragraph after the template content (or
   into the template's first empty paragraph) — never onto the end of the template's last heading.
 - **Day view** on today: the header's right side has a "Tasks dashboard" link to Tasks › Today, which lists the
-  same tasks as the Day view's Tasks section (decision T1); other days have no link. (M32) The link reads "Open
+  same tasks as the Day view's Tasks section (decision T1; (M33) the Tasks page's Today also lists, under Overdue,
+  the tasks with no date whose deadline has passed, which the Day view does not); other days have no link. (M32) The link reads "Open
   Tasks" and opens the Tasks page on its Today list; while the Work page is on for the space it reads "Open Work"
   and opens Work's Today. In the Tasks section the `+` menu's first row reads "New task" (was "Create task"), and
   the "Overdue (n)" group shows its count once (it read "Overdue (1) 1").
