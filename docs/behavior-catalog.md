@@ -54,6 +54,11 @@ Object has no accounts.
   App icon (M31): a row of swatches (Default, Red, Orange, Green, Blue, Purple, Pink, Gray; device setting
   `appIcon`), each showing the bolt in its colour; the choice recolours the browser tab's icon at once and the
   app window's from the next start (the window takes an icon only when it opens).
+  "Window buttons" (M33, ours; under Layout): "Automatic" (default), "Show", "Hide" (device setting
+  `windowButtons`: `auto`, `show`, `hide`). Shown only in the desktop window on Linux, where Object draws the
+  window's own buttons (not in a browser, not on Windows or macOS, not with the system's frame). Help: "The
+  minimize, maximize and close buttons at the end of the top bar. Automatic leaves them out on a tiling window
+  manager, where windows have none." A change shows or removes the buttons at once.
 - AI Assistant: "Hide AI features" switch.
 - Editor: Disable spellcheck; Spellcheck language (Experimental); Open notes as a full page (M32: was "Open objects
   as a full page"; on by default now; Alt+Shift click opens the preview instead); Show properties by default (ours,
@@ -341,6 +346,24 @@ Each starter template pre-fills the new type's properties.
   or is the page in view (with nothing popped out over it), the caret goes to the end of its text where it is
   open, and nothing more opens.
 
+- **The top bar in the desktop window (M33)**: the desktop window has no frame, so the top bar is its title bar.
+  Dragging a free part of the bar moves the window, and a double click there maximises it (the system's own
+  behaviour); everything in the bar keeps working as it does in a browser (the space menu, the sidebar button,
+  back and forward, the tabs with their menu and their scrolling, the tab menu, "Create new tab", "Today's note",
+  the side panel button), and so does anything that opens over it (menus, dialogs, tooltips). The bar stays 42px
+  high. Room for the window's own buttons follows where they are: on Windows the system draws minimise, maximise
+  and close over the top right corner and the bar keeps that corner free (138px when the system gives no
+  measure); on macOS the traffic lights sit in the bar's left end, which keeps 78px free for them (the block over
+  the sidebar narrows by as much, so the sidebar button and everything after it stay where they are), except in
+  full screen; on Linux Object draws three buttons as the last things in the bar: "Minimize", "Maximize"
+  ("Restore" while maximised) and "Close" (tooltips in those words; Close turns the danger colour under the
+  pointer; reached by Tab after everything else in the bar; they stay while the bar fades for typing; they take
+  clicks over the bar's full height and Close out to the window's edge, so the corner of a maximised window
+  closes it). No buttons
+  are drawn on a tiling compositor or with "Window buttons: Hide" (Settings > Appearance); the bar still moves the
+  window. With the system's ordinary frame nothing is kept free, nothing is drawn and the bar does not drag. The
+  window's system parts follow the app's theme. In a browser tab and in the pywebview window none of this exists:
+  the bar is exactly as before.
 - **Home (M32)**: a tab with no page (a new empty tab, the first open of a space with nothing to restore, the
   start choice "Home") shows Home; it replaces the old start text "Pick an object type / Choose a type in the
   sidebar to see its objects.", which is gone. Top to bottom: "New note" and "Today's note"; "Recent", the last 12
@@ -656,6 +679,11 @@ Each starter template pre-fills the new type's properties.
     window, and is offered the next time the note opens ("Recover unsaved changes": the kept text beside the
     version on disk, "Save changes" / "Discard"; nothing is written without that choice). Kept text the file
     already holds is cleared when the space opens, and never offered.
+  - (M33) The desktop window saves before it closes: on a close it first does what a closing browser window does
+    (unsaved text is sent and kept for the next open until it lands, a typed title is committed, a whiteboard and
+    a drawing flush) and then waits until no save is waiting or on its way (the open notes' text and titles, and
+    every write to the server not yet answered, a property edit included), 2.5 seconds at most; a failed save
+    does not hold the window (its text is kept as above). The app's server stops only after the window is gone.
 - **Make this line a task (M32)**, Ctrl+Shift+T with the caret in a note: the line holding the caret becomes a
   Task titled with its text and is replaced by the task's link card, whatever the line is: a paragraph, a heading,
   a list line (the list is split around it; nested lines become the task's body) or a to-do (a ticked one is made
