@@ -8,7 +8,7 @@ vi.mock('@/api/client', async (orig) => ({
 import { api, ConflictError } from '@/api/client'
 import type { UpdateResult } from '@/api/types'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
-import { completionToast, maybeOverdue, setStatus, toggleDone } from './taskActions'
+import { completionToast, dateRemovalOf, maybeOverdue, setDate, setStatus, toggleDone } from './taskActions'
 import { TASK_TYPE, taskRow } from './taskFixtures'
 
 const mocked = vi.mocked(api)
@@ -80,5 +80,47 @@ describe('taskActions', () => {
     } finally {
       setZone(null)
     }
+  })
+})
+
+// M33 (choice 9): removing a task's date from a row is the pane's "Remove date".
+describe('removing a task date (M33)', () => {
+  const day = (start: string) => ({ start, resolution: 'day' as const })
+  const ok: UpdateResult = { version: 'v2', frontmatter: {}, links: {}, synced: [], skipped: [], task: null }
+
+  test('test dateRemovalOf names what goes with the date and whether there is history to ask about', () => {
+    expect(dateRemovalOf(taskRow('Tasks/A.md', { date: day('2026-10-23') }))).toEqual({ updates: { date: null }, remove: [], hasHistory: false })
+    expect(dateRemovalOf(taskRow('Tasks/A.md', { date: day('2026-10-23'), repeat: 'every week', remind: 'on the day at 09:00' }))).toEqual({
+      updates: { date: null },
+      remove: ['repeat', 'remind'],
+      hasHistory: false,
+    })
+    expect(dateRemovalOf(taskRow('Tasks/A.md', { date: day('2026-10-23'), repeat: 'every week', occurrenceLog: '2026-10-16 skipped' }))).toEqual({
+      updates: { date: null },
+      remove: ['repeat', 'occurrenceLog'],
+      hasHistory: true,
+    })
+    // A blank log is no history; a task with no date has nothing to write.
+    expect(dateRemovalOf(taskRow('Tasks/A.md', { date: day('2026-10-23'), occurrenceLog: '  ' })).hasHistory).toBe(false)
+    expect(dateRemovalOf(taskRow('Tasks/A.md', {}))).toEqual({ updates: {}, remove: [], hasHistory: false })
+    // A repeat left behind by an earlier "No date" goes on the next one.
+    expect(dateRemovalOf(taskRow('Tasks/A.md', { repeat: 'every week' }))).toEqual({ updates: {}, remove: ['repeat'], hasHistory: false })
+  })
+
+  test('test setDate(null) makes that one write; a date still writes the date alone', async () => {
+    const updateProperties = vi.fn(async () => ok)
+    const rows = vi.fn(async () => [])
+    const taskApi = { updateProperties, rows }
+    await setDate(taskApi, taskRow('Tasks/A.md', { date: day('2026-10-23'), repeat: 'every week' }, 'v1'), null)
+    expect(updateProperties.mock.calls[0]).toEqual(['Tasks/A.md', { date: null }, 'v1', ['repeat']])
+    await setDate(taskApi, taskRow('Tasks/A.md', { date: day('2026-10-23'), repeat: 'every week' }, 'v1'), day('2026-10-24'))
+    expect(updateProperties.mock.calls[1]).toEqual(['Tasks/A.md', { date: day('2026-10-24') }, 'v1'])
+    // Nothing to remove: no write and no reload.
+    updateProperties.mockClear()
+    rows.mockClear()
+    const outcome = await setDate(taskApi, taskRow('Tasks/A.md', {}, 'v1'), null)
+    expect(updateProperties).not.toHaveBeenCalled()
+    expect(rows).not.toHaveBeenCalled()
+    expect(outcome).toEqual({ result: undefined, row: undefined, conflict: false })
   })
 })

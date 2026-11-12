@@ -243,3 +243,96 @@ describe('TaskDateChip for the deadline (M33)', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 })
+
+// M33 (choice 9): "No date" does what the properties pane's "Remove date" does for a task
+// (`properties/cells/DateCell.tsx`): `date: null`, and the repeat, the reminder and the occurrence
+// log removed with it; where there is a log, it asks first, as the pane does.
+describe('TaskDateChip "No date" (M33)', () => {
+  const pickNoDate = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByTestId('task-date'))
+    await user.click(await screen.findByRole('menuitem', { name: 'No date' }))
+  }
+
+  test('test "No date" on a plain task writes date: null alone, the call the pane makes', async () => {
+    const user = userEvent.setup()
+    mocked.rows.mockResolvedValue([])
+    render(<TaskDateChip row={taskRow('Tasks/A.md', { date: day('2026-10-23') }, 'v1')} type={TASK_TYPE} today={TODAY} />)
+    await pickNoDate(user)
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))
+    expect(mocked.updateProperties.mock.calls[0]).toEqual(['Tasks/A.md', { date: null }, 'v1'])
+  })
+
+  test('test "No date" on a task that repeats or reminds removes the repeat and the reminder with the date, in one write', async () => {
+    const user = userEvent.setup()
+    mocked.rows.mockResolvedValue([])
+    render(
+      <TaskDateChip
+        row={taskRow('Tasks/A.md', { date: day('2026-10-23'), repeat: 'every week', remind: 'on the day at 09:00' }, 'v1')}
+        type={TASK_TYPE}
+        today={TODAY}
+      />,
+    )
+    await pickNoDate(user)
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))
+    expect(mocked.updateProperties.mock.calls[0]).toEqual(['Tasks/A.md', { date: null }, 'v1', ['repeat', 'remind']])
+    // No question: there is no history to lose.
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+  })
+
+  test('test "No date" on a task with a history of repeats asks first, as the pane does; "Keep date" writes nothing', async () => {
+    const user = userEvent.setup()
+    mocked.rows.mockResolvedValue([])
+    const row = taskRow('Tasks/A.md', { date: day('2026-10-23'), repeat: 'every week', occurrenceLog: '2026-10-16 completed 2026-10-16T09:00:00Z' }, 'v1')
+    render(<TaskDateChip row={row} type={TASK_TYPE} today={TODAY} />)
+    await pickNoDate(user)
+    const ask = await screen.findByRole('alertdialog', { name: 'Remove date?' })
+    expect(ask).toHaveTextContent('Some repeats of this task are already done or skipped. Clearing the date throws that history away.')
+    expect(within(ask).getAllByRole('button').map((b) => b.textContent)).toEqual(['Keep date', 'Remove date'])
+    expect(mocked.updateProperties).not.toHaveBeenCalled()
+    await user.click(within(ask).getByRole('button', { name: 'Keep date' }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    // Back on the menu, nothing written.
+    expect(await screen.findByRole('menu', { name: 'Date' })).toBeInTheDocument()
+    expect(mocked.updateProperties).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('menuitem', { name: 'No date' }))
+    await user.click(within(await screen.findByRole('alertdialog', { name: 'Remove date?' })).getByRole('button', { name: 'Remove date' }))
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))
+    expect(mocked.updateProperties.mock.calls[0]).toEqual(['Tasks/A.md', { date: null }, 'v1', ['repeat', 'occurrenceLog']])
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  })
+
+  test('test "No date" on a task that has no date writes nothing', async () => {
+    const user = userEvent.setup()
+    const onResult = vi.fn()
+    render(<TaskDateChip row={taskRow('Tasks/A.md', {}, 'v1')} type={TASK_TYPE} today={TODAY} onResult={onResult} />)
+    await pickNoDate(user)
+    await waitFor(() => expect(screen.queryByRole('menu', { name: 'Date' })).toBeNull())
+    expect(mocked.updateProperties).not.toHaveBeenCalled()
+    expect(mocked.rows).not.toHaveBeenCalled()
+    expect(onResult).not.toHaveBeenCalled()
+  })
+
+  test('test the date picker\'s own "Remove date" on the chip does the same', async () => {
+    const user = userEvent.setup()
+    mocked.rows.mockResolvedValue([])
+    render(<TaskDateChip row={taskRow('Tasks/A.md', { date: day('2026-10-23'), remind: 'on the day at 09:00' }, 'v1')} type={TASK_TYPE} today={TODAY} />)
+    await user.click(screen.getByTestId('task-date'))
+    await user.click(await screen.findByRole('menuitem', { name: 'Pick a date' }))
+    await user.click(within(await screen.findByTestId('date-picker')).getByRole('button', { name: 'Remove date' }))
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))
+    expect(mocked.updateProperties.mock.calls[0]).toEqual(['Tasks/A.md', { date: null }, 'v1', ['remind']])
+  })
+
+  test('test "No deadline" writes deadline: null alone and never touches the repeat', async () => {
+    const user = userEvent.setup()
+    mocked.rows.mockResolvedValue([])
+    render(
+      <TaskDateChip property="deadline" row={taskRow('Tasks/A.md', { deadline: day('2026-10-23'), repeat: 'every week' }, 'v1')} type={TASK_TYPE} today={TODAY} />,
+    )
+    await user.click(screen.getByTestId('task-date'))
+    await user.click(await screen.findByRole('menuitem', { name: 'No deadline' }))
+    await waitFor(() => expect(mocked.updateProperties).toHaveBeenCalledTimes(1))
+    expect(mocked.updateProperties.mock.calls[0]).toEqual(['Tasks/A.md', { deadline: null }, 'v1'])
+  })
+})

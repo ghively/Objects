@@ -8,6 +8,11 @@
 // deadline (a task with no date). It shows the deadline, says so (the hourglass, the tooltip and
 // the name "Deadline: Nov 13, 2026"), is in the danger colour once the deadline has passed, and
 // its picker writes the deadline: Today, Tomorrow, Next week, No deadline, "Pick a date".
+//
+// M33 (choice 9): "No date" does what the properties pane's "Remove date" does for a task
+// (`taskActions.dateRemovalOf`): the repeat and the reminder go with the date in the same write,
+// and a task with done or skipped repeats on record asks first, in the pane's own words. On a
+// task that has no date it writes nothing.
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type SyntheticEvent } from 'react'
 import type { DateValue, Row, TypeDef } from '@/api/types'
 import { addDays, parseYmd, ymd } from '@/calendar/dates'
@@ -18,7 +23,7 @@ import { fromWallClock, wallClock, zonedToday } from '@/lib/zonedTime'
 import { DatePicker } from '@/properties/DatePicker'
 import { formatDate } from '@/properties/format'
 import { isOpen } from './statusCategory'
-import { DEFAULT_TASK_API, setDateProperty, type TaskApi, type TaskDateKey, type TaskOutcome } from './taskActions'
+import { DEFAULT_TASK_API, dateRemovalOf, setDateProperty, type TaskApi, type TaskDateKey, type TaskOutcome } from './taskActions'
 import { coveredDays } from './taskSections'
 
 export const TASK_DATE_TEXT = {
@@ -33,6 +38,11 @@ export const TASK_DATE_TEXT = {
   /** M33: the chip of a row listed by its deadline ("Deadline: Nov 13, 2026"), and its "none" row (our string). */
   deadlineLabel: 'Deadline',
   noDeadline: 'No deadline',
+  /** M33: the question before a date with a history of repeats is removed (the date picker's own words). */
+  removeTitle: 'Remove date?',
+  removeBody: 'Some repeats of this task are already done or skipped. Clearing the date throws that history away.',
+  removeKeep: 'Keep date',
+  removeConfirm: 'Remove date',
 }
 
 /** What the chip says per property: its name, its "none" choice and its icon. */
@@ -121,6 +131,8 @@ export function TaskDateChip({
 }) {
   const [open, setOpen] = useState(false)
   const [picking, setPicking] = useState(false)
+  /** "No date" on a task with a history of repeats: the question is showing. */
+  const [asking, setAsking] = useState(false)
   const [busy, setBusy] = useState(false)
   /** "Pick a date" opened the picker: its date field takes the caret, the date shown selected, so
    * a date typed at once ("friday", Enter) replaces it. */
@@ -164,8 +176,20 @@ export function TaskDateChip({
 
   /** A quick choice: write it and close. */
   const pick = (next: DateValue | null) => {
+    if (next === null && !isDeadline) return removeDate()
     setOpen(false)
     void write(next)
+  }
+
+  /** "No date" (and the picker's "Remove date"): the pane's removal; it asks first when repeats are on record. */
+  const removeDate = (confirmed = false) => {
+    const removal = dateRemovalOf(row)
+    if (removal.hasHistory && !confirmed) return setAsking(true)
+    setAsking(false)
+    setOpen(false)
+    // No date and nothing that goes with one: nothing to write.
+    if (Object.keys(removal.updates).length === 0 && removal.remove.length === 0) return
+    void write(null)
   }
 
   /** A menu's keys: Up and Down move through its items (round the ends), Home and End jump. */
@@ -192,6 +216,7 @@ export function TaskDateChip({
       onOpenChange={(o) => {
         setOpen(o)
         if (o) setPicking(false)
+        setAsking(false)
       }}
     >
       <span className="inline-flex shrink-0 items-center" onPointerDown={stop} onMouseDown={stop} onKeyDown={stop} onClick={stop}>
@@ -214,13 +239,32 @@ export function TaskDateChip({
         </PopoverTrigger>
       </span>
       <PopoverContent align="end" className="w-auto border-line bg-raised p-0 text-fg" onClick={stop} onPointerDown={stop} onKeyDown={stop}>
-        {picking ? (
+        {asking ? (
+          <div role="alertdialog" aria-label={TASK_DATE_TEXT.removeTitle} className="flex w-72 flex-col gap-2 p-3">
+            <h2 className="text-[15px] font-semibold">{TASK_DATE_TEXT.removeTitle}</h2>
+            <p className="text-[13px] text-fg-muted">{TASK_DATE_TEXT.removeBody}</p>
+            <div className="flex justify-end gap-2">
+              <button type="button" autoFocus onClick={() => setAsking(false)} className="rounded-md px-3 py-1 text-[14px] hover:bg-hover">
+                {TASK_DATE_TEXT.removeKeep}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => removeDate(true)}
+                className="rounded-md bg-[var(--danger)] px-3 py-1 text-[14px] font-medium text-white hover:opacity-90"
+              >
+                {TASK_DATE_TEXT.removeConfirm}
+              </button>
+            </div>
+          </div>
+        ) : picking ? (
           <div ref={pickerRef}>
             <DatePicker
               value={date}
               constraints={type?.propertyDefinitions.find((d) => d.key === property)?.options.constraints}
               now={todayProp}
               onChange={(next) => {
+                if (next === null && !isDeadline) return removeDate()
                 void write(next)
                 if (next === null) setOpen(false)
               }}

@@ -474,6 +474,14 @@ with the click. A type made from scratch ("Create your own") still opens its set
   chip, so a date is still one click away. Decision T1 changes with it: Tasks › Today is the Calendar Day view's
   list for today plus the tasks with no date whose deadline has passed, which the Day view does not list (it
   shows a deadline on its own day). The Work page's task lists and its Today badge are as they were.
+  (M33) **"No date"** on a row's chip does what "Remove date" in the properties pane does for a task, with the same
+  one write: `date: null`, and the task's `repeat`, `remind` and `occurrenceLog` keys removed with it (before, the
+  chip wrote `date: null` alone and left a repeat and a reminder behind with no date to act on). A task with done
+  or skipped repeats on record asks first, in the pane's words: "Remove date?", "Some repeats of this task are
+  already done or skipped. Clearing the date throws that history away.", "Keep date" / "Remove date". On a task
+  with no date, "No date" writes nothing. For a task with neither a repeat nor a reminder nothing changed: both
+  write `date: null` (the `date` line stays, holding `null`). "Remove date" in the chip's own date picker does
+  the same. "No deadline" writes `deadline: null` alone, as clearing the Deadline in the pane does.
 - **Work** (M32; optional): the dashboard that used to be the Tasks page is its own page, off until "Use the Work
   page in this space" is turned on (Settings > Work; a space that already holds work data reads as on). On: a
   "Work" entry under Tasks opens it (the `work` target), unchanged apart from its heading ("Work"). Off: nothing
