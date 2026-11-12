@@ -30,8 +30,15 @@ xvfb-run -a -s "-screen 0 1920x1080x24" node desktop/test/e2e/shell.e2e.js   # w
 ```
 
 Under `xvfb-run` install a window manager first (`openbox`; the script starts it), or the
-maximise and minimise checks are left out. With `xdotool` installed it also drags the window's
-edges and right-clicks with real pointer events. Environment: `OBJECT_E2E_PYTHON` (a Python that has
+maximise and minimise checks are left out. With `xdotool` installed it also uses real pointer
+and key events: it drags the window's edges and the top bar (and checks a press on a bar button
+or the space switcher does not move it), double-clicks the bar to maximise and restore, clicks
+Minimize, Maximize, Restore and the corner's Close, right-clicks, picks each "Window buttons"
+choice in Settings (and sees "Hide" honoured on the next launch), types a title and three
+sentences and closes at once with the page's own before-close handler, and types a property
+before the window manager's close (Alt+F4). It also checks the theme reaches the shell on load
+and on a change, "Spellcheck language" reaches its spellchecker (with the dictionary download
+pointed at nothing), and that no command line holds the one-time link. Environment: `OBJECT_E2E_PYTHON` (a Python that has
 Object's dependencies; default `uv run python`), `OBJECT_E2E_PLAYWRIGHT` (the `playwright`
 package's folder when it is not installed beside the front end), `OBJECT_E2E_PORT` (default
 8891; the two ports 100 and 200 above it are used for debugging), `OBJECT_E2E_SHOTS` (a folder
