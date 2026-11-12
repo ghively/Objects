@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ObjectDetail } from '@/api/types'
 import { ReviewedButton } from '@/calendar/DayHeader'
 import { useCalendar } from '@/calendar/useCalendar'
@@ -73,25 +73,58 @@ function DailyNoteControls({ path, note, version, onDismiss }: { path: string; n
   )
 }
 
+/**
+ * M33: the pager button the last step was made with, and the note it stepped to. Each note's view
+ * draws its own pager (twice: while it loads, then loaded), so the button a step was made with is
+ * gone the moment it is used and the focus fell back to the peek's frame. The new pager takes the
+ * focus back, so the same key steps on (and never lands in the note the step just showed, nor
+ * does an empty note take the caret from the pager). Forgotten when the person moves the focus
+ * elsewhere, and when the peek closes.
+ */
+let stepped: { path: string; button: 'prev' | 'next' } | null = null
+
 function Pager() {
-  const { index, list, next, prev } = usePeek()
+  const { index, list, next, prev, path } = usePeek()
+  const prevRef = useRef<HTMLButtonElement | null>(null)
+  const nextRef = useRef<HTMLButtonElement | null>(null)
+  useLayoutEffect(() => {
+    if (!stepped || stepped.path !== path) return
+    const wanted = stepped.button === 'next' ? nextRef.current : prevRef.current
+    // At either end of the list the button is off: the other one is the way back.
+    const el = wanted && !wanted.disabled ? wanted : stepped.button === 'next' ? prevRef.current : nextRef.current
+    el?.focus({ preventScroll: true })
+  }, [path])
   if (list.length < 2) return null
+  const step = (button: 'prev' | 'next') => {
+    if (button === 'next') next()
+    else prev()
+    const now = usePeek.getState().path
+    stepped = now !== null && now !== path ? { path: now, button } : null
+  }
+  // A blur means the person moved the focus (a button that is removed fires none).
+  const forget = () => {
+    stepped = null
+  }
   return (
     <div className="flex items-center gap-1 rounded-xl border border-line bg-raised-2 py-1 pr-1 pl-3 text-[15px]">
       <span className="tabular-nums">{`${index + 1} / ${list.length}`}</span>
       <button
+        ref={prevRef}
         type="button"
         aria-label="Previous"
-        onClick={prev}
+        onClick={() => step('prev')}
+        onBlur={forget}
         disabled={index <= 0}
         className="flex size-8 items-center justify-center rounded-md hover:bg-hover disabled:opacity-40 disabled:hover:bg-transparent"
       >
         <Icon name="ph-caret-left" size={16} />
       </button>
       <button
+        ref={nextRef}
         type="button"
         aria-label="Next"
-        onClick={next}
+        onClick={() => step('next')}
+        onBlur={forget}
         disabled={index >= list.length - 1}
         className="flex size-8 items-center justify-center rounded-md hover:bg-hover disabled:opacity-40 disabled:hover:bg-transparent"
       >
@@ -117,6 +150,10 @@ export function ObjectPeek() {
   // The version the peek's view adopts (load, saves, reloads) and its detail; reset with the path.
   const [version, setVersion] = useState<{ path: string; version: string } | null>(null)
   const [note, setNote] = useState<DailyNote | null>(null)
+  // The peek closed: a pager step made in it is over (`stepped`).
+  useEffect(() => {
+    if (path === null) stepped = null
+  }, [path])
 
   return (
     <>

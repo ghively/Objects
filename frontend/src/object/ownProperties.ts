@@ -4,19 +4,14 @@
  * (Collections, Description, Created at, Last updated, Tags, Icon, Aliases), so its notes open
  * with the pane closed and the text gets the room.
  */
-import type { PropertyDef, TypeDef } from '@/api/types'
+import type { TypeDef } from '@/api/types'
 import { isDailyNoteType } from './ObjectHeader'
+import { isSystemProperty } from './paneOrder'
 
-/** The system properties that are not `entity_*` kinds (a type has them only once added). */
-const SYSTEM_KEYS = new Set(['coverImage', 'color'])
+export { isSystemProperty }
 
 /** A Daily note's own two fields: its title shows the date, its header the Reviewed button. */
 const DAILY_NOTE_KEYS = new Set(['date', 'reviewed'])
-
-/** A system property: one every note has (`entity_*`), or the Cover image / Color system rows. */
-export function isSystemProperty(d: Pick<PropertyDef, 'key' | 'type'>): boolean {
-  return d.type.startsWith('entity_') || (SYSTEM_KEYS.has(d.key) && d.type === d.key)
-}
 
 /**
  * Whether `type` has properties of its own: a definition that is not a system row, or a computed

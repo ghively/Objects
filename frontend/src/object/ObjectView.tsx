@@ -70,6 +70,7 @@ import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, HeaderTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
 import { keyIsForView, usePageShortcuts } from './pageShortcuts'
+import { canTakeCaretOnOpen, dropHeldKeys, useBodyEntryKeys } from './bodyEntry'
 import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
 import { ImportSourceLine, importSourceOf } from './ImportSourceLine'
 import { counterpartEditor } from './CounterpartRows'
@@ -79,6 +80,7 @@ import {
   caretInTopLevelBlock,
   focusBody,
   focusBodyEnd,
+  placeBodyCaret,
   focusedBodyCaret,
 } from './bodyCaret'
 import { claimHandover, dropHandover, focusedTitle, handOver, peekHandover } from './renameHandover'
@@ -1668,6 +1670,11 @@ export function ObjectView({
   // own rename the text typed meanwhile (shown at once, saved here) and the caret; otherwise a
   // body-focus request for this note ("Today's note": the end of its text). Each is taken once.
   const takenRef = useRef(false)
+  /** The header took a brand-new note's mark: its title gets the focus, selected (set before the effect below runs). */
+  const freshTitleRef = useRef(false)
+  const onFreshTitle = useCallback(() => {
+    freshTitleRef.current = true
+  }, [])
   useEffect(() => {
     if (mode === 'inline' || !hasDetail || takenRef.current) return
     takenRef.current = true
@@ -1707,7 +1714,19 @@ export function ObjectView({
     }
     const at = claim?.caret ?? takeBodyFocus(path)
     if (at) focusBody(viewRootRef.current, at)
+    // M33, choice 1: a note whose text is empty opens with the caret in the text (there is
+    // nothing to read), unless the open brought its own caret (above), the note is brand new (its
+    // title is selected), or something else holds the focus (`canTakeCaretOnOpen`). The caret
+    // only: nothing is typed, so nothing is saved.
+    else if (!freshTitleRef.current && (text ?? detailRef.current?.body ?? '').trim() === '' && canTakeCaretOnOpen(viewRootRef.current, mode)) {
+      // The key that opened it may still be down (Enter on a row, the Work page's Space).
+      if (placeBodyCaret(viewRootRef.current, 'start')) dropHeldKeys()
+    }
   }, [mode, hasDetail, path, handed, adoptVersion, publishTitle])
+
+  // M33, choice 1: with nothing focused, Enter puts the caret at the end of the text and
+  // ArrowDown at its start (`bodyEntry.ts`).
+  useBodyEntryKeys(mode, viewRootRef)
 
   /** M32, item 2: Enter, ArrowDown or Tab in the title: the caret goes to the start of the body. */
   const enterBody = useCallback(() => focusBody(viewRootRef.current, 'start'), [])
@@ -1931,6 +1950,7 @@ export function ObjectView({
               onPropertiesChange={writeProperties}
               onOpenTag={onOpenTag}
               onEnterBody={enterBody}
+              onFreshTitle={onFreshTitle}
               // W10: what the references section under the text holds, said above the fold.
               beside={<ReferenceCounts path={path} />}
               beforeTitle={taskTick}

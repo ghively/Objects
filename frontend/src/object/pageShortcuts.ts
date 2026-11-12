@@ -68,7 +68,8 @@ function bodyOf(root: HTMLElement | null, path: string): Element | null {
   return null
 }
 
-const isDocumentLevel = (n: unknown) => n == null || n === document.body || n === document.documentElement || n === document || n === window
+/** Nothing in particular holds it: the page itself (`<body>`, the document, the window) or nothing at all. */
+export const isDocumentLevel = (n: unknown) => n == null || n === document.body || n === document.documentElement || n === document || n === window
 
 /**
  * Whether a key event belongs to the object view whose root (`[data-object-view]`) is `root`:

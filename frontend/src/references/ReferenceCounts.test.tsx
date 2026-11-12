@@ -136,6 +136,28 @@ describe('the count of backlinks and mentions beside the header (W10)', () => {
     expect(screen.getByText('No unlinked mentions')).toBeInTheDocument()
   })
 
+  // M33, choice 11: a line that names the note twice is one row. The count was, and is, the number
+  // of notes that mention this one (neither matches nor lines), so it matches the tab as before.
+  test('test the count still matches the Mentions tab when a line names the note twice', async () => {
+    const line = 'self talks about self here'
+    const doubled = {
+      path: 'Pages/Gamma.md',
+      version: 'v1',
+      occurrences: [
+        { start: 0, end: 4, text: 'self', context: line, contextStart: 0 },
+        { start: 17, end: 21, text: 'self', context: line, contextStart: 0 },
+      ],
+    }
+    mount(references({ tabs: ['all', 'backlinks', 'related', 'mentions'], mentions: [doubled, mention('Delta')], related: [], summaries }))
+    await waitFor(() => expect(counts()).toHaveTextContent('2 mentions'))
+    expect(counts()!.textContent).toBe('2 mentions')
+    expect(screen.getByRole('tab', { name: /^Mentions/ }).querySelector('[data-tab-count]')?.textContent).toBe('2')
+    // Two notes, each listed, the doubled line once.
+    expect(document.querySelectorAll('[data-mention]')).toHaveLength(2)
+    expect(document.querySelectorAll('[data-mention="Pages/Gamma.md"] [data-occurrence]')).toHaveLength(1)
+    expect(document.querySelectorAll('[data-mention="Pages/Gamma.md"] [data-occurrence] b')).toHaveLength(2)
+  })
+
   test('test the count of another note is not shown here, and it goes with the section', async () => {
     mocked.references.mockResolvedValue(refs(['Alpha'], []))
     const { rerender } = render(
