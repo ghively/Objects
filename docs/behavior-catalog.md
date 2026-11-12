@@ -511,7 +511,9 @@ Each starter template pre-fills the new type's properties.
   down does not go on to break lines: its repeats are dropped until the key is let go. A note whose text is empty
   (white space only counts as empty) opens with the caret in the text, on the page and in the peek, unless it is
   brand new (its title is selected, as before), the open asked for its own caret (Today's note), something else
-  holds the focus (a field, a button, a row of a list), it can't be edited, or it is not the view in front. A note
+  holds the focus (a field, a button, a row of a list), it can't be edited, or it is not the view in front. A key
+  still down when an empty note takes the caret (the Enter that opened it from a list, the Work page's Space)
+  types nothing into it: its repeats are dropped until a key is let go or a new one is pressed. A note
   with text is never focused by itself. The peek's pager keeps the focus on the button a step was made with (the
   other one at an end of the list), so the same key steps on and an empty note never takes the caret from the
   pager. Placing the caret saves nothing: no request is made by opening a note, by Enter or by ArrowDown.

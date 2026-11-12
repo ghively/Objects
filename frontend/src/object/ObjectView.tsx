@@ -70,7 +70,7 @@ import { TemplateMarker } from './TemplateMarker'
 import { UseTemplateMenu, USE_TEMPLATE_TEXT } from './UseTemplateMenu'
 import { ensureNewTags, HeaderTags, isDailyNoteType, isTagType, ObjectHeader, openTag } from './ObjectHeader'
 import { keyIsForView, usePageShortcuts } from './pageShortcuts'
-import { canTakeCaretOnOpen, useBodyEntryKeys } from './bodyEntry'
+import { canTakeCaretOnOpen, dropHeldKeys, useBodyEntryKeys } from './bodyEntry'
 import { frontmatterLayout, objectWideLayout, PageLayout, pageDesign, type PanelVariant } from './PageLayout'
 import { ImportSourceLine, importSourceOf } from './ImportSourceLine'
 import { counterpartEditor } from './CounterpartRows'
@@ -1719,7 +1719,8 @@ export function ObjectView({
     // title is selected), or something else holds the focus (`canTakeCaretOnOpen`). The caret
     // only: nothing is typed, so nothing is saved.
     else if (!freshTitleRef.current && (text ?? detailRef.current?.body ?? '').trim() === '' && canTakeCaretOnOpen(viewRootRef.current, mode)) {
-      placeBodyCaret(viewRootRef.current, 'start')
+      // The key that opened it may still be down (Enter on a row, the Work page's Space).
+      if (placeBodyCaret(viewRootRef.current, 'start')) dropHeldKeys()
     }
   }, [mode, hasDetail, path, handed, adoptVersion, publishTitle])
 

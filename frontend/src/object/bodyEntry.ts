@@ -73,38 +73,50 @@ export function canTakeCaretOnOpen(root: HTMLElement | null, mode: 'page' | 'pee
   return isClosing(active?.closest(LAYER) ?? null)
 }
 
-/** Enter held down: after it put the caret in the text, its repeats are dropped until it is let go. */
-let enterHeld = false
+/**
+ * A key that is still down when the caret lands in the text must not go on to type: the Enter
+ * that put it there (held a moment too long, it would break lines), or whatever key opened an
+ * empty note (Enter on a list's row, the Work page's Space). Its repeats are dropped until a key
+ * is let go or a new one is pressed. Only repeats: a key pressed afresh is never touched.
+ */
+let dropping: 'Enter' | 'any' | null = null
 
 function onRepeat(e: KeyboardEvent): void {
-  if (!enterHeld || e.key !== 'Enter') return
+  if (!dropping) return
   if (!e.repeat) {
-    // A new press: the earlier one was let go where we could not hear it.
+    // A new press: the held key was let go where we could not hear it.
     release()
     return
   }
+  if (dropping === 'Enter' && e.key !== 'Enter') return
   e.preventDefault()
   e.stopImmediatePropagation()
 }
 
 function release(): void {
-  enterHeld = false
+  dropping = null
   window.removeEventListener('keydown', onRepeat, true)
   window.removeEventListener('keyup', onRelease, true)
   window.removeEventListener('blur', release)
 }
 
 function onRelease(e: KeyboardEvent): void {
-  if (e.key === 'Enter') release()
+  if (dropping === 'any' || e.key === 'Enter') release()
 }
 
-function holdEnter(): void {
-  if (enterHeld) return
-  enterHeld = true
-  // Capture phase: the editor never sees a repeat, so a key held a moment too long types nothing.
-  window.addEventListener('keydown', onRepeat, true)
-  window.addEventListener('keyup', onRelease, true)
-  window.addEventListener('blur', release)
+function dropRepeats(of: 'Enter' | 'any'): void {
+  if (!dropping) {
+    // Capture phase: the editor never sees a repeat.
+    window.addEventListener('keydown', onRepeat, true)
+    window.addEventListener('keyup', onRelease, true)
+    window.addEventListener('blur', release)
+  }
+  dropping = of
+}
+
+/** The caret was placed by itself (an empty note opened): a key held since before types nothing. */
+export function dropHeldKeys(): void {
+  dropRepeats('any')
 }
 
 /** The node sits in a layer on its way out (the field of the palette that just opened the note). */
@@ -122,7 +134,7 @@ export function useBodyEntryKeys(mode: 'page' | 'peek' | 'inline', rootRef: RefO
       if (!viewInFront(root, mode)) return false
       if (!placeBodyCaret(root, e.key === 'Enter' ? 'end' : 'start')) return false
       e.preventDefault()
-      if (e.key === 'Enter') holdEnter()
+      if (e.key === 'Enter') dropRepeats('Enter')
       return true
     }
     const onKeyDown = (e: KeyboardEvent) => {

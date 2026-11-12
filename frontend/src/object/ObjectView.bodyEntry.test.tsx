@@ -284,6 +284,33 @@ describe.each(['page', 'peek'] as const)('the keyboard reaches the text, in the 
     expectNothingWritten()
   })
 
+  test.each(['Enter', ' ', 'x'])('the key that opened an empty note, still down (%j), types nothing into it', async (key) => {
+    const { editor } = await open(mode, EMPTY)
+    expect(bodyHasFocus(editor)).toBe(true)
+    const before = editor.state.doc.toJSON()
+    const seen = vi.fn()
+    editor.view.dom.addEventListener('keydown', seen)
+    // Its repeats now land in the text the caret was put in.
+    expect(fireEvent.keyDown(editor.view.dom, { key, repeat: true })).toBe(false)
+    expect(fireEvent.keyDown(editor.view.dom, { key, repeat: true })).toBe(false)
+    expect(seen).not.toHaveBeenCalled()
+    expect(editor.state.doc.toJSON()).toEqual(before)
+    fireEvent.keyUp(editor.view.dom, { key })
+    // Let go: the next key is the person's own, and the editor's.
+    fireEvent.keyDown(editor.view.dom, { key: 'x' })
+    expect(seen).toHaveBeenCalledTimes(1)
+    expectNothingWritten()
+  })
+
+  test('with no key held, the first key pressed in an empty note is the editor\'s', async () => {
+    const { editor } = await open(mode, EMPTY)
+    const seen = vi.fn()
+    editor.view.dom.addEventListener('keydown', seen)
+    fireEvent.keyDown(editor.view.dom, { key: 'H' })
+    fireEvent.keyDown(editor.view.dom, { key: 'i' })
+    expect(seen).toHaveBeenCalledTimes(2)
+  })
+
   test('text that is only white space counts as empty', async () => {
     files[EMPTY] = file(EMPTY, 'Blank', '\n   \n\n')
     const { editor } = await open(mode, EMPTY)
