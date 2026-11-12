@@ -193,6 +193,7 @@ __all__ = [
     "WriteNotice",
     "now_stamp",
     "safe_filename",
+    "title_heading",
     "unique_path",
     "version_of",
     "yaml_single_quoted",
@@ -303,6 +304,28 @@ _EXTRA_SYSTEM_DEFS = (
 )
 
 _HEADING_RE = re.compile(r"^#[ \t]+(.+?)[ \t#]*$", re.MULTILINE)
+
+
+def title_heading(body: str, title: str) -> re.Match[str] | None:
+    """The ``# <title>`` line of ``body`` that `Space.rename_object` keeps in step with the
+    title: the first level-one heading outside code (a fence, a code span) whose text is
+    ``title``. The match spans the line without its line end. None when there is none.
+
+    One rule for the rename and for M33's "notes that begin with a heading that repeats
+    their title" (`titleheadings`, which also asks that nothing but blank lines stands above
+    it)."""
+    code: list[tuple[int, int]] | None = None
+    for m in _HEADING_RE.finditer(body):
+        if m.group(1).strip() != title:
+            continue
+        if code is None:
+            code = code_ranges(body)  # a `# Old title` line inside a fence is not the heading
+        if any(s <= m.start() < e for s, e in code):
+            continue
+        return m
+    return None
+
+
 _UNTITLED_STEM_RE = re.compile(r"^Untitled(?: \(\d+\))?$")
 
 # Characters Windows doesn't allow in a file name (and control characters).
@@ -3522,10 +3545,14 @@ class Space:
 
     # -- rename -------------------------------------------------------------
 
+    @staticmethod
+    def _locks_title(t: TypeDefinition | None) -> bool:
+        """Whether notes of type ``t`` have a title that can't be changed (the daily note)."""
+        return t is not None and t.basic and t.name.lower() == "dailynote"
+
     def _is_title_locked(self, rel: str) -> bool:
         """A daily note's title is its date: it can't be renamed."""
-        t = self._type_of(rel)
-        return t is not None and t.basic and t.name.lower() == "dailynote"
+        return self._locks_title(self._type_of(rel))
 
     def _referrers(self, rel: str, old_title: str) -> dict[str, set[str]]:
         """Files linking to ``rel`` by its title or file name: path -> the link targets that do.
@@ -3751,13 +3778,9 @@ class Space:
         def edit(of: ObjectFile, _fm: dict) -> ObjectFile | None:
             src = set_keys(of.frontmatter_src or "", {"title": new_title})
             body = of.body
-            code = code_ranges(body)  # a `# Old title` line inside a fence is not the heading
-            for m in _HEADING_RE.finditer(body):
-                if any(s <= m.start() < e for s, e in code):
-                    continue
-                if m.group(1).strip() == old_title:
-                    body = body[: m.start()] + f"# {new_title}" + body[m.end() :]
-                    break
+            m = title_heading(body, old_title)
+            if m is not None:
+                body = body[: m.start()] + f"# {new_title}" + body[m.end() :]
             return replace(of, frontmatter_src=src, body=body)
 
         with self._lock:
