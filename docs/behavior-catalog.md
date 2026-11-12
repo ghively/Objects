@@ -1463,7 +1463,9 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   `electron` with no shell installed stops with 'The desktop window is not installed. Run "cd desktop && npm ci" in
   the Object folder first, or use --window pywebview.'; a shell that cannot start falls back in `auto` with one
   line, "The desktop window could not be started; opening the pywebview window instead.", and stops in `electron`
-  with "The desktop window could not be started.". `--browser` is unchanged.
+  with "The desktop window could not be started."; when the shell wrote an error before it failed, the line goes
+  on with " The desktop window said: <its last error line>" (Chromium's `[…:FATAL:…]` prefix left out, and
+  never a line holding a one-time link), instead of Chromium's raw text. `--browser` is unchanged.
   - **Per system**: Windows shows the system's own minimise, maximise (snap layouts) and close over the top bar's
     right end, in the theme's colours; macOS shows the traffic lights in the top bar's left end and the standard
     application menu (App, Edit, View, Window); Linux has no frame, and the top bar draws minimise,
@@ -1478,7 +1480,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
     `<state>/desktop/window.json` and it comes back on a screen that still exists (on Wayland the size and
     maximised state only). Web storage lives in `<state>/desktop`; the launch key stays a session cookie.
   - **What it shows**: only the app's own origin. A link to another site, `window.open` and a `target="_blank"`
-    link open in the default browser (web and `mailto:` links only); nothing else opens anywhere. A right click
+    link open in the default browser (web and `mailto:` links only) when a person has just clicked or pressed a key
+    in the window (within a second; a server's redirect after such a click too), and only from the app's own page:
+    a page that tries it by itself, or an embedded page of another site, opens nothing and is told nothing;
+    nothing else opens anywhere. A right click
     where the app shows no menu of its own gives Cut, Copy, Paste, Select all and, on a misspelled word, up to five
     suggestions and "Add to dictionary"; selected text that cannot be edited gives Copy and Select all. Spell check
     is on and follows Settings > Editor > "Spellcheck language" (the offered dictionary of that tag, else of the
@@ -1490,14 +1495,21 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
   - **Closing loses nothing**: on close the shell asks the page to save and waits for its answer or 3 seconds, then
     closes; it then waits up to 2 seconds for requests still on their way (the page's last keep-alive saves) before
     it exits, and only then does `objectapp` stop the server. (With pywebview the server stops as the window
-    closes.)
+    closes.) When `objectapp` itself is stopped (Ctrl-C, SIGTERM, SIGHUP), it asks the shell to close the same
+    way (`{"kind": "quit"}` on its stdin), waits up to 6 seconds for it, and only then stops the server; a shell
+    whose `objectapp` is gone (its stdin ended) closes its windows the same way and exits. On Windows, a shut down
+    or log off asks the page to save at once (without delaying it), and when the console window is closed, or at
+    log off or shut down, `objectapp` asks the shell to close and keeps the server up until it has (4.5 seconds
+    at most: Windows ends the process at 5).
   - **Keep on top** (M23) in the shell: `objectapp` writes one line to the shell's stdin (`{"open": "<one-time
     url>", "kind": "focus"}`) and the shell opens the 360x470 always-on-top window "Object focus", with the
     system's frame so it can be moved and closed; asked again while it is open, it comes to the front. It closes
     with the main window.
   - **A launcher entry**: `scripts/install-launcher.py --space <folder>` (`--name`, default "Object"; `--remove`;
     `--force`), run by hand, writes for the current user a Linux `.desktop` entry, a Windows Start menu shortcut or
-    a macOS `.command` file that runs `uv run objectapp --space <folder>`; it replaces only a file it wrote.
+    a macOS `.command` file that runs `uv run objectapp --space <folder>`; it replaces only a file it wrote. A
+    folder whose path holds a line break or another control character is refused plainly before anything is
+    written.
     Installers that bundle Python are not part of M33.
 - **Maintaining a running space over the token API**: type and saved-query definitions can be listed (`GET
   /api/v1/types`, `GET /api/v1/queries`, added 2026-11-09), read, made, edited and deleted while Object is open with

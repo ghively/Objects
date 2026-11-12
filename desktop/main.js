@@ -16,9 +16,9 @@ const { takeLaunch } = require('./lib/launch')
 const { controlsFor } = require('./lib/controls')
 const { cleanTheme, overlayFor, windowOptions, focusWindowOptions, webPreferences } = require('./lib/windowOptions')
 const { loadState, saveState, placeOnDisplays, isWayland } = require('./lib/windowState')
-const { sameOrigin, navigation, windowOpen } = require('./lib/guard')
+const { sameOrigin, navigation, windowOpen, createHandOffs } = require('./lib/guard')
 const { permissionAllowed } = require('./lib/permissions')
-const { lineReader, parseCommand } = require('./lib/stdinLines')
+const { listenToParent } = require('./lib/stdinLines')
 const { createCloseGate } = require('./lib/closeGate')
 const { createPending } = require('./lib/pending')
 const { applicationMenu, contextMenu } = require('./lib/menus')
@@ -58,6 +58,8 @@ function start({ url, origin, stateDir, icon, frame }) {
   let focusWindow = null
   let saveTimer = null
   let quitting = false
+  /** The ready line went out: from now on the end of stdin means `objectapp` is gone. */
+  let toldParentReady = false
   /** The session's spell-check languages before the setting was applied: the system's (from its locale). */
   let systemSpellCheckLanguages = null
 
@@ -108,20 +110,51 @@ function start({ url, origin, stateDir, icon, frame }) {
     shell.openExternal(target).catch(() => {})
   }
 
+  /** Where a navigation came from, for `handOffAllowed`: its window's main frame or another frame. */
+  function fromFrame(initiator) {
+    if (!initiator) return {}
+    try {
+      if (initiator.parent === null) return { isMainFrame: true }
+      return { isMainFrame: false, frameUrl: initiator.url }
+    } catch {
+      return { isMainFrame: false } // a frame that is gone
+    }
+  }
+
   function guard(contents) {
-    const onNavigate = (event) => {
+    // A link goes to the default browser only just after a person's click or key in this
+    // window, and only from the app's own page (`handOffAllowed`): never from an embedded page
+    // of another site, never from a page by itself. Anything else is refused without a word.
+    const handOffs = createHandOffs(origin)
+    contents.on('input-event', (_event, input) => { if (input) handOffs.input(input.type) })
+    contents.on('did-start-navigation', (details) => {
+      if (details.isMainFrame && !details.isSameDocument) handOffs.navigationStarted()
+    })
+    const handOff = (url, kind, frame) => {
+      if (handOffs.allowed(kind, frame)) openExternal(url)
+    }
+    contents.on('will-navigate', (event) => {
       const decision = navigation(event.url, origin)
       if (decision.action === 'allow') return
       event.preventDefault()
-      if (decision.action === 'external') openExternal(decision.url)
-    }
-    contents.on('will-navigate', onNavigate)
-    contents.on('will-redirect', (event) => {
-      if (event.isMainFrame) onNavigate(event)
+      if (decision.action === 'external') handOff(decision.url, 'navigate', fromFrame(event.initiator))
     })
+    // A server's redirect away from the app: it goes out when the navigation it ends was a
+    // person's (their click on a link of the app that the server sends elsewhere).
+    contents.on('will-redirect', (event) => {
+      if (!event.isMainFrame) return
+      const decision = navigation(event.url, origin)
+      if (decision.action === 'allow') return
+      event.preventDefault()
+      if (decision.action === 'external') handOff(decision.url, 'redirect', fromFrame(event.initiator))
+    })
+    // `window.open` and `target="_blank"`: Electron names no frame; its referrer is the one sign
+    // (empty with `noreferrer`, as the app's own links ask).
     contents.setWindowOpenHandler((details) => {
       const decision = windowOpen(details.url, origin)
-      if (decision.action === 'external') openExternal(decision.url)
+      if (decision.action === 'external') {
+        handOff(decision.url, 'open', { frameUrl: (details.referrer && details.referrer.url) || null })
+      }
       return { action: 'deny' }
     })
     contents.on('will-attach-webview', (event) => event.preventDefault())
@@ -159,6 +192,9 @@ function start({ url, origin, stateDir, icon, frame }) {
       proceed: () => { if (!win.isDestroyed()) win.close() },
     })
     gates.set(id, gate)
+    // Windows shutting down or logging off closes no window first: the page is asked to save
+    // now (its blur and `pagehide` keep-alive saves), and the shutdown is not held up.
+    if (platform === 'win32') win.on('query-session-end', () => { gate.sessionEnding() })
     win.on('close', (event) => {
       if (!gate.onClose()) event.preventDefault()
       else if (win === mainWindow) saveStateNow()
@@ -325,20 +361,34 @@ function start({ url, origin, stateDir, icon, frame }) {
 
   // -- `objectapp` on stdin -------------------------------------------------------------------
 
-  function listenToParent() {
-    const feed = lineReader((line) => {
-      const command = parseCommand(line, origin)
-      if (command && mainWindow !== null) openFocusWindow(command.open)
-    })
+  /**
+   * `objectapp` is stopping (the quit line) or gone (stdin ended): every window closes the way a
+   * person's close does, through its gate (the page saves first), and the shell quits once they
+   * have, after the requests still on their way (`quitWhenDone`).
+   */
+  function closeEverything() {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length === 0) {
+      quitWhenDone()
+      return
+    }
+    for (const win of windows) win.close()
+  }
+
+  function watchParent() {
     try {
-      process.stdin.on('error', () => {})
-      process.stdin.on('data', feed)
+      listenToParent(process.stdin, origin, {
+        open: (target) => { if (mainWindow !== null) openFocusWindow(target) },
+        quit: closeEverything,
+        started: () => toldParentReady,
+      })
     } catch {
-      // no stdin (started by hand): there is no keep-on-top line to read
+      // no stdin: there is no line to read
     }
   }
 
   function tellParentReady() {
+    toldParentReady = true
     try {
       process.stdout.on('error', () => {})
       process.stdout.write(`${READY_LINE}\n`)
@@ -367,7 +417,7 @@ function start({ url, origin, stateDir, icon, frame }) {
     prepareSession(session.defaultSession)
     registerBridge()
     createMainWindow()
-    listenToParent()
+    watchParent()
     tellParentReady()
   })
 }

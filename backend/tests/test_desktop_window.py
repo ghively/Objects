@@ -7,6 +7,8 @@ child is a fake."""
 from __future__ import annotations
 
 import json
+import os
+import signal
 import socket
 import subprocess
 import sys
@@ -49,16 +51,24 @@ def _port_is_free(port: int) -> bool:
 
 
 class _Stdin:
-    def __init__(self) -> None:
+    def __init__(self, on_line=None) -> None:
         self.text = ""
         self.flushed = 0
         self.broken = False
+        self.closed = False
+        self._on_line = on_line
 
     def write(self, text: str) -> int:
-        if self.broken:
+        if self.broken or self.closed:
             raise BrokenPipeError
         self.text += text
+        if self._on_line is not None:
+            for line in text.splitlines():
+                self._on_line(line)
         return len(text)
+
+    def close(self) -> None:
+        self.closed = True
 
     def flush(self) -> None:
         if self.broken:
@@ -68,20 +78,28 @@ class _Stdin:
 
 class FakeChild:
     """A stand-in for the shell: prints `output`, then runs `script(child)` (the test's part,
-    while the launcher waits) and exits with what `finish` was given."""
+    while the launcher waits) and exits with what `finish` was given. Like the shell, it closes
+    when the quit line reaches its stdin (`quits=False`: it never does)."""
 
     created: ClassVar[list[FakeChild]] = []
 
-    def __init__(self, argv, *, script=None, output=(READY,), exits=None, **kwargs) -> None:
+    def __init__(self, argv, *, script=None, output=(READY,), exits=None, quits=True, err_lines=(),
+                 err_after: threading.Event | None = None, **kwargs) -> None:
         self.argv = list(argv)
         self.kwargs = kwargs
-        self.stdin = _Stdin()
+        self.events: list[str] = []
+        self.stdin = _Stdin(on_line=self._line)
+        self._quits = quits
         self.returncode: int | None = exits
         self._done = threading.Event()
         if exits is not None:
             self._done.set()
         self._output = list(output)
         self.stdout = self._lines()
+        # Its stderr: `err_lines`, written once `err_after` is set (at once without it).
+        self._errors = list(err_lines)
+        self._errors_after = err_after
+        self.stderr = self._error_lines()
         self.terminated = False
         self.error: BaseException | None = None
         FakeChild.created.append(self)
@@ -92,6 +110,11 @@ class FakeChild:
         yield from self._output
         self._done.wait()
 
+    def _error_lines(self):
+        if self._errors_after is not None:
+            self._errors_after.wait(5)
+        yield from self._errors
+
     def _run(self, script) -> None:
         try:
             script(self)
@@ -100,9 +123,15 @@ class FakeChild:
         finally:
             self.finish(0)
 
+    def _line(self, line: str) -> None:
+        self.events.append(f"stdin {line}")
+        if self._quits and json.loads(line) == {"kind": "quit"}:
+            self.finish(0)
+
     def finish(self, code: int) -> None:
         if self.returncode is None:
             self.returncode = code
+            self.events.append(f"exit {code}")
         self._done.set()
 
     def poll(self) -> int | None:
@@ -115,9 +144,12 @@ class FakeChild:
 
     def terminate(self) -> None:
         self.terminated = True
+        self.events.append("terminate")
         self.finish(-15)
 
-    kill = terminate
+    def kill(self) -> None:
+        self.events.append("kill")
+        self.finish(-9)
 
 
 @pytest.fixture
@@ -421,6 +453,75 @@ def test_auto_falls_back_to_pywebview_and_says_so_in_one_line(env, monkeypatch, 
     assert _port_is_free(env.port)
 
 
+SANDBOX_FATAL = (
+    "[4242:1112/090000.000000:FATAL:sandbox/linux/suid/client/setuid_sandbox_host.cc:163] The SUID sandbox "
+    "helper binary was found, but is not configured correctly. Rather than run without sandboxing I'm aborting "
+    "now. You need to make sure that /x/desktop/node_modules/electron/dist/chrome-sandbox is owned by root and "
+    "has mode 4755.\n"
+)
+
+
+def test_the_fallback_line_says_what_the_shell_last_said(env, monkeypatch, capsys) -> None:
+    """Chromium's raw FATAL text is not left on the terminal: the one line says what went wrong."""
+    _install_shell(env.desktop)
+    _fake_webview(monkeypatch)
+    _popen(monkeypatch, output=(), exits=133, err_lines=("[4242:WARNING:bus.cc(408)] Failed to connect to the bus\n",
+                                                      SANDBOX_FATAL, "\n"))
+    launcher.main(["--space", str(env.root), "--port", str(env.port)])
+    out, err = capsys.readouterr()
+    assert out == (
+        launcher.SHELL_FALLBACK_MESSAGE + " The desktop window said: The SUID sandbox helper binary was found, but "
+        "is not configured correctly. Rather than run without sandboxing I'm aborting now. You need to make sure "
+        "that /x/desktop/node_modules/electron/dist/chrome-sandbox is owned by root and has mode 4755.\n"
+    )
+    assert err == ""  # the raw lines are not repeated
+
+
+def test_the_fallback_line_never_repeats_the_launch_link(env, monkeypatch, capsys) -> None:
+    _install_shell(env.desktop)
+    _fake_webview(monkeypatch)
+    _popen(monkeypatch, output=(), exits=1, err_lines=(
+        "Object: the launch could not be read.\n",
+        f"[1:ERROR:x.cc(1)] Failed to load http://127.0.0.1:{env.port}/_open?code=leak&next=/\n",
+    ))
+    launcher.main(["--space", str(env.root), "--port", str(env.port)])
+    out, err = capsys.readouterr()
+    assert out == launcher.SHELL_FALLBACK_MESSAGE + " The desktop window said: Object: the launch could not be read.\n"
+    assert "leak" not in out + err and "_open" not in out + err
+
+
+def test_window_electron_that_cannot_start_says_what_the_shell_last_said(env, monkeypatch, capsys) -> None:
+    _install_shell(env.desktop)
+    _popen(monkeypatch, output=(), exits=133, err_lines=(SANDBOX_FATAL,))
+    with pytest.raises(SystemExit):
+        launcher.main(["--space", str(env.root), "--port", str(env.port), "--window", "electron"])
+    err = capsys.readouterr().err
+    assert err.startswith(launcher.SHELL_FAILED_MESSAGE + " The desktop window said: The SUID sandbox helper")
+    assert err.count("\n") == 1
+
+
+def test_what_the_shell_writes_on_stderr_once_its_window_is_ready_is_passed_on_without_the_link(
+    env, monkeypatch, capsys
+) -> None:
+    _install_shell(env.desktop)
+    ready = threading.Event()
+
+    def script(child: FakeChild) -> None:
+        deadline = time.monotonic() + 5
+        while not windowhost.can_open() and time.monotonic() < deadline:  # the window is ready
+            time.sleep(0.01)
+        ready.set()
+        time.sleep(0.3)
+
+    _popen(monkeypatch, script=script, err_after=ready, err_lines=(
+        "Object: the window could not load the app.\n",
+        f"[1:ERROR:x.cc(1)] Failed to load http://127.0.0.1:{env.port}/_open?code=leak&next=/\n",
+    ))
+    launcher.main(["--space", str(env.root), "--port", str(env.port)])
+    out, err = capsys.readouterr()
+    assert out == "" and err == "Object: the window could not load the app.\n"
+
+
 def test_window_electron_that_cannot_start_stops_with_a_plain_message(env, monkeypatch, capsys) -> None:
     _install_shell(env.desktop)
     webview = _fake_webview(monkeypatch)
@@ -468,19 +569,300 @@ def test_browser_mode_never_starts_the_shell(env, monkeypatch) -> None:
     assert calls == [f"http://127.0.0.1:{env.port}/"]
 
 
+def _record_server_stop(monkeypatch: pytest.MonkeyPatch, events: list[str]) -> None:
+    """`SpaceHost.stop` adds "server stop" to `events`."""
+    real_stop = launcher.SpaceHost.stop
+
+    def stop(self) -> None:
+        events.append("server stop")
+        real_stop(self)
+
+    monkeypatch.setattr(launcher.SpaceHost, "stop", stop)
+
+
 def test_ctrl_c_stops_the_shell_before_the_server(env, monkeypatch) -> None:
+    """Ctrl-C: the shell is asked to quit (it lets the page save), and only once it has exited
+    is the server stopped. (Changed in the M33 fix pass: it was terminated at once.)"""
     _install_shell(env.desktop)
 
     class Interrupted(FakeChild):
+        interrupted = False
+
         def wait(self, timeout=None):
-            if not self.terminated:
+            if not self.interrupted:
+                self.interrupted = True
                 raise KeyboardInterrupt
             return super().wait(timeout)
 
+    events: list[str] = []
+    _record_server_stop(monkeypatch, events)
     monkeypatch.setattr(launcher.subprocess, "Popen", lambda argv, **kw: Interrupted(argv, **kw))
     launcher.main(["--space", str(env.root), "--port", str(env.port)])
-    assert FakeChild.created[0].terminated is True
+    (child,) = FakeChild.created
+    assert child.terminated is False
+    assert child.events == ['stdin {"kind": "quit"}', "exit 0"]
+    assert child.stdin.closed is True
+    assert events == ["server stop"]
     assert _port_is_free(env.port)
+
+
+# -- stopping the shell ------------------------------------------------------------------------
+
+
+def test_the_stop_wait_fits_the_pages_save_and_the_shells_drain() -> None:
+    """The page gets 3 seconds to save, then the shell waits up to 2 for the last requests."""
+    assert launcher.SHELL_STOP_SECONDS >= 3 + 2 + 0.5
+
+
+def test_stopping_the_shell_asks_it_to_quit_first() -> None:
+    child = FakeChild(["electron"])
+    launcher._stop_shell(child)
+    assert child.events == ['stdin {"kind": "quit"}', "exit 0"]
+    assert child.stdin.text == '{"kind": "quit"}\n' and child.stdin.flushed >= 1
+    assert child.stdin.closed is True  # and then its stdin ends: the parent is done with it
+    assert child.terminated is False
+
+
+def test_a_shell_that_does_not_quit_is_terminated_only_after_the_wait(monkeypatch) -> None:
+    monkeypatch.setattr(launcher, "SHELL_STOP_SECONDS", 0.3)
+    child = FakeChild(["electron"], quits=False)
+    started = time.monotonic()
+    launcher._stop_shell(child)
+    assert child.events == ['stdin {"kind": "quit"}', "terminate", "exit -15"]
+    assert time.monotonic() - started >= 0.3
+
+
+def test_a_shell_that_ignores_terminate_is_killed(monkeypatch) -> None:
+    monkeypatch.setattr(launcher, "SHELL_STOP_SECONDS", 0.1)
+    monkeypatch.setattr(launcher, "SHELL_KILL_SECONDS", 0.1)
+
+    class Stubborn(FakeChild):
+        def terminate(self) -> None:
+            self.terminated = True
+            self.events.append("terminate")
+
+    child = Stubborn(["electron"], quits=False)
+    launcher._stop_shell(child)
+    assert child.events == ['stdin {"kind": "quit"}', "terminate", "kill", "exit -9"]
+
+
+def test_a_shell_whose_stdin_is_gone_is_still_stopped(monkeypatch) -> None:
+    monkeypatch.setattr(launcher, "SHELL_STOP_SECONDS", 0.1)
+    child = FakeChild(["electron"], quits=False)
+    child.stdin.broken = True
+    launcher._stop_shell(child)
+    assert child.events == ["terminate", "exit -15"]
+
+
+def test_a_shell_that_already_exited_is_left_alone() -> None:
+    child = FakeChild(["electron"], exits=0)
+    launcher._stop_shell(child)
+    assert child.stdin.text == "" and child.terminated is False
+
+
+def _until_the_launcher_waits(number: int, before) -> None:
+    """Until the launcher has put its own handler on `number` (it does once the shell is ready)."""
+    deadline = time.monotonic() + 5
+    while signal.getsignal(number) is before and time.monotonic() < deadline:
+        time.sleep(0.01)
+    time.sleep(0.05)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals")
+@pytest.mark.parametrize("name", ["SIGTERM", "SIGHUP"])
+def test_a_stop_signal_stops_the_shell_before_the_server(env, monkeypatch, name) -> None:
+    """`kill <objectapp>` (or its terminal going away) takes Ctrl-C's path: the shell is asked to
+    quit and has exited before the server stops; the signal's own handler is put back after."""
+    _install_shell(env.desktop)
+    number = getattr(signal, name)
+    before = signal.getsignal(number)
+    events: list[str] = []
+    _record_server_stop(monkeypatch, events)
+
+    def script(child: FakeChild) -> None:
+        _until_the_launcher_waits(number, before)
+        os.kill(os.getpid(), number)
+        child._done.wait(5)  # the launcher asks it to quit; nothing else ends it
+
+    _popen(monkeypatch, script=script)
+    launcher.main(["--space", str(env.root), "--port", str(env.port)])
+    (child,) = FakeChild.created
+    assert child.events == ['stdin {"kind": "quit"}', "exit 0"]
+    assert child.terminated is False
+    assert events == ["server stop"]
+    assert _port_is_free(env.port)
+    assert signal.getsignal(number) is before
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals")
+def test_a_second_stop_signal_does_not_cut_the_save_short(env, monkeypatch) -> None:
+    _install_shell(env.desktop)
+    before = signal.getsignal(signal.SIGTERM)
+    events: list[str] = []
+    _record_server_stop(monkeypatch, events)
+
+    class Slow(FakeChild):
+        def _line(self, line: str) -> None:
+            self.events.append(f"stdin {line}")
+            os.kill(os.getpid(), signal.SIGTERM)  # again, while it closes
+            threading.Timer(0.3, self.finish, args=(0,)).start()
+
+    def script(child: FakeChild) -> None:
+        _until_the_launcher_waits(signal.SIGTERM, before)
+        os.kill(os.getpid(), signal.SIGTERM)
+        child._done.wait(5)
+
+    monkeypatch.setattr(launcher.subprocess, "Popen", lambda argv, **kw: Slow(argv, script=script, **kw))
+    launcher.main(["--space", str(env.root), "--port", str(env.port)])
+    (child,) = FakeChild.created
+    assert child.events == ['stdin {"kind": "quit"}', "exit 0"]
+    assert events == ["server stop"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a POSIX script stands in for the shell")
+def test_a_real_shell_that_fails_at_once_is_reported_by_its_last_error_line(env, tmp_path) -> None:
+    shell = tmp_path / "shell.py"
+    shell.write_text(
+        f"#!{sys.executable}\n"
+        "import sys\n"
+        f"sys.stderr.write({SANDBOX_FATAL!r})\n"
+        "sys.exit(133)\n",
+        encoding="utf-8",
+    )
+    shell.chmod(0o755)
+    said: list[str] = []
+    assert launcher.start_shell(shell, {"url": "http://127.0.0.1:1/_open?code=k"}, ready_timeout=10, said=said) is None
+    assert len(said) == 1 and said[0].startswith("The SUID sandbox helper binary was found")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a POSIX script stands in for the shell")
+def test_the_shell_sees_its_stdin_open_until_it_is_asked_to_quit(env, tmp_path) -> None:
+    """The real pipe: a started shell does not see its stdin end at launch; it gets the quit
+    line, then the end."""
+    record = tmp_path / "stdin.txt"
+    shell = tmp_path / "shell.py"
+    shell.write_text(
+        f"#!{sys.executable}\n"
+        "import sys\n"
+        f"out = open({str(record)!r}, 'a', buffering=1)\n"
+        "print('object-desktop: ready', flush=True)\n"
+        "for line in sys.stdin:\n"
+        "    out.write('line ' + line)\n"
+        "out.write('end\\n')\n",
+        encoding="utf-8",
+    )
+    shell.chmod(0o755)
+    child = launcher.start_shell(shell, {"url": "x"}, ready_timeout=10)
+    assert child is not None
+    time.sleep(1.0)
+    assert child.poll() is None
+    assert not record.exists() or record.read_text(encoding="utf-8") == ""
+    launcher._stop_shell(child)
+    assert child.poll() == 0
+    assert record.read_text(encoding="utf-8") == 'line {"kind": "quit"}\nend\n'
+
+
+# -- Windows: the console closed, log off, shut down ---------------------------------------------
+# The handler's logic, with a fake clock, a fake shell and a fake server. Not run on Windows.
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+class _ClockedShell:
+    """Exits `takes` seconds (of `clock`) after the quit line reaches it; never, with None."""
+
+    def __init__(self, clock: _Clock, takes: float | None) -> None:
+        self.clock = clock
+        self.takes = takes
+        self.exit_at: float | None = None
+        self.stdin = _Stdin(on_line=self._line)
+        self.terminated = False
+        self.events: list[tuple[str, float]] = []
+
+    def _line(self, line: str) -> None:
+        self.events.append((line, self.clock.now))
+        if self.takes is not None:
+            self.exit_at = self.clock.now + self.takes
+
+    def poll(self) -> int | None:
+        return 0 if self.exit_at is not None and self.clock.now >= self.exit_at else None
+
+    def terminate(self) -> None:
+        self.terminated = True
+
+
+class _Host:
+    def __init__(self, clock: _Clock) -> None:
+        self.clock = clock
+        self.stopped_at: float | None = None
+
+    def stop(self) -> None:
+        self.stopped_at = self.clock.now
+
+
+@pytest.mark.parametrize("event", [launcher.CTRL_CLOSE_EVENT, launcher.CTRL_LOGOFF_EVENT, launcher.CTRL_SHUTDOWN_EVENT])
+def test_the_console_ending_keeps_the_server_up_while_the_shell_closes(event) -> None:
+    clock = _Clock()
+    shell = _ClockedShell(clock, takes=2.5)
+    host = _Host(clock)
+    handler = launcher._ConsoleEnd(shell, host, clock=clock, sleep=clock.sleep)
+    assert handler(event) is True  # handled: the process may end now
+    assert shell.events == [('{"kind": "quit"}', 0.0)] and shell.stdin.closed
+    assert host.stopped_at is not None and host.stopped_at >= 2.5
+    assert host.stopped_at < launcher.CONSOLE_END_SECONDS
+    assert shell.terminated is False
+
+
+def test_the_console_ending_stops_the_server_in_time_when_the_shell_does_not_close() -> None:
+    clock = _Clock()
+    shell = _ClockedShell(clock, takes=None)
+    host = _Host(clock)
+    assert launcher._ConsoleEnd(shell, host, clock=clock, sleep=clock.sleep)(launcher.CTRL_CLOSE_EVENT) is True
+    assert launcher.CONSOLE_END_SECONDS <= host.stopped_at < 5.0  # Windows ends the process at 5 s
+    assert launcher.CONSOLE_END_SECONDS >= 3 + 1  # the page's 3 seconds, and some of the drain
+
+
+def test_ctrl_c_and_ctrl_break_are_left_to_python() -> None:
+    clock = _Clock()
+    shell = _ClockedShell(clock, takes=0.0)
+    host = _Host(clock)
+    handler = launcher._ConsoleEnd(shell, host, clock=clock, sleep=clock.sleep)
+    assert handler(0) is False and handler(1) is False  # CTRL_C_EVENT, CTRL_BREAK_EVENT
+    assert shell.events == [] and host.stopped_at is None
+
+
+def test_the_console_handler_is_set_on_windows_only() -> None:
+    calls: list[tuple] = []
+
+    class Kernel32:
+        def SetConsoleCtrlHandler(self, callback, add):  # noqa: N802 - the Windows name
+            calls.append((callback, add))
+            return 1
+
+    def functype(fn):
+        return ("callback", fn)
+
+    seen: list[int] = []
+    assert launcher._install_console_handler(seen.append, "linux", kernel32=Kernel32(), functype=functype) is None
+    assert calls == []
+    remove = launcher._install_console_handler(
+        lambda event: seen.append(event) or event == 2, "win32", kernel32=Kernel32(), functype=functype
+    )
+    assert remove is not None
+    (callback, add), = calls
+    assert add is True and callback[0] == "callback"
+    assert callback[1](2) is True and callback[1](0) is False and seen == [2, 0]
+    remove()
+    assert calls[1] == (callback, False)
 
 
 # -- the keep-on-top line ----------------------------------------------------------------------

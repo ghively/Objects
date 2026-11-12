@@ -70,6 +70,29 @@ test('a page that cannot be asked (not loaded, crashed) does not hold the window
   assert.equal(g.onClose(), true)
 })
 
+test('the system ending the session (Windows shutdown, log off) asks the page to save, holding nothing', () => {
+  const { g, calls, timers } = gate()
+  assert.equal(g.sessionEnding(), true)
+  assert.deepEqual(calls, ['ask'])
+  assert.equal(timers.pending.length, 0) // no wait: the shutdown is not held up
+  g.answered() // the page's answer closes nothing by itself
+  assert.deepEqual(calls, ['ask'])
+  // A close that comes after (the system closing the window) still goes through the gate.
+  assert.equal(g.onClose(), false)
+  assert.deepEqual(calls, ['ask', 'ask'])
+  g.answered()
+  assert.deepEqual(calls, ['ask', 'ask', 'proceed'])
+})
+
+test('a session end while the gate is already asking, or a page that cannot be asked, is no error', () => {
+  const { g, calls } = gate()
+  g.onClose()
+  assert.equal(g.sessionEnding(), false)
+  assert.deepEqual(calls, ['ask'])
+  const broken = gate({ ask: () => { throw new Error('gone') } })
+  assert.equal(broken.g.sessionEnding(), false)
+})
+
 test('an answer nobody asked for closes nothing', () => {
   const { g, calls } = gate()
   g.answered()

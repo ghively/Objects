@@ -232,3 +232,42 @@ def test_the_script_refuses_plainly(launcher, place, monkeypatch, capsys) -> Non
 def test_a_system_without_a_launcher_is_said_plainly(launcher, place) -> None:
     with pytest.raises(launcher.Refused, match="Linux, Windows and macOS"):
         launcher.install("freebsd14", name="Object", icon=None, **place)
+
+
+@pytest.mark.parametrize("platform", ["linux", "darwin", "win32"])
+@pytest.mark.parametrize("char", ["\n", "\r", "\t", "\x00", "\x1b", "\x7f"])
+def test_a_path_with_a_line_break_or_control_character_is_refused_before_anything_is_written(
+    launcher, place, platform, char
+) -> None:
+    """A line break in the space's path would add keys to the Linux entry (``Type=``, ``Exec=``),
+    and lines to the other two: refused on every system, nothing written, PowerShell not run."""
+    space = place["space"].parent / f"notes{char}Exec=evil"
+    powershell = FakePowerShell()
+    with pytest.raises(launcher.Refused, match="line break or another control character"):
+        launcher.install(platform, name="Object", icon=None, force=True, powershell=powershell,
+                         **{**place, "space": space})
+    assert powershell.scripts == []
+    assert [p for p in place["home"].rglob("*") if p.is_file()] == []
+    # The same for the other paths the entry holds: this repository's, uv's and the icon's.
+    for key in ("repo", "uv"):
+        with pytest.raises(launcher.Refused, match="line break or another control character"):
+            launcher.install(platform, name="Object", icon=None, force=True, powershell=powershell,
+                             **{**place, key: f"{place[key]}{char}x" if key == "uv" else Path(f"{place[key]}{char}x")})
+    with pytest.raises(launcher.Refused, match="line break or another control character"):
+        launcher.install(platform, name="Object", icon=place["home"] / f"icon{char}.png", force=True,
+                         powershell=powershell, **place)
+    assert powershell.scripts == []
+    assert [p for p in place["home"].rglob("*") if p.is_file()] == []
+
+
+def test_the_script_says_plainly_why_a_space_path_cannot_be_used(launcher, place, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(launcher.sys, "platform", "linux")
+    monkeypatch.setattr(launcher.Path, "home", classmethod(lambda cls: place["home"]))
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.setattr(launcher, "_icon", lambda platform, repo: None)
+    space = place["space"].parent / "notes\nType=Link"
+    space.mkdir()
+    assert launcher.main(["--space", str(space)]) == 1
+    err = capsys.readouterr().err
+    assert "line break or another control character" in err and err.count("\n") == 1
+    assert not (place["home"] / ".local").exists()

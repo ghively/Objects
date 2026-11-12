@@ -11,7 +11,8 @@ option wins) uses the frameless desktop shell in ``desktop/`` (Electron) when it
 child with its launch JSON (``url``, ``origin``, ``stateDir``, ``icon``, ``title``, ``frame``) in
 the child's environment (``OBJECT_DESKTOP_LAUNCH``), never on its command line, where other local
 users could read the one-time link in the process list; and it stops the server only when the
-shell has exited, so the page's last saves land. ``--frame system`` (``OBJECT_WINDOW_FRAME``) gives the shell's window the system's
+shell has exited, so the page's last saves land. Stopped itself (Ctrl-C, SIGTERM, SIGHUP), it asks
+the shell to close first (``{"kind": "quit"}`` on its stdin) and waits for it. ``--frame system`` (``OBJECT_WINDOW_FRAME``) gives the shell's window the system's
 ordinary frame.
 
 Which space opens: ``--space PATH`` when given; else the device setting's
@@ -33,6 +34,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import signal
 import subprocess
 import sys
 import threading
@@ -65,8 +68,23 @@ SHELL_READY_LINE = "object-desktop: ready"
 SHELL_LAUNCH_ENV = "OBJECT_DESKTOP_LAUNCH"
 """The variable of the shell's environment that holds its launch JSON (``desktop/lib/launch.js``)."""
 SHELL_READY_SECONDS = 30.0
-SHELL_STOP_SECONDS = 8.0
-"""On Ctrl-C: how long the shell gets to close (it lets the page save first) before it is killed."""
+SHELL_QUIT_LINE = json.dumps({"kind": "quit"}) + "\n"
+"""Written on the shell's stdin to ask it to close its windows as a person's close does
+(``desktop/lib/stdinLines.js``): the page saves first, then the last requests are waited for."""
+SHELL_STOP_SECONDS = 6.0
+"""How long the shell gets to close once asked: the page's 3 seconds to save, the shell's 2 for
+the requests still on their way, and one to spare. Only then is it terminated."""
+SHELL_KILL_SECONDS = 2.0
+"""After `terminate`, how long before the shell is killed."""
+STOP_SIGNALS = ("SIGTERM", "SIGHUP")
+"""While the shell runs these take Ctrl-C's path (where the system has them)."""
+# Windows console control events (wincon.h). Ctrl-C and Ctrl-Break (0, 1) stay Python's own.
+CTRL_CLOSE_EVENT = 2
+CTRL_LOGOFF_EVENT = 5
+CTRL_SHUTDOWN_EVENT = 6
+CONSOLE_END_SECONDS = 4.5
+"""Windows ends a process 5 seconds after its console is closed (and at log off or shut down);
+until then the server stays up while the shell closes its windows (the page saves) and drains."""
 SHELL_MISSING_MESSAGE = (
     'The desktop window is not installed. Run "cd desktop && npm ci" in the Object folder first, '
     "or use --window pywebview."
@@ -75,6 +93,8 @@ SHELL_FAILED_MESSAGE = "The desktop window could not be started."  # our string
 SHELL_FALLBACK_MESSAGE = (
     "The desktop window could not be started; opening the pywebview window instead."
 )  # our string
+SHELL_SAID = " The desktop window said: {}"  # our string
+"""Added to the two messages above: the last line the shell wrote on its stderr before it failed."""
 
 
 def build_server_config(
@@ -336,33 +356,210 @@ def _watch_ready(stream: Any, ready: threading.Event) -> None:
         pass
 
 
-def _stop_shell(child: Any) -> None:
-    """Ask a running shell to close (it lets the page save first), then make sure it is gone."""
+_CHROMIUM_PREFIX = re.compile(r"^\[[^\]]*\]\s*")
+
+
+def _shell_said(line: str, link: str) -> str | None:
+    """A line of the shell's stderr as it may be shown, without Chromium's ``[pid:…:FATAL:file]``
+    prefix; None when it is empty or holds anything of a one-time link."""
+    text = line.strip()
+    if not text or "_open" in text or "code=" in text or (link and link in text):
+        return None
+    return _CHROMIUM_PREFIX.sub("", text) or None
+
+
+class _ShellErrors:
+    """Reads the shell's stderr to its end. Until its window is ready the lines are kept, not
+    printed (`last`: what a start that failed said last, instead of Chromium's raw text); once it
+    is ready each line is passed on to this stderr as it was. A line holding anything of a
+    one-time link is never kept or passed on."""
+
+    def __init__(self, ready: threading.Event, link: str) -> None:
+        self.ready = ready
+        self.link = link
+        self.last: str | None = None
+        self.done = threading.Event()
+
+    def read(self, stream: Any) -> None:
+        try:
+            for line in stream:
+                shown = _shell_said(line, self.link)
+                if shown is None:
+                    continue
+                if not self.ready.is_set():
+                    self.last = shown
+                    continue
+                try:
+                    print(line.rstrip("\r\n"), file=sys.stderr, flush=True)
+                except (OSError, ValueError):
+                    pass
+        except (OSError, ValueError):
+            pass
+        finally:
+            self.done.set()
+
+
+def _with_said(message: str, said: list[str]) -> str:
+    """`message`, and what the shell said last when it said anything (one line)."""
+    return message + (SHELL_SAID.format(said[-1]) if said else "")
+
+
+def _ask_shell_to_quit(stream: Any) -> bool:
+    """Write the quit line on the shell's stdin, then close it; False when the pipe is gone."""
+    asked = True
+    try:
+        stream.write(SHELL_QUIT_LINE)
+        stream.flush()
+    except (OSError, ValueError):
+        asked = False
+    try:
+        stream.close()
+    except (OSError, ValueError):
+        pass
+    return asked
+
+
+def _stop_shell(child: Any, ask: bool = True) -> None:
+    """Make sure the shell is gone. With `ask` it is asked first (the quit line: it closes its
+    windows as a person's close does, so the page saves) and given `SHELL_STOP_SECONDS`; only
+    then is it terminated, and killed if that does not end it. Without `ask` (a shell whose
+    window never said it was ready) it is terminated at once."""
     if child.poll() is not None:
         return
+    if ask and child.stdin is not None and _ask_shell_to_quit(child.stdin):
+        try:
+            child.wait(timeout=SHELL_STOP_SECONDS)
+            return
+        except subprocess.TimeoutExpired:
+            pass
     child.terminate()
     try:
-        child.wait(timeout=SHELL_STOP_SECONDS)
+        child.wait(timeout=SHELL_KILL_SECONDS)
     except subprocess.TimeoutExpired:
         child.kill()
         child.wait()
 
 
+class _StopSignals:
+    """While the shell runs, SIGTERM and SIGHUP (where they exist) raise KeyboardInterrupt in the
+    main thread, so `kill <objectapp>` or a closed terminal takes Ctrl-C's path: the shell is
+    asked to quit and waited for, then the server stops. Only the first one does: a second one
+    while the shell closes is ignored, and so is one that comes once the stopping has begun
+    (`quiet`). `restore` puts the old handlers back."""
+
+    def __init__(self) -> None:
+        self._old: dict[int, Any] = {}
+        self._quiet = False
+
+    def _handle(self, _signum: int, _frame: Any) -> None:
+        if self._quiet:
+            return
+        self._quiet = True
+        raise KeyboardInterrupt
+
+    def install(self) -> None:
+        if threading.current_thread() is not threading.main_thread():
+            return
+        for name in STOP_SIGNALS:
+            number = getattr(signal, name, None)
+            if number is None or number in self._old:
+                continue
+            try:
+                self._old[number] = signal.signal(number, self._handle)
+            except (OSError, ValueError):
+                pass
+
+    def quiet(self) -> None:
+        self._quiet = True
+
+    def restore(self) -> None:
+        for number, previous in self._old.items():
+            try:
+                signal.signal(number, previous)
+            except (OSError, ValueError, TypeError):
+                pass
+        self._old.clear()
+
+
+class _ConsoleEnd:
+    """Windows: the console window is closed, or the user logs off or shuts down. Windows ends
+    this process when the handler returns (and 5 seconds on at the latest), so the handler asks
+    the shell to quit and keeps the server up until the shell has exited (its page saved, its
+    last requests drained) or `seconds` have gone, then stops the server and lets the process
+    end. Ctrl-C and Ctrl-Break are left to Python (KeyboardInterrupt). Not run on Windows here:
+    only its logic is tested."""
+
+    EVENTS = (CTRL_CLOSE_EVENT, CTRL_LOGOFF_EVENT, CTRL_SHUTDOWN_EVENT)
+
+    def __init__(
+        self, child: Any, host: Any, *, seconds: float = CONSOLE_END_SECONDS,
+        clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self.child = child
+        self.host = host
+        self.seconds = seconds
+        self.clock = clock
+        self.sleep = sleep
+        self._lock = threading.Lock()
+
+    def __call__(self, event: int) -> bool:
+        if event not in self.EVENTS:
+            return False
+        with self._lock:  # a second event waits for the first one's work, then ends too
+            deadline = self.clock() + self.seconds
+            if self.child.poll() is None and self.child.stdin is not None:
+                _ask_shell_to_quit(self.child.stdin)
+            while self.child.poll() is None and self.clock() < deadline:
+                self.sleep(0.05)
+            self.host.stop()
+        return True
+
+
+def _install_console_handler(
+    handler: Callable[[int], bool], platform: str = sys.platform, *, kernel32: Any = None, functype: Any = None,
+) -> Callable[[], None] | None:
+    """Windows: `handler` becomes a console control handler (``SetConsoleCtrlHandler``); returns
+    what removes it. Elsewhere, and when Windows refuses it: None."""
+    if not platform.startswith("win"):
+        return None
+    try:
+        if kernel32 is None or functype is None:
+            import ctypes
+            from ctypes import wintypes
+
+            kernel32 = kernel32 or ctypes.WinDLL("kernel32", use_last_error=True)
+            functype = functype or ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+        callback = functype(lambda event: bool(handler(int(event))))
+        if not kernel32.SetConsoleCtrlHandler(callback, True):
+            return None
+    except (AttributeError, OSError):
+        return None
+
+    def remove() -> None:
+        try:
+            kernel32.SetConsoleCtrlHandler(callback, False)  # `callback` is kept alive until here
+        except OSError:
+            pass
+
+    return remove
+
+
 def start_shell(
     binary: Path, launch: dict[str, Any], *, popen: Callable[..., Any] | None = None,
-    ready_timeout: float = SHELL_READY_SECONDS,
+    ready_timeout: float = SHELL_READY_SECONDS, said: list[str] | None = None,
 ) -> Any | None:
     """Start the desktop shell as a child; None when it cannot be started (it does not run, or
-    it exits or stays silent before its window exists). Its stdout is read for the ready line
-    only. Its launch (it holds the one-time link) is never printed and never on its command line:
-    it is in the child's own environment, which only this user can read, and the shell removes it
-    from its environment as it reads it."""
+    it exits or stays silent before its window exists); then `said` gets the last line of its
+    stderr, when it wrote one without a link in it. Its stdout is read for the ready line only.
+    Its launch (it holds the one-time link) is never printed and never on its command line: it is
+    in the child's own environment, which only this user can read, and the shell removes it from
+    its environment as it reads it."""
     environ = {k: v for k, v in os.environ.items() if k != "ELECTRON_RUN_AS_NODE"}
     environ[SHELL_LAUNCH_ENV] = json.dumps(launch)
     argv = [str(binary), str(DESKTOP_DIR)]
     try:
         child = (popen or subprocess.Popen)(
-            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=environ,
+            argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environ,
             text=True, encoding="utf-8", errors="replace",
         )
     except OSError:
@@ -371,12 +568,26 @@ def start_shell(
     threading.Thread(
         target=_watch_ready, args=(child.stdout, ready), name="objectapp-shell-output", daemon=True
     ).start()
+    errors = _ShellErrors(ready, str(launch.get("url") or ""))
+    stderr = getattr(child, "stderr", None)
+    if stderr is not None:
+        threading.Thread(target=errors.read, args=(stderr,), name="objectapp-shell-errors", daemon=True).start()
+    else:
+        errors.done.set()
+
+    def failed() -> None:
+        errors.done.wait(1.0)  # the last lines it wrote before it exited
+        if said is not None and errors.last is not None:
+            said.append(errors.last)
+
     deadline = time.monotonic() + ready_timeout
     while not ready.wait(0.05):
         if child.poll() is not None:
+            failed()
             return None
         if time.monotonic() >= deadline:
-            _stop_shell(child)
+            _stop_shell(child, ask=False)
+            failed()
             return None
     return child
 
@@ -440,6 +651,7 @@ def main(argv: list[str] | None = None) -> None:
         host.stop()
         parser.exit(1, _port_taken_message(args.port) + "\n")
 
+    signals = _StopSignals()
     try:
         if args.browser:
             _open_in_browser(host.ui_key, url, print_link=args.print_link)
@@ -449,13 +661,22 @@ def main(argv: list[str] | None = None) -> None:
         else:
             child = None
             if shell is not None:
-                child = start_shell(shell, shell_launch(host.ui_key, url, args.port, frame))
+                said: list[str] = []
+                child = start_shell(shell, shell_launch(host.ui_key, url, args.port, frame), said=said)
                 if child is None:
                     if window == "electron":
-                        parser.exit(1, SHELL_FAILED_MESSAGE + "\n")
-                    print(SHELL_FALLBACK_MESSAGE, flush=True)
+                        parser.exit(1, _with_said(SHELL_FAILED_MESSAGE, said) + "\n")
+                    print(_with_said(SHELL_FALLBACK_MESSAGE, said), flush=True)
             if child is not None:
-                _run_shell(child, host.ui_key)
+                # SIGTERM / SIGHUP: as Ctrl-C, the shell is stopped (and the page saves) before
+                # the server (`finally` below). Windows: a closed console, log off or shut down.
+                signals.install()
+                remove_console_handler = _install_console_handler(_ConsoleEnd(child, host))
+                try:
+                    _run_shell(child, host.ui_key)
+                finally:
+                    if remove_console_handler is not None:
+                        remove_console_handler()
                 return
 
             import webview
@@ -472,8 +693,10 @@ def main(argv: list[str] | None = None) -> None:
     except KeyboardInterrupt:
         pass
     finally:
+        signals.quiet()
         host.stop()
         thread.join(timeout=5)
+        signals.restore()
 
 
 if __name__ == "__main__":

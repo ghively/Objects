@@ -6,8 +6,22 @@ parent: it starts the server, starts this shell with its launch JSON in the envi
 one-time link in the process list; the shell removes it as it reads it), and stops the server
 when the shell exits. The shell never starts Python and is not meant to be run by hand.
 
-- Install once: `cd desktop && npm ci` (Electron is pinned to one exact version; the install
+`objectapp` talks to the shell on its stdin, one JSON line at a time (`lib/stdinLines.js`):
+`{"open": "<one-time url>", "kind": "focus"}` opens Keep on top's window, and `{"kind": "quit"}`
+(written when `objectapp` is stopped: Ctrl-C, SIGTERM, SIGHUP, a closed console) closes every
+window the way a person's close does, so the page saves first. `objectapp` keeps the pipe open
+for the shell's whole life, so the end of stdin means it is gone: the shell then closes the same
+way. (An end that comes before the window is ready is ignored: that is a stdin that was never
+connected, not `objectapp` going.)
+
+- Install once: `npm ci` in this folder (Electron is pinned to one exact version; the install
   also fetches its binary). Then `uv run objectapp --space <folder>` uses it.
+- When it cannot start, `objectapp` says so in one line with the last error line the shell wrote
+  (never anything of the one-time link), and in `auto` opens the pywebview window instead. On
+  Ubuntu 23.10 and later that error can be Chromium's "SUID sandbox helper": run
+  `sudo chown root node_modules/electron/dist/chrome-sandbox && sudo chmod 4755 node_modules/electron/dist/chrome-sandbox`
+  here once (or allow it through an AppArmor profile). What the shell writes on stderr once its
+  window is ready is passed on, without lines holding a one-time link.
 - Spell check follows the device setting "Spellcheck language" (the page tells the shell the
   tag; `lib/spellcheck.js` picks the dictionary: the exact language, else the same language,
   else the system's). On Windows and Linux Chromium downloads a language's dictionary from its
@@ -24,7 +38,9 @@ It is not part of `npm test`: it needs a display, the built front end (`frontend
 Python. From the repository root:
 
 ```sh
-cd frontend && npm run build && cd ..
+cd frontend
+npm run build
+cd ..
 node desktop/test/e2e/shell.e2e.js                 # on a desktop
 xvfb-run -a -s "-screen 0 1920x1080x24" node desktop/test/e2e/shell.e2e.js   # without one (Linux)
 ```
@@ -36,10 +52,14 @@ or the space switcher does not move it), double-clicks the bar to maximise and r
 Minimize, Maximize, Restore and the corner's Close, right-clicks, picks each "Window buttons"
 choice in Settings (and sees "Hide" honoured on the next launch), types a title and three
 sentences and closes at once with the page's own before-close handler, and types a property
-before the window manager's close (Alt+F4). It also checks the theme reaches the shell on load
+before the window manager's close (Alt+F4) and before SIGTERM to `objectapp` (the shell and
+`objectapp` exit, the port is free). It also checks the theme reaches the shell on load
 and on a change, "Spellcheck language" reaches its spellchecker (with the dictionary download
-pointed at nothing), and that no command line holds the one-time link. Environment: `OBJECT_E2E_PYTHON` (a Python that has
+pointed at nothing), that no command line holds the one-time link, and that links reach the
+default browser only on a person's click: not when the page follows one by itself, not from an
+embedded page of another site (served on the port above the app's), and yes for a click on a
+Web link block in a note and on a button that calls `window.open`. Environment: `OBJECT_E2E_PYTHON` (a Python that has
 Object's dependencies; default `uv run python`), `OBJECT_E2E_PLAYWRIGHT` (the `playwright`
 package's folder when it is not installed beside the front end), `OBJECT_E2E_PORT` (default
-8891; the two ports 100 and 200 above it are used for debugging), `OBJECT_E2E_SHOTS` (a folder
-for two screenshots).
+8891; the port 1 above it serves the other site, and the two ports 100 and 200 above it are used
+for debugging), `OBJECT_E2E_SHOTS` (a folder for two screenshots).
