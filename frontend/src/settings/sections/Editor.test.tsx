@@ -292,6 +292,41 @@ describe('EditorSection', () => {
     expect(within(group).getAllByRole('checkbox').map((c) => c.getAttribute('aria-label'))).toEqual(['Notes', 'Daily notes', 'Books'])
   })
 
+  // ---- M33 (choice 7): the "> " setting ----
+
+  test('test \'Typing "> " makes\' offers "A toggle" (the default) and "A quote", after "Toggle style", and patches greaterThanMakes (M33)', async () => {
+    const user = userEvent.setup()
+    render(<EditorSection />)
+    expect(screen.getByRole('heading', { name: 'Typing "> " makes' })).toBeInTheDocument()
+    const g = screen.getByRole('radiogroup', { name: 'Typing "> " makes' })
+    expect(within(g).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['A toggle', 'A quote'])
+    expect(within(g).getByRole('radio', { name: 'A toggle' })).toHaveAttribute('aria-checked', 'true')
+    // Between "Toggle style" and "Turn off automatic numbered lists".
+    const style = screen.getByRole('radiogroup', { name: 'Toggle style' })
+    const numbered = screen.getByRole('switch', { name: 'Turn off automatic numbered lists' })
+    expect(style.compareDocumentPosition(g) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(g.compareDocumentPosition(numbered) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText(EDITOR_TEXT.greaterThanDescription)).toBeInTheDocument()
+
+    await user.click(within(g).getByRole('radio', { name: 'A quote' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ greaterThanMakes: 'quote' }, expect.anything())
+    expect(within(g).getByRole('radio', { name: 'A quote' })).toHaveAttribute('aria-checked', 'true')
+    // The editor reads it from the store when the key is typed.
+    expect(useSettings.getState().settings.greaterThanMakes).toBe('quote')
+    await user.click(within(g).getByRole('radio', { name: 'A toggle' }))
+    expect(mocked.patchSettings).toHaveBeenLastCalledWith({ greaterThanMakes: 'toggle' }, expect.anything())
+    expect(EDITOR_SEARCH).toEqual(expect.arrayContaining(['Typing "> " makes', 'A toggle', 'A quote']))
+  })
+
+  test('test settings saved before M33 (no greaterThanMakes) show "A toggle" (M33)', () => {
+    const old = { ...settingsDefaults } as Partial<typeof settingsDefaults>
+    delete old.greaterThanMakes
+    useSettings.setState({ settings: old as typeof settingsDefaults, revision: 'r0', loaded: true })
+    render(<EditorSection />)
+    const g = screen.getByRole('radiogroup', { name: 'Typing "> " makes' })
+    expect(within(g).getByRole('radio', { name: 'A toggle' })).toHaveAttribute('aria-checked', 'true')
+  })
+
   // ---- M33 (choice 5): titles written twice ----
 
   test('test the title-headings row is not shown when no note repeats its title, and is asked once (M33)', async () => {

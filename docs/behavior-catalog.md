@@ -78,6 +78,10 @@ Object has no accounts.
   space, Open folder…). On, that button is hidden (the sidebar toggle stays); a lone Alt tap shows it, focused, and
   another hides it, as a hidden window menu comes back with Alt (our call). The palette and Ctrl+, reach its spaces
   and settings too.
+  (M33) 'Typing "> " makes' (a row after "Toggle style"; device setting `greaterThanMakes`): "A toggle" (the
+  default, `toggle`) or "A quote" (`quote`). It explains 'What ">" and a space turn the start of a line into. "|"
+  and a space make a quote either way, and the slash menu has both.'. The editor reads it when the key is typed,
+  so a change applies to the next line without a reload. What it changes is under "Markdown list shortcuts".
   (M33) Titles written twice: only while the space has notes whose first heading repeats their title, a row under
   the section's header reads "N notes begin with a heading that repeats their title." ("1 note begins with a
   heading that repeats its title.") with the button "Remove those headings". The count is asked when the section
@@ -642,6 +646,13 @@ with the click. A type made from scratch ("Create your own") still opens its set
     `[X]`) a checked one, and `[ ] ` / `[x] ` do the same at the start of a text line. In a bullet list that has
     other lines only the typed line becomes a to-do. In a numbered list, a heading or a to-do the characters stay
     text. `> ` is still a toggle and `| ` a quote (M32, our call 1).
+  - (M33) With Settings > Editor > 'Typing "> " makes' set to "A quote", the `>` mark is the quote mark, as `|` is:
+    `> ` at the start of a text line makes the quote block `| ` makes (saved as `> text`), and in a combined run it
+    quotes too (`>#` + Space = a quoted heading 1); `>|` is then two marks of one kind and stays text. The toggle
+    keeps its other ways in (the slash menu's "Toggle", the block menus). With "A toggle" (the default) nothing
+    changes. `| ` makes a quote either way; in a code block the characters stay text; one undo gives the typed
+    `> ` back, as for the other marks. The setting changes typing only: a saved note's quotes and toggles are read
+    and written the same with either choice.
   - `()` always gives the same icon (Object keeps no last-used icon).
   - "Turn off automatic numbered lists" removes `1.` as a mark, alone and combined.
 - **Object `...` menu**: see audit item 44. **Delete** asks for confirmation then moves to Trash (30 days).

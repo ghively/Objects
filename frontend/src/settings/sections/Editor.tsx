@@ -129,6 +129,12 @@ export const EDITOR_TEXT = {
     default: { name: 'Default', description: 'A colored rail marks the highlight, and its notes sit below in smaller type.' },
     minimal: { name: 'Minimal', description: 'No rail; the highlight reads as ordinary text.' },
   },
+  // M33 (choice 7): what "> " and a Space make at the start of a line (`greaterThanMakes`).
+  greaterThan: 'Typing "> " makes',
+  greaterThanDescription:
+    'What ">" and a space turn the start of a line into. "|" and a space make a quote either way, and the slash menu has both.', // our string
+  greaterThanToggle: 'A toggle',
+  greaterThanQuote: 'A quote',
   // M33 (choice 5): notes whose first heading repeats their title.
   titleHeadings: (n: number) =>
     n === 1
@@ -149,6 +155,9 @@ export const EDITOR_SEARCH: string[] = [
   T.toggleStyle,
   T.toggleStyleToggle,
   T.toggleStyleBullet,
+  T.greaterThan,
+  T.greaterThanToggle,
+  T.greaterThanQuote,
   T.disableNumbered,
   T.disableSpellcheck,
   T.spellCheckLang,
@@ -444,6 +453,17 @@ export function EditorSection() {
             { value: 'bullet', label: T.toggleStyleBullet },
           ]}
           onChange={(toggleStyle) => set({ toggleStyle })}
+        />
+      </SettingGroup>
+      <SettingGroup title={T.greaterThan} help={T.greaterThanDescription}>
+        <OptionCards
+          label={T.greaterThan}
+          value={settings.greaterThanMakes === 'quote' ? 'quote' : 'toggle'}
+          options={[
+            { value: 'toggle', label: T.greaterThanToggle },
+            { value: 'quote', label: T.greaterThanQuote },
+          ]}
+          onChange={(greaterThanMakes) => set({ greaterThanMakes })}
         />
       </SettingGroup>
       <SwitchRow
