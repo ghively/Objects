@@ -10,10 +10,12 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import types
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from objectapp import __main__ as launcher
@@ -61,7 +63,7 @@ class FakeChild:
     """A stand-in for the shell: prints `output`, then runs `script(child)` (the test's part,
     while the launcher waits) and exits with what `finish` was given."""
 
-    created: list[FakeChild] = []
+    created: ClassVar[list[FakeChild]] = []
 
     def __init__(self, argv, *, script=None, output=(READY,), exits=None, **kwargs) -> None:
         self.argv = list(argv)
@@ -231,7 +233,11 @@ def test_auto_starts_the_shell_and_stops_the_server_when_it_exits(env, monkeypat
             opener.open(launch["url"], timeout=5)
         except urllib.error.HTTPError as res:
             seen["again"] = res.headers.get("set-cookie")
-        # Keep on top: one JSON line on the shell's stdin, with its own one-time link.
+        # Keep on top: one JSON line on the shell's stdin, with its own one-time link. (The
+        # launcher offers it a moment after the shell said it was ready.)
+        deadline = time.monotonic() + 5
+        while not windowhost.can_open() and time.monotonic() < deadline:
+            time.sleep(0.01)
         windowhost.open_window(f"http://127.0.0.1:{env.port}/?mini=work")
         seen["stdin"] = child.stdin.text
         seen["flushed"] = child.stdin.flushed
