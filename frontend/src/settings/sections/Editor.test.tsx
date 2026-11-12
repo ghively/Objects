@@ -13,6 +13,8 @@ import { objectSummary, spaceEntry, typeDef } from '@/test/mockApi'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
 import { resetSpaceInfo, useSpaceInfo } from '@/settings/useSpaceInfo'
 import { EDITOR_SEARCH, EDITOR_TEXT, EditorSection } from './Editor'
+import { SPELLCHECK_DOWNLOAD_TEXT } from '@/desktop/spellCheckLanguage'
+import { fakeDesktop } from '@/desktop/testBridge'
 
 const mocked = vi.mocked(api)
 
@@ -229,6 +231,19 @@ describe('EditorSection', () => {
     expect(within(g).getByText('No rail; the highlight reads as ordinary text.')).toBeInTheDocument()
     await user.click(within(g).getByRole('radio', { name: 'Minimal' }))
     expect(mocked.patchSettings).toHaveBeenLastCalledWith({ highlightStyle: 'minimal' }, expect.anything())
+  })
+
+  test('test the spellcheck row says the dictionary is downloaded once only in the desktop window on Linux and Windows (M33)', () => {
+    const { unmount } = render(<EditorSection />)
+    expect(screen.queryByText(SPELLCHECK_DOWNLOAD_TEXT)).toBeNull()
+    unmount()
+    window.objectDesktop = fakeDesktop({ platform: 'linux' }).bridge
+    try {
+      render(<EditorSection />)
+      expect(screen.getByText(SPELLCHECK_DOWNLOAD_TEXT)).toBeInTheDocument()
+    } finally {
+      delete window.objectDesktop
+    }
   })
 
   test('test spellcheck language saves a normalised tag and refuses a bad one', async () => {

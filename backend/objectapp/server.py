@@ -925,6 +925,19 @@ def _tasks_ui_problem(tasks: Any) -> str | None:
     return None
 
 
+class _AppFiles(StaticFiles):
+    """The built front end. M33: the page itself (`index.html`) is sent with ``Cache-Control:
+    no-cache``, so a window that keeps its cache between launches (the desktop window does) asks
+    again after the app is rebuilt and never starts on an old page that names scripts which are
+    gone. The scripts and styles carry a hash in their names and may be cached as before."""
+
+    async def get_response(self, path: str, scope):  # type: ignore[override]
+        response = await super().get_response(path, scope)
+        if response.media_type == "text/html":
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 def create_app(
     space: Space,
     static_dir: Path | None = None,
@@ -2576,6 +2589,6 @@ def create_app(
     app.include_router(whiteboard_router(space, announce_whiteboard))
 
     if static_dir is not None and Path(static_dir).is_dir():
-        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+        app.mount("/", _AppFiles(directory=static_dir, html=True), name="static")
 
     return app

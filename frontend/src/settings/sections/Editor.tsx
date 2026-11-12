@@ -33,6 +33,7 @@ import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { LINK_VIEWS } from '@/types/CardViewSettings'
 import { OptionCards, SaveError, SecondaryButton, SectionHeader, SettingGroup, SwitchRow, errorText } from '../controls'
 import { normalizeLanguageTag } from '@/settings/spellcheck'
+import { SpellCheckDownloadNote } from '@/desktop/spellCheckLanguage'
 import { useSettingsTypes } from './ObjectTypes'
 
 export const EDITOR_TEXT = {
@@ -484,6 +485,7 @@ export function EditorSection() {
           <>
             <span className="mr-1.5 inline-flex rounded border border-line px-1 text-[11px] font-medium text-fg-muted">{T.experimental}</span>
             {T.spellCheckLangDescription}
+            <SpellCheckDownloadNote />
           </>
         }
       >

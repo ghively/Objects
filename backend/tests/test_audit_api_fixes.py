@@ -279,6 +279,23 @@ def test_static_files_are_gzipped(m8_space_dir: Path, tmp_path: Path, monkeypatc
         assert "content-encoding" not in c.get("/tiny.css", headers={"accept-encoding": "gzip"}).headers
 
 
+def test_the_page_is_asked_again_after_a_rebuild(m8_space_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """M33: `index.html` goes out with `Cache-Control: no-cache` (the desktop window keeps its
+    cache between launches); the hashed scripts are not marked."""
+    monkeypatch.setenv("OBJECT_STATE_DIR", str(tmp_path / "state"))
+    static = tmp_path / "dist"
+    (static / "assets").mkdir(parents=True)
+    (static / "index.html").write_text("<!doctype html><title>Object</title>", encoding="utf-8")
+    (static / "assets" / "index-abc123.js").write_text("console.log(1);\n", encoding="utf-8")
+    app = create_app(Space(m8_space_dir), static, watch=False)
+    with TestClient(app) as c:
+        for name in ("", "index.html"):
+            r = c.get(f"/{name}")
+            assert r.status_code == 200 and r.headers.get("cache-control") == "no-cache", name
+        r = c.get("/assets/index-abc123.js")
+        assert r.status_code == 200 and "cache-control" not in r.headers
+
+
 def test_sse_is_not_buffered_by_gzip(m8_space_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     import threading
     import time
