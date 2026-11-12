@@ -75,8 +75,19 @@ describe('WindowControls', () => {
   test('test the close button takes the danger colour on hover', () => {
     window.objectDesktop = fakeDesktop({ platform: 'linux', controls: 'custom' }).bridge
     render(<Shell />)
-    expect(screen.getByRole('button', { name: 'Close' })).toHaveClass('hover:bg-danger')
-    expect(screen.getByRole('button', { name: 'Minimize' })).not.toHaveClass('hover:bg-danger')
+    // The box that is seen takes the colour while the pointer is anywhere on the button.
+    expect(screen.getByRole('button', { name: 'Close' }).firstElementChild).toHaveClass('group-hover:bg-danger', 'group-hover:text-white')
+    expect(screen.getByRole('button', { name: 'Minimize' }).firstElementChild).not.toHaveClass('group-hover:bg-danger')
+    expect(screen.getByRole('button', { name: 'Minimize' }).firstElementChild).toHaveClass('group-hover:bg-hover')
+  })
+
+  test('test the buttons fill the bar to its top and to the window edge: the corner closes', () => {
+    window.objectDesktop = fakeDesktop({ platform: 'linux', controls: 'custom' }).bridge
+    render(<Shell />)
+    const group = screen.getByRole('group', { name: 'Window' })
+    // Full height of the bar, and over the bar's own right padding.
+    expect(group).toHaveClass('self-stretch', 'items-stretch', '-mr-2', 'app-no-drag')
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveClass('pr-2')
   })
 
   test('test the buttons are reachable by keyboard and last in the bar', () => {

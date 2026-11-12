@@ -5,8 +5,8 @@
  * 'none' means no buttons (a tiling compositor, "Window buttons: Hide", the system's frame): all
  * three draw nothing, as a browser tab and the pywebview window do.
  *
- * They are ordinary buttons of the bar (its size, its hover), reachable by Tab after everything
- * else in it; Close takes the theme's danger colour under the pointer. They stay while the rest
+ * They look like the bar's other buttons (its size, its hover) and are reachable by Tab after
+ * everything else in it; Close takes the theme's danger colour under the pointer. They stay while the rest
  * of the bar fades for typing (`focus/TypingFade`), as the system's buttons do on the other two.
  */
 import { Icon } from '@/components/Icon'
@@ -24,6 +24,11 @@ export const WINDOW_CONTROLS_TEXT = {
 
 const T = WINDOW_CONTROLS_TEXT
 
+/**
+ * One button. What is seen is the bar's usual 32px square (the inner box takes the hover); what is
+ * clicked is taller and, for Close, wider: the full height of the bar, out to the window's edge.
+ * So the pointer thrown into the corner of a maximised window closes it, as on every system.
+ */
 function ControlButton({ label, icon, size, onClick, danger }: { label: string; icon: string; size: number; onClick(): void; danger?: boolean }) {
   return (
     <button
@@ -31,12 +36,16 @@ function ControlButton({ label, icon, size, onClick, danger }: { label: string; 
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={cn(
-        'flex size-8 items-center justify-center rounded-md text-fg',
-        danger ? 'hover:bg-danger hover:text-white' : 'hover:bg-hover',
-      )}
+      className={cn('group flex items-center pl-px outline-none', danger ? 'pr-2' : 'pr-px')}
     >
-      <Icon name={icon} size={size} />
+      <span
+        className={cn(
+          'flex size-8 items-center justify-center rounded-md text-fg group-focus-visible:outline-2',
+          danger ? 'group-hover:bg-danger group-hover:text-white' : 'group-hover:bg-hover',
+        )}
+      >
+        <Icon name={icon} size={size} />
+      </span>
     </button>
   )
 }
@@ -47,7 +56,7 @@ export function WindowControls() {
   const d = desktop()
   if (!d || (stored ?? d.controls) !== 'custom') return null
   return (
-    <div role="group" aria-label={T.group} data-window-controls="" data-typing-stay="" className="app-no-drag ml-1.5 flex shrink-0 items-center gap-0.5">
+    <div role="group" aria-label={T.group} data-window-controls="" data-typing-stay="" className="app-no-drag -mr-2 ml-1.5 flex shrink-0 items-stretch self-stretch">
       <ControlButton label={T.minimize} icon="ph-minus" size={16} onClick={() => d.minimize()} />
       {maximized ? (
         <ControlButton label={T.restore} icon="ph-copy-simple" size={16} onClick={() => d.toggleMaximize()} />

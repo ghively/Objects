@@ -75,5 +75,11 @@ html.desktop-controls-traffic:not(.desktop-fullscreen) .app-titlebar-lead > butt
   min-width: 0;
 }
 
+/* Only the name gives way: not the sidebar button, not the space's icon or the menu's caret. */
+html.desktop-controls-traffic:not(.desktop-fullscreen) .app-titlebar-lead > button:last-child,
+html.desktop-controls-traffic:not(.desktop-fullscreen) .app-titlebar-lead > button:not(:last-child) > :is(:first-child, :last-child) {
+  flex-shrink: 0;
+}
+
 /* 'custom' (Linux): nothing is kept free; the three buttons (`WindowControls`) are the last things
    in the bar's own row. 'none': nothing is kept free and nothing is drawn. */
