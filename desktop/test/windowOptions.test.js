@@ -25,6 +25,22 @@ test('macOS: the traffic lights sit inset in the top bar', () => {
   assert.equal(o.frame, undefined)
 })
 
+test('macOS: the traffic lights are centred in the 42px top bar, and the page keeps the same room free', () => {
+  // The buttons' frame is TRAFFIC_LIGHT_BUTTON high (the 12pt circle inside a 14x16 frame);
+  // the position is that frame's top left, so (42 - 16) / 2 from the top centres them.
+  const { TRAFFIC_LIGHT_BUTTON } = require('../lib/windowOptions')
+  assert.deepEqual(TRAFFIC_LIGHT_BUTTON, { width: 14, height: 16, gap: 6 })
+  assert.equal(TRAFFIC_LIGHTS.y, 13)
+  assert.equal(TRAFFIC_LIGHTS.y * 2 + TRAFFIC_LIGHT_BUTTON.height, TOP_BAR_HEIGHT)
+  // Three buttons from x, then room to spare before the bar's first button.
+  const right = TRAFFIC_LIGHTS.x + 3 * TRAFFIC_LIGHT_BUTTON.width + 2 * TRAFFIC_LIGHT_BUTTON.gap
+  assert.ok(right + 8 <= TRAFFIC_LIGHTS.reserve, `${right} leaves too little of ${TRAFFIC_LIGHTS.reserve}`)
+  // The page's side (frontend/src/desktop/desktop.css) keeps exactly that room free.
+  const css = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'frontend', 'src', 'desktop', 'desktop.css'), 'utf8')
+  assert.match(css, new RegExp(`html\\.desktop-controls-traffic:not\\(\\.desktop-fullscreen\\) \\.app-titlebar \\{\\s*padding-left: ${TRAFFIC_LIGHTS.reserve}px;`))
+  assert.match(css, new RegExp(`calc\\(348px \\+ 0\\.625rem - ${TRAFFIC_LIGHTS.reserve}px\\)`))
+})
+
 test('Linux: no frame at all', () => {
   const o = windowOptions('linux', DARK, {})
   assert.equal(o.frame, false)

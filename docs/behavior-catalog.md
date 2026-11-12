@@ -389,11 +389,12 @@ with the click. A type made from scratch ("Create your own") still opens its set
   the side panel button), and so does anything that opens over it (menus, dialogs, tooltips). The bar stays 42px
   high. Room for the window's own buttons follows where they are: on Windows the system draws minimise, maximise
   and close over the top right corner and the bar keeps that corner free (138px when the system gives no
-  measure); on macOS the traffic lights sit in the bar's left end, which keeps 78px free for them (the block over
+  measure); on macOS the traffic lights sit in the bar's left end, centred in its height, which keeps 78px free for them (the block over
   the sidebar narrows by as much, so the sidebar button and everything after it stay where they are), except in
   full screen; on Linux Object draws three buttons as the last things in the bar: "Minimize", "Maximize"
   ("Restore" while maximised) and "Close" (tooltips in those words; Close turns the danger colour under the
-  pointer; reached by Tab after everything else in the bar; they stay while the bar fades for typing; they take
+  pointer; reached by Tab after everything else in the bar; they stay, and take clicks, while the bar fades for
+  typing; they keep to the window's right end in focus mode; they take
   clicks over the bar's full height and Close out to the window's edge, so the corner of a maximised window
   closes it). No buttons
   are drawn on a tiling compositor or with "Window buttons: Hide" (Settings > Appearance); the bar still moves the
@@ -779,8 +780,9 @@ with the click. A type made from scratch ("Create your own") still opens its set
     window, and is offered the next time the note opens ("Recover unsaved changes": the kept text beside the
     version on disk, "Save changes" / "Discard"; nothing is written without that choice). Kept text the file
     already holds is cleared when the space opens, and never offered.
-  - (M33) The desktop window saves before it closes: on a close it first does what a closing browser window does
-    (unsaved text is sent and kept for the next open until it lands, a typed title is committed, a whiteboard and
+  - (M33) The desktop window saves before it closes: on a close (its own Close button, the system's, Alt+F4) focus
+    first leaves the field being typed in, so a property's text saves as it does on a click elsewhere; then it
+    does what a closing browser window does (unsaved text is sent and kept for the next open until it lands, a typed title is committed, a whiteboard and
     a drawing flush) and then waits until no save is waiting or on its way (the open notes' text and titles, and
     every write to the server not yet answered, a property edit included), 2.5 seconds at most; a failed save
     does not hold the window (its text is kept as above). The app's server stops only after the window is gone.
@@ -1479,7 +1481,10 @@ own; the strings live in `frontend/src/import/text.ts`, `import/scan/text.ts` an
     link open in the default browser (web and `mailto:` links only); nothing else opens anywhere. A right click
     where the app shows no menu of its own gives Cut, Copy, Paste, Select all and, on a misspelled word, up to five
     suggestions and "Add to dictionary"; selected text that cannot be edited gives Copy and Select all. Spell check
-    is on. Downloads (exports) ask where to save through the system's dialog. Notifications, the clipboard, the
+    is on and follows Settings > Editor > "Spellcheck language" (the offered dictionary of that tag, else of the
+    same language, else the system's; macOS uses its own spellchecker); on Windows and Linux the dictionary is
+    downloaded once from the browser engine's server, and the setting's help says so there ("The dictionary for
+    this language is downloaded once from the browser engine's server."). Downloads (exports) ask where to save through the system's dialog. Notifications, the clipboard, the
     microphone and full screen (presentations) are allowed for the app's own origin; every other permission, and
     every other site, is refused. The page has no Node; it gets only `window.objectDesktop`.
   - **Closing loses nothing**: on close the shell asks the page to save and waits for its answer or 3 seconds, then

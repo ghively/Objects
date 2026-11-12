@@ -2,7 +2,8 @@
  * Puts the device settings that act app-wide onto `<html>` once they are loaded (so the defaults
  * never overwrite what `index.html` painted first):
  * - the text size (`--app-zoom`, `zoom.ts`);
- * - the spellcheck language (`lang`, `spellcheck.ts`; the browser's spellchecker follows it);
+ * - the spellcheck language (`lang`, `spellcheck.ts`; the browser's spellchecker follows it; in the
+ *   desktop window the shell is told it too, once the settings are read: `desktop/spellCheckLanguage`);
  * - "Keep type settings inside Settings only" (`data-hide-type-settings`: `index.css`
  *   hides every `[data-type-setting]` entry point while it is set);
  * - the highlight style (`data-highlight-style`; Object has no highlight blocks yet, so nothing
@@ -12,6 +13,7 @@
  */
 import { useEffect } from 'react'
 import { settingsDefaults, useSettings } from '@/settings/useSettings'
+import { tellSpellCheckLanguage } from '@/desktop/spellCheckLanguage'
 import { useAppIcon } from './appIcon'
 import { documentLang } from './spellcheck'
 import { applyZoom } from './zoom'
@@ -25,6 +27,9 @@ export function DeviceSettingsFollower() {
   useEffect(() => {
     if (ready) applyZoom(zoom)
   }, [ready, zoom])
+  useEffect(() => {
+    if (ready) tellSpellCheckLanguage(spellCheckLang)
+  }, [ready, spellCheckLang])
   useEffect(() => {
     const root = document.documentElement
     root.setAttribute('lang', documentLang(spellCheckLang))

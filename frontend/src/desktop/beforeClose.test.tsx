@@ -83,6 +83,51 @@ describe('saveEverything', () => {
     window.removeEventListener('pagehide', onPageHide)
   })
 
+  test('test a field still being typed in saves as it does when focus leaves it, and that save is waited for', async () => {
+    // The system's own close button (and Alt+F4) takes no focus: a property field that saves on
+    // blur would keep what was typed to itself.
+    const { calls, fetchMock } = deferredFetch()
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+    trackWrites()
+    const field = document.createElement('textarea')
+    field.addEventListener('blur', () => void fetch('/api/object/properties', { method: 'PATCH', body: '{}' }))
+    document.body.appendChild(field)
+    field.focus()
+    expect(document.activeElement).toBe(field)
+    const order: string[] = []
+    const onPageHide = () => order.push(`pagehide ${calls.length}`)
+    window.addEventListener('pagehide', onPageHide)
+    const done = settled(saveEverything())
+    window.removeEventListener('pagehide', onPageHide)
+    // The field gave up focus first, so its save was on its way when the editors were told.
+    expect(document.activeElement).not.toBe(field)
+    expect(order).toEqual(['pagehide 1'])
+    expect(calls.map((c) => c.method)).toEqual(['PATCH'])
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(done()).toBe(false)
+    await act(async () => calls[0].resolve())
+    await vi.advanceTimersByTimeAsync(SETTLE_QUIET_MS + 50)
+    expect(done()).toBe(true)
+    field.remove()
+  })
+
+  test('test a field that cannot give up focus does not keep the window open', async () => {
+    const field = document.createElement('input')
+    field.blur = () => {
+      throw new Error('boom')
+    }
+    document.body.appendChild(field)
+    field.focus()
+    const onPageHide = vi.fn()
+    window.addEventListener('pagehide', onPageHide)
+    const done = settled(saveEverything())
+    window.removeEventListener('pagehide', onPageHide)
+    expect(onPageHide).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(done()).toBe(true)
+    field.remove()
+  })
+
   test('test nothing pending: it resolves at once', async () => {
     const done = settled(saveEverything())
     await vi.advanceTimersByTimeAsync(0)

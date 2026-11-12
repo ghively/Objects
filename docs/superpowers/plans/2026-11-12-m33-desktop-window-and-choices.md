@@ -38,7 +38,9 @@ Additive: `uv run objectapp` keeps working exactly as today. When the shell is i
 - New option `--window auto|electron|pywebview` (default `auto`: the shell when `desktop/node_modules/electron`
   is there, else pywebview; `electron` fails with a plain message when it is not installed; `pywebview` forces
   the old window). Environment `OBJECT_WINDOW` gives the same choice.
-- Python hands the shell, as one JSON argument (`--object-launch=<json>`): `url` (the one-time `/_open?code=…`
+- Python hands the shell, as one JSON object in the child's environment (`OBJECT_DESKTOP_LAUNCH`; never on its
+  command line, where other local users could read the link in the process list; the shell removes the variable
+  as it reads it, so nothing it starts inherits it): `url` (the one-time `/_open?code=…`
   link), `origin` (`http://127.0.0.1:<port>`), `stateDir`, `icon` (the device setting "App icon" file, or null),
   `title` ("Object").
 - **Keep on top** (M23): `windowhost.set_opener` writes one JSON line to the shell's stdin,
@@ -108,6 +110,10 @@ interface ObjectDesktop {
   /** Linux only: apply the "Window buttons" setting now ('auto' | 'show' | 'hide'); resolves the controls
    *  now in force. */
   setWindowButtons(v: 'auto' | 'show' | 'hide'): Promise<'custom' | 'none'>
+  /** The device setting "Spellcheck language" (a tag, or null): Electron's spellchecker does not follow
+   *  `<html lang>`. The shell picks the offered dictionary (exact, else the same language, else the system's);
+   *  a no-op on macOS. (Added when the two halves were put together.) */
+  setSpellCheckLanguage(tag: string | null): void
 }
 ```
 
@@ -147,7 +153,7 @@ Rule of the pass: additive, nothing a person relies on is taken away, no file is
   it) from each such note through the ordinary body write (atomic, CRLF/BOM kept, version history keeps the
   earlier text, `lastUpdated` as any body save). Refused with the space's usual answer when the space is read-only.
 - The bridge and the front-end `desktop/` module names above.
-- The launch argument, the stdin line and `--window` / `OBJECT_WINDOW` above.
+- The launch (`OBJECT_DESKTOP_LAUNCH`), the stdin line and `--window` / `OBJECT_WINDOW` above.
 
 ## Lanes and file ownership
 
@@ -192,3 +198,15 @@ mentions; the settings keys on an old file.
    stays the cautious one.
 5. Linux draws its own three buttons rather than the overlay Electron also offers there, so they can be left out
    on a tiling compositor.
+6. The two halves run together (2026-11-12, Linux under a virtual display): a press on the bar's free part moves the
+   window and a double click there maximises and restores; the Linux buttons work by real clicks, also while the
+   bar is faded for typing (they stay clickable) and at the window's right end in focus mode; closing makes focus
+   leave the field being typed in first, so a property's text is saved by the system's close too; the page's
+   `<html>` classes are set before the first paint. macOS's traffic lights go at x 14, y 13: Electron places them
+   by the button frame (AppKit's standard 14x16 points, the 12pt circle inside), so (42 - 16) / 2 centres them in
+   the 42px bar, and they end at 68px, inside the 78px the page keeps free (a test on the shell's side reads the
+   page's CSS so the two stay equal). macOS could not be run here.
+7. The spell-check language reaches the shell (`setSpellCheckLanguage`): Electron's spellchecker follows the
+   session's languages, not `<html lang>`, so the device setting would otherwise do nothing in the desktop window.
+   Spell check stays on; on Windows and Linux Chromium downloads a language's dictionary once from its vendor's
+   server, which the setting's help says inside the shell on those two systems and the README says too.

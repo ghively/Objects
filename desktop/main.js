@@ -1,17 +1,18 @@
 'use strict'
 // Object's desktop window (M33): a frameless Electron shell around the app that `objectapp`
 // serves on 127.0.0.1. `objectapp` (Python) is the parent: it starts the server, starts this
-// shell with `--object-launch=<json>`, and stops the server when the shell exits. Nothing here
-// knows how to start Python.
+// shell with its launch JSON in the environment (OBJECT_DESKTOP_LAUNCH, never on the command
+// line), and stops the server when the shell exits. Nothing here knows how to start Python.
 //
 // Safety: the window only ever shows the launch origin; the page has no Node (sandbox, context
-// isolation) and gets only the bridge in preload.js; the one-time links (the launch argument
-// and the keep-on-top line) are never logged and never written to disk.
+// isolation) and gets only the bridge in preload.js; the one-time links (the launch and the
+// keep-on-top line) are never logged and never written to disk, and the launch variable is
+// removed from this process's environment as soon as it is read.
 
 const path = require('node:path')
 const { app, BrowserWindow, Menu, ipcMain, nativeTheme, screen, session, shell } = require('electron')
 
-const { parseLaunch } = require('./lib/launch')
+const { takeLaunch } = require('./lib/launch')
 const { controlsFor } = require('./lib/controls')
 const { cleanTheme, overlayFor, windowOptions, focusWindowOptions, webPreferences } = require('./lib/windowOptions')
 const { loadState, saveState, placeOnDisplays, isWayland } = require('./lib/windowState')
@@ -21,6 +22,7 @@ const { lineReader, parseCommand } = require('./lib/stdinLines')
 const { createCloseGate } = require('./lib/closeGate')
 const { createPending } = require('./lib/pending')
 const { applicationMenu, contextMenu } = require('./lib/menus')
+const { spellCheckLanguagesFor } = require('./lib/spellcheck')
 
 /** `objectapp` reads this line on the shell's stdout: the window exists. */
 const READY_LINE = 'object-desktop: ready'
@@ -31,7 +33,8 @@ const BUTTONS = ['auto', 'show', 'hide']
 
 let launch
 try {
-  launch = parseLaunch(process.argv)
+  // Read once and removed: nothing this process starts (the default browser, a helper) inherits it.
+  launch = takeLaunch(process.env)
 } catch (error) {
   console.error(`Object: ${error.message}`)
   app.exit(2)
@@ -55,6 +58,8 @@ function start({ url, origin, stateDir, icon, frame }) {
   let focusWindow = null
   let saveTimer = null
   let quitting = false
+  /** The session's spell-check languages before the setting was applied: the system's (from its locale). */
+  let systemSpellCheckLanguages = null
 
   app.setName('Object')
   if (platform === 'win32') app.setAppUserModelId('com.objectapp.Object')
@@ -274,6 +279,19 @@ function start({ url, origin, stateDir, icon, frame }) {
     ipcMain.on('object-desktop:set-theme', (event, value) => {
       const next = cleanTheme(value)
       if (next && callerWindow(event)) applyTheme(next)
+    })
+    // "Spellcheck language": Windows and Linux pick the dictionary here; macOS uses the system's
+    // own spellchecker, so nothing is done there. Chromium downloads a language's dictionary from
+    // its vendor's server the first time it is used (said in Settings and the README).
+    ipcMain.on('object-desktop:set-spell-check-language', (event, tag) => {
+      if (platform === 'darwin' || !callerWindow(event) || (tag !== null && typeof tag !== 'string')) return
+      const ses = event.sender.session
+      if (systemSpellCheckLanguages === null) systemSpellCheckLanguages = ses.getSpellCheckerLanguages()
+      try {
+        ses.setSpellCheckerLanguages(spellCheckLanguagesFor(tag, ses.availableSpellCheckerLanguages, systemSpellCheckLanguages))
+      } catch {
+        // a language Chromium refuses: the dictionary stays as it was
+      }
     })
     ipcMain.handle('object-desktop:is-maximized', (event) => callerWindow(event)?.isMaximized() === true)
     ipcMain.handle('object-desktop:is-full-screen', (event) => callerWindow(event)?.isFullScreen() === true)

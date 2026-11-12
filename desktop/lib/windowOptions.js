@@ -10,8 +10,21 @@
 /** The app's top bar (`frontend/src/shell/TopBar.tsx`, `h-[42px]`). */
 const TOP_BAR_HEIGHT = 42
 
-/** macOS: where the traffic lights are put, and the room (px from the left edge) they take. */
-const TRAFFIC_LIGHTS = { x: 14, y: 14, reserve: 78 }
+/**
+ * macOS: one traffic-light button. Electron places the buttons by their frame
+ * (`trafficLightPosition` is the first frame's top left; it centres them by the frame's height
+ * when it lays them out itself), and AppKit's standard window button frame is 14x16 points with
+ * the 12pt circle inside, 6 points apart. Not run here: macOS cannot be run in this repository's
+ * checks, so this is from the documentation and the system's standard sizes.
+ */
+const TRAFFIC_LIGHT_BUTTON = { width: 14, height: 16, gap: 6 }
+
+/**
+ * macOS: where the traffic lights are put, and the room (px from the left edge) they take.
+ * `y` centres them in the top bar: (42 - 16) / 2 = 13. `reserve` is what the page keeps free
+ * (`frontend/src/desktop/desktop.css`, `padding-left: 78px`): they end at 14 + 3x14 + 2x6 = 68.
+ */
+const TRAFFIC_LIGHTS = { x: 14, y: (TOP_BAR_HEIGHT - TRAFFIC_LIGHT_BUTTON.height) / 2, reserve: 78 }
 
 /**
  * Until the page has ever said its theme: the app's default (dark) theme's `--bg-app` and
@@ -98,6 +111,6 @@ function webPreferences(preload) {
 }
 
 module.exports = {
-  TOP_BAR_HEIGHT, TRAFFIC_LIGHTS, DEFAULT_THEME, DEFAULT_SIZE, cleanTheme, overlayFor, windowOptions,
+  TOP_BAR_HEIGHT, TRAFFIC_LIGHT_BUTTON, TRAFFIC_LIGHTS, DEFAULT_THEME, DEFAULT_SIZE, cleanTheme, overlayFor, windowOptions,
   focusWindowOptions, webPreferences,
 }

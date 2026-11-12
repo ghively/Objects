@@ -5,7 +5,8 @@
  * region, no room kept for window buttons, no buttons).
  *
  * The type is the plan's Contract, word for word, plus `framed` (the coordinator's addition of
- * 2026-11-12 for the shell's `--frame system` mode).
+ * 2026-11-12 for the shell's `--frame system` mode) and `setSpellCheckLanguage` (added when the
+ * two halves were put together, 2026-11-12).
  */
 
 export type DesktopPlatform = 'win32' | 'darwin' | 'linux'
@@ -36,6 +37,9 @@ export interface ObjectDesktop {
   /** Linux only: apply the "Window buttons" setting now ('auto' | 'show' | 'hide'); resolves the controls
    *  now in force. */
   setWindowButtons(v: 'auto' | 'show' | 'hide'): Promise<'custom' | 'none'>
+  /** The device setting "Spellcheck language" (a language tag, or null for the system's languages):
+   *  Electron's spellchecker does not follow `<html lang>`. A no-op on macOS (the system's own). */
+  setSpellCheckLanguage(tag: string | null): void
 }
 
 declare global {
