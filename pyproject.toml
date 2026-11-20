@@ -3,7 +3,7 @@ name = "objectapp"
 version = "0.1.0"
 description = "A local, file-based object workspace with an object-based UI"
 authors = [
-    { name = "Gene Hively", email = "ghively@cpicardgroup.com" }
+    { name = "Gene Hively", email = "genehively@gmail.com" }
 ]
 requires-python = ">=3.13"
 dependencies = [

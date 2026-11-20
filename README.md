@@ -286,4 +286,4 @@ Rules for contributors, human or agent, are in [`CLAUDE.md`](CLAUDE.md). To pick
 
 ---
 
-<sub>Object's application code is written from scratch. Keep this repository private.</sub>
+<sub>Object's application code is written from scratch.</sub>
