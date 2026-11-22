@@ -5,18 +5,10 @@ import { StringEditor } from '@/editor/StringEditor'
 import { WIKILINK_RE } from '@/editor/extensions/wikilink'
 import { useLinkPicker } from '@/links/LinkPicker'
 import { presentWikilink } from '@/links/wikilinkPresenter'
+import { escapeHtml } from '@/lib/escapeHtml'
 import { placeholderFor } from '../format'
 import type { CellExtras } from '../cellFor'
 import type { CellProps } from './types'
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
 
 /**
  * The href to render, or null when it is unsafe. Allows http, https and mailto, and relative
