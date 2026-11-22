@@ -99,7 +99,12 @@ function placeRawCaret(content: HTMLElement, at: 'start' | 'end'): void {
 export function focusBodyEnd(root: ParentNode | null | undefined): boolean {
   const ed = bodyEditorOf(root)
   if (ed?.isEditable && !Selection.atEnd(ed.state.doc).$head.parent.isTextblock) {
-    ed.chain().insertContentAt(ed.state.doc.content.size, { type: 'paragraph' }).focus('end').run()
+    // Not the chain's focus ('end') either: it goes through the editor's focus command, which
+    // takes the DOM focus a second time a frame later and steals it back from whoever took it
+    // meanwhile (focusBody's trap, PR #16). The line is inserted, the caret placed at its end
+    // and the focus taken here, once.
+    ed.chain().insertContentAt(ed.state.doc.content.size, { type: 'paragraph' }).run()
+    ed.view.dispatch(ed.state.tr.setSelection(Selection.atEnd(ed.state.doc)))
     ed.view.focus()
     return true
   }
