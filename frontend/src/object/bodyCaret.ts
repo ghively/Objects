@@ -6,7 +6,7 @@
  * at its start or end (an exact selection is the formatted editor's only).
  */
 import type { Editor as TiptapEditor } from '@tiptap/core'
-import { Selection } from '@tiptap/pm/state'
+import { Selection, TextSelection } from '@tiptap/pm/state'
 import { getBlockSelection } from '@/editor/extensions/blockSelection'
 
 /** Where the caret goes: the body's start or end, or an exact selection (document positions). */
@@ -28,9 +28,18 @@ export function focusBody(root: ParentNode | null | undefined, at: BodyCaret): b
   const ed = bodyEditorOf(root)
   if (ed) {
     if (!ed.isEditable) return false
-    if (typeof at === 'string') ed.commands.focus(at)
-    else ed.chain().setTextSelection({ from: at.anchor, to: at.head }).focus().run()
-    // The focus command defers DOM focus a frame; take it now so the next keystroke lands here.
+    // Not the editor's focus command: it takes the DOM focus a second time a frame later, which
+    // steals it back from whoever took it meanwhile (a title being retyped while its rename
+    // answers: that blur committed a half-typed title). The selection is placed and the focus
+    // taken here, once (the way `placeBodyCaret` already goes).
+    const { doc } = ed.state
+    const selection =
+      typeof at === 'string'
+        ? at === 'end'
+          ? Selection.atEnd(doc)
+          : Selection.atStart(doc)
+        : TextSelection.create(doc, Math.min(at.anchor, doc.content.size), Math.min(at.head, doc.content.size))
+    ed.view.dispatch(ed.state.tr.setSelection(selection))
     ed.view.focus()
     return true
   }
