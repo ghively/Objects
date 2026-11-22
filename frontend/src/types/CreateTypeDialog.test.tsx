@@ -154,8 +154,12 @@ describe('CreateTypeDialog gallery (item 21)', () => {
     rerender(<CreateTypeDialog open />)
     expect(await screen.findByRole('button', { name: 'IT operations' })).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('button', { name: /Hosts/ })).toBeNull()
-    // Nothing was written anywhere for it.
-    expect({ ...localStorage }).toEqual(stored)
+    // Nothing was written anywhere for it. The icon cache (Icon.tsx's 'object.icons') is a
+    // per-viewer convenience that lands whenever a gallery icon finishes loading, and when it
+    // lands is a race — it is not the fold being remembered, so it is set aside here.
+    const { ['object.icons']: _icons, ...after } = { ...localStorage }
+    const { ['object.icons']: _iconsBefore, ...before } = stored
+    expect(after).toEqual(before)
   })
 
   test('test a section the frontend has no title for still shows, named from its key (M32)', async () => {

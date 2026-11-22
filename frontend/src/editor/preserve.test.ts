@@ -95,7 +95,11 @@ describe('splitBlocks / joinBlocks', () => {
       best = Math.min(best, performance.now() - t0)
       expect(blocks).toHaveLength(warm.length)
     }
-    expect(best).toBeLessThan(300)
+    // GitHub's shared runners are several times slower than a dev machine (observed ~2.4s
+    // against ~0.1-0.3s locally); the budget there is scaled so the bar still catches a real
+    // regression without failing on the runner's speed.
+    const budget = process.env.CI ? 3_000 : 300
+    expect(best).toBeLessThan(budget)
   }, 30_000)
 })
 
