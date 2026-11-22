@@ -1,0 +1,56 @@
+# The gate: backend pytest and the frontend build/test/lint chain, on every push
+# to master and every pull request. Mirrors the manual commands in HANDOFF.md
+# ("Run" / gates) so CI and local runs cannot drift apart. pygobject/pycairo
+# (linux-only window deps) are skipped: no test opens a real window (they fake
+# the webview, see backend/tests/test_desktop_window.py), and building them
+# needs system girepository headers not present on the runner.
+name: gate
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+      - name: Install dependencies
+        run: >
+          uv sync --locked
+          --no-install-package pygobject --no-install-package pycairo
+      - name: pytest
+        run: uv run --no-sync python -m pytest backend/tests -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Build (tsc -b + vite)
+        run: npm run build
+        working-directory: frontend
+      - name: Vitest
+        run: npx vitest run
+        working-directory: frontend
+      - name: Lint
+        run: npm run lint
+        working-directory: frontend
