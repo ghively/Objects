@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .merge import TooLarge, merge_objects
 from .propvalues import InvalidValue
 from .space import Conflict, ReadOnly
@@ -30,10 +31,6 @@ class MergeRequest(BaseModel):
     targetVersion: str
     confirm: bool = False
     clientId: str | None = None
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 def router(ctx: ApiContext) -> APIRouter:

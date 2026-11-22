@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from . import captures
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .propvalues import InvalidValue
 from .space import Conflict, ReadOnly
 from .watcher import ChangeEvent
@@ -40,10 +41,6 @@ class MarkFiledRequest(BaseModel):
     path: str
     version: str
     clientId: str | None = None
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 def router(ctx: ApiContext, loop: WorkLoop, service: WorkService) -> APIRouter:

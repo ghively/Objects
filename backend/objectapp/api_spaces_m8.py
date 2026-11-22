@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .spaces import (
     SpaceFolderChanged,
     SpaceIsCurrent,
@@ -32,10 +33,6 @@ class DeleteSpaceRequest(BaseModel):
     path: str
     permanent: bool = False
     folder: str | None = None
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 def router(ctx: ApiContext) -> APIRouter:

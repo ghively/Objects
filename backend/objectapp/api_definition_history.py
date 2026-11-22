@@ -32,6 +32,7 @@ from pydantic import BaseModel
 
 from .apictx import ApiContext
 from .collections import CollectionDef
+from .errors import error_response as _error
 from .history import HistoryStore, VersionNotFound
 from .propvalues import InvalidValue
 from .queries import QueryDef
@@ -59,10 +60,6 @@ class DefinitionRestoreRequest(BaseModel):
     id: str
     baseRevision: str
     confirm: bool = False
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 def _type_problem(data: dict[str, Any]) -> str | None:

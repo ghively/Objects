@@ -32,6 +32,7 @@ from fastapi.responses import JSONResponse
 from . import alerttype, windowhost, workboard, workday, workfloor, workfocus, workwins
 from .alertwatch import alerts_view
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .history import HistoryStore
 from .localtime import to_local
 from .propvalues import InvalidValue
@@ -54,10 +55,6 @@ if TYPE_CHECKING:
     from .workservice import WorkService
 
 __all__ = ["router"]
-
-
-def _error(status: int, message: str) -> JSONResponse:
-    return JSONResponse({"detail": message}, status_code=status)
 
 
 def _locked(reason: str) -> JSONResponse:

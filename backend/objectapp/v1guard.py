@@ -33,9 +33,9 @@ from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Any
 
 from fastapi import Request
-from fastapi.responses import JSONResponse
 
 from .apiquery import is_excluded
+from .errors import error_response as error
 from .tokens import ActivityLog, TokenRecord, TokenStore
 from .watcher import ChangeEvent
 
@@ -75,10 +75,6 @@ class Denied(Exception):
         super().__init__(detail)
         self.status = status
         self.detail = detail
-
-
-def error(status: int, detail: str, **extra: Any) -> JSONResponse:
-    return JSONResponse({"detail": detail, **extra}, status_code=status)
 
 
 def guarded(fn):

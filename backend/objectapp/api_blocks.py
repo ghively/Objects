@@ -23,6 +23,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .relink import _LINK_RE, _segments
 
 __all__ = ["block_markdown", "block_reference_ids", "router"]
@@ -95,10 +96,6 @@ def block_reference_ids(body: str) -> list[tuple[str, str]]:
             if sm is not None:
                 out.append((m.group(1).strip(), sm.group(1)))
     return out
-
-
-def _error(status: int, message: str) -> JSONResponse:
-    return JSONResponse({"detail": message}, status_code=status)
 
 
 def router(ctx: ApiContext) -> APIRouter:

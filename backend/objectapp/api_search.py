@@ -19,16 +19,13 @@ from fastapi import APIRouter, Body, Query
 from fastapi.responses import JSONResponse
 
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .searchindex import MAX_LIMIT
 
 __all__ = ["MAX_QUERY_LENGTH", "MODES", "router"]
 
 MAX_QUERY_LENGTH = 200
 MODES = ("auto", "title", "fullText")
-
-
-def _error(message: str) -> JSONResponse:
-    return JSONResponse({"detail": message}, status_code=422)
 
 
 def router(ctx: ApiContext) -> APIRouter:
@@ -48,17 +45,17 @@ def router(ctx: ApiContext) -> APIRouter:
         mode: str = Query(default="auto"),
     ):
         if mode not in MODES:
-            return _error('The field "mode" must be auto, title or fullText.')
+            return _error(422, 'The field "mode" must be auto, title or fullText.')
         if len(q) > MAX_QUERY_LENGTH:
-            return _error(f'The field "q" must be at most {MAX_QUERY_LENGTH} characters.')
+            return _error(422, f'The field "q" must be at most {MAX_QUERY_LENGTH} characters.')
         n = 50
         if limit is not None and limit != "":
             try:
                 n = int(limit)
             except ValueError:
-                return _error(f'The field "limit" must be a whole number from 1 to {MAX_LIMIT}.')
+                return _error(422, f'The field "limit" must be a whole number from 1 to {MAX_LIMIT}.')
             if not 1 <= n <= MAX_LIMIT:
-                return _error(f'The field "limit" must be a whole number from 1 to {MAX_LIMIT}.')
+                return _error(422, f'The field "limit" must be a whole number from 1 to {MAX_LIMIT}.')
         known = {t.id for t in ctx.space.types}
         types = [t for t in type if t in known]
         exclude = [t for t in excludeType if t in known]

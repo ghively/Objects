@@ -237,6 +237,7 @@ from .alertwatch import AlertWatch
 from .apictx import ApiContext
 from .computed import Computer, Obj, has_computed
 from .curator import ActivityMiddleware, Curator, IdleClock
+from .errors import error_response as _error
 from .keycompat import KeyCompatMiddleware
 from .appstate import state_dir
 from .automations import AutomationEngine
@@ -705,10 +706,6 @@ def reveal_in_file_manager(path: Path) -> None:
         subprocess.Popen(["open", "-R", str(path)])  # noqa: S603, S607
     else:
         subprocess.Popen(["xdg-open", str(path.parent)])  # noqa: S603, S607
-
-
-def _error(status: int, message: str) -> JSONResponse:
-    return JSONResponse({"detail": message}, status_code=status)
 
 
 def _unusable_id(id: str) -> bool:

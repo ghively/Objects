@@ -17,6 +17,7 @@ from . import agentfiles, mcpgateway
 from . import settings as device_settings
 from .agents import AgentRegistry
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .mcpstore import McpStore
 from .space import ReadOnly
 from .typemodel import RevisionConflict
@@ -55,10 +56,6 @@ class SettingsRequest(BaseModel):
 class CreateRequest(BaseModel):
     copyChangeReviewer: bool = False
     clientId: str | None = None
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 def _tool_rows(name: str, result: Any, marked: set[str]) -> list[dict[str, Any]]:

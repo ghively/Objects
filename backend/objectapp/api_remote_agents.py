@@ -52,6 +52,7 @@ from .agents import NOT_REMOTE, AgentRecord, AgentRegistry, endpoint_host, remot
 from .api_agents import _fail
 from .api_agents import _settings as _device_settings
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .remotemodel import CARD_TIMEOUT, REMOTE_KIND, AuthInput, card_url_for, clean_auth
 from .watcher import ChangeEvent
 
@@ -117,10 +118,6 @@ def _parse(model: type[BaseModel], body: Any) -> Any:
         return model.model_validate(body if body is not None else {})
     except ValidationError:
         return None
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 def _hostname(url: str) -> str:

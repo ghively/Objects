@@ -38,6 +38,7 @@ from pydantic import BaseModel
 
 from . import vcs
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .vcsservice import TARGET_SPACE, TARGET_STATE, RepoTarget, VcsRefused, VcsService
 from .watcher import ChangeEvent
 
@@ -71,10 +72,6 @@ class FileRestoreRequest(BaseModel):
     sourcePath: str | None = None
     baseVersion: str
     clientId: str | None = None
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 RESYNC_KINDS = ("types", "views", "ui", "collections", "queries")

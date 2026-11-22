@@ -75,6 +75,7 @@ from .aichat import (
 )
 from .apictx import ApiContext
 from .appstate import space_key
+from .errors import error_response as _error
 from .propvalues import InvalidValue
 from .remotemodel import REMOTE_KIND
 from .settings import read as read_settings
@@ -185,10 +186,6 @@ class _TurnRecord:
         if self.tools or done is None:
             return self.shown()
         return str(done.get("text") or "") or self.shown()
-
-
-def _error(status: int, detail: str, **extra: Any) -> JSONResponse:
-    return JSONResponse({"detail": detail, **extra}, status_code=status)
 
 
 def _cap_history(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
