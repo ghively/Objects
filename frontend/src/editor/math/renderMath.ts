@@ -13,6 +13,7 @@
  */
 import { useEffect, useState } from 'react'
 import type katexType from 'katex'
+import { escapeHtml } from '@/lib/escapeHtml'
 
 type Katex = typeof katexType
 
@@ -55,10 +56,6 @@ export function useMathReady(): boolean {
     return onMathReady(() => setReady(true))
   }, [ready])
   return ready
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 }
 
 /**

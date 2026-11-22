@@ -22,19 +22,11 @@ import { highlightTokens } from '@/editor/code/highlight'
 import { findInlineMath } from '@/editor/annotations'
 import { WIKILINK_RE } from '@/editor/extensions/wikilink'
 import { renderDisplayMath, renderMath } from '@/editor/math/renderMath'
+import { escapeHtml } from '@/lib/escapeHtml'
 import { safeHref } from '@/properties/cells/TextBlockCell'
 
 /** Longer text renders as escaped plain paragraphs (our number). */
 export const MAX_RENDER_CHARS = 200_000
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
 
 function chip(target: string, label: string | null): string {
   const data = `data-wikilink="" data-target="${escapeHtml(target)}"` + (label ? ` data-label="${escapeHtml(label)}"` : '')
