@@ -4,8 +4,7 @@
 
 # Local tooling state
 .remember/
-.claude/settings.local.json
-.claude/worktrees/
+.claude/
 
 # Build and runtime
 node_modules/
