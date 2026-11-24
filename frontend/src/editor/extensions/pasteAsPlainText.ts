@@ -24,7 +24,7 @@ export function armPlainPaste(): void {
  * block whose text is code: `rawBlock`) the lines stay in the block as text with its newlines,
  * as ProseMirror's own code paste does; paragraphs cannot go there and would split the fence.
  */
-export function pastePlainText(view: EditorView, text: string): boolean {
+function pastePlainText(view: EditorView, text: string): boolean {
   const { schema, selection } = view.state
   if (selection.$from.parent.type.spec.code) {
     const code = text.replace(/\r\n?/g, '\n')
@@ -40,7 +40,7 @@ export function pastePlainText(view: EditorView, text: string): boolean {
   return true
 }
 
-export const pasteAsPlainTextKey = new PluginKey('pasteAsPlainText')
+const pasteAsPlainTextKey = new PluginKey('pasteAsPlainText')
 
 export const PasteAsPlainText = Extension.create({
   name: 'pasteAsPlainText',

@@ -9,15 +9,15 @@
 import { useSyncExternalStore } from 'react'
 import type { DeviceSettings } from '@/api/types'
 
-export type ThemeName = 'light' | 'lightDimmed' | 'dark' | 'darkDimmed'
+type ThemeName = 'light' | 'lightDimmed' | 'dark' | 'darkDimmed'
 
-export const THEME_NAMES: readonly ThemeName[] = ['light', 'lightDimmed', 'dark', 'darkDimmed']
+const THEME_NAMES: readonly ThemeName[] = ['light', 'lightDimmed', 'dark', 'darkDimmed']
 
 /** The `localStorage` key of the first-paint cache. */
 export const THEME_CACHE_KEY = 'object.theme'
 
 /** What `applyTheme` writes to `<html>` (and caches, as JSON). */
-export interface ThemeAttrs {
+interface ThemeAttrs {
   theme: ThemeName
   dark: boolean
   monoTags: boolean
@@ -54,7 +54,7 @@ function setFlag(root: HTMLElement, name: string, on: boolean) {
 }
 
 /** Write `attrs` onto `root` (the same rules as `index.html`'s first-paint script). */
-export function applyThemeAttrs(attrs: ThemeAttrs, root: HTMLElement = document.documentElement): void {
+function applyThemeAttrs(attrs: ThemeAttrs, root: HTMLElement = document.documentElement): void {
   root.setAttribute('data-theme', attrs.theme)
   root.classList.toggle('dark', attrs.dark)
   setFlag(root, 'data-mono-tags', attrs.monoTags)
@@ -75,7 +75,7 @@ export function applyTheme(settings: ThemeSettings, root: HTMLElement = document
 }
 
 /** The theme on `<html>` now (`dark` when none is set: tokens.css's default). */
-export function currentThemeName(root: HTMLElement | null = typeof document === 'undefined' ? null : document.documentElement): ThemeName {
+function currentThemeName(root: HTMLElement | null = typeof document === 'undefined' ? null : document.documentElement): ThemeName {
   const t = root?.getAttribute('data-theme')
   return t && (THEME_NAMES as readonly string[]).includes(t) ? (t as ThemeName) : 'dark'
 }

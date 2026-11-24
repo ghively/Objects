@@ -37,7 +37,7 @@ export const CHATS_TEXT = {
 } as const
 
 /** From this many characters the field searches the chats' text (our number). */
-export const SEARCH_MIN = 2
+const SEARCH_MIN = 2
 /** The search waits this long after the last key (our number). */
 export const SEARCH_DEBOUNCE_MS = 250
 
@@ -49,7 +49,7 @@ export function chatDate(iso: string): string {
 }
 
 /** Open `chatId` of `agentId` in the active tab's side panel and focus it. */
-export function openAgentTranscript(agentId: string, chatId: string): void {
+function openAgentTranscript(agentId: string, chatId: string): void {
   useTabs.getState().openInSidepanel({ kind: 'aiChat', agentId, chatId })
   useAiFocus.getState().bump()
 }

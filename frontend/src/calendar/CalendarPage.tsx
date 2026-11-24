@@ -15,7 +15,7 @@ import { useCalendar, useWeekStart } from './useCalendar'
 // The sidebar switch lives in `calendarUi` (the shell's shortcut uses it without this page's code).
 export { toggleCalendarSidebar, useCalendarSidebarOpen }
 
-export interface CalendarPageProps {
+interface CalendarPageProps {
   onOpenTarget: (t: Target) => void
 }
 

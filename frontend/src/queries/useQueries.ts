@@ -8,7 +8,7 @@ import { showToast } from '@/editor/media/upload'
 import { appendSection, buildSections } from '@/types/dashboardSections'
 import { reloadDefinitions, useDefinitions, useDefs } from '@/types/useDefinitions'
 
-export interface UseQueries {
+interface UseQueries {
   queries: Query[]
   loaded: boolean
   byId(id: string): Query | undefined
@@ -40,7 +40,7 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
  * Save `edit(query)` on the stored query. On a 409 the fresh query is fetched, the edit is
  * applied to it once, and the save is tried again.
  */
-export function saveQueryEdit(id: string, edit: (q: Query) => Query): Promise<Query> {
+function saveQueryEdit(id: string, edit: (q: Query) => Query): Promise<Query> {
   return enqueue(async () => {
     const cur = latest(id)
     if (!cur) throw new Error('Unknown saved search')

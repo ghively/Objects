@@ -5,7 +5,7 @@ import { placeholderFor } from '../format'
 import { LabelMenu, LabelPill } from '../LabelMenu'
 import type { CellProps } from './types'
 
-export interface LabelCellProps extends CellProps<string[] | null> {
+interface LabelCellProps extends CellProps<string[] | null> {
   /** Saves an edited option set (the parent saves the type before it applies the value). */
   onDefChange?(next: PropertyDef): void | Promise<unknown>
   /** Opens the property's settings (from the menu's gear). */

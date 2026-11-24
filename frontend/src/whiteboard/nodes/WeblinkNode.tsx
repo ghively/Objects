@@ -14,7 +14,7 @@ import { normalizeWeblinkUrl, weblinkHost } from '../model'
 import { NodeChrome } from './NodeChrome'
 
 /** Opens `url` in a new browser window when it is a valid web link (only http/https). */
-export function openWeblink(url: string): void {
+function openWeblink(url: string): void {
   const safe = normalizeWeblinkUrl(url)
   if (!safe || safe !== url.trim()) return
   window.open(safe, '_blank', 'noopener,noreferrer')

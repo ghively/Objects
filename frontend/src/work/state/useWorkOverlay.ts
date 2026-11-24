@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import { isWorkOn } from '../useWorkOn'
 
-export interface WorkOverlayState {
+interface WorkOverlayState {
   session: { path: string } | null
   smaller: { path: string; stepId: string } | null
   openSession(path: string): void

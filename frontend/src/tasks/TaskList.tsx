@@ -52,7 +52,7 @@ const TaskRow = memo(function TaskRow({
   )
 })
 
-export interface TaskListProps {
+interface TaskListProps {
   groups: TaskGroup[]
   /** The Task type (the rows' statuses). */
   type: TypeDef | undefined

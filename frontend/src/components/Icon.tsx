@@ -88,7 +88,7 @@ export function forgetRememberedIcons(): void {
 }
 
 /** `{prefix, name}` for an Iconify id, or `prefix: null` when its prefix isn't bundled. */
-export function parseIconId(id: string): { prefix: string | null; name: string } {
+function parseIconId(id: string): { prefix: string | null; name: string } {
   for (const prefix of PREFIXES) {
     if (id.startsWith(`${prefix}-`) || id.startsWith(`${prefix}:`)) {
       return { prefix, name: id.slice(prefix.length + 1) }
@@ -115,7 +115,7 @@ export function iconName(icon: IconValue | string | null | undefined, fallback: 
   return v && v.trim() ? v : fallback
 }
 
-export interface ResolvedIcon {
+interface ResolvedIcon {
   data: IconData
   /** `prefix:name` of the icon actually drawn. */
   resolved: string
@@ -195,7 +195,7 @@ export function IconOrEmoji({
   )
 }
 
-export interface IconProps {
+interface IconProps {
   /** Any Iconify id with a bundled prefix (`ph`, `vscode-icons`); anything else renders `ph-cube`. */
   name: string
   size?: number

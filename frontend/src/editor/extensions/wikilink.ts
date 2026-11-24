@@ -25,7 +25,7 @@ export function isWikilinkTarget(title: string): boolean {
  * A title with `#` is still no target (`isWikilinkTarget`): the pickers link
  * such an object by its path (`wikilinkTargetFor`, as `space.py` `_link_text`).
  */
-export function wikilinkTarget(target: string): string {
+function wikilinkTarget(target: string): string {
   if (isWikilinkTarget(target)) return target
   const cut = target.split(/[|\n]/, 1)[0]
   return cut.replace(/[[\]]/g, '').replace(/\s+/g, ' ').trim()
@@ -51,10 +51,10 @@ export type WikilinkAttrs = { target: string; label: string | null }
  * Decorates a rendered chip (resolution state, type colour, click handling).
  * Returns a cleanup run when the chip is destroyed or re-rendered.
  */
-export type WikilinkPresenter = (dom: HTMLElement, attrs: WikilinkAttrs) => (() => void) | void
+type WikilinkPresenter = (dom: HTMLElement, attrs: WikilinkAttrs) => (() => void) | void
 
 /** Called after `[[` (or an `@` at the start of a word) is typed; `range` covers the typed characters. */
-export type WikilinkTrigger = (editor: Editor, range: { from: number; to: number }) => void
+type WikilinkTrigger = (editor: Editor, range: { from: number; to: number }) => void
 
 let presenter: WikilinkPresenter | null = null
 let trigger: WikilinkTrigger | null = null

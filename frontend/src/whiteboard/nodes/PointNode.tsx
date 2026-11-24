@@ -8,8 +8,8 @@ import type { WhiteboardNodeProps } from '../canvasTypes'
 import { NodeChrome } from './NodeChrome'
 
 /** The dot's diameter and the grab area around it (our choice). */
-export const POINT_DOT = 10
-export const POINT_HIT = 20
+const POINT_DOT = 10
+const POINT_HIT = 20
 
 function PointNodeImpl({ data, selected }: WhiteboardNodeProps) {
   return (

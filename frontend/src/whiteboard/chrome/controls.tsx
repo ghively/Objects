@@ -56,7 +56,7 @@ export function hint(name: string, key?: string): string {
   return key ? `${name} (${key})` : name
 }
 
-export interface ChromeButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-pressed'> {
+interface ChromeButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-pressed'> {
   label: string
   pressed?: boolean
   /** Tooltip; defaults to the label. */

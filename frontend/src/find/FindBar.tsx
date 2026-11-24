@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { isRawFindControl } from './findControl'
 import { useFind } from './useFind'
 
-export interface FindBarProps {
+interface FindBarProps {
   path: string
   editorRef: RefObject<BodyEditorHandle | null>
 }

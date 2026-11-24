@@ -13,7 +13,7 @@ import type { WhiteboardTextAlign } from '@/api/whiteboardTypes'
 import { editorExtensions, loadBody, serializeBody } from '@/editor/document'
 import '@/editor/editor.css'
 
-export interface TextBlockEditorProps {
+interface TextBlockEditorProps {
   markdown: string
   align?: WhiteboardTextAlign
   onCommit(markdown: string): void

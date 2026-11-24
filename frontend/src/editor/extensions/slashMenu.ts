@@ -13,10 +13,10 @@ import { Suggestion, exitSuggestion } from '@tiptap/suggestion'
 import { create } from 'zustand'
 import type { SlashView } from '../slash/slashItems'
 
-export const slashMenuKey = new PluginKey('slashMenu')
+const slashMenuKey = new PluginKey('slashMenu')
 const openedAtKey = new PluginKey('slashMenuOpenedAt')
 
-export interface SlashMenuState {
+interface SlashMenuState {
   /** The editor the open menu belongs to. */
   editor: Editor | null
   /** The `/query` text's range. */

@@ -8,7 +8,7 @@ import { settingsDefaults } from './defaults'
 
 export { settingsDefaults }
 
-export interface SettingsState {
+interface SettingsState {
   /** The defaults until `load()` resolves. */
   settings: DeviceSettings
   revision: string

@@ -139,7 +139,7 @@ export function TargetLabel({ target, space, emptyTitle }: { target: Target | nu
   )
 }
 
-export function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
+function TabLabel({ tab, space }: { tab: Tab; space: SpaceInfo | null }) {
   return <TargetLabel target={tabTarget(tab)} space={space} />
 }
 

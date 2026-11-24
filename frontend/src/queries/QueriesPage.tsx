@@ -20,7 +20,7 @@ import { useTitleCtx } from './QueryPage'
 import { removeQuery, useQueries } from './useQueries'
 import { QUERY_ICON } from '@/lib/defIcons'
 
-export const QUERIES_TEXT = {
+const QUERIES_TEXT = {
   heading: SAVED_SEARCHES,
   new: 'New',
   emptyTitle: 'No saved searches',
@@ -31,7 +31,7 @@ export const QUERIES_TEXT = {
 }
 
 /** Create a query and open it (the server gives it its id; it starts as an unready draft). */
-export async function createQueryAndOpen(): Promise<Query> {
+async function createQueryAndOpen(): Promise<Query> {
   const q = await api.createQuery()
   useTabs.getState().open({ kind: 'query', id: q.id })
   return q

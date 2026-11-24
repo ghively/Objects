@@ -31,7 +31,7 @@ import {
 } from './formulas'
 import { cellText, tableGrid } from './tableCommands'
 
-export type Statement = (typeof FORMULA_STATEMENTS)[number]
+type Statement = (typeof FORMULA_STATEMENTS)[number]
 
 /** The statements whose name starts with `word` (case-insensitive). */
 export function matchingStatements(word: string): Statement[] {
@@ -39,14 +39,14 @@ export function matchingStatements(word: string): Statement[] {
   return FORMULA_STATEMENTS.filter((s) => s.name.startsWith(w))
 }
 
-export type FormulaFunctionListProps = {
+type FormulaFunctionListProps = {
   word: string
   active: number
   onPick: (s: Statement) => void
 }
 
 /** The statements list shown under a formula cell being edited. */
-export function FormulaFunctionList({ word, active, onPick }: FormulaFunctionListProps) {
+function FormulaFunctionList({ word, active, onPick }: FormulaFunctionListProps) {
   const items = matchingStatements(word)
   return (
     <div className="formula-menu" role="listbox" aria-label="Formula functions">
@@ -110,7 +110,7 @@ function editingOf(state: EditorState, editable: boolean): Editing | null {
 }
 
 /** Pick `s` for the name being typed in the formula cell holding the caret. */
-export function pickStatement(view: EditorView, s: Statement): void {
+function pickStatement(view: EditorView, s: Statement): void {
   const editing = formulaCellsKey.getState(view.state)?.editing
   if (!editing) return
   const text = FORMULA_CONSTANTS.has(s.name) ? s.name : `${s.name}(`

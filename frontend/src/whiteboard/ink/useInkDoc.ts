@@ -8,10 +8,10 @@ import { INK_STRINGS } from './inkStrings'
 import type { InkDoc, InkStroke } from './types'
 
 /** Saves wait this long after the last change. */
-export const INK_SAVE_DELAY_MS = 400
+const INK_SAVE_DELAY_MS = 400
 /** First retry delay after a failed save; it doubles up to `INK_RETRY_MAX_MS` (as the board's saves). */
 export const INK_RETRY_MS = 2000
-export const INK_RETRY_MAX_MS = 30000
+const INK_RETRY_MAX_MS = 30000
 /** Automatic retries after a run of failed saves; then only the next change (or a flush) tries again. */
 export const INK_RETRY_LIMIT = 5
 

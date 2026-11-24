@@ -186,7 +186,7 @@ export async function appendToDailyNote(path: string, text: string): Promise<str
 }
 
 /** Create a page (titled `title`, or the default title), write `body` into it and open it. */
-export async function createPage(typeId: string, body: string, title?: string): Promise<string> {
+async function createPage(typeId: string, body: string, title?: string): Promise<string> {
   // The text goes in the creating write: a creation rule's write can't come between them.
   const created = await api.createObject(typeId, {
     ...(title !== undefined ? { title } : {}),
@@ -199,7 +199,7 @@ export async function createPage(typeId: string, body: string, title?: string): 
 }
 
 /** "Create page" from Markdown: the first heading is the title and leaves the body. */
-export async function createPageFromMarkdown(typeId: string, text: string): Promise<string> {
+async function createPageFromMarkdown(typeId: string, text: string): Promise<string> {
   const h = firstHeading(text)
   if (!h) return createPage(typeId, text)
   const lines = text.split(/\r\n?|\n/)
@@ -208,7 +208,7 @@ export async function createPageFromMarkdown(typeId: string, text: string): Prom
 }
 
 /** A page for a pasted URL: one bookmark block; the URL is never fetched. */
-export async function createPageFromUrl(typeId: string, u: URL): Promise<string> {
+async function createPageFromUrl(typeId: string, u: URL): Promise<string> {
   const href = u.href
   const title = urlTitle(u)
   return createPage(typeId, `<!-- block: bookmark -->\n${bookmarkMarkdown(href, title)}\n`, title)

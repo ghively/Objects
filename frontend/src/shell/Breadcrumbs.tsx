@@ -21,7 +21,7 @@ import { activeTab, tabCrumbs, tabTarget, useTabs } from '@/nav/tabs'
 import { TargetLabel } from '@/shell/TabStrip'
 
 /** Crumbs shown inline, the current page included. */
-export const MAX_VISIBLE_CRUMBS = 3
+const MAX_VISIBLE_CRUMBS = 3
 
 function Separator() {
   return (

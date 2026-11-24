@@ -189,7 +189,7 @@ function FooterButton({ icon, label, onClick }: { icon: string; label: string; o
   )
 }
 
-export interface SpacesMenuProps {
+interface SpacesMenuProps {
   /** The trigger (the top bar's space button). */
   children: ReactNode
 }

@@ -25,9 +25,9 @@ export type SettingsSectionId =
   | 'work'
   | 'integrations'
 
-export const DEFAULT_SECTION: SettingsSectionId = 'appearance'
+const DEFAULT_SECTION: SettingsSectionId = 'appearance'
 
-export interface SettingsModalState {
+interface SettingsModalState {
   isOpen: boolean
   section: SettingsSectionId
   shortcutsOpen: boolean

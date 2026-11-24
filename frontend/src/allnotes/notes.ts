@@ -8,7 +8,7 @@ import { formatDate } from '@/properties/format'
 import { useSettings } from '@/settings/useSettings'
 
 /** Notes shown under Home's "Recent". */
-export const RECENT_NOTES = 12
+const RECENT_NOTES = 12
 
 type TypeLookup = Readonly<Record<string, TypeDef | undefined>> | ReadonlyMap<string, TypeDef>
 
@@ -17,12 +17,12 @@ function typeFor(types: TypeLookup, id: string): TypeDef | undefined {
 }
 
 /** The Task type (the basic one, by flag and name or by id), as `tasks/useTaskRows` finds it. */
-export function isTaskTypeOf(type: TypeDef | undefined, typeId: string): boolean {
+function isTaskTypeOf(type: TypeDef | undefined, typeId: string): boolean {
   return type ? type.id === 'task' || (type.basic && type.name.toLowerCase() === 'task') : typeId === 'task'
 }
 
 /** The Tag type (id `tag`, or named Tag). */
-export function isTagTypeOf(type: TypeDef | undefined, typeId: string): boolean {
+function isTagTypeOf(type: TypeDef | undefined, typeId: string): boolean {
   return type ? type.id === 'tag' || type.name.toLowerCase() === 'tag' : typeId === 'tag'
 }
 
@@ -58,7 +58,7 @@ export function recentNotes(objects: readonly ObjectSummary[], types: readonly T
     .slice(0, limit)
 }
 
-export type NotesGroupId = 'today' | 'yesterday' | 'thisWeek' | 'earlier'
+type NotesGroupId = 'today' | 'yesterday' | 'thisWeek' | 'earlier'
 
 /** The Notes view's groups, in order. */
 export const NOTES_GROUPS: readonly { id: NotesGroupId; label: string }[] = [
@@ -89,7 +89,7 @@ export function editedDay(at: string): string {
 }
 
 /** Our strings. */
-export const EDITED_TEXT = { yesterday: 'Yesterday' } as const
+const EDITED_TEXT = { yesterday: 'Yesterday' } as const
 
 /** When a note was edited, short: the time for today, "Yesterday", else the date. */
 export function editedLabel(at: string, today: string): string {

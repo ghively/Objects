@@ -7,7 +7,7 @@ import { openTodaysNote, TODAYS_NOTE_TEXT } from '@/calendar/openTodaysNote'
 import { isEditableTarget } from '@/lib/shortcuts'
 import { WindowControls } from '@/desktop/WindowControls'
 
-export const TOP_BAR_TEXT = {
+const TOP_BAR_TEXT = {
   changeSpace: 'Change space',
   createNewTab: 'Create new tab',
   hideSidepanel: 'Hide sidepanel',

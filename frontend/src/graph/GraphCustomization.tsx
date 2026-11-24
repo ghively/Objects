@@ -24,7 +24,7 @@ export const CUSTOMIZATION_TEXT = {
 
 type SwitchKey = 'showCompletedTasks' | 'showMinimalNodes' | 'hideLargeNodes' | 'hideDates' | 'hideIndirectLinks'
 
-export interface GraphCustomizationProps {
+interface GraphCustomizationProps {
   custom: Custom
   onPatch(partial: Partial<Custom>): void
   types: TypeDef[]

@@ -23,7 +23,7 @@ export interface OpenMods {
   via?: 'link' | 'nav'
 }
 
-export type OpenMode = 'current' | 'newTab' | 'peek' | 'sidepanel'
+type OpenMode = 'current' | 'newTab' | 'peek' | 'sidepanel'
 
 /**
  * With "Open notes as a full page" off, Tasks open in the peek; with it on (the default since M32)

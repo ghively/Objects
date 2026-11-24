@@ -169,7 +169,7 @@ export interface WhiteboardWeblinkBlock {
 
 export type WhiteboardBlock = WhiteboardTextBlock | WhiteboardEntityBlock | WhiteboardMediaBlock | WhiteboardWeblinkBlock
 
-export interface WhiteboardViewport {
+interface WhiteboardViewport {
   x: number
   y: number
   zoom: number

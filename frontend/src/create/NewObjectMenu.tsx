@@ -47,7 +47,7 @@ const MAX_RESULTS = 30
  * role's basic type: "Whiteboard", "Whiteboards", `ph-presentation`; the server writes
  * the full definition on the first create).
  */
-export const PENDING_WHITEBOARD_TYPE: TypeDef = {
+const PENDING_WHITEBOARD_TYPE: TypeDef = {
   schemaVersion: 2,
   id: 'whiteboard',
   name: WHITEBOARD_TYPE_NAME,
@@ -70,7 +70,7 @@ export const PENDING_WHITEBOARD_TYPE: TypeDef = {
   revision: '',
 }
 
-export interface NewObjectMenuProps {
+interface NewObjectMenuProps {
   open: boolean
   onOpenChange(open: boolean): void
   /** Start at step 2 with this type. */

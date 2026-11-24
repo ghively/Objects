@@ -41,7 +41,7 @@ export { deleteObjectsLabel }
 
 // ---------------------------------------------------------------------------------------------
 
-export interface CreateCollectionDialogProps {
+interface CreateCollectionDialogProps {
   open: boolean
   onOpenChange(open: boolean): void
   /** The object type the collection holds. */
@@ -113,7 +113,7 @@ export function CreateCollectionDialog({ open, onOpenChange, typeId, onCreated }
 
 // ---------------------------------------------------------------------------------------------
 
-export interface DeleteCollectionDialogProps {
+interface DeleteCollectionDialogProps {
   collection: Pick<Collection, 'id' | 'name'>
   open: boolean
   onOpenChange(open: boolean): void
@@ -230,7 +230,7 @@ export function DeleteCollectionDialog({ collection, open, onOpenChange, onDelet
 
 // ---------------------------------------------------------------------------------------------
 
-export interface RemoveFromCollectionDialogProps {
+interface RemoveFromCollectionDialogProps {
   open: boolean
   onOpenChange(open: boolean): void
   /** How many objects the request covers. */

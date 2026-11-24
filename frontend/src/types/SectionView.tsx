@@ -154,7 +154,7 @@ function DefinitionCard({
 }
 
 /** "Create query": a query on this type, opened at once. */
-export async function createQueryFor(type: TypeDef): Promise<void> {
+async function createQueryFor(type: TypeDef): Promise<void> {
   const q = await api.createQuery({
     definition: { types: [{ id: type.id }], filterGroup: emptyFilterGroup(), sorts: [], groupBy: null },
     view: { viewDefinition: { dataViewLayout: 'list' } },
@@ -162,7 +162,7 @@ export async function createQueryFor(type: TypeDef): Promise<void> {
   useTabs.getState().open({ kind: 'query', id: q.id })
 }
 
-export interface SectionViewProps {
+interface SectionViewProps {
   type: TypeDef
   section: RenderedSection
   search: string

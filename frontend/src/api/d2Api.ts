@@ -16,12 +16,12 @@ export interface DefinitionVersion {
   size: number
 }
 
-export interface DefinitionVersionContent {
+interface DefinitionVersionContent {
   id: string
   text: string | null
 }
 
-export interface DefinitionRestoreResult {
+interface DefinitionRestoreResult {
   /** The definition file's new revision. */
   revision: string
   /** Objects the save rewrote to follow the definition (a type's renamed or removed properties). */

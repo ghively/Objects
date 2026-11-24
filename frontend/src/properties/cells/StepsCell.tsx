@@ -30,7 +30,7 @@ function asShown(value: StepValue[] | null | undefined): StepValue[] {
 }
 
 /** The table form of a step list ('' when it has none). */
-export function stepsSummary(steps: readonly StepValue[]): string {
+function stepsSummary(steps: readonly StepValue[]): string {
   if (steps.length === 0) return ''
   const i = currentIndex(steps)
   if (i === null) return `${steps.length} steps`
@@ -38,7 +38,7 @@ export function stepsSummary(steps: readonly StepValue[]): string {
 }
 
 /** The steps under `key` in a work write's result (the item's decoded field, else its steps). */
-export function stepsFromResult(res: WorkWriteResult, key: string): StepValue[] | null {
+function stepsFromResult(res: WorkWriteResult, key: string): StepValue[] | null {
   const field = res.item?.fields?.[key]
   if (Array.isArray(field)) return field as StepValue[]
   return Array.isArray(res.item?.steps) ? res.item.steps : null

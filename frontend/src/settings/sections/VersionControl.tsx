@@ -18,8 +18,8 @@ const T = VCS_TEXT
 
 export const VERSION_CONTROL_SEARCH: string[] = [T.enabled, T.remote, T.pushNow, T.commitNow, T.openHistory, 'git', 'backup']
 
-export const COMMIT_DELAYS = [30, 60, 120, 300, 600, 1800]
-export const PUSH_DELAYS = [300, 600, 1800, 3600]
+const COMMIT_DELAYS = [30, 60, 120, 300, 600, 1800]
+const PUSH_DELAYS = [300, 600, 1800, 3600]
 
 function minutes(seconds: number): string {
   return seconds < 60 ? `${seconds} seconds` : seconds === 60 ? '1 minute' : `${Math.round(seconds / 60)} minutes`

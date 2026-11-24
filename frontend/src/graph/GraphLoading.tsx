@@ -8,7 +8,7 @@ export const LOADING_STEPS = [
   'Drawing the graph',
 ] as const
 
-export interface GraphLoadingProps {
+interface GraphLoadingProps {
   /** Index of the current step in `LOADING_STEPS`. */
   step: number
   /** 0–1 progress of the current step, when known (the layout). */

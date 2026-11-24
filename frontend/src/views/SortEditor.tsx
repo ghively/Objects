@@ -4,7 +4,7 @@ import { MenuSelect, propertyOptions } from './MenuSelect'
 import { choiceFor, type PropChoice } from './properties'
 import { SORT_OPTIONS } from './sort'
 
-export interface SortEditorProps {
+interface SortEditorProps {
   sorts: Sort[]
   onChange(next: Sort[]): void
   choices: PropChoice[]

@@ -5,7 +5,7 @@ import { fileName } from '@/properties/files'
 import { dateSpan } from './dates'
 import { displayTitle, findDef, rowValue, type FilterCtx } from './filter'
 
-export interface SortOptionInfo {
+interface SortOptionInfo {
   key: Sort['option']
   label: string
 }

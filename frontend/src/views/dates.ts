@@ -100,7 +100,7 @@ export function resolveRelative(rel: DateRelative, now: Date, weekStart: WeekSta
   }
 }
 
-export interface DateSpan {
+interface DateSpan {
   /** The start (a day: its first instant in the time-zone setting). */
   start: Date
   /** The end; null when the value has none. */
@@ -150,7 +150,7 @@ export function dayReader(): (iso: string) => string | null {
   }
 }
 
-export interface DaySpan {
+interface DaySpan {
   /** `YYYY-MM-DD` of the start, in the time-zone setting. */
   start: string
   /** The end's day; null when the value has none. */

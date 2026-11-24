@@ -23,7 +23,7 @@ export function cardImage(row: Row): string | null {
   return typeof preview === 'string' && preview && !/^[a-z][a-z0-9+.-]*:/i.test(preview) ? preview : null
 }
 
-export const isEmptyValue = (v: unknown): boolean =>
+const isEmptyValue = (v: unknown): boolean =>
   v === null ||
   v === undefined ||
   v === '' ||

@@ -16,7 +16,7 @@ export interface CustomizePage {
   body: ReactNode
 }
 
-export interface CustomizeMenuProps {
+interface CustomizeMenuProps {
   state: ViewState
   onState(next: ViewState): void
   choices: PropChoice[]

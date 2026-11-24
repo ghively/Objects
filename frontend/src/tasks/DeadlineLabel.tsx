@@ -35,7 +35,7 @@ export function deadlineText(deadline: DateValue | null | undefined, today: Date
 }
 
 /** True when the task's date (its day) is after its deadline's day. */
-export function scheduledAfterDeadline(date: DateValue | null | undefined, deadline: DateValue | null | undefined): boolean {
+function scheduledAfterDeadline(date: DateValue | null | undefined, deadline: DateValue | null | undefined): boolean {
   const d = date?.start ? localDayOf(date.start) : null
   const due = deadline?.start ? localDayOf(deadline.start) : null
   return !!d && !!due && dayDiff(due, d) > 0

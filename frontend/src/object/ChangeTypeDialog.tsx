@@ -28,7 +28,7 @@ export const CHANGE_TYPE_TEXT = {
   action: 'Change type',
 }
 
-export interface ChangeTypeDialogProps {
+interface ChangeTypeDialogProps {
   open: boolean
   onOpenChange(open: boolean): void
   path: string

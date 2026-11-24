@@ -6,7 +6,7 @@ import type { Filter, Layout, PropertyDef, QueryDefinition, TypeDef } from '@/ap
 import { typeLabel } from '@/lib/typeLabel'
 import { emptyFilterGroup } from '@/views/model'
 
-export interface QueryRecommendation {
+interface QueryRecommendation {
   title: string
   definition: QueryDefinition
   layout: Layout

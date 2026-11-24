@@ -27,19 +27,19 @@ export const SKILL_SAVE_MS = MEMORY_SAVE_MS
 const SKILL_MD = 'SKILL.md'
 
 /** A file's leading YAML frontmatter (`---` lines, BOM and line endings kept) and the rest. */
-export function splitFrontmatter(text: string): [string, string] {
+function splitFrontmatter(text: string): [string, string] {
   const m = /^(\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$))/.exec(text)
   return m ? [m[1], text.slice(m[1].length)] : ['', text]
 }
 
 /** Our strings for this view, beside `LEARNING_TEXT`'s. */
-export const SKILL_DETAIL_TEXT = {
+const SKILL_DETAIL_TEXT = {
   close: 'Close',
   files: 'Files',
   restoreConflict: 'A skill with this name is active.', // the route's 409 text
 } as const
 
-export interface SkillDetailProps {
+interface SkillDetailProps {
   agentId: string
   name: string
   archived: boolean

@@ -282,7 +282,7 @@ export interface SearchOptions {
 }
 
 /** `api.linkMention` input: link the mention `text` at `[start, end)` of `path`'s body to `target`. */
-export interface LinkMentionInput {
+interface LinkMentionInput {
   /** The mentioning object. */
   path: string
   /** The mentioned object. */

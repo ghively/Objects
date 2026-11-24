@@ -6,18 +6,18 @@ import { Icon, IconOrEmoji } from '@/components/Icon'
 import { findByName, useCollections } from './useCollections'
 import { COLLECTION_ICON } from '@/lib/defIcons'
 
-export const COLLECTION_TEXT = {
+const COLLECTION_TEXT = {
   placeholder: 'Find or create a collection',
   heading: 'Select Collections',
 }
 
 /** "No Collection" / "{n} Collection" / "{n} Collections". */
-export function collectionsSummary(n: number): string {
+function collectionsSummary(n: number): string {
   if (n <= 0) return 'No Collection'
   return n === 1 ? '1 Collection' : `${n} Collections`
 }
 
-export interface CollectionPickerProps {
+interface CollectionPickerProps {
   /** The object's `collections:` names. */
   value: string[]
   /** The object's type: only collections holding it are offered. */

@@ -9,7 +9,7 @@ import type { Box } from './model'
 type Pt = [number, number]
 type Seg = { cmd: 'M' | 'L' | 'C' | 'Q'; pts: Pt[] }
 
-export interface ShapeFlip {
+interface ShapeFlip {
   flipX?: boolean
   flipY?: boolean
 }

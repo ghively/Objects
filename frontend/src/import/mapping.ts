@@ -133,7 +133,7 @@ export function cleanMapping(m: ImportMapping, target: ImportTargetKind): Import
 }
 
 /** A type as the user sees it: the preview's planned values under the user's overrides. */
-export interface EffectiveType {
+interface EffectiveType {
   name: string
   pluralName: string
   skip: boolean

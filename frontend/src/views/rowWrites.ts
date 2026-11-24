@@ -7,7 +7,7 @@ import type { Row } from '@/api/types'
 import { typeOf } from '@/links/linkIndex'
 import { isSynced, SYNCED_TEXT } from '@/properties/synced'
 
-export interface RowWrites {
+interface RowWrites {
   /**
    * Run `write` after the row's earlier writes, with the newest version known for it and the
    * newest copy of the row. The result's version is remembered, so a later write from a stale

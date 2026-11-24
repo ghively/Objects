@@ -136,7 +136,7 @@ function loadPhNames(): Promise<string[]> {
   return phNames
 }
 
-export interface IconPickerProps {
+interface IconPickerProps {
   value: IconValue | null | undefined
   onChange(next: IconValue | null): void
 }

@@ -33,7 +33,7 @@ interface Batch {
 const batches = new WeakMap<WhiteboardHost, Batch>()
 
 /** The row of `path`, fetched together with every other row asked for in the same tick. */
-export function loadRow(host: WhiteboardHost, path: string): Promise<Row | null> {
+function loadRow(host: WhiteboardHost, path: string): Promise<Row | null> {
   let batch = batches.get(host)
   if (!batch) {
     const paths = new Set<string>()

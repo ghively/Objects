@@ -20,18 +20,18 @@ import { CONNECTIONS, LINES, normalizeConnection, normalizeLine, normalizeMarker
 import { WB } from '../strings'
 import { ChromeButton, hint, KEY_HINT, MenuRow, PopoverMenu } from './controls'
 
-export const MARKER_LABEL: Record<WhiteboardPickerMarker, string> = {
+const MARKER_LABEL: Record<WhiteboardPickerMarker, string> = {
   none: WB.edgeTipNone.text,
   arrow: WB.edgeTipArrow.text,
   dot: WB.edgeTipDot.text,
   double: WB.edgeTipDouble.text,
 }
-export const CONNECTION_LABEL: Record<WhiteboardEdgeConnection, string> = {
+const CONNECTION_LABEL: Record<WhiteboardEdgeConnection, string> = {
   straight: WB.edgeConnectionStraight.text,
   cornered: WB.edgeConnectionCornered.text,
   curved: WB.edgeConnectionCurved.text,
 }
-export const LINE_LABEL: Record<WhiteboardEdgeLine, string> = {
+const LINE_LABEL: Record<WhiteboardEdgeLine, string> = {
   solid: WB.edgeLineSolid.text,
   dashed: WB.edgeLineDashed.text,
   dotted: WB.edgeLineDotted.text,
@@ -50,7 +50,7 @@ function shared<T>(items: readonly T[]): T | undefined {
   return items.every((v) => v === first) ? first : undefined
 }
 
-export interface EdgeStyleMenuProps {
+interface EdgeStyleMenuProps {
   edges: WhiteboardEdge[]
   blocks: Record<string, WhiteboardBlock>
   actions: BoardActions

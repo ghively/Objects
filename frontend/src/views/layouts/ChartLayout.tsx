@@ -12,7 +12,7 @@ export function ChartLayout(props: LayoutProps) {
   return <ChartView {...props} />
 }
 
-export interface ChartSettingsProps {
+interface ChartSettingsProps {
   types: TypeDef[]
   state: ViewState
   onState(next: ViewState): void

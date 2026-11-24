@@ -64,7 +64,7 @@ function mods(e: MouseEvent): OpenMods {
  * and the built-in DailyNote "New daily note" (`newLabel`).
  */
 /** The New button's words for a type: "New note", "New daily note", else "New {its name}". */
-export function newLabel(type: TypeDef): string {
+function newLabel(type: TypeDef): string {
   if (isBuiltInPage(type)) return NEW_NOTE
   if (isBuiltInDailyNote(type)) return `New ${DAILY_NOTE.toLowerCase()}`
   return `New ${type.name}`
@@ -147,7 +147,7 @@ export function NewSplitButton({
 type TabKey = 'overview' | 'all' | string
 
 /** The basic Task type (by flag and name, as the server infers it). */
-export const isBasicTaskType = (type: TypeDef): boolean => type.basic && type.name.toLowerCase() === 'task'
+const isBasicTaskType = (type: TypeDef): boolean => type.basic && type.name.toLowerCase() === 'task'
 
 export function TabPill({
   active,

@@ -137,7 +137,7 @@ export async function uploadFile(file: File): Promise<MediaAttrs | null> {
 }
 
 /** Upload `file` and insert its media block below the block at the selection. */
-export async function uploadAndInsert(editor: Editor, file: File): Promise<boolean> {
+async function uploadAndInsert(editor: Editor, file: File): Promise<boolean> {
   const attrs = await uploadFile(file)
   if (!attrs || editor.isDestroyed) return false
   return editor.chain().insertMedia(attrs).run()

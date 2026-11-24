@@ -165,7 +165,7 @@ function showActionToast(text: string, action: string, onAction: () => void): vo
 type StarterSetup = 'basic' | 'itops'
 
 /** The two starter sets, in gallery order (the space dialog's `SETUPS` gives the icons). */
-export const STARTER_SETS: { setup: StarterSetup; icon: string; label: string; description: string }[] = [
+const STARTER_SETS: { setup: StarterSetup; icon: string; label: string; description: string }[] = [
   {
     setup: 'basic',
     icon: SETUPS.find((s) => s.value === 'basic')?.icon ?? 'ph-shapes',
@@ -216,7 +216,7 @@ const STARTER_SET_TYPES: Record<StarterSetup, { section: string | null; types: r
  * id or its name, which is the server's rule for leaving one out. `null` when the gallery holds
  * none of the set's own section (it could not be read), so nothing true can be listed.
  */
-export function starterSetMissing(
+function starterSetMissing(
   setup: StarterSetup,
   gallery: readonly TypeTemplate[] | null,
   types: readonly Pick<TypeDef, 'id' | 'name'>[],
@@ -241,7 +241,7 @@ export function starterSetMissing(
  * Whether adding `setup` turns the Work page on, as far as the client can tell: only the IT set
  * does, only when the switch was never set by hand, and it is news only while Work is off.
  */
-export function starterSetTurnsWorkOn(setup: StarterSetup, space: Pick<SpaceInfo, 'workOn' | 'workEnabled'> | null): boolean {
+function starterSetTurnsWorkOn(setup: StarterSetup, space: Pick<SpaceInfo, 'workOn' | 'workEnabled'> | null): boolean {
   return setup === 'itops' && space !== null && space.workOn === false && (space.workEnabled ?? null) === null
 }
 
@@ -259,14 +259,14 @@ const SECTION_TITLES: Record<string, string> = {
  * A section's heading: its known title, else its key as words ("homeLife" → "Home life"), so a
  * section the back end adds later still shows under a name. The unsectioned row has none.
  */
-export function sectionTitle(key: string | null): string | null {
+function sectionTitle(key: string | null): string | null {
   if (key === null || key === '') return null
   if (key in SECTION_TITLES) return SECTION_TITLES[key]
   const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim().toLowerCase()
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
-export interface GallerySection {
+interface GallerySection {
   /** The data's section key (null: the unsectioned row). */
   key: string | null
   title: string | null
@@ -280,7 +280,7 @@ export interface GallerySection {
  * templates in the data's order; the section titled "IT operations" is moved to the end and
  * starts collapsed.
  */
-export function gallerySections(gallery: readonly TypeTemplate[]): GallerySection[] {
+function gallerySections(gallery: readonly TypeTemplate[]): GallerySection[] {
   const groups: GallerySection[] = []
   const byKey = new Map<string | null, GallerySection>()
   for (const t of gallery) {
@@ -298,7 +298,7 @@ export function gallerySections(gallery: readonly TypeTemplate[]): GallerySectio
   return [...groups.filter((g) => !g.collapsed), ...groups.filter((g) => g.collapsed)]
 }
 
-export interface CreateTypeDialogProps {
+interface CreateTypeDialogProps {
   open: boolean
   onOpenChange?(open: boolean): void
   /**

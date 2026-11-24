@@ -3,7 +3,7 @@ import type { TypeDef, ViewState } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { normalizeTableConfig, setAllHidden, setHidden, setWrapAll, tableDefs } from './tableConfig'
 
-export interface TableCustomizePageProps {
+interface TableCustomizePageProps {
   type: TypeDef
   state: ViewState
   onState(next: ViewState): void

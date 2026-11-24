@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MCP_TEXT } from './mcpText'
 
-export interface SetSecretDialogProps {
+interface SetSecretDialogProps {
   name: string | null
   onOpenChange(o: boolean): void
   onSaved?(): void

@@ -23,19 +23,19 @@ export const COLOR_MENU_TEXT = {
 }
 
 /** Colour the selected text, or with `null` remove its text colour. A colour becomes the last-used one. */
-export function applyTextColor(editor: Editor, color: ThemeColor | null): boolean {
+function applyTextColor(editor: Editor, color: ThemeColor | null): boolean {
   if (color) setLastUsedHighlightColor(`text-${color}`)
   return editor.chain().focus().setTextColor(color).run()
 }
 
 /** Give the selected text a background colour, or with `null` remove it. A colour becomes the last-used one. */
-export function applyHighlight(editor: Editor, color: ThemeColor | null): boolean {
+function applyHighlight(editor: Editor, color: ThemeColor | null): boolean {
   if (color) setLastUsedHighlightColor(`bg-${color}`)
   return editor.chain().focus().setHighlight(color).run()
 }
 
 /** The colour of each kind on the selection (the mark at its start), for the check marks. */
-export function currentTokenColors(editor: Editor): { text: ThemeColor | null; bg: ThemeColor | null } {
+function currentTokenColors(editor: Editor): { text: ThemeColor | null; bg: ThemeColor | null } {
   const text = editor.isActive('textColor') ? (editor.getAttributes('textColor').color as ThemeColor) : null
   const bg = editor.isActive('highlight') ? (editor.getAttributes('highlight').color as ThemeColor) : null
   return { text: text ?? null, bg: bg ?? null }
@@ -113,7 +113,7 @@ function Section({
   )
 }
 
-export interface ColorMenuProps {
+interface ColorMenuProps {
   editor: Editor
   /** Called after a colour is applied. */
   onDone?: () => void

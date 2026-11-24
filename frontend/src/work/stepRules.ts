@@ -20,7 +20,7 @@ export type RuleStep = Pick<StepValue, 'kind' | 'state' | 'text'> & Partial<Omit
 }
 
 /** The status property as the rules need it (a `PropertyDef` fits). */
-export interface StatusDefLike {
+interface StatusDefLike {
   options: { set?: Pick<LabelOption, 'id' | 'text' | 'statusCategory'>[] }
 }
 
@@ -232,7 +232,7 @@ export function allowedActions(steps: readonly RuleStep[], index: number, role: 
 
 // -- writes (optimistic UI; the server decides) -------------------------------------------
 
-export interface ActionOptions {
+interface ActionOptions {
   now: Date
   text?: string | null
   notBefore?: string | null

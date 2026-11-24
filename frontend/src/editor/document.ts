@@ -74,7 +74,7 @@ import { NbspEntity, referencesIn, withLinkForms, withReferences } from './exten
 import { RecordAudio } from './media/recordAudio'
 import { LazyTable } from './table/LazyTable'
 
-export type EditorExtensionOptions = {
+type EditorExtensionOptions = {
   /** `false` leaves out the "1. " input rule. */
   numberedListInputRule?: boolean
   /** The editor holds one paragraph (a Text property cell): pasted text is never read as Markdown blocks. */
@@ -103,7 +103,7 @@ const REGISTRY_OWNED_KEYS: Record<string, (key: string) => boolean> = {
 }
 
 /** `ext` without the built-in keys the registry owns (unchanged when it has none). */
-export function withoutRegistryKeys<T extends AnyExtension>(ext: T): T {
+function withoutRegistryKeys<T extends AnyExtension>(ext: T): T {
   const owned = REGISTRY_OWNED_KEYS[ext.name]
   if (!owned) return ext
   const stripped = ext.extend({

@@ -4,7 +4,7 @@
  */
 import type { WhiteboardTool } from '@/api/whiteboardTypes'
 
-export interface WbString {
+interface WbString {
   text: string
   ours?: true
 }
@@ -247,7 +247,7 @@ export function quickCreateLinkTyped(name: string): string {
   return QUICK_CREATE_LINK_TYPED.text.replace('{name}', name)
 }
 
-export type WbKey = keyof typeof WB
+type WbKey = keyof typeof WB
 
 /** The text of a whiteboard string. */
 export function t(key: WbKey): string {

@@ -8,7 +8,7 @@ import { SHAPE_MENU_TOOLS } from '../model'
 import { WB } from '../strings'
 import { KEY_HINT, MenuRow, ShapeIcon, hint, toolLabel } from './controls'
 
-export interface ShapeMenuProps {
+interface ShapeMenuProps {
   /** The current tool (its row is marked). */
   value?: WhiteboardTool
   onPick(tool: WhiteboardShapeMenuTool): void

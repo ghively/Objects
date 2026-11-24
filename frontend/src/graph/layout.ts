@@ -5,11 +5,11 @@ import type Graph from 'graphology'
 import { inferSettings } from 'graphology-layout-forceatlas2'
 import FA2Layout from 'graphology-layout-forceatlas2/worker'
 
-export const LAYOUT_MAX_MS = 4000
-export const LAYOUT_SAMPLE_MS = 200
+const LAYOUT_MAX_MS = 4000
+const LAYOUT_SAMPLE_MS = 200
 /** Stop when the mean displacement per sample falls below this (graph units). */
-export const LAYOUT_STILL = 0.05
-export const BARNES_HUT_ABOVE = 500
+const LAYOUT_STILL = 0.05
+const BARNES_HUT_ABOVE = 500
 
 /** Last known positions by path, so a reload or a filter change doesn't scatter the graph. */
 const positions = new Map<string, { x: number; y: number }>()
@@ -19,7 +19,7 @@ export function forgetPositions(): void {
 }
 
 /** FNV-1a 32-bit. */
-export function hashString(s: string): number {
+function hashString(s: string): number {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i)
@@ -29,7 +29,7 @@ export function hashString(s: string): number {
 }
 
 /** A deterministic start position for `path` inside a disc whose size grows with the graph. */
-export function initialPosition(path: string, order: number): { x: number; y: number } {
+function initialPosition(path: string, order: number): { x: number; y: number } {
   const h = hashString(path)
   const angle = ((h & 0xffff) / 0x10000) * Math.PI * 2
   const radius = Math.sqrt(((h >>> 16) + 1) / 0x10000) * Math.max(10, Math.sqrt(order) * 10)
@@ -45,7 +45,7 @@ export function startPosition(path: string, order: number): { x: number; y: numb
  * Give every node `x`/`y`: its last position, or one from the hash of its `path` attribute. One
  * `updateEachNodeAttributes` (one event for a renderer listening, not one per node).
  */
-export function seedPositions(graph: Graph): void {
+function seedPositions(graph: Graph): void {
   const order = graph.order
   graph.updateEachNodeAttributes(
     (key, attrs) => {
@@ -63,7 +63,7 @@ function remember(graph: Graph): void {
   })
 }
 
-export interface LayoutOptions {
+interface LayoutOptions {
   signal?: AbortSignal
   /** The nodes already carry their start positions (`startPosition`): skip `seedPositions`. */
   seeded?: boolean

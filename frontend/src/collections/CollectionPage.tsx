@@ -76,7 +76,7 @@ function mods(e: MouseEvent): OpenMods {
 }
 
 /** Whether `name` names collection `c` (its name or a former name, case-insensitively). */
-export function namesCollection(c: Pick<Collection, 'name' | 'formerNames'>, name: string): boolean {
+function namesCollection(c: Pick<Collection, 'name' | 'formerNames'>, name: string): boolean {
   const n = name.trim().toLowerCase()
   return c.name.toLowerCase() === n || c.formerNames.some((f) => f.toLowerCase() === n)
 }
@@ -88,7 +88,7 @@ function sectionQueryTitle(q: Pick<Query, 'name'> & Partial<Pick<Query, 'titleIs
 }
 
 /** The sections of a collection's Overview: `pinned`, then its query sections, then the removed ones. */
-export function collectionSections(
+function collectionSections(
   c: Collection,
   queries: (Pick<Query, 'id' | 'name' | 'icon'> & Partial<Pick<Query, 'titleIsCustom' | 'definition'>>)[],
   titleCtx: TitleCtx = { types: [], tagIdsToTitles: {} },
@@ -289,7 +289,7 @@ function TemplatesMenu({ collection, types }: { collection: Collection; types: T
 
 // ---------------------------------------------------------------------------------------------
 
-export interface CollectionPageProps {
+interface CollectionPageProps {
   id: string
   /**
    * M31: `peek` is the collection peek's layout (catalog section 9): one header row (icon, name,

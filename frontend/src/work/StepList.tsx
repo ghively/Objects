@@ -18,7 +18,7 @@ export interface StepActionExtra {
   notBefore?: string
 }
 
-export interface StepListProps {
+interface StepListProps {
   steps: readonly StepValue[]
   readOnly?: boolean
   /** Resolves false when the write failed (the list is put back). */

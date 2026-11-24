@@ -94,7 +94,7 @@ export interface Icon {
 
 export type Visibility = 'alwaysShow' | 'hideWhenEmpty' | 'hidden'
 
-export type NumberFormatType = 'number' | 'currency' | 'percentage' | 'progress'
+type NumberFormatType = 'number' | 'currency' | 'percentage' | 'progress'
 
 export interface NumberFormat {
   type: NumberFormatType
@@ -671,7 +671,7 @@ export interface EntityRef {
 }
 
 /** A file a cascading rewrite left alone (read-only, or it kept changing on disk). */
-export interface SkippedFile {
+interface SkippedFile {
   path: string
   reason: string
 }
@@ -939,7 +939,7 @@ export interface FilterGroup {
   elements: (Filter | FilterGroup)[]
 }
 
-export type SortOption = 'ascending' | 'descending' | 'ascendingExists' | 'descendingExists'
+type SortOption = 'ascending' | 'descending' | 'ascendingExists' | 'descendingExists'
 
 export interface Sort {
   propertyId: string
@@ -1226,7 +1226,7 @@ export interface TaskEntry {
 }
 
 /** An object whose date property covers a calendar day. */
-export interface DatedEntry {
+interface DatedEntry {
   path: string
   /** The date property's key. */
   key: string
@@ -1250,7 +1250,7 @@ export interface CalendarDay {
 }
 
 /** M8: one Timeline item; `at` a UTC instant, `key` the date property of a `dated` item. */
-export interface CalendarTimelineItem {
+interface CalendarTimelineItem {
   path: string
   at: string
   kind: 'created' | 'dated' | 'task'
@@ -1329,7 +1329,7 @@ export interface CreatedDailyNote {
 // ---- M5: search, references, graph ----
 
 /** Where a search hit matched; each snippet wraps its matches in U+0002 … U+0003. */
-export interface SearchHighlight {
+interface SearchHighlight {
   field: 'title' | 'aliases' | 'description' | 'properties' | 'blocksContent' | 'tags'
   snippets: string[]
 }
@@ -1470,7 +1470,7 @@ export interface OverdueInfo {
   today: string
 }
 
-export type TaskStatsCellState = 'completed' | 'excused' | 'skipped' | 'missed' | 'future' | 'none'
+type TaskStatsCellState = 'completed' | 'excused' | 'skipped' | 'missed' | 'future' | 'none'
 
 /** GET /api/tasks/stats */
 export interface TaskStats {
@@ -1624,7 +1624,7 @@ export interface StartImportRequest {
 }
 
 /** M27: what the scan step hands to the import: patterns to leave out, flagged files to leave out, flagged files imported with `excludeFromAI`. */
-export interface ImportScanChoices {
+interface ImportScanChoices {
   leaveOut: string[]
   leaveOutFiles: string[]
   excludeFromAi: string[]
@@ -1661,7 +1661,7 @@ export interface ImportPlannedType {
   properties: ImportPlannedProperty[]
 }
 
-export interface ImportSkippedItem {
+interface ImportSkippedItem {
   /** Source-relative POSIX path. */
   path: string
   reason: ImportSkipReason
@@ -1920,7 +1920,7 @@ export const OBJECT_ACTION_KINDS: readonly AutomationActionKind[] = [
   'removeFromCollection',
 ]
 
-export type AutomationRunStatus = 'ok' | 'failed' | 'skipped'
+type AutomationRunStatus = 'ok' | 'failed' | 'skipped'
 
 /** One run in a rule's log (`<state dir>`, the newest 200 per rule). */
 export interface AutomationRun {
@@ -2013,7 +2013,7 @@ export interface ApiToken {
 }
 
 /** The ``mcpServers`` entry an MCP client (Claude Code, Claude Desktop) needs. */
-export interface McpConfig {
+interface McpConfig {
   mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }>
 }
 
@@ -2193,7 +2193,7 @@ export interface Agent {
 // ---- M20: remote agents (A2A) ----
 
 /** One skill on a remote agent's Agent Card. */
-export interface RemoteSkill {
+interface RemoteSkill {
   id: string
   name: string
   description: string
@@ -2516,7 +2516,7 @@ export type McpServerKind = 'command' | 'url'
 export type McpTransport = 'http' | 'sse'
 
 /** A stdio server's env row; a secret row has `value` null, `set` = stored. */
-export interface McpEnvRow {
+interface McpEnvRow {
   key: string
   value: string | null
   secret: boolean
@@ -2524,14 +2524,14 @@ export interface McpEnvRow {
 }
 
 /** A URL server's header row; a secret row has `value` null, `set` = stored. */
-export interface McpHeaderRow {
+interface McpHeaderRow {
   name: string
   value: string | null
   secret: boolean
   set: boolean
 }
 
-export interface McpToolInfo {
+interface McpToolInfo {
   name: string
   description: string
 }
@@ -2845,7 +2845,7 @@ export interface AddWorkFieldsResult {
 export type WorkViewId = 'now' | 'flow' | 'projects' | 'today' | 'floor' | 'queues' | 'agent' | 'stuck' | 'wins' | 'captures'
   | 'alerts' | 'everything' | 'tickets' | (string & {}) // M24 adds 'captures'
 export type Energy = 'low' | 'medium' | 'high'
-export interface PersonRef { path: string; title: string }
+interface PersonRef { path: string; title: string }
 /** `GET /api/work/board`: M22's summary plus what the views need. */
 export interface WorkBoardItem extends WorkItemSummary {
   typeName: string
@@ -2864,7 +2864,7 @@ export interface FocusDay { day: string; notePath: string | null; version: strin
 export interface MeetingSlot { path: string; title: string; start: string; end: string; startLocal: string; endLocal: string }
 export interface WorkToday { day: string; now: string; nowLocal: string; meetings: MeetingSlot[] }
 export interface WinDay { day: string; stepsDone: number; itemsClosed: number; objectsChanged: number }
-export interface WinEntry { at: string; kind: 'step' | 'closed'; path: string; title: string; text: string }
+interface WinEntry { at: string; kind: 'step' | 'closed'; path: string; title: string; text: string }
 export interface WorkWins {
   /** Oldest first. */
   days: WinDay[]
@@ -2942,7 +2942,7 @@ export interface AgentStatus {
   held?: AgentHeldRow[]
   note: string | null
 }
-export type CaptureFrom = WorkViewId | 'focusSession' | 'keepOnTop' | 'panel'
+type CaptureFrom = WorkViewId | 'focusSession' | 'keepOnTop' | 'panel'
 export interface CaptureRequest { text: string; fromView: CaptureFrom; linkedPath?: string | null }
 export interface CaptureSummary {
   path: string
@@ -2957,7 +2957,7 @@ export interface WorkAgentSettings {
   agentId: string | null; agent: Agent | null; problem: string | null   // NOT_SET, M17's texts, REMOTE_REFUSED
   acts: boolean; autoRun: boolean; readTools: string[]; settingsRevision: string
 }
-export type CaptureRoute = 'file' | 'breakDown' | 'question'
+type CaptureRoute = 'file' | 'breakDown' | 'question'
 export interface CaptureItem extends CaptureSummary {   // what M24's sink answers for every capture
   objectId: string | null; version: string; title: string; fromView: string | null; linkedTitle: string | null
   filedTo: { path: string; title: string } | null
@@ -2975,9 +2975,9 @@ export interface GeneralFloor { items: FloorItemValue[]; revision: string }
 
 // ---- M27 the agent workflow (design sections 8 and 9) ----
 
-export type ProposalAction = 'use' | 'extend' | 'create'
+type ProposalAction = 'use' | 'extend' | 'create'
 
-export interface ProposalProperty {
+interface ProposalProperty {
   key: string
   name: string
   kind: string
@@ -3014,7 +3014,7 @@ export interface SchemaProposal {
 
 export type ProposalStatus = 'accepted' | 'edited' | 'rejected'
 
-export interface ProposalEdit {
+interface ProposalEdit {
   name?: string
   plural?: string
   /** Keys of the properties left out. */
@@ -3030,7 +3030,7 @@ export interface ProposalReviewItem {
   edited?: ProposalEdit
 }
 
-export interface ProposalReview {
+interface ProposalReview {
   items: ProposalReviewItem[]
 }
 
@@ -3040,11 +3040,11 @@ export interface ImportProposalResponse {
 }
 
 /** M30: `entities` (a batch kept as Sources: the bulk pass finished, waiting for the Entities step) and `writing` (Write runs). */
-export type FilingState = 'idle' | 'running' | 'trial' | 'entities' | 'writing' | 'done' | 'failed'
-export type FilingConfidence = 'high' | 'medium' | 'low'
+type FilingState = 'idle' | 'running' | 'trial' | 'entities' | 'writing' | 'done' | 'failed'
+type FilingConfidence = 'high' | 'medium' | 'low'
 export type FilingVerdict = 'right' | 'wrong'
 
-export interface FilingValue {
+interface FilingValue {
   key: string
   value: unknown
   quote: string
@@ -3052,7 +3052,7 @@ export interface FilingValue {
 }
 
 /** A tag or collection a filing result adds, with the words it was read from. */
-export interface FilingLabel {
+interface FilingLabel {
   value: string
   quote: string
   ok: boolean
@@ -3090,7 +3090,7 @@ export interface FilingStatus {
 
 // ---- M30 entity extraction and distillation (plan 2026-11-09-m30-entity-extraction.md) ----
 
-export type EntityStatus = 'accepted' | 'renamed' | 'rejected'
+type EntityStatus = 'accepted' | 'renamed' | 'rejected'
 
 export interface EntityDecision {
   status: EntityStatus
@@ -3104,7 +3104,7 @@ export interface EntitiesReview {
   splits: { id: string; names: string[] }[]
 }
 
-export interface SourceCite {
+interface SourceCite {
   path: string
   title: string
   quote: string

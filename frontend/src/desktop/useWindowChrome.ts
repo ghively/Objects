@@ -21,7 +21,7 @@ import { useSettings } from '@/settings/useSettings'
 import { barDragsWindow, desktop, windowButtonsValue, type DesktopControls, type WindowButtons } from './bridge'
 import './desktop.css'
 
-export interface ChromeState {
+interface ChromeState {
   /** The window buttons in force; null outside the shell and until the chrome is mounted. */
   controls: DesktopControls | null
   maximized: boolean
@@ -66,10 +66,10 @@ export async function applyWindowButtons(v: WindowButtons): Promise<void> {
   }
 }
 
-export const FULLSCREEN_CLASS = 'desktop-fullscreen'
-export const DRAG_CLASS = 'desktop-drag'
+const FULLSCREEN_CLASS = 'desktop-fullscreen'
+const DRAG_CLASS = 'desktop-drag'
 const CONTROLS: readonly DesktopControls[] = ['overlay', 'traffic', 'custom', 'none']
-export const controlsClass = (c: DesktopControls) => `desktop-controls-${c}`
+const controlsClass = (c: DesktopControls) => `desktop-controls-${c}`
 
 /** Mounted once (`DesktopChrome`). */
 export function useWindowChrome(): void {

@@ -131,7 +131,7 @@ export interface OpenOptions {
   inPlace?: boolean
 }
 
-export interface TabsState {
+interface TabsState {
   tabs: Tab[]
   activeId: string | null
   open(target: Target, opts?: OpenOptions): void
@@ -294,7 +294,7 @@ function withPanel(
 }
 
 /** Pinned tabs first, each group keeping its order. */
-export function sortPinned(tabs: Tab[]): Tab[] {
+function sortPinned(tabs: Tab[]): Tab[] {
   if (!tabs.some((t) => t.pinned)) return tabs
   return [...tabs.filter((t) => t.pinned), ...tabs.filter((t) => !t.pinned)]
 }
@@ -313,7 +313,7 @@ function freshTab(target: Target | null, trail: Target[] = []): Tab {
 }
 
 /** The tab to activate once `tabs` lost the active one: the most recently opened. */
-export function mostRecentTab(tabs: Tab[]): Tab | null {
+function mostRecentTab(tabs: Tab[]): Tab | null {
   let best: Tab | null = null
   for (const t of tabs) if (!best || (t.lastOpened ?? 0) > (best.lastOpened ?? 0)) best = t
   return best
@@ -672,7 +672,7 @@ function sameTab(a: Tab, b: Tab): boolean {
 
 followStorage(useTabs, mergeTabsFromStorage)
 
-export interface PeekState {
+interface PeekState {
   /** The object shown in the peek, or null when closed. */
   path: string | null
   /** The list the peek was opened from; the pager steps through it. */
@@ -773,7 +773,7 @@ export const usePeek = create<PeekState>()((set, get) => ({
  * M31: the collection peek (catalog section 9: a collection page "opens in a peek"). `list` is the
  * type's collections the stepper goes through ("1 / 3"), `typeId` the parent type its chip names.
  */
-export interface CollectionPeekState {
+interface CollectionPeekState {
   /** The collection shown in the peek, or null when closed. */
   id: string | null
   list: string[]

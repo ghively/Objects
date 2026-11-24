@@ -14,16 +14,16 @@ export const AREAS: readonly PanelArea[] = ['area1', 'area2', 'area3']
  * `45%`, dragged between 10 % and 90 %, back to 45 % on a double click on the resizer).
  */
 export const DEFAULT_SIDEPANEL_FRACTION = 0.45
-export const MIN_SIDEPANEL_FRACTION = 0.1
-export const MAX_SIDEPANEL_FRACTION = 0.9
+const MIN_SIDEPANEL_FRACTION = 0.1
+const MAX_SIDEPANEL_FRACTION = 0.9
 /** Areas 2 and 3 are this many px high by default. */
-export const DEFAULT_AREA_SIZE = 220
+const DEFAULT_AREA_SIZE = 220
 /** No area, area 1 included, gets lower than this. */
 export const MIN_AREA_SIZE = 120
 /** How many targets an entry remembers for its own back and forward. */
-export const ENTRY_HISTORY_LIMIT = 30
+const ENTRY_HISTORY_LIMIT = 30
 
-export function isPanelArea(v: unknown): v is PanelArea {
+function isPanelArea(v: unknown): v is PanelArea {
   return v === 'area1' || v === 'area2' || v === 'area3'
 }
 
@@ -38,7 +38,7 @@ export function isBacklinksTarget(t: SidepanelTarget | null | undefined): boolea
 }
 
 /** Targets that follow the tab's main object rather than naming one: the local graph and backlinks. */
-export function followsMain(t: SidepanelTarget | null | undefined): boolean {
+function followsMain(t: SidepanelTarget | null | undefined): boolean {
   return t?.kind === 'localGraph' || isBacklinksTarget(t)
 }
 
@@ -84,7 +84,7 @@ export function isSidepanelShown(tab: Tab | null | undefined): boolean {
 }
 
 /** An entry's own history (its current target is `history[index]`). */
-export function entryHistory(e: SidepanelEntry): { history: SidepanelTarget[]; index: number } {
+function entryHistory(e: SidepanelEntry): { history: SidepanelTarget[]; index: number } {
   if (Array.isArray(e.history) && typeof e.index === 'number' && e.index >= 0 && e.index < e.history.length) {
     return { history: e.history, index: e.index }
   }

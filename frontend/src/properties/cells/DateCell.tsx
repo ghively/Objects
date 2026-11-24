@@ -32,7 +32,7 @@ const VARIABLE_LABEL: Record<string, string> = Object.fromEntries(TEMPLATE_VARIA
  * The variable of a `{creation:<var>}` value, else null. Quoted in YAML it is a string;
  * unquoted, YAML reads it as a one-key mapping `{"creation:<var>": null}`.
  */
-export function creationVariable(raw: unknown): TemplateVariable | null {
+function creationVariable(raw: unknown): TemplateVariable | null {
   let name: string | null = null
   if (typeof raw === 'string') name = /^\{creation:([A-Za-z]+)\}$/.exec(raw.trim())?.[1] ?? null
   else if (raw && typeof raw === 'object' && !Array.isArray(raw)) {

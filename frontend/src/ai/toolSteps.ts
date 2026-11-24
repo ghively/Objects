@@ -230,7 +230,7 @@ const INFINITIVE: Record<string, string> = {
 }
 
 /** Why a failed call was refused (the CLI's permission answers), or null when it is an ordinary error. */
-export function refusalReason(result: string | null): string | null {
+function refusalReason(result: string | null): string | null {
   if (!result) return null
   if (/permission to use .+ (?:has been )?denied|haven't granted/i.test(result)) return TOOL_STEP_TEXT.toolOff
   if (/denied by your permission settings|directory that is denied/i.test(result)) return TOOL_STEP_TEXT.pathDenied

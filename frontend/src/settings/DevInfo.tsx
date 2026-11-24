@@ -28,14 +28,14 @@ export const DEV_INFO_TEXT = {
 
 const T = DEV_INFO_TEXT
 
-export interface DevInfoRow {
+interface DevInfoRow {
   label: string
   /** `null` or empty: shown as "None", with nothing to copy. */
   value: string | null | undefined
 }
 
 /** Whether "Show developer information" is on. */
-export function useDevInfoShown(): boolean {
+function useDevInfoShown(): boolean {
   return useSettings((s) => s.settings.showDeveloperInfo === true)
 }
 

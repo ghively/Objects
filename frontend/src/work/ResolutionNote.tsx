@@ -63,7 +63,7 @@ export function ResolutionNote({ note }: { note: Note }) {
   )
 }
 
-export interface ResolutionNoteSectionProps {
+interface ResolutionNoteSectionProps {
   path: string
   /** The object's version: an open section reads the note again when it changes. */
   version: string

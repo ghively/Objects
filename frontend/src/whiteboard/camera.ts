@@ -10,7 +10,7 @@ export interface Viewport {
   zoom: number
 }
 
-export interface WheelInput {
+interface WheelInput {
   deltaX: number
   deltaY: number
   ctrlKey: boolean
@@ -22,7 +22,7 @@ export interface WheelInput {
   deltaMode?: number
 }
 
-export const clampZoom = (z: number): number =>
+const clampZoom = (z: number): number =>
   Number.isFinite(z) ? Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) : 1
 
 /** Zoom to `zoom` keeping the pane point `(px, py)` over the same flow point. */
@@ -57,7 +57,7 @@ export function wheelViewport(viewport: Viewport, e: WheelInput, zoomOnScroll: b
 }
 
 /** Highest zoom "Zoom to fit" / "Zoom to selection" use (our choice: never magnify past 100 %). */
-export const FIT_MAX_ZOOM = 1
+const FIT_MAX_ZOOM = 1
 
 /** The viewport that shows every box inside `pane` with `padding` pixels around; zoom 1 at the origin when empty. */
 export function fitBox(

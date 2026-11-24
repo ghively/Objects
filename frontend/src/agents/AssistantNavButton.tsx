@@ -23,9 +23,9 @@ import { openAgentChat } from './AgentsSection'
 export const DEFAULT_AGENT_ID = 'assistant'
 
 /** The Assistant's fallback name before the agent list arrives. */
-export const ASSISTANT_LABEL = 'Assistant'
+const ASSISTANT_LABEL = 'Assistant'
 
-export interface AssistantNavButtonProps {
+interface AssistantNavButtonProps {
   /** The sidebar's opener (`SidebarProps['onOpenTarget']`); the tabs store's `open` when absent. */
   onOpenTarget?: (target: Target, opts: { newTab?: boolean }) => void
 }

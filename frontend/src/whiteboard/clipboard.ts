@@ -18,7 +18,7 @@ export const CLIPBOARD_PREFIX = 'object-whiteboard-v1:'
 /** Offset of a paste from the copied nodes: one grid step. */
 export const PASTE_OFFSET = GRID
 
-export interface ClipboardPayload {
+interface ClipboardPayload {
   nodes: WhiteboardNode[]
   edges: WhiteboardEdge[]
   blocks: Record<string, WhiteboardBlock>
@@ -150,7 +150,7 @@ export function pastePayload(
 }
 
 /** What pasted plain text becomes: a web link for a lone `http(s)` URL, else a text block. */
-export type TextPaste = { kind: 'weblink'; url: string } | { kind: 'text'; markdown: string } | null
+type TextPaste = { kind: 'weblink'; url: string } | { kind: 'text'; markdown: string } | null
 
 export function classifyText(text: string): TextPaste {
   const trimmed = text.replace(/\r\n?/g, '\n').replace(/^\n+|\s+$/g, '')
@@ -206,7 +206,7 @@ const IMAGE_EXT: Record<string, string> = {
 }
 
 /** The name a pasted image is uploaded under (our choice). */
-export function pastedImageName(type: string): string {
+function pastedImageName(type: string): string {
   return `Pasted image.${IMAGE_EXT[type] ?? 'png'}`
 }
 

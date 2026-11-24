@@ -10,9 +10,9 @@ import { addDays, addMonths, addYears, todayYmd, type CalendarView, type Day, ty
 
 export type StepKey = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown'
 
-export const VIEWS: CalendarView[] = ['month', 'week', 'rolling', 'day']
+const VIEWS: CalendarView[] = ['month', 'week', 'rolling', 'day']
 
-export interface CalendarState {
+interface CalendarState {
   view: CalendarView
   anchor: Day
   setView(view: CalendarView): void
@@ -27,7 +27,7 @@ export interface CalendarState {
 }
 
 /** One pager step from `anchor` in `view`, `dir` = ±1. */
-export function pagerStep(view: CalendarView, anchor: Day, dir: number): Day {
+function pagerStep(view: CalendarView, anchor: Day, dir: number): Day {
   if (view === 'month') return addMonths(anchor, dir)
   if (view === 'week') return addDays(anchor, 7 * dir)
   return addDays(anchor, dir)

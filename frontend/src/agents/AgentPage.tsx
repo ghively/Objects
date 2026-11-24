@@ -22,7 +22,7 @@ import { useAgents } from './useAgents'
  * The last ask to show an agent's tab. Opening the target an open page already shows changes
  * nothing in the tabs store, so `seq` tells the page to switch back to `tab` all the same.
  */
-export const useAgentTabRequest = create<{ agentId: string | null; tab: string | null; seq: number }>(() => ({
+const useAgentTabRequest = create<{ agentId: string | null; tab: string | null; seq: number }>(() => ({
   agentId: null,
   tab: null,
   seq: 0,
@@ -39,7 +39,7 @@ export function openAgentTab(agentId: string, tab: string): void {
   useTabs.getState().open({ kind: 'agent', id: agentId, tab }, {})
 }
 
-export interface AgentPageProps {
+interface AgentPageProps {
   id: string
   /** The tab to show first (an `AGENT_TABS` id); Profile when absent or unknown. */
   tab?: string

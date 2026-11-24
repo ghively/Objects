@@ -114,7 +114,7 @@ const RawMode = lazyWithReload(() => import('@/editor/RawMode').then((m) => ({ d
 installWikilinkPresenter()
 installLinkPicker()
 
-export interface ObjectViewProps {
+interface ObjectViewProps {
   path: string
   mode: 'page' | 'peek' | 'inline'
   /** Inline only: muted text shown while the body is empty. */
@@ -174,13 +174,13 @@ export function patchSummary(summary: ObjectSummary, fm: Record<string, unknown>
 }
 
 /** The `…` menu item. */
-export const OPEN_IN_SIDEPANEL_MENU_ITEM = 'Open in side panel'
+const OPEN_IN_SIDEPANEL_MENU_ITEM = 'Open in side panel'
 
 /** The `…` menu item. */
-export const FIND_IN_PAGE_MENU_ITEM = 'Find in page'
+const FIND_IN_PAGE_MENU_ITEM = 'Find in page'
 
 /** M8 menu items and the focus-mode button. */
-export const OBJECT_M8_TEXT = {
+const OBJECT_M8_TEXT = {
   versionHistory: 'Version history',
   /** M32: was "Merge into object". */
   mergeObject: `Merge into ${NOTE_LOWER}`,
@@ -192,7 +192,7 @@ export const OBJECT_M8_TEXT = {
 } as const
 
 /** M9 menu items. */
-export const OBJECT_M9_TEXT = {
+const OBJECT_M9_TEXT = {
   wideLayout: 'Wide layout',
   normalLayout: 'Normal layout',
   textStats: 'Text stats',
@@ -212,7 +212,7 @@ export const OBJECT_AI_TEXT = {
 } as const
 
 /** The menu's Import and Copy > rows. */
-export const OBJECT_MENU_TEXT = {
+const OBJECT_MENU_TEXT = {
   import: 'Import',
   copy: 'Copy',
   /** M32: was "Copy object reference" / "Link to object copied". */
@@ -223,7 +223,7 @@ export const OBJECT_MENU_TEXT = {
 } as const
 
 /** M32: the view's notices, in the glossary's words (each said "object"). */
-export const OBJECT_VIEW_TEXT = {
+const OBJECT_VIEW_TEXT = {
   cantOpen: `Couldn't open this ${NOTE_LOWER}.`,
   fileGone: `This ${NOTE_LOWER}'s file was deleted or moved on disk. Edits here aren't saved.`,
   readOnly: (reason: string) => `This ${NOTE_LOWER} opens read-only: ${reason}. Fix the file to edit it.`,

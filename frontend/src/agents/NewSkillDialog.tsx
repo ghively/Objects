@@ -15,7 +15,7 @@ import { LEARNING_TEXT as T } from './learningText'
 /** The longest description the skills index takes (`learningmodel.SKILL_DESCRIPTION_MAX`). */
 export const SKILL_DESCRIPTION_MAX = 60
 
-export interface NewSkillDialogProps {
+interface NewSkillDialogProps {
   agentId: string
   open: boolean
   onOpenChange(o: boolean): void

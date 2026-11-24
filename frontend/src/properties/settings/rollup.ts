@@ -38,7 +38,7 @@ export function rollupRelations(type: TypeDef): PropertyDef[] {
   return type.propertyDefinitions.filter((d) => d.type === 'entity')
 }
 
-export interface RollupTarget {
+interface RollupTarget {
   id: string
   name: string
   kind: PropertyType

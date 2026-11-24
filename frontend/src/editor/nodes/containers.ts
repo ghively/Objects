@@ -23,7 +23,7 @@ export function containerSourceAttributes() {
 }
 
 /** The sibling blocks the selection covers, in their common block parent. */
-export function selectedBlockRange(tr: Transaction): { from: number; to: number; parentDepth: number } | null {
+function selectedBlockRange(tr: Transaction): { from: number; to: number; parentDepth: number } | null {
   const { $from, $to } = tr.selection
   const a = leafBlockAt($from)
   const b = leafBlockAt($to)

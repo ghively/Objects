@@ -22,7 +22,7 @@
 import type { ObjectDetail } from '@/api/types'
 import type { BodyCaret } from './bodyCaret'
 
-export interface RenameHandover {
+interface RenameHandover {
   /** The note under its new path, at the rename's version, with the body as it is on disk. */
   detail: ObjectDetail
   /** Where the caret was, when the body had the focus. */
@@ -36,7 +36,7 @@ export interface RenameHandover {
 }
 
 /** A title field with the focus: its text as typed and its selection. */
-export interface TitleField {
+interface TitleField {
   draft: string
   start: number | null
   end: number | null

@@ -13,7 +13,7 @@ export const CHAT_MENU_TEXT = {
   learn: 'Learn from this chat',
 } as const
 
-export interface ChatMenuProps {
+interface ChatMenuProps {
   agentId: string | null
   chatId: string | null
   /** A review of this chat runs. */

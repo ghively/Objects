@@ -11,7 +11,7 @@ import type { DeviceSettings } from '@/api/types'
 import { useCalendar } from '@/calendar/useCalendar'
 import { sameTarget, tabTarget, useTabs, type Target } from './tabs'
 
-export type OpenOnStart = DeviceSettings['openOnStart'][string]
+type OpenOnStart = DeviceSettings['openOnStart'][string]
 
 export function applyOpenOnStart(choice: OpenOnStart | undefined): void {
   if (!choice) return

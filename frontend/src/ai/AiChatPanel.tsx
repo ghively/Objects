@@ -94,7 +94,7 @@ import { noticeSeen, rememberNotice, useAiFocus } from './reveal'
 import { useAi, useAiHidden, type AiSeed } from './store'
 
 /** One message as the panel keeps it: the saved fields plus what it needs to retry or apply. */
-export interface ChatItem extends AiMessage {
+interface ChatItem extends AiMessage {
   id: string
   /** A user turn: what was sent (to retry it). */
   prompt?: string
@@ -470,7 +470,7 @@ function StatusExplanation({ status }: { status: AiStatus | null }) {
 
 // ---- the panel ----
 
-export interface AiChatPanelProps {
+interface AiChatPanelProps {
   /** The side-panel entry showing the chat. */
   entryId: string
   /** The saved AI Chat object it shows (none: a new chat). */

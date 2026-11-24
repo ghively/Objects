@@ -38,7 +38,7 @@ export function makeDefaultTemplate(editor: TypeEditor, typeId: string, key: str
   return editor.save({ ...cur, templates: { ...cur.templates, defaultTemplateId: key } })
 }
 
-export interface UseTemplateMenuProps {
+interface UseTemplateMenuProps {
   type: TypeDef
   editor: TypeEditor
   onApply(templateId: string): void

@@ -10,10 +10,10 @@
 
 export const ZOOM_MIN = 0.6
 export const ZOOM_MAX = 1.5
-export const ZOOM_STEP = 0.05
+const ZOOM_STEP = 0.05
 export const ZOOM_CACHE_KEY = 'object.zoom'
 
-export type ZoomMode = 'in' | 'out' | 'reset'
+type ZoomMode = 'in' | 'out' | 'reset'
 
 const round = (z: number) => Math.round(z * 100) / 100
 

@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { formatDate } from '@/properties/format'
 
-export const COMPLETION_LOG_TEXT = {
+const COMPLETION_LOG_TEXT = {
   heading: 'Completion Log',
   deleteTitle: 'Remove this entry from the log?',
   deleteDescription: 'It will be gone from the task history for good.',

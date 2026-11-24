@@ -27,7 +27,7 @@ import { attachmentKind } from '../annotations'
 import './blockOptions.css'
 
 /** Node types that carry block options (leaves, plus the containers' own options). */
-export const BLOCK_OPTION_TYPES = [
+const BLOCK_OPTION_TYPES = [
   'paragraph',
   'heading',
   'bulletList',
@@ -58,7 +58,7 @@ export const BLOCK_PARENTS = new Set(['doc', 'toggle', 'group', 'column', 'inden
 const CONTAINER_NODES = new Set(['toggle', 'group', 'columns', 'indent'])
 
 /** What a node is, for the option table's "Applies to" column. */
-export function nodeTargets(node: PMNode): OptionTarget[] {
+function nodeTargets(node: PMNode): OptionTarget[] {
   switch (node.type.name) {
     case 'paragraph':
       return ['paragraph']
@@ -221,7 +221,7 @@ const iconVisitor: DecorationVisitor = (node, pos, decos) => {
   return false
 }
 
-export const blockIconKey = new PluginKey<DecorationSet>('blockIcons')
+const blockIconKey = new PluginKey<DecorationSet>('blockIcons')
 
 function parseOptions(el: HTMLElement): Option[] | null {
   const out: Option[] = []

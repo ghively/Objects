@@ -3,7 +3,7 @@
 // strings.
 import type { PropertyDef, PropertyType } from '@/api/types'
 
-export interface FormulaFunction {
+interface FormulaFunction {
   name: string
   /** How it is called, as shown in the list. */
   signature: string
@@ -49,7 +49,7 @@ export const FORMULA_FUNCTIONS: readonly FormulaFunction[] = [
 export const FORMULA_FUNCTION_NAMES: ReadonlySet<string> = new Set(FORMULA_FUNCTIONS.map((f) => f.name))
 
 /** The system names `prop("…")` always knows, in the spec's order. */
-export const SYSTEM_PROP_NAMES: readonly string[] = ['Title', 'Description', 'Tags', 'Created at', 'Last updated', 'Aliases']
+const SYSTEM_PROP_NAMES: readonly string[] = ['Title', 'Description', 'Tags', 'Created at', 'Last updated', 'Aliases']
 
 // The system kinds behind those names (listed by their system name, not the definition's).
 const SYSTEM_KINDS = new Set<PropertyType>([

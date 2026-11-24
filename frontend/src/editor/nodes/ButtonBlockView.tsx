@@ -24,7 +24,7 @@ import './buttonBlock.css'
 // cells, which themselves hold an editor, so a static import would make a module cycle.
 const RuleEditorDialog = lazyWithReload(() => import('@/automations/RuleEditor').then((m) => ({ default: m.RuleEditorDialog })))
 
-export const BUTTON_BLOCK_MENU_TEXT = {
+const BUTTON_BLOCK_MENU_TEXT = {
   menu: 'Button menu',
   editLabel: 'Edit label',
   label: 'Button label',

@@ -33,7 +33,7 @@ import { SpaceImage } from '@/components/SpaceImage'
 import { loadPageInspectorPinned, PageInspector, PAGE_INSPECTOR_TEXT, savePageInspectorPinned } from './PageInspector'
 import { decodeIcon } from './PropertyPanel'
 
-export type PageDesign = 'standard' | 'indexCard' | 'profile' | 'encyclopedia'
+type PageDesign = 'standard' | 'indexCard' | 'profile' | 'encyclopedia'
 
 /** Where the property panel sits, and so how it is drawn. */
 export type PanelVariant = 'side' | 'card' | 'column' | 'infobox'
@@ -79,7 +79,7 @@ export function objectWideLayout(type: TypeDef | undefined, layout: ObjectFrontm
 }
 
 /** The object's wide cover: its own `wideCoverImage`, else the type's. */
-export function objectWideCover(type: TypeDef | undefined, layout: ObjectFrontmatterLayout | undefined): boolean {
+function objectWideCover(type: TypeDef | undefined, layout: ObjectFrontmatterLayout | undefined): boolean {
   return layout?.wideCoverImage ?? !!type?.wideCoverImage
 }
 
@@ -96,7 +96,7 @@ export function pageDesign(type: TypeDef | undefined): PageDesign {
   return type?.viewDesign ?? 'standard'
 }
 
-export function panelVariant(design: PageDesign): PanelVariant {
+function panelVariant(design: PageDesign): PanelVariant {
   switch (design) {
     case 'indexCard':
       return 'card'
@@ -115,11 +115,11 @@ const FONT_VAR: Record<TypeFont, string> = {
   monospace: 'var(--object-font-monospace)',
 }
 
-export function fontStyle(font: TypeFont | undefined): CSSProperties {
+function fontStyle(font: TypeFont | undefined): CSSProperties {
   return { fontFamily: FONT_VAR[font ?? 'sans-serif'] ?? FONT_VAR['sans-serif'] }
 }
 
-export interface PageLayoutProps {
+interface PageLayoutProps {
   type?: TypeDef
   summary: ObjectSummary
   /** The object header (type chip, icon, title, description, aliases, tags). */

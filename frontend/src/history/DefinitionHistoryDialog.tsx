@@ -82,7 +82,7 @@ const S = DEFINITION_HISTORY
 
 type Preview = { id: string; text: string } | { id: string; error: true } | { id: string; loading: true }
 
-export interface DefinitionHistoryDialogProps {
+interface DefinitionHistoryDialogProps {
   open: boolean
   onOpenChange(open: boolean): void
   kind: DefinitionKind

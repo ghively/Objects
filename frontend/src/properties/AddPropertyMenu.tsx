@@ -9,7 +9,7 @@ import { addProperty, isSystemKind } from './typeEdits'
 
 export const BASIC_TYPE_INFO = 'The properties of basic types are fixed.'
 
-export interface AddPropertyMenuProps {
+interface AddPropertyMenuProps {
   type: TypeDef
   /** Every type of the space (for "Object Select"). */
   types: readonly TypeDef[]
@@ -33,7 +33,7 @@ function defaultIcon(kind: PropertyType): IconValue {
 }
 
 /** The items the type can still add: system properties it already has are hidden. */
-export function addableItems(type: TypeDef): AddPropertyItem[] {
+function addableItems(type: TypeDef): AddPropertyItem[] {
   const has = new Set(type.propertyDefinitions.map((d) => d.type))
   return ADD_PROPERTY_ITEMS.filter((i) => !(isSystemKind(i.type) && has.has(i.type)))
 }

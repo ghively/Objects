@@ -46,7 +46,7 @@ export function SettingGroup({
   )
 }
 
-export interface OptionItem<T extends string> {
+interface OptionItem<T extends string> {
   value: T
   label: string
   description?: string

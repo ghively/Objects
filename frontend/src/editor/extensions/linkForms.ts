@@ -58,7 +58,7 @@ const REFERENCE = /(?<![^\n])\[\^[^\]\s]+\](?!:)|(?<=[^\n])\[\^[^\]\s]+\]|\[[^[\
  * body defines `[foo]:`, and a footnote definition line `[^1]: …` is one only
  * when the body refers to `[^1]` (audit 2026-11-07 #37).
  */
-export type BodyReferences = { labels: Set<string>; footnotes: Set<string> }
+type BodyReferences = { labels: Set<string>; footnotes: Set<string> }
 let bodyReferences: BodyReferences | null = null
 
 /** A link label as Markdown matches it: case-folded, inner blanks collapsed. */

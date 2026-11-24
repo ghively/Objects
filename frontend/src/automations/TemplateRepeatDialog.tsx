@@ -36,7 +36,7 @@ export function repeatOf(rules: readonly AutomationRule[], templateId: string | 
 }
 
 /** A new repeat rule for template `templateId` of type `typeId`. */
-export function templateRepeatInput(typeId: string, templateId: string, name: string, trigger: ScheduleTrigger): RuleFields {
+function templateRepeatInput(typeId: string, templateId: string, name: string, trigger: ScheduleTrigger): RuleFields {
   return {
     name: RULE_TEXT.repeatName(name).slice(0, 100),
     description: '',
@@ -48,7 +48,7 @@ export function templateRepeatInput(typeId: string, templateId: string, name: st
   }
 }
 
-export interface TemplateRepeatDialogProps {
+interface TemplateRepeatDialogProps {
   open: boolean
   typeId: string
   template: ObjectSummary

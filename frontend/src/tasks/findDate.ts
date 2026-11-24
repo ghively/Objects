@@ -10,7 +10,7 @@
 // "today", "tomorrow", "next week", "in N days" and a written date (2026-12-01) are read anywhere.
 import { parseDate } from '@/editor/slash/parseDate'
 
-export interface FoundDate {
+interface FoundDate {
   /** The day the words name (`YYYY-MM-DD`). */
   day: string
   /** The words as typed ("next friday"). */

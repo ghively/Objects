@@ -19,8 +19,8 @@ import { AUTO_MAX_HEIGHT, AUTO_MAX_WIDTH, AUTO_MIN_WIDTH, AUTO_TEXT_MIN_HEIGHT, 
 import { isEditable, useBoardActions, useBoardState } from '../store'
 import { WB } from '../strings'
 
-export const HANDLE_IDS = ['top', 'right', 'bottom', 'left'] as const
-export type HandleId = (typeof HANDLE_IDS)[number]
+const HANDLE_IDS = ['top', 'right', 'bottom', 'left'] as const
+type HandleId = (typeof HANDLE_IDS)[number]
 
 const POSITIONS: Record<HandleId, Position> = {
   top: Position.Top,
@@ -30,7 +30,7 @@ const POSITIONS: Record<HandleId, Position> = {
 }
 
 /** The resize floor of a node: its kind's (`minSizeFor`); an embedded object is at least 360 wide. */
-export function resizeFloor(kind: WhiteboardNodeKind, entity = false): { width: number; height: number } {
+function resizeFloor(kind: WhiteboardNodeKind, entity = false): { width: number; height: number } {
   const min = minSizeFor(kind)
   return entity ? { width: Math.max(min.width, LINK_BLOCK_MIN_WIDTH), height: min.height } : min
 }
@@ -182,7 +182,7 @@ function RotationKnob({ node }: { node: WhiteboardNode }) {
   )
 }
 
-export interface NodeChromeProps {
+interface NodeChromeProps {
   node: WhiteboardNode
   selected: boolean
   /** An embedded object (resize floor 360 wide). */

@@ -106,7 +106,7 @@ function SwitchItem({ label, checked, onChange }: { label: string; checked: bool
   )
 }
 
-export type TableMenuProps = {
+type TableMenuProps = {
   editor: Editor
   /** The table's position (the widget's own position, which is the table's). */
   getPos: () => number | undefined
@@ -294,7 +294,7 @@ function anchorFor(view: EditorView, tablePos: number): Anchor | null {
   return prev && prev.hasAttribute('data-table-menu') ? prev : null
 }
 
-export const tableUiKey = new PluginKey<DecorationSet>('tableUi')
+const tableUiKey = new PluginKey<DecorationSet>('tableUi')
 
 export const TableUi = Extension.create({
   name: 'tableUi',

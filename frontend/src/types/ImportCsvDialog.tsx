@@ -53,7 +53,7 @@ export const IMPORT_CSV_TEXT = {
 export const CSV_ROW_LIMIT = 1000
 
 /** The title target's key in a mapping. */
-export const TITLE_TARGET = 'title'
+const TITLE_TARGET = 'title'
 
 /** Kinds a CSV value can be imported into (system kinds kept by the app are not). */
 const IMPORTABLE = new Set<PropertyDef['type']>([
@@ -75,7 +75,7 @@ const IMPORTABLE = new Set<PropertyDef['type']>([
   'phone',
 ])
 
-export interface CsvTarget {
+interface CsvTarget {
   key: string
   name: string
   def?: PropertyDef
@@ -187,7 +187,7 @@ export function csvRecord(
 }
 
 /** Each column's decimal separator as its cells are written (`columnDecimalComma`). */
-export function csvDecimalCommas(data: (string | CsvCell)[][], width: number): (boolean | undefined)[] {
+function csvDecimalCommas(data: (string | CsvCell)[][], width: number): (boolean | undefined)[] {
   return Array.from({ length: width }, (_, i) => columnDecimalComma(data.map((r) => asCell(r[i] ?? '').text)))
 }
 

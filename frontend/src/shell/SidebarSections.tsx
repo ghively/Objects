@@ -157,11 +157,11 @@ export function SidebarSections({ onOpenTarget }: { onOpenTarget?: OpenTarget })
 // ---- workspaceOrder (M9) ----
 
 /** The `workspaceOrder` ids of the two fixed blocks; the others are custom section ids. */
-export const WORKSPACE_OBJECTS = 'objects'
-export const WORKSPACE_PINNED = 'pinned'
+const WORKSPACE_OBJECTS = 'objects'
+const WORKSPACE_PINNED = 'pinned'
 
 /** Our string: the drag handle's name. */
-export const REORDER_HANDLE = (name: string) => `Reorder ${name}`
+const REORDER_HANDLE = (name: string) => `Reorder ${name}`
 
 /**
  * The sidebar's top-level blocks in order: the ids `workspaceOrder` lists (unknown ids ignored),
@@ -300,7 +300,7 @@ export function WorkspaceSections({ onOpenTarget, objects }: { onOpenTarget?: Op
 }
 
 /** "Add Section": a name, then the empty section appears above Pinned. */
-export function AddSection() {
+function AddSection() {
   const { addSection } = usePinned()
   const [open, setOpen] = useState(false)
   return (

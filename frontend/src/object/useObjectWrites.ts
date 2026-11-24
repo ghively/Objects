@@ -35,7 +35,7 @@ export interface BodyControl {
   resume(version: string): void | Promise<void>
 }
 
-export interface ObjectWritesOptions {
+interface ObjectWritesOptions {
   path: string
   /** The version the next write is based on (shared with the body editor). */
   versionRef: MutableRefObject<string>

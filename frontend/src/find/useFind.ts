@@ -1,7 +1,7 @@
 /** Find in page: which object's find bar is open, and its query and options (not persisted). */
 import { create } from 'zustand'
 
-export interface FindState {
+interface FindState {
   /** The object whose find bar is open, or null. */
   path: string | null
   /** The text being searched for; kept between openings, like a browser's find. */

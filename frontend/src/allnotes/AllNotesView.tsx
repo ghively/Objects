@@ -18,7 +18,7 @@ import { applySorts } from '@/views/sort'
 import { useRows } from '@/views/useRows'
 import { byEditedDesc, editedAt, editedDay, editedGroup, editedLabel, isListedNote, isListedType, NOTES_GROUPS } from './notes'
 
-export const ALL_NOTES_TEXT = {
+const ALL_NOTES_TEXT = {
   heading: ALL_NOTES,
   description: 'Every note, by when it was last edited.', // our string
   emptyTitle: 'No notes yet',
@@ -36,7 +36,7 @@ const initial = (layout: Layout): ViewState => ({
  * The view's filters, then the notes by last edit under Today / Yesterday / This week / Earlier
  * (empty groups left out). With a sort or a grouping of the user's own, the standard pipeline.
  */
-export function notesPipeline(today: string): Pipeline {
+function notesPipeline(today: string): Pipeline {
   return (rows, state, ctx) => {
     const filtered = applyFilters(rows, state.filterGroup, ctx)
     if (state.groupBy || state.sorts.length > 0) {

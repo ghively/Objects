@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button'
 import { REMOTE_CHAT_TEXT as R } from './aiText'
 
-export interface RemoteContextNoticeProps {
+interface RemoteContextNoticeProps {
   open: boolean
   agentName: string
   host: string

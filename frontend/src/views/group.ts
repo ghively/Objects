@@ -31,7 +31,7 @@ import { wallClock } from '@/lib/zonedTime'
 import { wallStart, weekStartOf, type WeekStart } from './dates'
 import { defIn, displayTitle, findDef, rowValue, typeMap, type FilterCtx } from './filter'
 
-export interface GroupOption {
+interface GroupOption {
   key: string
   label: string
 }
@@ -43,9 +43,9 @@ const DATE_KINDS = new Set<PropertyType>(['datetime', 'datetimeSimple', 'entity_
 const NOT_GROUPABLE = new Set<PropertyType>(['blocks', 'simpleTableBlock', 'files', 'steps', 'textList', 'floorItems'])
 
 /** Group-by option of a status label: one group per status category ("By category" is our string). */
-export const STATUS_CATEGORY_OPTION = 'statusCategory'
+const STATUS_CATEGORY_OPTION = 'statusCategory'
 /** Group-by option of a date: the Tasks "Scheduled" buckets. */
-export const SCHEDULED_OPTION = 'scheduled'
+const SCHEDULED_OPTION = 'scheduled'
 
 const isStatusLabel = (def?: Pick<PropertyDef, 'type' | 'options'>) => def?.type === 'label' && !!def.options?.isStatus
 
@@ -150,7 +150,7 @@ export function findGroupConfig<T extends { id: string }>(groups: T[] | undefine
 }
 
 /** Where the group `id` sits in the saved order, or -1. */
-export function groupConfigIndex(groups: { id: string }[] | undefined, id: string): number {
+function groupConfigIndex(groups: { id: string }[] | undefined, id: string): number {
   if (!groups) return -1
   const exact = groups.findIndex((x) => x.id === id)
   return exact >= 0 ? exact : groups.findIndex((x) => sameGroupId(x.id, id))
@@ -592,7 +592,7 @@ export function groupRows(
 }
 
 /** A kanban drag: the row being moved and the column it left. */
-export interface GroupMove {
+interface GroupMove {
   row: Row
   from?: Group | null
 }

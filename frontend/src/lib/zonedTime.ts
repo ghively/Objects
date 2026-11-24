@@ -8,7 +8,7 @@
  */
 import { useSettings } from '@/settings/useSettings'
 
-export interface ZonedParts {
+interface ZonedParts {
   year: number
   /** 1–12 */
   month: number

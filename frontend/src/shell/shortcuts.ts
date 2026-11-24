@@ -22,22 +22,22 @@ import { currentTarget, useTabs } from '@/nav/tabs'
 import { isTasksHidden } from '@/tasks/tasksHidden'
 import { useTabMenu } from '@/shell/TabMenu'
 
-export const TAB_SHORTCUT_IDS = ['closeTab', 'openNewTab', 'navigateTabs', 'openTabList', 'navigateBack', 'navigateForward'] as const
+const TAB_SHORTCUT_IDS = ['closeTab', 'openNewTab', 'navigateTabs', 'openTabList', 'navigateBack', 'navigateForward'] as const
 
-export const PANEL_SHORTCUT_IDS = ['toggleSidepanel', 'toggleLeftSidebar', 'toggleCalendarSidebar'] as const
+const PANEL_SHORTCUT_IDS = ['toggleSidepanel', 'toggleLeftSidebar', 'toggleCalendarSidebar'] as const
 
 registerShortcuts(M7_SHORTCUTS.filter((d) => (TAB_SHORTCUT_IDS as readonly string[]).includes(d.id)))
 registerShortcuts(M7_SHORTCUTS.filter((d) => (PANEL_SHORTCUT_IDS as readonly string[]).includes(d.id)))
 
 /** Close the active tab (a pinned tab stays: it has no close button either; our rule). */
-export function closeActiveTab(): void {
+function closeActiveTab(): void {
   const s = useTabs.getState()
   const tab = s.tabs.find((t) => t.id === s.activeId)
   if (tab && !tab.pinned) s.close(tab.id)
 }
 
 /** Activate the next tab, wrapping around. */
-export function cycleTabs(): void {
+function cycleTabs(): void {
   const s = useTabs.getState()
   if (s.tabs.length < 2) return
   const i = s.tabs.findIndex((t) => t.id === s.activeId)
@@ -50,7 +50,7 @@ export function taskTypeId(): string | undefined {
   return (types.find((t) => t.basic && t.name.toLowerCase() === 'task') ?? types.find((t) => t.id === 'task'))?.id
 }
 
-export const CREATE_TASK_FAILED = 'Could not create the task.'
+const CREATE_TASK_FAILED = 'Could not create the task.'
 
 /**
  * "Create new task" (Ctrl+Shift+T): the New menu's flow for the Task type, outside editable
@@ -78,7 +78,7 @@ export function goToCalendar(): void {
  * The General keys of the 2026-11-08 sweep. Inside the editor Ctrl+Shift+T stays "Make this line
  * a task"; Ctrl+Alt+H types nothing, so it works there too.
  */
-export function useGeneralShortcuts(): void {
+function useGeneralShortcuts(): void {
   useGlobalShortcut('createNewTask', createNewTask)
   useGlobalShortcut('goToCalendar', goToCalendar, { allowInEditable: true })
 }

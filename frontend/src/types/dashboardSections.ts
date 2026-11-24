@@ -13,7 +13,7 @@ import { queryTitle, type TitleCtx } from '@/queries/autoTitle'
  * default set. `unreviewed` exists only on the basic DailyNote type (and not while it hides
  * reviewing).
  */
-export const BUILTIN_KEYS = [
+const BUILTIN_KEYS = [
   'recentlyAccessed',
   'collections',
   'queries',
@@ -22,7 +22,7 @@ export const BUILTIN_KEYS = [
   'noBacklinks',
   'unreviewed',
 ] as const
-export type BuiltinKey = (typeof BUILTIN_KEYS)[number]
+type BuiltinKey = (typeof BUILTIN_KEYS)[number]
 
 export const SECTION_TEXT = {
   overview: 'Overview',
@@ -70,7 +70,7 @@ const BUILTIN_META: Record<BuiltinKey, { label: string; icon: string; inFullView
   unreviewed: { label: SECTION_TEXT.unreviewed, icon: 'ph-check-circle', inFullView: false, description: SECTION_TEXT.unreviewedDescription },
 }
 
-export const isBuiltin = (key: string): key is BuiltinKey => key in BUILTIN_META
+const isBuiltin = (key: string): key is BuiltinKey => key in BUILTIN_META
 
 /** Sections that can't be removed: Collections and Queries. */
 const NOT_REMOVABLE: ReadonlySet<string> = new Set(['collections', 'queries'])
@@ -90,7 +90,7 @@ export const isBasicDailyNote = (type: Pick<TypeDef, 'basic' | 'id' | 'name'>): 
   type.basic && (type.id === 'dailynote' || type.name.replace(/\s+/g, '').toLowerCase() === 'dailynote')
 
 /** Whether the type shows the "Unreviewed" section: the basic DailyNote type, unless it hides reviewing. */
-export const hasUnreviewed = (type: TypeDef): boolean => isBasicDailyNote(type) && !type.hideReviewing
+const hasUnreviewed = (type: TypeDef): boolean => isBasicDailyNote(type) && !type.hideReviewing
 
 /** A daily note row's day: its `date` value, else a `YYYY-MM-DD` title, else a `YYYY-MM-DD` file stem. */
 export function dailyNoteDay(row: Row): string {
@@ -111,7 +111,7 @@ export function unreviewedRows(rows: Row[]): Row[] {
     .map((x) => x.r)
 }
 
-export const typeHasTags = (type: Pick<TypeDef, 'propertyDefinitions'>): boolean =>
+const typeHasTags = (type: Pick<TypeDef, 'propertyDefinitions'>): boolean =>
   type.propertyDefinitions.some((d) => d.key === 'tags' || d.type === 'entity_tags')
 
 /**
@@ -263,7 +263,7 @@ function toSaved(s: RenderedSection): DashboardSection {
 }
 
 /** `views` with `visible` as the dashboard's sections (in that order) and `removed` as its removed keys. */
-export function withSections(views: Views, visible: RenderedSection[], removed: string[]): Views {
+function withSections(views: Views, visible: RenderedSection[], removed: string[]): Views {
   return { ...views, dashboard: { ...views.dashboard, sections: visible.map(toSaved), removedSections: removed } }
 }
 

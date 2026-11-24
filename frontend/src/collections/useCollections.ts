@@ -6,7 +6,7 @@ import type { Collection, SaveCollectionResult, Views } from '@/api/types'
 import { showToast } from '@/editor/media/upload'
 import { reloadDefinitions, useDefinitions, useDefs } from '@/types/useDefinitions'
 
-export interface UseCollections {
+interface UseCollections {
   collections: Collection[]
   loaded: boolean
   byId(id: string): Collection | undefined

@@ -7,7 +7,7 @@ import { create } from 'zustand'
 import { api, ConflictError } from '@/api/client'
 import type { SpaceInfo, SpacePatch } from '@/api/types'
 
-export interface SpaceInfoState {
+interface SpaceInfoState {
   space: SpaceInfo | null
   loaded: boolean
   load(): Promise<void>

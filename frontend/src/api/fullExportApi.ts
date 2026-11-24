@@ -8,7 +8,7 @@ const BASE = '/api/full-export'
 
 export type FullExportScope = 'current' | 'all'
 
-export interface FullExportSpaceResult {
+interface FullExportSpaceResult {
   name: string
   /** The space's folder name inside the export folder. */
   folder: string
@@ -34,7 +34,7 @@ export interface FullExportJob {
   error: string | null
 }
 
-export interface FullExportAutoStatus {
+interface FullExportAutoStatus {
   enabled: boolean
   scope: FullExportScope
   folder: string | null

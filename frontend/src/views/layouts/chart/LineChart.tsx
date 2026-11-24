@@ -6,7 +6,7 @@ import { CategoryLabels, VALUE_STYLE, ValueGrid, markLabel, markProps, tickWidth
 import { niceScale } from './scale'
 
 /** Past this many categories, points without rows are not drawn (our choice). */
-export const SPARSE_POINTS = 60
+const SPARSE_POINTS = 60
 
 export function LineChart(props: ChartDrawProps) {
   const { data, width, height, showValues } = props

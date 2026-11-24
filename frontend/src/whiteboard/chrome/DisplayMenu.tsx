@@ -9,7 +9,7 @@ import type { ResolvedSettings, SettingKey } from '../canvasTypes'
 import { WB } from '../strings'
 import { MenuHeading } from './controls'
 
-export const DISPLAY_SETTINGS: { key: SettingKey; label: string }[] = [
+const DISPLAY_SETTINGS: { key: SettingKey; label: string }[] = [
   { key: 'isSnappingToGrid', label: WB.displaySnapToGrid.text },
   { key: 'isSnappingToNodes', label: WB.displaySnapToNodes.text },
   { key: 'isShowingDots', label: WB.displayShowDots.text },
@@ -17,7 +17,7 @@ export const DISPLAY_SETTINGS: { key: SettingKey; label: string }[] = [
   { key: 'isEngineeringMode', label: WB.displayEngineeringMode.text },
 ]
 
-export interface DisplayMenuProps {
+interface DisplayMenuProps {
   settings: ResolvedSettings
   onSettings(key: SettingKey, value: boolean): void
 }

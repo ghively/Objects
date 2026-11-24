@@ -26,7 +26,7 @@ import { codeHighlightPlugin } from '../code/highlight'
 import '../../theme/codeSyntax.css'
 import './codeBlock.css'
 
-export function isLockedCodeBlock(node: PMNode): boolean {
+function isLockedCodeBlock(node: PMNode): boolean {
   if (node.type.name !== 'codeBlock') return false
   const opts = (node.attrs.blockOptions as Option[] | null) ?? []
   return opts.some((o) => o.key === 'lock' && o.value === true)

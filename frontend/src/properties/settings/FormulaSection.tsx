@@ -12,7 +12,7 @@ import { ResultNumberFormat, SettingsSection } from './shared'
 import { FORMULA_TEXT } from './texts'
 
 /** The preview debounce, in milliseconds. */
-export const PREVIEW_DELAY = 300
+const PREVIEW_DELAY = 300
 
 const MAX_LENGTH = 2000
 

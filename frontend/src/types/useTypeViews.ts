@@ -13,7 +13,7 @@ const SAVE_DELAY_MS = 300
 export type ViewsEdit = (v: Views) => Views
 
 /** `views` with the All view in `layout`, when that is a layout the type page offers. */
-export function withDefaultLayout(views: Views, layout: unknown): Views {
+function withDefaultLayout(views: Views, layout: unknown): Views {
   if (!FULL_VIEW_LAYOUTS.includes(layout as Layout)) return views
   return { ...views, all: { ...views.all, viewDefinition: { ...views.all.viewDefinition, dataViewLayout: layout as Layout } } }
 }

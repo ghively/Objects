@@ -56,7 +56,7 @@ export function canDuplicate(row: Row, type: TypeDef | undefined): boolean {
  * while "Open notes as a full page" is on (the default); with it off, the peek, so the view stays
  * put as it did before.
  */
-export async function duplicateRow(row: Row): Promise<void> {
+async function duplicateRow(row: Row): Promise<void> {
   const res = await api.duplicateObject(row.summary.path)
   usePeek.getState().peek(res.path)
 }

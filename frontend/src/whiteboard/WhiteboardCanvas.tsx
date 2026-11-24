@@ -94,7 +94,7 @@ const INK_DEFAULTS: Record<InkToolState['tool'], number> = { pen: 4, highlighter
 const INK_DEFAULT_COLOR = '#71717a'
 
 /** Files dropped together are placed in a diagonal cascade this far apart (our choice: one grid step). */
-export const DROP_CASCADE = GRID
+const DROP_CASCADE = GRID
 
 /**
  * Uploads `files` one after another (refusing any over 100 MiB before sending, M7's rule) and
@@ -130,7 +130,7 @@ function isPlacementTool(tool: WhiteboardTool): boolean {
  * How long a Ctrl/Cmd+C or V waits for the browser's own copy or paste event (which carries the
  * clipboard without a permission prompt) before using `navigator.clipboard` instead (our choice).
  */
-export const CLIPBOARD_EVENT_WAIT_MS = 60
+const CLIPBOARD_EVENT_WAIT_MS = 60
 
 /** "Export as PNG": the whole board, or with `selection` the selected nodes; false when nothing was exported. */
 export type BoardExporter = (title: string, opts?: { selection?: boolean }) => Promise<boolean>
@@ -144,7 +144,7 @@ export interface CanvasControls {
   zoomToBox(box: Box, opts?: { fill?: boolean }): void
 }
 
-export interface WhiteboardCanvasProps {
+interface WhiteboardCanvasProps {
   /** The per-viewer camera key (board id or path). */
   boardKey: string
   settings: ResolvedSettings

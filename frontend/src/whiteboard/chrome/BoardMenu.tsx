@@ -13,7 +13,7 @@ import { ClearBoardDialog } from './ClearBoardDialog'
 import { MenuRow, MenuSeparator, PopoverMenu } from './controls'
 
 /** Our string (the same text as the page's expand button). */
-export const OPEN_AS_PAGE = 'Open as page'
+const OPEN_AS_PAGE = 'Open as page'
 /** Our label. */
 export const EXPORT_AS_PNG = 'Export as PNG'
 /** Our label. */

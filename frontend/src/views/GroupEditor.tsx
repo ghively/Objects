@@ -6,7 +6,7 @@ import { choiceFor, type PropChoice } from './properties'
 
 const SELECT = 'h-7 max-w-full rounded-md border border-line bg-raised px-1.5 text-[13px] text-fg outline-none'
 
-export interface GroupEditorProps {
+interface GroupEditorProps {
   groupBy: GroupBy | null
   onChange(next: GroupBy | null): void
   choices: PropChoice[]

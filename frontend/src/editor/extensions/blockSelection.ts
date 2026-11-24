@@ -31,7 +31,7 @@ import type { Option } from '../annotations'
 import { keymapFor } from '../shortcuts'
 import { BLOCK_ID_SUFFIX } from '../blocks'
 
-export type BlockSelectionState = { anchor: number; head: number } | null
+type BlockSelectionState = { anchor: number; head: number } | null
 
 export const blockSelectionKey = new PluginKey<BlockSelectionState>('blockSelection')
 
@@ -115,7 +115,7 @@ export function blockSelectionRange(state: EditorState): BlockRange | null {
 }
 
 /** The block holding the cursor (or a selected atom block), as a one-block range. */
-export function cursorBlockRange(state: EditorState): BlockRange | null {
+function cursorBlockRange(state: EditorState): BlockRange | null {
   const leaf = blockChain(state.tr)[0]
   return leaf ? rangeBetween(state.doc, leaf.pos, leaf.pos) : null
 }
@@ -126,7 +126,7 @@ export function targetRange(state: EditorState): BlockRange | null {
 }
 
 /** An editor selection covering `from..to`: text from the first text position to the last, else the node. */
-export function selectionCovering(doc: PMNode, from: number, to: number): Selection {
+function selectionCovering(doc: PMNode, from: number, to: number): Selection {
   const start = Selection.findFrom(doc.resolve(from), 1, true)
   const end = Selection.findFrom(doc.resolve(to), -1, true)
   if (start && end && start.from >= from && end.to <= to && start.from <= end.to) {
@@ -176,7 +176,7 @@ export function selectActiveBlock(editor: Editor): boolean {
 }
 
 /** Shift+Up / Shift+Down while blocks are selected: move the head one sibling. */
-export function expandBlockSelection(editor: Editor, dir: -1 | 1): boolean {
+function expandBlockSelection(editor: Editor, dir: -1 | 1): boolean {
   const sel = getBlockSelection(editor.state)
   if (!sel) return false
   const { doc } = editor.state
@@ -478,7 +478,7 @@ export function toggleMathBlock(editor: Editor): boolean {
 }
 
 /** Mod-Enter: check or uncheck the to-do holding the cursor. */
-export function toggleTodoInBlock(editor: Editor): boolean {
+function toggleTodoInBlock(editor: Editor): boolean {
   const $from = editor.state.selection.$from
   for (let d = $from.depth; d >= 1; d--) {
     const node = $from.node(d)
@@ -494,7 +494,7 @@ export function toggleTodoInBlock(editor: Editor): boolean {
  * Mod-Shift-Enter (or Mod-Enter outside a to-do): open or close the toggle whose line holds the cursor; a toggle
  * with no children gets an empty child block, opened and focused.
  */
-export function toggleToggleInBlock(editor: Editor): boolean {
+function toggleToggleInBlock(editor: Editor): boolean {
   const $from = editor.state.selection.$from
   for (let d = $from.depth; d >= 1; d--) {
     const node = $from.node(d)
@@ -526,7 +526,7 @@ const ITEM_NODES = new Set(['listItem', 'taskItem'])
  * Tab / Shift-Tab with the cursor in a list item: sink or lift that item. This was the list
  * extensions' own key; the registry owns it now (`indentBlocks`, `unindentBlocks`).
  */
-export function indentListItemAtCursor(editor: Editor, dir: 1 | -1): boolean {
+function indentListItemAtCursor(editor: Editor, dir: 1 | -1): boolean {
   if (getBlockSelection(editor.state)) return false
   const $from = editor.state.selection.$from
   for (let d = $from.depth; d >= 1; d--) {
@@ -626,7 +626,7 @@ function onClipboard(view: EditorView, event: ClipboardEvent, cut: boolean, edit
 const MD_BLOCK_START = /^ {0,3}(?:#{1,6}(?:[ \t]|$)|[-+*](?:[ \t]|$)|\d{1,9}[.)](?:[ \t]|$)|>|`{3}|~{3}|\||(?:[-*_][ \t]*){3,}$|\$\$|<!--|!\[)/m
 const MD_INLINE = /`[^`\n]+`|\*\*\S[^\n]*?\*\*|\*\S[^*\n]*\*|~~\S[^\n]*?~~|\[\[[^\]\n]+\]\]|\[[^\]\n]*\]\([^)\n]*\)/
 
-export function looksLikeMarkdown(text: string): boolean {
+function looksLikeMarkdown(text: string): boolean {
   return MD_BLOCK_START.test(text) || MD_INLINE.test(text)
 }
 
@@ -695,7 +695,7 @@ function parsePastedText(editor: Editor, text: string, $context: ResolvedPos): S
  * splitting it. Inside a list item, a table cell or a quote the default paste
  * (ProseMirror fitting the slice) applies instead.
  */
-export function insertPastedBlocks(view: EditorView, nodes: PMNode[]): boolean {
+function insertPastedBlocks(view: EditorView, nodes: PMNode[]): boolean {
   const { state } = view
   const tr = state.tr
   if (!state.selection.empty) tr.deleteSelection()
@@ -734,7 +734,7 @@ function decorations(state: EditorState): DecorationSet {
   )
 }
 
-export interface BlockSelectionOptions {
+interface BlockSelectionOptions {
   /**
    * Read pasted text as Markdown (`pasteBlocks`). Off for an editor that holds one paragraph
    * (a Text property cell), where a list or heading has no place: the plain text paste applies.

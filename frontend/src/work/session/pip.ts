@@ -7,7 +7,7 @@ import { createRoot } from 'react-dom/client'
 import { isWorkOn } from '../useWorkOn'
 
 /** The window's size (ported from the old dashboard). */
-export const PIP_SIZE = { width: 340, height: 430 } as const
+const PIP_SIZE = { width: 340, height: 430 } as const
 
 interface DocumentPictureInPicture {
   requestWindow(o: { width: number; height: number }): Promise<Window>

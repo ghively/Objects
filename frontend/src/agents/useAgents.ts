@@ -6,7 +6,7 @@ import { create } from 'zustand'
 import { api } from '@/api/client'
 import type { Agent } from '@/api/types'
 
-export interface AgentsState {
+interface AgentsState {
   agents: Agent[]
   loaded: boolean
   /** Fetch the list now (after a write of our own, so it doesn't wait for the event). */

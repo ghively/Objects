@@ -8,11 +8,11 @@ import { DailyNoteSlot } from './DailyNoteSlot'
 import { DayHeader, ReviewedButton } from './DayHeader'
 import type { Day, WeekStart } from './dates'
 
-export const MULTI_DAY_TEXT = {
+const MULTI_DAY_TEXT = {
   openAsPage: 'Open as Page',
 }
 
-export interface MultiDayDayProps {
+interface MultiDayDayProps {
   day: Day
   today: Day
   weekStart: WeekStart

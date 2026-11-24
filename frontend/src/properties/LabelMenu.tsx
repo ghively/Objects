@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils'
 import { labelStyle, lineColor, randomColor } from '@/theme/palette'
 
 /** The status sections, in menu order; the first three sit under "Open". */
-export const STATUS_SECTIONS: readonly { category: StatusCategory; name: string }[] = [
+const STATUS_SECTIONS: readonly { category: StatusCategory; name: string }[] = [
   { category: 'not-started', name: 'Not started' },
   { category: 'in-progress', name: 'In progress' },
   { category: 'blocked', name: 'Blocked' },
@@ -35,7 +35,7 @@ const SECTION_PREFIX = 'section:'
 /** Our string: shown in the menu when the type save behind a new option failed. */
 const CREATE_FAILED = 'The label could not be created.'
 
-export interface LabelMenuProps {
+interface LabelMenuProps {
   def: PropertyDef
   /** The selected option texts. */
   value: string[]

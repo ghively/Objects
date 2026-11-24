@@ -24,7 +24,7 @@ const SkillsTab = lazyWithReload(() => import('./SkillsTab').then((m) => ({ defa
 /** M21: the Schedules tab, loaded when first shown. */
 const SchedulesTab = lazyWithReload(() => import('./SchedulesTab').then((m) => ({ default: m.SchedulesTab })))
 
-export interface AgentTab {
+interface AgentTab {
   id: string
   label: string
   order: number

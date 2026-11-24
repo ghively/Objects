@@ -5,7 +5,7 @@ import { asComputed, computedDateResolution, computedNumberFormat } from '../com
 import { formatDate, formatNumber, placeholderFor } from '../format'
 
 /** What an error value shows (our string); the server's message is its tooltip. */
-export const COMPUTED_ERROR_TEXT = 'Formula error'
+const COMPUTED_ERROR_TEXT = 'Formula error'
 
 /**
  * A formula or rollup value, read-only, by its result type: text; a number in the property's

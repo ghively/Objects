@@ -34,7 +34,7 @@ import { useRows } from '@/views/useRows'
 import './searchPage.css'
 
 /** The search page's strings. */
-export const SEARCH_PAGE_TEXT = {
+const SEARCH_PAGE_TEXT = {
   heading: 'Search',
   emptyState: 'Type a word to find content in this space.',
   fullTextSearchOnly: 'Text matches only',
@@ -43,9 +43,9 @@ export const SEARCH_PAGE_TEXT = {
   saving: 'Saving...',
 } as const
 
-export const SEARCH_PAGE_DEBOUNCE_MS = 150
+const SEARCH_PAGE_DEBOUNCE_MS = 150
 /** Results fetched (the server's maximum). */
-export const SEARCH_PAGE_LIMIT = 200
+const SEARCH_PAGE_LIMIT = 200
 
 const initialState = (): ViewState => ({
   viewDefinition: { dataViewLayout: 'list' },
@@ -81,7 +81,7 @@ export function searchDefinition(
   return def
 }
 
-export interface SearchPageProps {
+interface SearchPageProps {
   q?: string
   textOnly?: boolean
 }

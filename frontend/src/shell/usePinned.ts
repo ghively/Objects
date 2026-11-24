@@ -183,7 +183,7 @@ const withItems = (ui: UiState, sectionId: string, fn: (items: PinRef[]) => PinR
 
 export type PinTarget = PinRef | { kind: 'object'; path: string; id?: string | null }
 
-export interface UsePinned {
+interface UsePinned {
   pinned: PinRef[]
   sections: SidebarSection[]
   loaded: boolean

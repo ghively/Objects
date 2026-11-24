@@ -19,7 +19,7 @@
 import { useEffect, useRef } from 'react'
 
 /** `aiChat`: bound while focus is inside the AI chat panel (M10). `work`: on the Work page (M23). */
-export type ShortcutScope = 'global' | 'editor' | 'calendar' | 'table' | 'whiteboard' | 'aiChat' | 'work'
+type ShortcutScope = 'global' | 'editor' | 'calendar' | 'table' | 'whiteboard' | 'aiChat' | 'work'
 
 export interface ShortcutDef {
   id: string
@@ -506,7 +506,7 @@ export const EXISTING_SHORTCUTS: ShortcutDef[] = [
  * In other editable fields (a dialog's input, a quick-add box) the two "new" keys stay off, as
  * before M32.
  */
-export const NEW_KEYS_IN_NOTE = {
+const NEW_KEYS_IN_NOTE = {
   /** A note's view (page, peek or inline): the keys work in its editable fields. */
   noteSelector: '[data-object-view]',
   /** Raw mode keeps Ctrl+U ("undo selection"). */
@@ -575,7 +575,7 @@ export const M8_SHORTCUTS: ShortcutDef[] = [
  * Ids that share a key by design: the handlers tell them apart (a text
  * selection or blocks selected; the cursor in a to-do or a toggle).
  */
-export const SHARED_KEY_IDS: readonly (readonly string[])[] = [
+const SHARED_KEY_IDS: readonly (readonly string[])[] = [
   ['codeToken', 'toggleCodeBlock'],
   ['mathToken', 'toggleMathBlock'],
   ['toggleTodoInBlockWithCursor', 'toggleToggleInBlockWithCursor'],
@@ -600,7 +600,7 @@ export const PRESENTATION_ONLY_IDS: readonly string[] = ['exitPresentationMode',
  * menu shows next to "Group") is bound in
  * `editor/handles/groupKey.ts`, with blocks selected only.
  */
-export const POLISH_SHORTCUTS: ShortcutDef[] = [
+const POLISH_SHORTCUTS: ShortcutDef[] = [
   def('groupBlocks', 'block', 'Group the selected blocks, or ungroup a selected group', ['Mod-g'], 'editor', V, true),
 ]
 
@@ -609,7 +609,7 @@ export const POLISH_SHORTCUTS: ShortcutDef[] = [
  * as the sidebar's "Pinned"). Handled by `object/ObjectView.tsx` for the active view, outside editable targets for
  * Mod-e and Mod-i (in the editor they stay code and italic).
  */
-export const OBJECT_MENU_SHORTCUTS: ShortcutDef[] = [
+const OBJECT_MENU_SHORTCUTS: ShortcutDef[] = [
   def('openExportMenu', 'page', 'Export this note', ['Mod-e'], 'global', V, false),
   // "Import": on a type page Ctrl+I opens the type's CSV import, not a page's.
   def('openImportMenu', 'page', 'Import', ['Mod-i'], 'global', V, false),
@@ -656,7 +656,7 @@ export const AI_SHORTCUTS: ShortcutDef[] = [
  * through `editor/extensions/openBlockStyling.ts`, which asks the handles overlay
  * (`editor/handles/BlockHandles.tsx`) to open the block menu for the target blocks.
  */
-export const SWEEP_SHORTCUTS: ShortcutDef[] = [
+const SWEEP_SHORTCUTS: ShortcutDef[] = [
   def('createNewTask', 'global', 'Create new task', ['Mod-Shift-t'], 'global', V, true),
   def('pasteAsPlainText', 'text', 'Paste as plain text', ['Mod-Shift-v'], 'editor', V, true),
   def('goToCalendar', 'global', 'Go to Calendar', ['Mod-Alt-h'], 'global', V, true),

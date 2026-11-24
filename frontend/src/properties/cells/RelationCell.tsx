@@ -8,7 +8,7 @@ import { placeholderFor } from '../format'
 import { isTagType, RelationPicker } from '../RelationPicker'
 import type { CellProps } from './types'
 
-export interface RelationCellProps extends CellProps<EntityRef[] | null> {
+interface RelationCellProps extends CellProps<EntityRef[] | null> {
   /** Opens a linked object (a click on its chip). */
   onOpenObject?(path: string): void
   /** "Edit Property" in the picker: opens the property's settings. */

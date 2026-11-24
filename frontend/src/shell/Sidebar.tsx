@@ -115,8 +115,8 @@ function useCollapsedTypes(): [Set<string>, (typeId: string) => void] {
 }
 
 /** The footer theme button's tooltips: the mode it switches to. */
-export const SET_DARK_MODE = 'Dark mode'
-export const SET_LIGHT_MODE = 'Light mode'
+const SET_DARK_MODE = 'Dark mode'
+const SET_LIGHT_MODE = 'Light mode'
 
 /** The footer's sun button: switches between the light and the dark theme. */
 function ThemeButton() {
@@ -139,31 +139,31 @@ function ThemeButton() {
 }
 
 /** The footer gear's tooltip. */
-export const SETTINGS_TOOLTIP = 'Settings'
+const SETTINGS_TOOLTIP = 'Settings'
 /** The footer's Shortcuts icon: opens the shortcuts sheet (catalog §4: settings gear, theme toggle, Shortcuts icon). */
-export const SHORTCUTS_TOOLTIP = 'Shortcuts'
+const SHORTCUTS_TOOLTIP = 'Shortcuts'
 
 /** M32: the arrow beside "New": the list of types to make something else (our string). */
-export const NEW_MENU_LABEL = 'Choose a type'
+const NEW_MENU_LABEL = 'Choose a type'
 
 /** The square search button's tooltip. */
-export const SEARCH_THIS_SPACE = 'Search this space'
+const SEARCH_THIS_SPACE = 'Search this space'
 
 /** The sidebar entry for the Work page (M32: only while Work is on for the space). */
-export const WORK_LABEL = WORK
+const WORK_LABEL = WORK
 
 /**
  * M32: the sidebar's first entry, every note by last edited (the all-notes view). "All notes",
  * so that it and the Note type's row under Types ("Notes") are two different words.
  */
-export const NOTES_LABEL = ALL_NOTES
+const NOTES_LABEL = ALL_NOTES
 
 /** The sidebar entry for the saved-search list (M32: was "Queries"). */
-export const QUERIES_LABEL = SAVED_SEARCHES
+const QUERIES_LABEL = SAVED_SEARCHES
 
 /** M32: the type list's heading (was "Object Types") and its `+` (was "Create object type"). */
-export const TYPES_HEADING = TYPES
-export const NEW_TYPE_LABEL = NEW_TYPE
+const TYPES_HEADING = TYPES
+const NEW_TYPE_LABEL = NEW_TYPE
 
 /** By the plural the screen shows (M32: the built-in Page sorts as "Notes", DailyNote as "Daily notes"). */
 export function byPluralName(a: TypeDef, b: TypeDef): number {

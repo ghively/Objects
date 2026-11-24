@@ -4,14 +4,14 @@ import type { InkStroke } from './types'
 /** Corner handles of the ink selection box, in screen pixels (half the hit square). */
 export const INK_HANDLE_PX = 8
 /** The smallest scale a corner drag may reach (our choice), so a selection never collapses. */
-export const MIN_INK_SCALE = 0.05
+const MIN_INK_SCALE = 0.05
 
 export type Corner = 'nw' | 'ne' | 'sw' | 'se'
 
 type Pt = readonly number[]
 
 /** Point-in-polygon (even-odd rule). */
-export function pointInPolygon(x: number, y: number, polygon: readonly Pt[]): boolean {
+function pointInPolygon(x: number, y: number, polygon: readonly Pt[]): boolean {
   let inside = false
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const [xi, yi] = polygon[i]

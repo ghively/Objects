@@ -14,7 +14,7 @@ export interface SnapGuide {
   end: number
 }
 
-export interface NodeSnap {
+interface NodeSnap {
   dx: number
   dy: number
   guides: SnapGuide[]

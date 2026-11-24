@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
 import { boardOutline, boardStats, frameLabel, move, orderedFrames, type BoardStats } from '../readingOrder'
 import { WB } from '../strings'
 
-export type InspectorTab = 'outline' | 'frames' | 'stats'
+type InspectorTab = 'outline' | 'frames' | 'stats'
 
 const PIN_KEY = 'object.whiteboard.inspectorPinned'
 
@@ -38,7 +38,7 @@ export function saveInspectorPinned(pinned: boolean): void {
   }
 }
 
-export interface FloatingInspectorProps {
+interface FloatingInspectorProps {
   board: WhiteboardData
   strokes?: readonly unknown[]
   /** Reordering frames writes the board; off on a locked or read-only board. */

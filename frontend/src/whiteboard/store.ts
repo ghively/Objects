@@ -33,7 +33,7 @@ import type { InkStroke, InkToolState } from './plugin'
 export type { BoardDoc }
 
 /** Store-internal actions the canvas and `useBoard` use (not part of the sub-lane contract). */
-export interface CanvasActions {
+interface CanvasActions {
   /** A document from the server (first load or external reload): replaces the doc; the steps are rebased onto it. */
   load(doc: BoardDoc): void
   /** The board after a merge: replaces it without marking it dirty; the steps are rebased onto it. */
@@ -56,7 +56,7 @@ export interface CanvasActions {
   measure(sizes: A.MeasuredSizes): void
 }
 
-export interface BoardState {
+interface BoardState {
   doc: BoardDoc
   /** Selected node and edge ids. */
   selection: string[]

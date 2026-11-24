@@ -93,7 +93,7 @@ export function dateValueOf(row: Row, key: string): DateValue | null {
   return typeof dv.start === 'string' && dv.start ? (dv as DateValue) : null
 }
 
-export interface RowDays {
+interface RowDays {
   start: Day
   /** The last day covered (the start's own day when the value has no end, or an end before its start). */
   end: Day

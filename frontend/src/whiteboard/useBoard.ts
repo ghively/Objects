@@ -27,16 +27,16 @@ import { WB } from './strings'
 
 export const SAVE_DELAY_MS = 400
 /** First retry delay after a failed save; it doubles up to `SAVE_RETRY_MAX_MS` (as the editor's autosave). */
-export const SAVE_RETRY_MS = 2000
-export const SAVE_RETRY_MAX_MS = 30000
+const SAVE_RETRY_MS = 2000
+const SAVE_RETRY_MAX_MS = 30000
 /** Automatic retries after a run of failed saves; then only the next edit (or a flush) tries again. */
 export const SAVE_RETRY_LIMIT = 5
 
 type BoardClient = Pick<WhiteboardApi, 'board' | 'saveBoard'>
 
-export type BoardStatus = 'loading' | 'ready' | 'error'
+type BoardStatus = 'loading' | 'ready' | 'error'
 
-export interface UseBoardResult {
+interface UseBoardResult {
   store: BoardStore
   status: BoardStatus
   error: string | null

@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { describeRepeat, formatRepeat, localDayOf, parseRepeat, presetOn } from './repeat'
 
-export interface RepeatMenuProps {
+interface RepeatMenuProps {
   /** The raw `repeat` text (null: no repeat). An invalid text is shown as is, with a hint. */
   value: string | null
   /** The task's date start (`YYYY-MM-DD` or ISO); names the weekday, day and month of the presets. */
@@ -23,7 +23,7 @@ export interface RepeatMenuProps {
 }
 
 /** Our string: a `repeat` text that does not parse is kept and shown with this hint. */
-export const INVALID_REPEAT_HINT = 'Not a valid repeat.'
+const INVALID_REPEAT_HINT = 'Not a valid repeat.'
 
 const PRESET_TEXTS = ['every day', 'every weekday', 'every week', 'every month', 'every year'] as const
 

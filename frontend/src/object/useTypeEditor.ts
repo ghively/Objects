@@ -14,7 +14,7 @@ import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 import { ConfirmChangesDialog } from './ConfirmChangesDialog'
 import { rebase } from './rebaseType'
 
-export type TypeUpdater = (latest: TypeDef) => TypeDef
+type TypeUpdater = (latest: TypeDef) => TypeDef
 
 export interface TypeEditor {
   type: TypeDef | undefined

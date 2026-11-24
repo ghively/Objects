@@ -22,7 +22,7 @@ export type QuickCreatePick =
   | { kind: 'none' }
   | { kind: 'remove' }
 
-export interface QuickCreateMenuProps {
+interface QuickCreateMenuProps {
   onPick(pick: QuickCreatePick): void
   /** Escape or a click outside (the canvas treats it as "Remove"). */
   onClose(): void

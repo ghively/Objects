@@ -116,7 +116,7 @@ const VIEW_CLASS: Record<BacklinkContentView, string> = {
 }
 
 /** One backlink's block, with its parents above when the full path shows. */
-export function BacklinkContext({
+function BacklinkContext({
   context,
   view,
   nestedView,
@@ -215,7 +215,7 @@ function ReferenceActions({ path, list }: { path: string; list: string[] }) {
   )
 }
 
-export interface BacklinksTabProps {
+interface BacklinksTabProps {
   entries: BacklinkEntry[]
   summaries: Record<string, ObjectSummary>
   /** "Backlink content view" (default embed). */

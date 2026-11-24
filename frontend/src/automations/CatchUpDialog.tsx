@@ -20,7 +20,7 @@ import {
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import { runMessage } from './useAutomations'
 
-export const CATCH_UP_TEXT = {
+const CATCH_UP_TEXT = {
   title: 'Missed automations',
   description: 'These scheduled automations didn’t run while Object was closed.',
   create: (count: string, name: string) => `Create the ${count} missed “${name}”?`,
@@ -34,7 +34,7 @@ export const CATCH_UP_TEXT = {
 const T = CATCH_UP_TEXT
 
 /** The count a row shows: `50+` when the server kept only the newest 50. */
-export const catchUpCount = (item: AutomationCatchUpItem): string => (item.capped ? `${item.missed.length}+` : String(item.count))
+const catchUpCount = (item: AutomationCatchUpItem): string => (item.capped ? `${item.missed.length}+` : String(item.count))
 
 /** A row's question. */
 export function catchUpQuestion(item: AutomationCatchUpItem): string {

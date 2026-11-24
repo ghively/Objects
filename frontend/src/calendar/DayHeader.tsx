@@ -8,7 +8,7 @@ import { typeOf, useLinkIndex } from '@/links/linkIndex'
 import { cn } from '@/lib/utils'
 import { formatLong, isoWeekday, weekNumber, weekdayColor, weekdayName, type Day, type WeekStart } from './dates'
 
-export const DAY_TEXT = {
+const DAY_TEXT = {
   today: 'Today',
   week: 'Week',
   reviewed: 'Reviewed',

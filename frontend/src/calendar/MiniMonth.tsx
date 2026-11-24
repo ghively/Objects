@@ -12,7 +12,7 @@ const SUNDAY_FIRST = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 const MONDAY_FIRST = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 const YEAR_SPAN = 50
 
-export interface MiniMonthProps {
+interface MiniMonthProps {
   /** The calendar's active day. */
   anchor: Day
   /** The viewer's local day. */

@@ -21,7 +21,7 @@ import { SCHEDULE_TEXT as T, scheduleFieldsOf, type ScheduleFieldValues } from '
 const FIELD =
   'rounded-md border border-line bg-raised px-2 text-[14px] text-fg outline-none placeholder:text-fg-muted focus-visible:ring-1 focus-visible:ring-line'
 
-export interface ScheduleDialogProps {
+interface ScheduleDialogProps {
   open: boolean
   agent: Agent
   /** The schedule to edit; null makes a new one. */

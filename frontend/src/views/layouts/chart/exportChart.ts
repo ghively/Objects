@@ -18,7 +18,7 @@ export const CHART_EXPORT_FAILED = 'The chart could not be exported.'
 export const CHART_NOT_SHOWN = 'The chart isn’t on screen, so it can’t be exported.'
 
 /** Pixel ratio of the PNG (as the whiteboard's). */
-export const CHART_PIXEL_RATIO = 2
+const CHART_PIXEL_RATIO = 2
 
 /** The SVG file is a `data:` URL with this prefix and the percent-encoded document. */
 export const SVG_DATA_URL_PREFIX = 'data:image/svg+xml;charset=utf-8,'
@@ -195,7 +195,7 @@ function drawLegend(legend: NonNullable<ReturnType<typeof readLegend>>, width: n
 
 /** The chart's svg as a standalone file: a background, the chart with its styles as attributes,
  * the legend below. */
-export function chartSvgDataUrl(frame: HTMLElement, svg: SVGSVGElement): string {
+function chartSvgDataUrl(frame: HTMLElement, svg: SVGSVGElement): string {
   const width = sideOf(svg, 'width')
   const height = sideOf(svg, 'height')
   const chart = svg.cloneNode(true) as SVGSVGElement

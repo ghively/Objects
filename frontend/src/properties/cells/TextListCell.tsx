@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils'
 import { placeholderFor } from '../format'
 import { CELL_TEXT, type CellProps } from './types'
 
-export const MAX_LIST_ITEMS = 50
-export const MAX_LIST_ITEM_LENGTH = 500
+const MAX_LIST_ITEMS = 50
+const MAX_LIST_ITEM_LENGTH = 500
 
 const clean = (items: readonly string[]) => items.map((t) => t.replace(/\s+/g, ' ').trim()).filter((t) => t !== '')
 const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i])

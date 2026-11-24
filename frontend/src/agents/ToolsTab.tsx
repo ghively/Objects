@@ -15,7 +15,7 @@ import { inputOf, PROFILE_TEXT, putAgent, reloadAgent } from './ProfileTab'
 import { ToolSwitches } from './ToolSwitches'
 
 // Our strings.
-export const TOOLS_TEXT = {
+const TOOLS_TEXT = {
   intro: 'Every tool is on unless you switch it off. Switched-off tools are refused when this agent runs.',
   loading: 'Loading…',
 } as const

@@ -50,13 +50,13 @@ export function setFocusToggleForTests(fn: (() => void) | null | undefined): voi
 }
 
 /** The focus-mode toggle, or null while focus mode isn't built. */
-export function focusModeToggle(): (() => void) | null {
+function focusModeToggle(): (() => void) | null {
   if (focusToggleOverride !== undefined) return focusToggleOverride
   const store = Object.values(focusModules)[0]?.useFocusMode
   return store ? () => store.getState().toggle() : null
 }
 
-export interface CommandPaletteProps {
+interface CommandPaletteProps {
   onOpenTarget: (target: Target, opts?: OpenOptions) => void
   onToggleSidebar: () => void
   onToggleRightPanel: () => void

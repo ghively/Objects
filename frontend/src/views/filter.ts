@@ -27,7 +27,7 @@ import { parseRemind } from '@/tasks/remind'
 import { parseRepeat } from '@/tasks/repeat'
 import { dayRange, dayReader, daySpan, endOfDay, parseDay, resolveRelative, startOfDay, type DayRange, type WeekStart } from './dates'
 
-export interface FilterOption {
+interface FilterOption {
   key: string
   label: string
 }
@@ -210,7 +210,7 @@ const BUILTIN_KINDS: Record<string, PropertyType> = {
 }
 
 /** The untitled fallback the UI shows for an empty title. */
-export const UNTITLED = 'Untitled'
+const UNTITLED = 'Untitled'
 export const displayTitle = (row: Row): string => (row.summary.title?.trim() ? row.summary.title : UNTITLED)
 
 /**

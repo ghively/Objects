@@ -55,14 +55,14 @@ const T = WORK_TEXT
 export const WORK_SEARCH: string[] = [T.usePage, T.yourName, T.jiraSite, T.alertFolder, T.alertIntervals, T.addAlertType, WORK_AGENT_TEXT.group, WORK_AGENT_TEXT.acts, WORK_AGENT_TEXT.autoRun, WORK_AGENT_TEXT.readTools, WORK_AGENT_TEXT.deskSync]
 
 /** Longest alert folder path the server accepts (`settings.WORK_ALERT_FOLDER_MAX`). */
-export const MAX_ALERT_FOLDER = 500
+const MAX_ALERT_FOLDER = 500
 /** Most interval rows the server accepts (`settings.WORK_ALERT_INTERVALS_MAX`). */
-export const MAX_ALERT_INTERVALS = 50
+const MAX_ALERT_INTERVALS = 50
 
 /** Longest Activity name the server accepts (`settings._valid`). */
-export const MAX_ACTIVITY_NAME = 60
+const MAX_ACTIVITY_NAME = 60
 /** Longest Jira site the server accepts (`spaceconfig._checked`). */
-export const MAX_JIRA_SITE = 300
+const MAX_JIRA_SITE = 300
 
 const INPUT =
   'h-9 w-full max-w-[420px] rounded-md border border-line bg-raised px-2 text-[15px] text-fg outline-none focus:border-fg-muted'

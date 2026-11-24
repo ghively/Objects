@@ -29,8 +29,8 @@ export const AUTOSAVE_DELAY_MS = 1000
 export const AUTOSAVE_MAX_WAIT_MS = 3000
 /** First retry delay after a failed save; it doubles up to `AUTOSAVE_RETRY_MAX_MS`. */
 export const AUTOSAVE_RETRY_MS = 2000
-export const AUTOSAVE_RETRY_MAX_MS = 30000
-export const AUTOSAVE_ERROR_TEXT = 'Changes not saved. Retrying…'
+const AUTOSAVE_RETRY_MAX_MS = 30000
+const AUTOSAVE_ERROR_TEXT = 'Changes not saved. Retrying…'
 /**
  * M32: the largest body save sent with `keepalive` (the client's limit, `api.saveBody`). A longer
  * note goes as a normal request, which a closing page may cut off: its text is kept in
@@ -45,7 +45,7 @@ export { KEEPALIVE_MAX_BYTES }
  */
 export type SaveState = 'saved' | 'unsaved' | 'saving' | 'error'
 
-export type AutosaveOptions = {
+type AutosaveOptions = {
   path: string
   version: string
   readOnly: boolean

@@ -27,7 +27,7 @@ import { SAVED_SEARCH, SAVED_SEARCH_LOWER } from '@/lib/words'
 import { formatInZone } from '@/lib/zonedTime'
 import { invalidateLinkIndex, useLinkIndex } from '@/links/linkIndex'
 
-export const TRASH_TEXT = {
+const TRASH_TEXT = {
   heading: 'Trash',
   info: 'Notes and types are kept in the Trash for 30 days and are then removed completely. Types and collections cannot be restored completely. This is Object\'s own Trash, separate from your computer\'s.',
   empty: 'Trash is empty',

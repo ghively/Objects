@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { APPROVE_ARM_MS, stepAction, type WorkRunner } from '../state/workActions'
 import { WORK_TEXT } from '../workText'
 
-export interface StepActionsProps {
+interface StepActionsProps {
   item: { path: string; title: string; ticket: TicketInfo | null }
   step: WorkStep
   run?: WorkRunner

@@ -16,7 +16,7 @@ export interface MenuOption {
   icon?: string | IconValue | null
 }
 
-export interface MenuSelectProps {
+interface MenuSelectProps {
   /** The trigger's accessible name ("Operator", "Sort property"). */
   label: string
   value: string

@@ -11,7 +11,7 @@ export const TOOLBAR_TEXT = {
   exportPng: 'Export view as PNG',
 }
 
-export interface GraphToolbarProps {
+interface GraphToolbarProps {
   /** Enter in the search field. */
   onSearch(query: string): void
   /** "Fit graph to view"; the button shows only when given. */

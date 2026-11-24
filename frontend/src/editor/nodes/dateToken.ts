@@ -18,7 +18,7 @@ const TIME_RE = /^<time datetime="(\d{4}-\d{2}-\d{2})">([^<\r\n]*)<\/time>/
 
 export const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
 
-export function dateTokenMarkdown(date: string, text?: string | null): string {
+function dateTokenMarkdown(date: string, text?: string | null): string {
   return `<time datetime="${date}">${text ?? date}</time>`
 }
 

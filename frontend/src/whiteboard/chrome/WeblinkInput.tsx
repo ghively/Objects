@@ -8,7 +8,7 @@ import { useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } fr
 import { normalizeWeblinkUrl } from '../model'
 import { WB } from '../strings'
 
-export interface WeblinkInputProps {
+interface WeblinkInputProps {
   onSubmit(link: { url: string; title?: string }): void
   onClose(): void
 }

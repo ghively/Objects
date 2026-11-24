@@ -9,13 +9,13 @@ import { useTabs } from '@/nav/tabs'
 import { useTagObjects } from '@/properties/TagPicker'
 import { tagStyle } from '@/theme/palette'
 
-export interface TagCount {
+interface TagCount {
   tag: ObjectSummary
   count: number
 }
 
 /** Each tag with its count, most used first, then by title (our choice). */
-export function tagCounts(tags: ObjectSummary[], objects: ObjectSummary[]): TagCount[] {
+function tagCounts(tags: ObjectSummary[], objects: ObjectSummary[]): TagCount[] {
   const uses = new Map<string, number>()
   for (const o of objects) {
     if (o.template) continue

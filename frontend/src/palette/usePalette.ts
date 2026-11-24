@@ -10,7 +10,7 @@ import { create } from 'zustand'
 
 export type PaletteMode = 'search' | 'actions'
 
-export interface PaletteState {
+interface PaletteState {
   open: boolean
   mode: PaletteMode
   /** How many times the palette has been opened (a switch of mode while open is the same opening). */

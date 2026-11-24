@@ -25,7 +25,7 @@ html[${TYPING_ATTR}] [${TYPING_FADE_ATTR}], html[${TYPING_ATTR}] [${TYPING_FADE_
 @media (prefers-reduced-motion: reduce) { [${TYPING_FADE_ATTR}] > * { transition: none !important; } }`
 
 /** Keys that edit text without a modifier: what counts as typing (our reading of "while typing"). */
-export function isTypingKey(e: KeyboardEvent): boolean {
+function isTypingKey(e: KeyboardEvent): boolean {
   if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return false
   return e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter'
 }

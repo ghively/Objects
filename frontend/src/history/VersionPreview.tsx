@@ -18,20 +18,20 @@ import { typeOf, useLinkIndex } from '@/links/linkIndex'
 /** Frontmatter keys the app keeps, never counted or shown as properties (our choice). */
 const KEPT_KEYS = new Set(['id', 'type', 'template', 'title', 'createdAt', 'lastUpdated'])
 
-export interface VersionProperty {
+interface VersionProperty {
   key: string
   /** The value as display text ('' when empty). */
   value: string
 }
 
-export interface ParsedVersion {
+interface ParsedVersion {
   /** The frontmatter lines (without the fences); null when the text has none. */
   frontmatter: string[] | null
   body: string
 }
 
 /** Split a version's text (`\n` line ends, no BOM) into its frontmatter lines and body. */
-export function splitVersionText(text: string): ParsedVersion {
+function splitVersionText(text: string): ParsedVersion {
   const t = text.replace(/\r\n?/g, '\n')
   if (!t.startsWith('---\n')) return { frontmatter: null, body: text }
   const lines = t.split('\n')
@@ -107,7 +107,7 @@ export function propertyCountLabel(n: number): string {
   return `${n} ${n === 1 ? 'property' : 'properties'}`
 }
 
-export const PROPERTIES_SECTION = 'Properties'
+const PROPERTIES_SECTION = 'Properties'
 
 function typeIdOf(text: string): string | null {
   const { frontmatter } = splitVersionText(text)

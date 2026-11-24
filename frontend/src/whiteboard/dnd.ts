@@ -5,7 +5,7 @@
  */
 export const OBJECT_DRAG_MIME = 'application/x-object-path'
 
-export type DroppedObject = { path: string } | { link: string } | null
+type DroppedObject = { path: string } | { link: string } | null
 
 const ONE_WIKILINK = /^\s*(\[\[[^[\]\n]+\]\])\s*$/
 

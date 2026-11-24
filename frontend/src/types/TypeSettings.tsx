@@ -130,7 +130,7 @@ const FONTS: readonly { value: TypeFont; name: string }[] = [
   { value: 'monospace', name: 'Monospace' },
 ]
 
-export interface TypeSettingsProps {
+interface TypeSettingsProps {
   typeId: string
   /** "Edit Template" and "+ New Template": open the template object. */
   onOpenTemplate?(path: string): void
@@ -256,7 +256,7 @@ const LIST_VIEWS: readonly { value: Layout; name: string }[] = FULL_VIEW_LAYOUTS
 const MEDIA_GRID_TYPES = new Set(['image', 'weblink', 'tweet'])
 
 /** The layout the type page opens in when nothing is saved: the setting, else the built-in default. */
-export function defaultListView(type: TypeDef): Layout {
+function defaultListView(type: TypeDef): Layout {
   const set = type.defaultDataViewLayout
   if (set && FULL_VIEW_LAYOUTS.includes(set)) return set
   return type.basic && MEDIA_GRID_TYPES.has(type.name.toLowerCase()) ? 'grid' : 'list'
@@ -273,14 +273,14 @@ const CREATE_IN_CALENDAR: readonly { value: CreateInCalendar; name: string }[] =
 const isDateKind = (d: PropertyDef): boolean => d.type === 'datetime' || d.type === 'datetimeSimple'
 
 /** Whether the type gets the "Calendar" group: a date property, and not the basic Task or DailyNote type. */
-export function showsCalendarGroup(type: TypeDef): boolean {
+function showsCalendarGroup(type: TypeDef): boolean {
   if (type.basic && type.name.toLowerCase() === 'task') return false
   if (isBasicDailyNote(type)) return false
   return type.propertyDefinitions.some(isDateKind)
 }
 
 /** `type` with `createInCalendarOption` set; `enabled` is the key's absence. */
-export function withCreateInCalendar(type: TypeDef, value: CreateInCalendar): TypeDef {
+function withCreateInCalendar(type: TypeDef, value: CreateInCalendar): TypeDef {
   const next: TypeDef = { ...type }
   if (value === 'enabled') delete next.createInCalendarOption
   else next.createInCalendarOption = value

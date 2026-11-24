@@ -8,7 +8,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { stemOf } from '@/links/linkIndex'
 
-export interface RecoveryDialogProps {
+interface RecoveryDialogProps {
   open: boolean
   path: string
   /** The kept text. */

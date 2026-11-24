@@ -17,7 +17,7 @@ export const DAILY_NOTE_TEXT = {
   placeholder: 'Start your daily note',
 }
 
-export interface DailyNoteSlotProps {
+interface DailyNoteSlotProps {
   day: Day
   /** The day's note from the calendar range (null: none yet). */
   note: { path: string } | null

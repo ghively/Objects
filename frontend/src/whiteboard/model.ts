@@ -141,9 +141,9 @@ export const MARKERS: readonly WhiteboardMarker[] = [...PICKER_MARKERS, 'arrowCl
 export const CONNECTIONS: readonly WhiteboardEdgeConnection[] = ['straight', 'cornered', 'curved']
 export const LINES: readonly WhiteboardEdgeLine[] = ['solid', 'dashed', 'dotted']
 
-export const DASHED_DASHARRAY = '8 8'
+const DASHED_DASHARRAY = '8 8'
 /** Zero-length dashes with round line caps draw a row of dots. */
-export const DOTTED_DASHARRAY = '0 10'
+const DOTTED_DASHARRAY = '0 10'
 
 /** The media menu (M8): the upload tools, then the web link. */
 const UPLOAD_TOOLS = ['image', 'pdf', 'audio', 'file'] as const

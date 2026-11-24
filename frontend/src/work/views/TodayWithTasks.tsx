@@ -16,12 +16,12 @@ import { useSpaceInfo } from '@/settings/useSpaceInfo'
 import type { WorkDataState } from '../state/useWorkData'
 import { TodayView } from './TodayView'
 
-export const TODAY_TASKS_HEADING = 'Today’s tasks'
+const TODAY_TASKS_HEADING = 'Today’s tasks'
 /** Our string (decision T1). */
-export const OPEN_IN_CALENDAR = 'Open in Calendar'
+const OPEN_IN_CALENDAR = 'Open in Calendar'
 
 /** The Calendar's Day view on today (Ctrl/Cmd+click: in a new tab). */
-export function openCalendarToday(newTab = false): void {
+function openCalendarToday(newTab = false): void {
   const calendar = useCalendar.getState()
   calendar.setView('day')
   calendar.today()

@@ -24,7 +24,7 @@ import {
 import { deleteObjectsLabel } from '@/lib/deleteText'
 import { TypeChip } from '@/shell/Sidebar'
 
-export const SELECTION_TEXT = {
+const SELECTION_TEXT = {
   /** After the count. */
   selected: 'selected',
   changeType: 'Change the type of the selection',
@@ -37,9 +37,9 @@ export const SELECTION_TEXT = {
 }
 
 /** "Delete {count} object | Delete {count} objects": the shared wording. */
-export const deleteCountLabel = deleteObjectsLabel
+const deleteCountLabel = deleteObjectsLabel
 
-export interface SelectionBarProps {
+interface SelectionBarProps {
   /** The selected rows, in view order. */
   rows: Row[]
   types: TypeDef[]

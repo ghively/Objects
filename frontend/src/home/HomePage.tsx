@@ -60,7 +60,7 @@ function lastDayOf(row: Row): string | null {
 }
 
 /** Home's tasks: the open ones whose date ended before today (oldest first), then today's. */
-export function homeTasks(rows: readonly Row[], type: TypeDef | undefined, today: string): { row: Row; overdue: boolean }[] {
+function homeTasks(rows: readonly Row[], type: TypeDef | undefined, today: string): { row: Row; overdue: boolean }[] {
   const now = new Date()
   const out: { row: Row; overdue: boolean; day: string }[] = []
   for (const row of rows) {

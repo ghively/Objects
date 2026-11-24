@@ -16,7 +16,7 @@ import { invalidateLinkIndex, typeOf } from '@/links/linkIndex'
 import { formatDate } from '@/properties/format'
 import { findDatePhrase } from './findDate'
 
-export const QUICK_ADD_TEXT = {
+const QUICK_ADD_TEXT = {
   placeholder: 'Add a task',
   button: 'Add task',
   created: (taskName: string) => `Created task "${taskName}"`,
@@ -26,7 +26,7 @@ export const QUICK_ADD_TEXT = {
   preview: (taskName: string, date: string) => `Adds "${taskName}" on ${date}`,
 }
 
-export interface QuickAddTaskProps {
+interface QuickAddTaskProps {
   /** The basic Task type's id (from `types`, never hard-coded). */
   taskTypeId: string | undefined
   /** Values the new task gets so it shows in the current view (`matchingValues`). */

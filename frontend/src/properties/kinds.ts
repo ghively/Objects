@@ -3,7 +3,7 @@
 // icons are the default property icons.
 import type { PropertyType, TypeDef } from '@/api/types'
 
-export interface KindMeta {
+interface KindMeta {
   name: string
   description: string
   /** An Iconify id. */
@@ -103,7 +103,7 @@ export function kindIcon(type: string): string {
  *   multi-select `entity` property bound to it;
  * - `coverImage`: adds the `coverImage` system property.
  */
-export type AddPropertyAction = 'property' | 'objectSelect' | 'coverImage'
+type AddPropertyAction = 'property' | 'objectSelect' | 'coverImage'
 
 export interface AddPropertyItem {
   /** The menu key, which fixes the order. */

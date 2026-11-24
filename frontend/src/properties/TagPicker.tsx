@@ -8,7 +8,7 @@ import { tagStyle } from '@/theme/palette'
 const TAG_TYPE = 'tag'
 const LIMIT = 30
 
-export interface TagPickerProps {
+interface TagPickerProps {
   /** The object's tag names. */
   value: string[]
   onChange(next: string[]): void

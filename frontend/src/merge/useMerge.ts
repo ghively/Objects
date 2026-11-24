@@ -4,7 +4,7 @@
  */
 import { create } from 'zustand'
 
-export interface MergeState {
+interface MergeState {
   /** The object to merge into another; null when closed. */
   source: string | null
   open(path: string): void

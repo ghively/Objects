@@ -47,7 +47,7 @@ const EmptyPlaceholder = Extension.create({
   },
 })
 
-export type EditorProps = {
+type EditorProps = {
   path: string
   body: string
   version: string

@@ -47,7 +47,7 @@ import {
 } from './timeline/model'
 
 /** Row height in px (our choice). */
-export const TIMELINE_ROW_H = 32
+const TIMELINE_ROW_H = 32
 const HEADER_ROW_H = 24
 const HEADER_H = HEADER_ROW_H * 2
 /** The table's widths in rem (our choice). */
@@ -59,7 +59,7 @@ const OVERSCAN = 10
 const CLICK_SLOP = 3
 
 /** Our strings. */
-export const TIMELINE_TEXT = {
+const TIMELINE_TEXT = {
   today: 'Today',
   noDate: (n: number) => `No date (${n})`,
   outOfRange: (n: number) => `Out of range (${n})`,
@@ -884,14 +884,14 @@ function Tray({
 
 // -- settings ----------------------------------------------------------------------------------
 
-export interface TimelineSettingsProps {
+interface TimelineSettingsProps {
   types: TypeDef[]
   state: ViewState
   onState(next: ViewState): void
 }
 
 /** Our strings. */
-export const TIMELINE_SETTINGS_TEXT = {
+const TIMELINE_SETTINGS_TEXT = {
   start: 'Start date',
   end: 'End date',
   sameAsStart: 'From the start date',

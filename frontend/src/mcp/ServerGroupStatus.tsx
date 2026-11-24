@@ -7,13 +7,13 @@
 import type { McpGroupStatus } from '@/api/types'
 import { MCP_TEXT } from './mcpText'
 
-export interface ServerGroupStatusProps {
+interface ServerGroupStatusProps {
   status: McpGroupStatus
   loading?: boolean
 }
 
 /** The status line's text, or null for none. */
-export function serverStatusText(status: McpGroupStatus, loading = false): string | null {
+function serverStatusText(status: McpGroupStatus, loading = false): string | null {
   if (status.status === 'disabled') return MCP_TEXT.turnedOffInSettings
   if (status.status === 'needsSecrets') return MCP_TEXT.needsSecrets(status.missingVars)
   if (loading) return MCP_TEXT.listing

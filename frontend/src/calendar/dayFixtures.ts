@@ -15,7 +15,7 @@ const dateProp = (key: string) =>
   propertyDef({ id: key, key, type: 'datetimeSimple', name: key, options: { constraints: { resolutionPreference: 'day' } } })
 
 export const MEETING = typeDef({ id: 'meeting', name: 'Meeting', pluralName: 'Meetings', propertyDefinitions: [dateProp('when')] })
-export const JOURNAL = typeDef({
+const JOURNAL = typeDef({
   id: 'journal',
   name: 'Journal',
   pluralName: 'Journals',
@@ -45,7 +45,7 @@ export let listeners: ((e: ChangeEvent) => void)[] = []
 /** The days the mocked `api.calendar` answers with (others are empty). */
 export let days: Record<string, CalendarDay> = {}
 /** The rows the mocked `api.rows` answers with, by path. */
-export let rowsByPath: Record<string, Row> = {}
+let rowsByPath: Record<string, Row> = {}
 
 export function setDay(day: string, cd: Partial<CalendarDay>) {
   days = { ...days, [day]: calendarDay(cd) }

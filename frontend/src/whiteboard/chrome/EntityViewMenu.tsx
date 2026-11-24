@@ -25,7 +25,7 @@ export function entityViewOf(block: WhiteboardBlock | undefined): WhiteboardEnti
   return v && ENTITY_VIEWS.some((e) => e.view === v) ? v : 'smallCard'
 }
 
-export interface EntityViewMenuProps {
+interface EntityViewMenuProps {
   /** The selected entity nodes (unlocked). */
   nodes: WhiteboardNode[]
   blocks: Record<string, WhiteboardBlock>

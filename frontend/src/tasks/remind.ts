@@ -49,7 +49,7 @@ export function parseRemind(text: unknown, resolution?: Resolution): ReminderRul
 }
 
 /** The resolution a rule fits: a time of day means a day date. */
-export const remindResolution = (rule: ReminderRule): Resolution => (rule.timeOfDay !== undefined ? 'day' : 'time')
+const remindResolution = (rule: ReminderRule): Resolution => (rule.timeOfDay !== undefined ? 'day' : 'time')
 
 /** The canonical text of a rule; `resolution` defaults to the one the rule fits. Throws on a misfit. */
 export function formatRemind(rule: ReminderRule, resolution: Resolution = remindResolution(rule)): string {

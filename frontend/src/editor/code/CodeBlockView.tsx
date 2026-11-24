@@ -20,7 +20,7 @@ import { filterLanguages, hasPreview, languageOf } from './languages'
 import { MarkdownPreview } from './MarkdownPreview'
 import { MermaidPreview } from './MermaidPreview'
 
-export type PreviewMode = 'edit' | 'split' | 'display'
+type PreviewMode = 'edit' | 'split' | 'display'
 
 const MODES: { mode: PreviewMode; label: string }[] = [
   { mode: 'edit', label: 'Edit' },
@@ -33,13 +33,13 @@ function optionOf(options: Option[] | null | undefined, key: string): string | t
 }
 
 /** The preview mode a code block shows: its `preview` option, "Display" when absent or unknown. */
-export function previewModeOf(options: Option[] | null | undefined): PreviewMode {
+function previewModeOf(options: Option[] | null | undefined): PreviewMode {
   const v = optionOf(options, 'preview')
   return v === 'edit' || v === 'split' || v === 'display' ? v : 'display'
 }
 
 /** Save `text` as a file through a temporary object URL (no server round trip). */
-export function downloadText(text: string, filename: string): void {
+function downloadText(text: string, filename: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
   const a = document.createElement('a')
   a.href = url

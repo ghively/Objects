@@ -73,7 +73,7 @@ const TAGS_DEF = sysDef('tags', 'entity_tags', 'Tags')
 const DESCRIPTION_DEF = sysDef('description', 'entity_description', 'Description')
 const ALIASES_DEF = sysDef('aliases', 'entity_aliases', 'Aliases')
 
-export interface ObjectHeaderProps {
+interface ObjectHeaderProps {
   summary: ObjectSummary
   type?: TypeDef
   readOnly?: boolean

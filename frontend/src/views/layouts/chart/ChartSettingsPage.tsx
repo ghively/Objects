@@ -28,7 +28,7 @@ import {
   type ChartExportFormat,
 } from './exportChart'
 
-export const CHART_KINDS: { value: ChartKind; label: string; icon: string }[] = [
+const CHART_KINDS: { value: ChartKind; label: string; icon: string }[] = [
   { value: 'bar', label: 'Bar', icon: 'ph-chart-bar' },
   { value: 'horizontalBar', label: 'Horizontal bar', icon: 'ph-chart-bar-horizontal' },
   { value: 'line', label: 'Line', icon: 'ph-chart-line' },
@@ -71,7 +71,7 @@ function Switch({ label, checked, onChange }: { label: string; checked: boolean;
   )
 }
 
-export interface ChartSettingsPageProps {
+interface ChartSettingsPageProps {
   types: TypeDef[]
   state: ViewState
   onState(next: ViewState): void

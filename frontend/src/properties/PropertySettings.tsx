@@ -78,7 +78,7 @@ const TEXT = {
   headerColumnDescription: 'Show the first cell of each row as a header, like the header row.',
 }
 
-export interface PropertySettingsProps {
+interface PropertySettingsProps {
   typeId: string
   propertyId: string
   open: boolean

@@ -42,7 +42,7 @@ function yieldToBrowser(): Promise<void> {
   return new Promise((r) => setTimeout(r, 0))
 }
 
-export interface GraphCanvasProps {
+interface GraphCanvasProps {
   data: GraphData
   visible: VisibleGraph
   custom: GraphCustomization

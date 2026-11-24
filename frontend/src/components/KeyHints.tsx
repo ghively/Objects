@@ -2,12 +2,12 @@
  * The footer under the keyboard-driven menus (slash menu, `@` picker, New menu, search):
  * "↑↓ to navigate  Esc to abort  ↵ to select".
  */
-export interface KeyHint {
+interface KeyHint {
   keys: string
   label: string
 }
 
-export const KEY_HINTS: readonly KeyHint[] = [
+const KEY_HINTS: readonly KeyHint[] = [
   { keys: '↑↓', label: 'to navigate' },
   { keys: 'Esc', label: 'to abort' },
   { keys: '↵', label: 'to select' },

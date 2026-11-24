@@ -13,7 +13,7 @@ interface AutomationsState {
   loaded: boolean
 }
 
-export const useAutomationStore = create<AutomationsState>()(() => ({ rules: [], loaded: false }))
+const useAutomationStore = create<AutomationsState>()(() => ({ rules: [], loaded: false }))
 
 const RELOAD_DELAY_MS = 150
 let refs = 0

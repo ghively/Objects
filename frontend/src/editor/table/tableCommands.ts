@@ -25,7 +25,7 @@ import { TableMap } from '@tiptap/pm/tables'
 import type { Option } from '../annotations'
 import { cellNumber, evaluateGrid, isFormula, shownText, type FormulaResult } from './formulas'
 
-export type CellRef = { row: number; col: number }
+type CellRef = { row: number; col: number }
 
 /** The table node at `pos`, or null. */
 export function tableAt(doc: PMNode, pos: number): PMNode | null {
@@ -85,7 +85,7 @@ export function cellPos(doc: PMNode, tablePos: number, cell: CellRef): number | 
 }
 
 /** Table size: rows and columns. */
-export function tableSize(table: PMNode): { rows: number; cols: number } {
+function tableSize(table: PMNode): { rows: number; cols: number } {
   const map = TableMap.get(table)
   return { rows: map.height, cols: map.width }
 }
@@ -341,7 +341,7 @@ export function shownGrid(table: PMNode): { grid: string[][]; shown: string[][];
   return { grid, shown, results }
 }
 
-export type SortDirection = 'asc' | 'desc'
+type SortDirection = 'asc' | 'desc'
 
 type SortKey = { kind: 0; n: number } | { kind: 1; s: string } | { kind: 2 }
 

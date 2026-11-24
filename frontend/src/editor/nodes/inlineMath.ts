@@ -17,7 +17,7 @@ declare module '@tiptap/core' {
   }
 }
 
-export function inlineMathMarkdown(text: string): string {
+function inlineMathMarkdown(text: string): string {
   return `$${text}$`
 }
 

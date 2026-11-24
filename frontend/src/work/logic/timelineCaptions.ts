@@ -4,9 +4,9 @@
 import { DEFAULT_DAY_RANGE, type DayBlock, type DayRange } from './daySlots'
 
 /** Blocks shorter than this (minutes) show their label and time as a caption under the track. */
-export const SHORT_BLOCK_MINUTES = 50
+const SHORT_BLOCK_MINUTES = 50
 /** The track's narrowest width (its `min-w`); the captions' scale until the track is measured. */
-export const TRACK_MIN_PX = 640
+const TRACK_MIN_PX = 640
 /** The gap between the track and a caption, and between two captions in a row (px). */
 export const CAPTION_GAP_PX = 4
 

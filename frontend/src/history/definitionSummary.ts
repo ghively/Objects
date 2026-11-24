@@ -3,19 +3,19 @@
 // summary and its wording are our call; the dialog also shows the file itself, pretty-printed.
 import type { DefinitionKind } from '@/api/d2Api'
 
-export interface SummaryRow {
+interface SummaryRow {
   label: string
   value: string
 }
 
-export interface DefinitionSummary {
+interface DefinitionSummary {
   /** What the version holds. */
   rows: SummaryRow[]
   /** What is different now (restoring the version undoes these). */
   changes: string[]
 }
 
-export const SUMMARY_TEXT = {
+const SUMMARY_TEXT = {
   name: 'Name',
   pluralName: 'Plural name',
   description: 'Description',

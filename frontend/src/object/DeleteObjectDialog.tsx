@@ -47,7 +47,7 @@ export const useDeleteRequest = create<DeleteRequestState>()((set, get) => ({
   },
 }))
 
-export interface DeleteObjectDialogProps {
+interface DeleteObjectDialogProps {
   open: boolean
   onOpenChange(open: boolean): void
   /** Do the delete (the owner sends its current `baseVersion`); reject to show the error. */
