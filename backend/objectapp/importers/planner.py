@@ -351,11 +351,12 @@ def plan(
         if not mapping.typeKey and not keep_as_sources:
             raise MappingProblem("Choose the frontmatter key that names each object's type.")
     type_source = "notion" if is_notion else mapping.typeSource
+    type_key = mapping.typeKey  # final by now (set above when empty); captured for the closure below
     existing_types = target.types()
     by_id = {t.id: t for t in existing_types}
     if target.kind != "currentSpace":
-        for key, o in mapping.types.items():
-            if o.existingTypeId:  # "" (a new type) is fine anywhere
+        for key, t_override in mapping.types.items():
+            if t_override.existingTypeId:  # "" (a new type) is fine anywhere
                 raise MappingProblem("An existing type can only be chosen when importing into this space.")
 
     # M30: the Source type (the space's, else M28's definition, made by the writer).
@@ -384,7 +385,7 @@ def plan(
         if type_source == "folder":
             return f"folder:{o.group}" if o.group else PAGE_KEY
         if type_source == "key":
-            v = _scalar_type_value(o.fm.get(mapping.typeKey)) if mapping.typeKey else None
+            v = _scalar_type_value(o.fm.get(type_key)) if type_key else None
             if v and read.space_plurals is not None and v.casefold() == "page":
                 return PAGE_KEY  # M31: a space's own Page objects are Pages
             return f"key:{v}" if v else PAGE_KEY
@@ -441,12 +442,12 @@ def plan(
             plan_types.append(PlanType(key, name, plural, origin, label, [], src_id, False))
             type_writes[key] = TypeWrite(key, src_id, name, plural, folder, True)
             continue
-        o = mapping.types.get(key) or TypeOverride()
-        name = " ".join((o.name if o.name is not None else name).split()) or name
-        plural = " ".join((o.pluralName if o.pluralName is not None else plural).split()) or plural
+        tov = mapping.types.get(key) or TypeOverride()
+        name = " ".join((tov.name if tov.name is not None else name).split()) or name
+        plural = " ".join((tov.pluralName if tov.pluralName is not None else plural).split()) or plural
         # "" (Lane U's dialog): "make a new type" even when a type has this name.
-        force_new = o.existingTypeId == ""
-        existing_id = o.existingTypeId or None
+        force_new = tov.existingTypeId == ""
+        existing_id = tov.existingTypeId or None
         if existing_id is not None:
             ex = by_id.get(existing_id)
             if ex is None:
@@ -483,7 +484,7 @@ def plan(
             tw = TypeWrite(key, None, name, plural, safe_filename(plural), False)
         if existing_id is None and (force_new or not (key == PAGE_KEY and page_type is not None)):
             taken_type_names.add(name.casefold())
-        skip = bool(o.skip)
+        skip = bool(tov.skip)
         plan_types.append(PlanType(key, name, plural, origin, label, [], existing_id, skip))
         type_writes[key] = tw
         effective_types[key] = TypeOverride(
@@ -592,7 +593,8 @@ def plan(
             if not any(p.key == pkey for p in pt.properties):
                 raise MappingProblem(f'The mapping names an unknown property "{pkey}" of "{pt.key}".')
         effective_props[pt.key] = {
-            p.key: PropertyOverride(kind=p.kind, isArray=p.isArray, name=p.name, skip=p.skip) for p in pt.properties
+            p.key: PropertyOverride(kind=p.kind, isArray=p.isArray, name=p.name, skip=p.skip)  # type: ignore[arg-type]  # PlanProperty.kind is an ImportKind stored as str
+            for p in pt.properties
         }
 
     # 4. Convert every value (pass A: texts and counts), then build the definitions.
@@ -616,10 +618,10 @@ def plan(
                                 st.texts.append(t)
                 continue
             st = stats.setdefault((pt.key, pp.key), PropStats())
-            values = [(o, o.fields.get(pp.sourceName)) for o in objs if pp.sourceName in o.fields]
-            radix = kinds.column_decimal_comma([v for _, v in values if isinstance(v, str)])
+            pairs = [(o, o.fields.get(pp.sourceName)) for o in objs if pp.sourceName in o.fields]
+            radix = kinds.column_decimal_comma([v for _, v in pairs if isinstance(v, str)])
             kind, arr = (pp.kind, pp.isArray) if pp.systemKey is None else ("datetime", False)
-            for o, v in values:
+            for o, v in pairs:
                 if kinds.is_empty(v):
                     continue
                 st.valueCount += 1
@@ -650,15 +652,15 @@ def plan(
             if pp.systemKey or pp.skip:
                 continue
             st = stats.get((pt.key, pp.key), PropStats())
-            ex = pdefs.get((pt.key, pp.key))
-            if ex is not None:
-                if ex.type == "label":
-                    have = {str(o.get("text", "")).strip().casefold() for o in ex.options.get("set") or [] if isinstance(o, dict)}
+            exdef = pdefs.get((pt.key, pp.key))
+            if exdef is not None:
+                if exdef.type == "label":
+                    have = {str(o.get("text", "")).strip().casefold() for o in exdef.options.get("set") or [] if isinstance(o, dict)}
                     add = [t for t in st.texts if t.strip().casefold() not in have]
                     if add:
                         tw.add_options[pp.key] = add
-                        merged = copy.deepcopy(ex)
-                        merged.options["set"] = list(ex.options.get("set") or []) + label_options(add)
+                        merged = copy.deepcopy(exdef)
+                        merged.options["set"] = list(exdef.options.get("set") or []) + label_options(add)
                         _fix_option_ids(merged)
                         pdefs[(pt.key, pp.key)] = merged
                 continue
@@ -852,8 +854,8 @@ def plan(
         for pp, api in converted.get(po.sourcePath, []):
             if pp.systemKey:
                 continue
-            pdef = pdefs.get((po.typeKey, pp.key))
-            if pdef is None:
+            edef = pdefs.get((po.typeKey, pp.key))
+            if edef is None:
                 continue
             if pp.kind == "entity":
                 refs: list[dict[str, Any]] = []
@@ -884,7 +886,7 @@ def plan(
                         not_converted.append((w.typeName, pp.name, po.sourcePath, extra["target"]))
                     api = api[:1]
             try:
-                updates, _removals = encode_updates(pdef, api, {}, link_for=None)
+                updates, _removals = encode_updates(edef, api, {}, link_for=None)
             except InvalidValue as exc:
                 not_converted.append((w.typeName, pp.name, po.sourcePath, f"{_short(api)} ({exc})"))
                 continue

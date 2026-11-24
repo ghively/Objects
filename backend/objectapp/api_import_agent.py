@@ -90,7 +90,7 @@ NO_BATCH = "No such import batch."
 def router(ctx: ApiContext, jobs: Jobs, announce_resync) -> APIRouter:
     r = APIRouter()
     fil = filing.Filing(ctx.space, announce_resync)
-    r.filing = fil  # type: ignore[attr-defined]  (tests reach it)
+    r.filing = fil  # type: ignore[attr-defined]  # tests reach it
 
     @r.post("/import/batches")
     def post_draft(req: DraftRequest):

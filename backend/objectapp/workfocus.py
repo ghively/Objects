@@ -227,7 +227,7 @@ def focus_day(space: Space, day: str) -> dict:
     """The ``FocusDay`` of ``day``; reads only (a missing note is not created)."""
     day = _check_day(day)
     path = _note_path(space, day)
-    empty = {"day": day, "notePath": None, "version": None, "hasSection": False, "lines": []}
+    empty: dict[str, Any] = {"day": day, "notePath": None, "version": None, "hasSection": False, "lines": []}
     if path is None:
         return empty
     try:

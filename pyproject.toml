@@ -47,7 +47,152 @@ module-root = "backend"
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 
+# Type checking (run: `uv run --no-sync python -m mypy backend/objectapp`).
+# Permissive but real: full default error set plus checks of untyped function
+# bodies; strictness is ratcheted per module in the overrides below as modules
+# earn it, rather than by weakening the global config.
+[tool.mypy]
+python_version = "3.13"
+# The package is installed editable by `uv sync`, so `objectapp.*` imports and
+# the files under backend/objectapp are the same sources.
+explicit_package_bases = true
+mypy_path = "backend"
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_configs = true
+no_implicit_optional = true
+
+# Third-party dependencies that ship no PEP 561 stubs.
+[[tool.mypy.overrides]]
+module = [
+    "webview.*",
+    "send2trash.*",
+    "watchdog.*",
+    "markdownify.*",
+    "bs4.*",
+    "openpyxl.*",
+    "docx.*",
+    "pptx.*",
+    "PIL.*",
+    "psutil.*",
+    "pypdf.*",
+]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# Per-module narrowing debt (the ratchet list). The modules below carry older
+# Optional/Any flow that mypy's default checks surface: guards mypy cannot see,
+# values rebuilt under a first-binding type, and unchecked Nones. Everything
+# else in the package is checked with the full default error set above, and
+# these modules keep every check EXCEPT the codes listed with them. Remove a
+# code (then a module) here as the module is cleaned up; the aim is an empty
+# list. Generated from the mypy run at the time the config was introduced.
+[[tool.mypy.overrides]]
+module = ["objectapp.api_definition_history", "objectapp.api_import", "objectapp.api_learning", "objectapp.api_vcs", "objectapp.automation_filter", "objectapp.automations", "objectapp.importers.gitprov", "objectapp.queries", "objectapp.readers.docx", "objectapp.reminders", "objectapp.server", "objectapp.settings", "objectapp.spaces", "objectapp.typemodel", "objectapp.v1guard", "objectapp.workservice"]
+disable_error_code = ["arg-type"]
+
+[[tool.mypy.overrides]]
+module = ["objectapp.api_graph", "objectapp.api_history", "objectapp.api_tasks", "objectapp.api_v1_synced", "objectapp.api_work_agent", "objectapp.automations_model", "objectapp.formula", "objectapp.importers.provenance", "objectapp.trash"]
+disable_error_code = ["assignment"]
+
+[[tool.mypy.overrides]]
+module = ["objectapp.agents", "objectapp.agentschedules", "objectapp.desksync", "objectapp.importers.proposal", "objectapp.taskhook"]
+disable_error_code = ["arg-type", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = ["objectapp.calendarquery", "objectapp.propvalues", "objectapp.watcher"]
+disable_error_code = ["arg-type", "assignment"]
+
+[[tool.mypy.overrides]]
+module = ["objectapp.api_v1_tools", "objectapp.importers.source", "objectapp.remotechat"]
+disable_error_code = ["arg-type", "attr-defined"]
+
+[[tool.mypy.overrides]]
+module = ["objectapp.schedulerun", "objectapp.vcsservice", "objectapp.workloop"]
+disable_error_code = ["index", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = ["objectapp.importers.filing", "objectapp.queryeval"]
+disable_error_code = ["arg-type", "assignment", "operator"]
+
+[[tool.mypy.overrides]]
+module = ["objectapp.alertwatch", "objectapp.counterparts"]
+disable_error_code = ["index"]
+
+[[tool.mypy.overrides]]
+module = ["objectapp.whiteboardfile", "objectapp.whiteboardink"]
+disable_error_code = ["operator"]
+
+[[tool.mypy.overrides]]
+module = ["objectapp.references", "objectapp.whiteboardtrash"]
+disable_error_code = ["operator", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = ["objectapp.aichat", "objectapp.relink"]
+disable_error_code = ["union-attr"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.headless"
+disable_error_code = ["arg-type", "assignment", "attr-defined"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.importers.entitywrite"
+disable_error_code = ["arg-type", "assignment", "call-overload", "dict-item", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.mcpgateway"
+disable_error_code = ["arg-type", "assignment", "index"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.importers.entities"
+disable_error_code = ["arg-type", "assignment", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.api_ai"
+disable_error_code = ["arg-type", "attr-defined", "dict-item"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.ai"
+disable_error_code = ["arg-type", "attr-defined", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.fullexport"
+disable_error_code = ["arg-type", "dict-item"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.collections"
+disable_error_code = ["arg-type", "dict-item", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.api_v1"
+disable_error_code = ["arg-type", "index"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.frontmatter"
+disable_error_code = ["arg-type", "index", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.space"
+disable_error_code = ["arg-type", "misc", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.importers.writer"
+disable_error_code = ["assignment", "misc"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.searchindex"
+disable_error_code = ["assignment", "union-attr"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.merge"
+disable_error_code = ["attr-defined"]
+
+[[tool.mypy.overrides]]
+module = "objectapp.importers.batches"
+disable_error_code = ["misc"]
+
 [dependency-groups]
 dev = [
+    "mypy>=2.4.1",
     "pytest>=9.1.1",
 ]

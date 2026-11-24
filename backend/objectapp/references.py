@@ -518,7 +518,7 @@ def related_tags(space: Space, path: str) -> list[dict[str, Any]]:
     for s in summaries:
         if s.path == path or s.template is not None or not s.tags:
             continue
-        folded = {}
+        folded: dict[str, str] = {}
         for t in s.tags:
             if isinstance(t, str) and t.strip():
                 folded.setdefault(_fold(t), t.strip())

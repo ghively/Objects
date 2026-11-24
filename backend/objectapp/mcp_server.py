@@ -149,9 +149,9 @@ class ObjectClient:
         return self._answer(res)
 
 
-READ = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
-WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
-REPLACE = ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False)
+READ = ToolAnnotations(read_only_hint=True, open_world_hint=False)
+WRITE = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
+REPLACE = ToolAnnotations(read_only_hint=False, destructive_hint=True, open_world_hint=False)
 
 
 def build_server(client: ObjectClient, write: bool = True, sync: bool | None = None) -> MCPServer:

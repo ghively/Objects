@@ -398,9 +398,12 @@ def _decode_date(pdef: PropertyDefinition, raw: Any) -> dict[str, Any] | None:
     parts = [p for p in text.split("->")]
     if len(parts) > 2:
         return None
-    decoded = [_decode_part(p, _prefers_day(pdef)) for p in parts]
-    if any(d is None for d in decoded):
-        return None
+    decoded: list[tuple[str, str]] = []
+    for p in parts:
+        d = _decode_part(p, _prefers_day(pdef))
+        if d is None:
+            return None
+        decoded.append(d)
     resolution = "day" if all(d[0] == "day" for d in decoded) else "time"
     values = [
         d[1] if resolution == "day" or d[0] == "time" else f"{d[1]}T00:00:00.000Z"

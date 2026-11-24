@@ -1078,6 +1078,14 @@ for _name in (
 
 
 class Space:
+    # Cached state, initialised in `__init__` (declared here because methods above
+    # `__init__` in the class body assign them too).
+    _type_ids: dict[str, str] | None
+    _name_cache: tuple[tuple | None, str] | None
+    _config_cache: tuple[tuple | None, dict[str, Any]] | None
+    _work_values: dict[str, tuple[str, frozenset[str]]]
+    _work_data: bool | None
+
     @property
     def types(self) -> list[TypeDefinition]:
         """The space's types; assigning or changing it in place drops the `_type_id` lookup."""
@@ -1114,15 +1122,15 @@ class Space:
     def __init__(self, root: Path) -> None:
         self.root = Path(root).resolve()
         self._space_json = os.fspath(self.root / SPACE_REL)
-        self._name_cache: tuple[tuple | None, str] | None = None
+        self._name_cache = None
         """(`space.json`'s stat key, the name read with it) for `name`."""
-        self._config_cache: tuple[tuple | None, dict[str, Any]] | None = None
+        self._config_cache = None
         """(`space.json`'s stat key, the data read with it) for `work_on` (M32)."""
-        self._work_values: dict[str, tuple[str, frozenset[str]]] = {}
+        self._work_values = {}
         """M32: path -> (the note's type name, the ticket and work field keys it holds a value
         for), for the notes that hold one; kept by every rescan (`_note_work_values`). Behind
         the Work switch's default (`_has_work_data`) and the fields listed with Work off."""
-        self._work_data: bool | None = None
+        self._work_data = None
         """M32: `_has_work_data`'s answer, worked out again only after the index above or the
         types changed (so `work_on` stays a lookup)."""
         self.file_times: dict[str, str] = {}
@@ -2489,16 +2497,16 @@ class Space:
             grouped.setdefault(qid, {}).setdefault(key, []).append(ref)
         for qid, lists in grouped.items():
             try:
-                data, rev = store.read(qid)
+                defn, rev = store.read(qid)
             except (DefinitionUnreadable, ValueError):
                 continue
-            if data is None or not isinstance(data.get("definition"), dict):
+            if defn is None or not isinstance(defn.get("definition"), dict):
                 continue  # deleted since: nothing to put the id back into
             touched = False
             for key, refs in lists.items():
-                items = self._query_type_list(data, key)
+                items = self._query_type_list(defn, key)
                 if items is None:
-                    items = data["definition"][key] = []
+                    items = defn["definition"][key] = []
                 if any(self._query_entry_id(e) == type_id for e in items):
                     continue  # already there again (added back by hand)
                 # In the order they were dropped, so each index is its original position.
@@ -2515,7 +2523,7 @@ class Space:
             if not touched:
                 continue
             try:
-                store.write(qid, data, rev)
+                store.write(qid, defn, rev)
             except (RevisionConflict, ReadOnly, OSError):
                 _log.warning("Could not put the restored type %s back into query %s", type_id, qid)
                 continue
@@ -2618,16 +2626,6 @@ class Space:
             color=_str_or_none(fm.get("color")),
             collections=_str_list(fm.get("collections")),
         )
-
-    def list(self, type_id: str | None = None) -> list[ObjectSummary]:
-        """The space's objects (templates excluded), optionally of one type."""
-        with self._lock:
-            items = sorted(
-                (s for s in self._summaries.values() if s.template is None), key=lambda s: s.path
-            )
-        if type_id is None:
-            return items
-        return [s for s in items if s.type == type_id]
 
     def get(self, path: str) -> ObjectSummary:
         rel = self._rel(path)
@@ -6893,3 +6891,13 @@ class Space:
         Answered by a cached `Resolver`, rebuilt when the names change.
         """
         return self._current_resolver().resolve(link, from_path)
+
+    def list(self, type_id: str | None = None) -> list[ObjectSummary]:
+        """The space's objects (templates excluded), optionally of one type."""
+        with self._lock:
+            items = sorted(
+                (s for s in self._summaries.values() if s.template is None), key=lambda s: s.path
+            )
+        if type_id is None:
+            return items
+        return [s for s in items if s.type == type_id]

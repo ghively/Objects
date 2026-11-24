@@ -448,11 +448,11 @@ def rename_key(src: str, old: str, new: str) -> str:
     row, col = data.lc.key(old)
     line = lines[row]
     lines[row] = line[:col] + _render_key(new) + line[_key_token_end(line, col) :]
-    out = "".join(lines)
+    text = "".join(lines)
     expected = {(new if k == old else k): v for k, v in parse_fm(src).items()}
     try:
-        if parse_fm(out) == expected:
-            return out
+        if parse_fm(text) == expected:
+            return text
     except FrontmatterError:
         pass
     # The key's line couldn't be spliced (an unusual key form): re-render the key

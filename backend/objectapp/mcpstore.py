@@ -283,11 +283,6 @@ class McpStore:
             return empty, True
         servers = [s for s in data.get("servers") or [] if isinstance(s, dict) and isinstance(s.get("id"), str)]
         return {**data, "servers": servers}, False
-
-    def list(self) -> list[McpServerRecord]:
-        """File order; never writes."""
-        return [_record(s) for s in self._read()[0]["servers"]]
-
     def unreadable(self) -> bool:
         """True when the file is there but can't be read: it lists no servers (`UNREADABLE`),
         and the next write copies it aside first. Never writes."""
@@ -385,8 +380,12 @@ class McpStore:
             self.secrets.delete_prefix(f"mcp:{server_id}:")
 
 
-# -- validation -------------------------------------------------------------------
+    def list(self) -> list[McpServerRecord]:
+        """File order; never writes."""
+        return [_record(s) for s in self._read()[0]["servers"]]
 
+
+# -- validation -------------------------------------------------------------------
 
 def _plain(value: str | None, *, too_long: str = VALUE_TOO_LONG, bad: str = BAD_VALUE) -> str:
     """A plain (non-secret) value: no ``${`` (the CLI would expand it), no NUL, capped."""

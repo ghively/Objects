@@ -527,8 +527,8 @@ def _install_console_handler(
             import ctypes
             from ctypes import wintypes
 
-            kernel32 = kernel32 or ctypes.WinDLL("kernel32", use_last_error=True)
-            functype = functype or ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+            kernel32 = kernel32 or ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]  # Windows-only API
+            functype = functype or ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)  # type: ignore[attr-defined]  # Windows-only API
         callback = functype(lambda event: bool(handler(int(event))))
         if not kernel32.SetConsoleCtrlHandler(callback, True):
             return None
@@ -684,11 +684,13 @@ def main(argv: list[str] | None = None) -> None:
             webview.create_window("Object", host.ui_key.open_url(url), width=1440, height=900)
             # M23: Keep on top opens a small always-on-top window at /?mini=work. pywebview's
             # private mode gives each window its own cookies, so it gets its own code (S6).
-            windowhost.set_opener(
-                lambda u: webview.create_window(
-                    "Object focus", host.ui_key.open_url(u), width=360, height=470, on_top=True
+            def _open_focus(url: str) -> None:
+                # The opener's window is thrown away; pywebview's Window return is unused.
+                webview.create_window(
+                    "Object focus", host.ui_key.open_url(url), width=360, height=470, on_top=True
                 )
-            )
+
+            windowhost.set_opener(_open_focus)
             webview.start(**_webview_start_options(sys.platform), **_window_icon_options(sys.platform))
     except KeyboardInterrupt:
         pass
