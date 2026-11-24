@@ -3711,35 +3711,9 @@ class Space:
         The same rule as `_referrers`, over each board's entity blocks and text-block links
         (read only; an unreadable or missing board adds nothing).
         """
-        from .whiteboardfile import board_rel, load_board
-        from .whiteboardstore import whiteboard_type
-        from .whiteboardtrash import board_links
+        from .whiteboardspace import board_referrers
 
-        t = whiteboard_type(self)
-        if t is None:
-            return {}
-        names = {_fold(old_title), _fold(PurePosixPath(rel).stem), _fold(rel[:-3])}
-        candidates = self._links.mentioning(names)  # a board's links count as body links
-        with self._lock:
-            boards = sorted(p for p, s in self._summaries.items() if s.type == t.id and p in candidates)
-        out: dict[str, set[str]] = {}
-        for md in boards:
-            with self._lock:
-                try:
-                    data = (self.root / board_rel(md)).read_bytes()
-                except OSError:
-                    continue
-            board, reason = load_board(data)
-            if reason:
-                continue
-            found = {
-                target
-                for target in board_links(board)
-                if _fold(target) in names and self.resolve(target, md) == rel
-            }
-            if found:
-                out[md] = found
-        return out
+        return board_referrers(self, rel, old_title)
 
     def rename_object(self, path: str, new_title: str, base_version: str) -> RenameResult:
         """Set an object's title, rename its file to match, and relink references to it.
@@ -3858,18 +3832,9 @@ class Space:
         If the sidecars can't follow (both or neither move), the .md goes back to ``rel``
         and the board keeps its old file name; the title change stands.
         """
-        from .whiteboardtrash import move_sidecars
+        from .whiteboardspace import move_board_files
 
-        try:
-            move_sidecars(self, rel, new_rel)
-        except OSError:
-            try:
-                self._move_file(new_rel, rel, version)
-            except OSError:
-                _log.exception("Could not move %s back after its sidecars failed", new_rel)
-                return new_rel
-            return rel
-        return new_rel
+        return move_board_files(self, rel, new_rel, version)
 
     def _rename_tag_lists(
         self, old: str, new: str, tag_rel: str, relinked: list[str], skipped: list[Skip]
@@ -5234,28 +5199,9 @@ class Space:
 
     def _restore_whiteboard(self, trash_id: str, original: str, data: bytes) -> str:
         """Put a trashed whiteboard's ``.md`` and its sidecars back under one free stem."""
-        from .whiteboardtrash import free_whiteboard_stem, restore_sidecars
+        from .whiteboardspace import restore_whiteboard
 
-        rel = self._rel(original)
-        parent = PurePosixPath(rel).parent.as_posix()
-        folder = "" if parent == "." else parent
-        stem = PurePosixPath(rel).stem
-        for _attempt in range(100):
-            target = free_whiteboard_stem(self.root, folder, stem)
-            if self._place(target, data):
-                break
-        else:
-            raise OSError(f"Could not find a free file name for {stem!r}")
-        try:
-            restore_sidecars(self, trash_id, target)
-        except BaseException:
-            # Leave the entry whole in the trash: take the .md back out.
-            self.own_deletes[target] = version_of(data)
-            (self.root / target).unlink(missing_ok=True)
-            self.own_writes.pop(target, None)
-            self.rescan_file(target)
-            raise
-        return target
+        return restore_whiteboard(self, trash_id, original, data)
 
     def restore(self, trash_id: str) -> dict[str, list[str]]:
         """Restore a trash entry; return ``{paths, typeIds}`` of what came back.
@@ -5414,95 +5360,21 @@ class Space:
         work fields only while Work is on for the space (`work_on`); ``itops`` turns Work on
         (``workEnabled: true`` beside the marker) unless the user already set the switch.
         """
-        from . import spaceconfig
-        from .basicsetup import basic_types, retarget_relations
-        from .typemodel import ON_DEMAND_TYPES
+        from . import spacesetup
 
-        if setup not in ("basic", "blank", "itops"):
-            raise ValueError(f"Unknown space setup: {setup!r}")
-        created: list[str] = []
-        with self._lock:
-            fresh = spaceconfig.needs_setup(self.root)
-            if setup == "basic":
-                taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
-                named = self._ids_by_name()
-                # M32: Project gets the ticket and work fields only while Work is on here.
-                starter = basic_types(work=self.work_on())
-                retarget = {t.id: named[t.name.lower()] for t in starter
-                            if t.id not in taken and t.name.lower() in named}  # fmt: skip
-                types_dir = self.root / ".object" / "types"
-                for t in starter:
-                    if t.id in taken or t.id in retarget:
-                        continue
-                    if (types_dir / f"{t.id}.json").exists():
-                        # A type file put there since the space was opened (a sync, by hand)
-                        # and not loaded: never replaced, as `write_itops_types` leaves it.
-                        continue
-                    retarget_relations(t, retarget)
-                    self._write_type_json(t, "")
-                    self.types.append(t)
-                    self._types_changed(t.id)
-                self._sort_types()
-            elif setup == "itops":
-                created = self._apply_itops_setup()
-            if fresh:
-                for type_id in ON_DEMAND_TYPES:
-                    builtin = self.type_by_id(type_id)
-                    if builtin is not None and builtin.basic:
-                        self._persist_type(builtin)
-            config = spaceconfig.read(self.root)[0]
-            marker = config.get("setup")
-            # A set asked for again finds its marker (and, for the IT operations set, a Work
-            # switch) already there: space.json is not written again.
-            settled = marker == setup and (
-                setup != "itops" or isinstance(config.get("workEnabled"), bool)
-            )
-            if not (setup == "basic" and marker == "itops") and not settled:
-                # M32: the IT operations starter turns Work on for its space (unless the user
-                # already set the switch), in the same write as the marker.
-                spaceconfig.set_internal(
-                    self.root, "setup", setup, work_default=True if setup == "itops" else None
-                )
-            self.work_on()  # the Task type follows a switch this turned on
-        return created
+        return spacesetup.apply_setup(self, setup)
 
     def _ids_by_name(self) -> dict[str, str]:
         """Lower-cased type name -> the id of the (first) type of that name."""
-        out: dict[str, str] = {}
-        for t in self.types:
-            out.setdefault(t.name.lower(), t.id)
-        return out
+        from .spacesetup import ids_by_name
+
+        return ids_by_name(self)
 
     def _apply_itops_setup(self) -> list[str]:
         """Write and load the IT ops types, templates and seed Tags; return the objects' paths."""
-        from .basicsetup import write_itops_tags, write_itops_types
+        from .spacesetup import itops_setup
 
-        taken = {t.id for t in self.types} | {u.id for u in self.unreadable_types}
-        written = [
-            *write_itops_types(self.root, skip=taken, named=self._ids_by_name()),
-            *write_itops_tags(self.root),
-        ]
-        types_dir = self.root / ".object" / "types"
-        created: list[str] = []
-        loaded: list[str] = []
-        for full in written:
-            if full.parent == types_dir and full.suffix == ".json":
-                t = self._stored_type(full.stem)
-                if t is not None:
-                    # M32: listed as a load lists it (a switch the user set off stays off).
-                    self._top_up(t)
-                    self.types = [x for x in self.types if x.id != t.id]
-                    self.types.append(t)
-                    loaded.append(t.id)
-            else:
-                created.append(full.relative_to(self.root).as_posix())
-        self._sort_types()
-        for type_id in loaded:
-            self._types_changed(type_id)
-        # The templates and Tags after the types, so each file is read as its type's.
-        for rel in created:
-            self.rescan_file(rel)
-        return created
+        return itops_setup(self)
 
     def add_type(self, t: TypeDefinition) -> TypeDefinition:
         """M30: write the ready-made type ``t`` (its id, folder and properties as given) and
@@ -5644,15 +5516,9 @@ class Space:
         default template (named as the type, with the type's sections) as the starter writes
         it; the older gallery entries get none. A template that can't be made never fails the
         type's creation."""
-        from .basicsetup import ITOPS_TEMPLATE_SECTIONS, ITOPS_TYPE_IDS, itops_template
+        from .spacesetup import add_itops_template
 
-        if key not in ITOPS_TYPE_IDS or key not in ITOPS_TEMPLATE_SECTIONS:
-            return
-        _name, body = itops_template(key)
-        try:
-            self.create_template(t.id, t.name, body=body, default=True)
-        except (InvalidValue, TypeReadOnly, KeyError, OSError):
-            _log.warning("Type %s is created without its default template", t.id, exc_info=True)
+        add_itops_template(self, t, key)
 
     def create_media_type(self, name: str) -> TypeDefinition:
         """Create and save the basic media type ``name`` (Image, PDF, File, ...): its media fields
