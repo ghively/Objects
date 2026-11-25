@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils'
 import { MODEL_TEXT as T, isModelName, modelLabel, useAiModels } from './models'
 
-export interface ModelPickerProps {
+interface ModelPickerProps {
   value: string | null
   onChange(next: string | null): void
   /** The "Default" row's text, e.g. "Default" or "Default (Sonnet 5.5)". The trigger says "Default" with no pick. */

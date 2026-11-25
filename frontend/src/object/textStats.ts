@@ -112,7 +112,7 @@ export function textStats(text: string, locale?: string): TextStats {
   }
 }
 
-export type StatKey = keyof TextStats | 'createdAt' | 'lastUpdated'
+type StatKey = keyof TextStats | 'createdAt' | 'lastUpdated'
 
 /** A stats row: a count (`value` then the pluralized noun) or a date (`label` then `value`). */
 export interface StatRow {

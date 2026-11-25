@@ -7,7 +7,7 @@ import type { ViewState } from '@/api/types'
 
 const SAVE_DELAY_MS = 400
 
-export type ViewPatch = Partial<ViewState> | ((s: ViewState) => ViewState)
+type ViewPatch = Partial<ViewState> | ((s: ViewState) => ViewState)
 
 const apply = (s: ViewState, p: ViewPatch): ViewState => (typeof p === 'function' ? p(s) : { ...s, ...p })
 

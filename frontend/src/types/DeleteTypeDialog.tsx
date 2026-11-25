@@ -26,7 +26,7 @@ export const DELETE_TYPE_TEXT = {
   action: 'Delete type',
 }
 
-export interface DeleteTypeDialogProps {
+interface DeleteTypeDialogProps {
   type: Pick<TypeDef, 'id' | 'name'>
   open: boolean
   onOpenChange(open: boolean): void

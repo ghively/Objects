@@ -27,7 +27,7 @@ export const DEEP_LINK_TEXT = {
   copied: 'Deep link copied', // our string
 } as const
 
-export type ScrollAction = 'scrollToTop' | 'scrollToBottom' | 'scrollPageUp' | 'scrollPageDown'
+type ScrollAction = 'scrollToTop' | 'scrollToBottom' | 'scrollPageUp' | 'scrollPageDown'
 
 const SCROLL_ACTIONS: readonly ScrollAction[] = ['scrollToTop', 'scrollToBottom', 'scrollPageUp', 'scrollPageDown']
 
@@ -105,7 +105,7 @@ async function copyToClipboard(text: string): Promise<void> {
   }
 }
 
-export interface PageShortcutsOptions {
+interface PageShortcutsOptions {
   mode: 'page' | 'peek' | 'inline'
   path: string
   summary: Pick<ObjectSummary, 'title' | 'path'> | undefined

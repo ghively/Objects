@@ -6,7 +6,7 @@ import type { ReminderRule, Resolution } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { formatRemind, parseRemind } from './remind'
 
-export interface ReminderMenuProps {
+interface ReminderMenuProps {
   /** The raw `remind` text (null: no reminder). */
   value: string | null
   /** The task date's resolution: which presets apply. */
@@ -23,7 +23,7 @@ export const REMINDER_NOTICE = 'Reminders show as system notifications while Obj
 const NOTICE_KEY = 'object.reminderNoticeShown'
 
 /** The time a day reminder gets when none is set (our default: "Morning"). */
-export const DEFAULT_REMINDER_TIME = '09:00'
+const DEFAULT_REMINDER_TIME = '09:00'
 
 /**
  * The time suggestions. The times are ours.

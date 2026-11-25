@@ -275,7 +275,7 @@ function addMonths(d: Date, months: number): Date {
 }
 
 /** One step after the day `d` (an `on` rule: the first matching day strictly after it). */
-export function stepDay(rule: RepeatRule, d: Date, ws: WeekStart = 'monday'): Date | null {
+function stepDay(rule: RepeatRule, d: Date, ws: WeekStart = 'monday'): Date | null {
   if (rule.on && rule.unit !== 'weekday' && rule.unit !== 'day') {
     for (let k = 0; k < MAX_PERIODS; k++) for (const c of period(rule, d, k, ws)) if (c > d) return c
     return null

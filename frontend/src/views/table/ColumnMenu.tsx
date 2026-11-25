@@ -9,7 +9,7 @@ import type { PropChoice } from '../properties'
 import { SORT_OPTIONS } from '../sort'
 import { isWrapped, setHidden, setPinnedThrough, setWrap, visibleColumns } from './tableConfig'
 
-export interface ColumnMenuProps {
+interface ColumnMenuProps {
   def: PropertyDef
   typeId: string
   state: ViewState

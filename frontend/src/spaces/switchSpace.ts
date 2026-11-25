@@ -13,12 +13,12 @@ export const SWITCH_TEXT = {
   dismiss: 'Close',
 } as const
 
-export const SWITCH_POLL_MS = 200
-export const SWITCH_TIMEOUT_MS = 15_000
+const SWITCH_POLL_MS = 200
+const SWITCH_TIMEOUT_MS = 15_000
 
-export type SwitchPhase = 'idle' | 'switching' | 'error'
+type SwitchPhase = 'idle' | 'switching' | 'error'
 
-export interface SpaceSwitchState {
+interface SpaceSwitchState {
   phase: SwitchPhase
   /** The folder being switched to (while switching, or the one that failed). */
   path: string | null
@@ -62,7 +62,7 @@ function message(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
-export interface SwitchOptions {
+interface SwitchOptions {
   pollMs?: number
   timeoutMs?: number
 }

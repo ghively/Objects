@@ -27,7 +27,7 @@ export const AGENT_PICKER_TEXT = {
 const T = AGENT_PICKER_TEXT
 const DEFAULT_AGENT_ID = 'assistant'
 
-export interface AgentPickerProps {
+interface AgentPickerProps {
   value: string
   onChange(agentId: string): void
   disabled?: boolean

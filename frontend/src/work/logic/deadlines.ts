@@ -1,7 +1,7 @@
 // M23 Task 7: deadline countdowns (plan `2026-11-05-m23-work-section.md`: within 60 days, ours). Pure.
 import type { WorkBoardItem } from '@/api/types'
 
-export const DEADLINE_DAYS = 60
+const DEADLINE_DAYS = 60
 
 const dayNumber = (ymd: string): number | null => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd)

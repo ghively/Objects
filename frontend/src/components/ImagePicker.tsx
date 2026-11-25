@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'react'
 import { api } from '@/api/client'
 import { cn } from '@/lib/utils'
 
-export interface ImagePickerProps {
+interface ImagePickerProps {
   /** The current image's space-relative path. */
   value: string | null | undefined
   onChange(next: string | null): void

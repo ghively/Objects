@@ -61,7 +61,7 @@ const LOADERS: Record<string, () => Promise<GrammarModule>> = {
 }
 
 export const HIGHLIGHT_DEBOUNCE_MS = 150
-export const MAX_HIGHLIGHT_CHARS = 200_000
+const MAX_HIGHLIGHT_CHARS = 200_000
 
 const loads = new Map<string, Promise<boolean>>()
 const loadListeners = new Set<() => void>()
@@ -200,7 +200,7 @@ function nodeTokens(node: PMNode): Token[] {
 }
 
 /** Inline decorations for every code block of `doc`. */
-export function highlightDecorations(doc: PMNode, typeName = 'codeBlock'): DecorationSet {
+function highlightDecorations(doc: PMNode, typeName = 'codeBlock'): DecorationSet {
   const decos: Decoration[] = []
   doc.descendants((node, pos) => {
     if (node.type.name !== typeName) return true

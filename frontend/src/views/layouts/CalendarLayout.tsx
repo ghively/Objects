@@ -274,7 +274,7 @@ export function CalendarLayout(props: LayoutProps) {
   )
 }
 
-export interface CalendarSettingsProps {
+interface CalendarSettingsProps {
   types: TypeDef[]
   state: ViewState
   onState(next: ViewState): void

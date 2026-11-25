@@ -83,7 +83,7 @@ declare module '@tiptap/core' {
 }
 
 /** The text block that carries the id of the block at the selection of `tr`, or `null`. */
-export function idCarrier(tr: Transaction): { node: PMNode; pos: number } | null {
+function idCarrier(tr: Transaction): { node: PMNode; pos: number } | null {
   const $from = tr.selection.$from
   // A list item: its first text block.
   for (let d = $from.depth; d >= 1; d--) {
@@ -109,7 +109,7 @@ export function idCarrier(tr: Transaction): { node: PMNode; pos: number } | null
 }
 
 /** The id already at the end of a text block, or `null`. */
-export function textblockId(node: PMNode): string | null {
+function textblockId(node: PMNode): string | null {
   const last = node.lastChild
   if (!last?.isText) return null
   return BLOCK_ID_SUFFIX.exec(last.text ?? '')?.[1] ?? null
@@ -119,7 +119,7 @@ export function textblockId(node: PMNode): string | null {
  * The id of the block at the selection of `tr`: the one it has, or a fresh one
  * written onto it in `tr` (with `write`); `null` when the block cannot carry one.
  */
-export function blockIdIn(editor: Editor, tr: Transaction, write: boolean, random?: () => number): string | null {
+function blockIdIn(editor: Editor, tr: Transaction, write: boolean, random?: () => number): string | null {
   const carrier = idCarrier(tr)
   if (!carrier) return null
   const existing = textblockId(carrier.node)

@@ -43,7 +43,7 @@ export interface SuggestContext {
  * `test(name)` takes a name as typed (it is normalised here). Not a `RegExp`: a glob is matched by
  * the state-set simulation, never by a backtracking regex.
  */
-export interface CompiledPattern {
+interface CompiledPattern {
   source: string
   test(name: string): boolean
 }
@@ -51,7 +51,7 @@ export interface CompiledPattern {
 const WS = /\s/
 
 /** The name as patterns see it: trimmed, lowercased. */
-export function normalizeName(name: string): string {
+function normalizeName(name: string): string {
   return name.trim().toLowerCase()
 }
 

@@ -17,7 +17,7 @@ export interface ImportDialogPreset {
   newSpaceOnly?: boolean
 }
 
-export interface ImportDialogState {
+interface ImportDialogState {
   isOpen: boolean
   preset: ImportDialogPreset
   open(preset?: ImportDialogPreset): void

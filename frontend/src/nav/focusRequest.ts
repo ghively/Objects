@@ -1,7 +1,7 @@
 // A one-shot request to put the caret in a note's body once its editor is ready (M32): "Today's
 // note" asks for the end of the text, a new note's title hands over to the start. Whoever opens the
 // note asks (lane B); the note page takes the request when its editor mounts (lane E).
-export type BodyFocus = 'start' | 'end'
+type BodyFocus = 'start' | 'end'
 
 const pending = new Map<string, BodyFocus>()
 

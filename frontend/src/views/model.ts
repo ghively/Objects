@@ -5,7 +5,7 @@
 // is in no picker; its label only shows in tooltips and tests.
 import type { Layout, SmallCardViewConfig, TypeDef, ViewState, FilterGroup } from '@/api/types'
 
-export interface LayoutInfo {
+interface LayoutInfo {
   label: string
   /** An Iconify id. */
   icon: string

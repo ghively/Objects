@@ -24,7 +24,7 @@ class DOMMatrixReadOnlyStub {
 
 let installed = false
 
-export function installFlowEnv(size = { width: 1280, height: 800 }): void {
+function installFlowEnv(size = { width: 1280, height: 800 }): void {
   if (installed || typeof window === 'undefined') return
   installed = true
   const g = globalThis as unknown as Record<string, unknown>

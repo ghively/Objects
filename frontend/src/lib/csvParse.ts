@@ -5,7 +5,7 @@
  * a quote in the middle of an unquoted field, or text after a closing quote, is read as well as
  * possible and flagged (`error`), for Import CSV's "Some issues were found while parsing your file." note.
  */
-export interface CsvParseResult {
+interface CsvParseResult {
   rows: string[][]
   error: boolean
 }
@@ -16,7 +16,7 @@ export interface CsvCell {
   quoted: boolean
 }
 
-export interface CsvCellsResult {
+interface CsvCellsResult {
   rows: CsvCell[][]
   error: boolean
 }

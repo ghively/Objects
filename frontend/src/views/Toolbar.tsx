@@ -15,7 +15,7 @@ import { SortEditor } from './SortEditor'
 /** Below this width the layout picker folds into Customize. */
 const NARROW_PX = 480
 
-export interface ToolbarProps {
+interface ToolbarProps {
   /**
    * The Calendar sections' toolbar: the layout picker and a settings menu holding only
    * Calculations, no Filter, Sort or Group by; the count only when the layout is not a list.

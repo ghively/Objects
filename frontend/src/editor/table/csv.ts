@@ -31,7 +31,7 @@ export function csvFilename(title: string | null | undefined): string {
 }
 
 /** Save `text` as `filename`. */
-export function downloadCsv(text: string, filename: string): void {
+function downloadCsv(text: string, filename: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }))
   const a = document.createElement('a')
   a.href = url

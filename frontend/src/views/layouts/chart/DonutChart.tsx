@@ -5,7 +5,7 @@ import { TEXT_STYLE, markLabel, markProps, type ChartDrawProps } from './marks'
 const TAU = Math.PI * 2
 
 /** The path of a ring slice from angle `a0` to `a1` (radians, 0 at 12 o'clock, clockwise). */
-export function slicePath(cx: number, cy: number, r0: number, r1: number, a0: number, a1: number): string {
+function slicePath(cx: number, cy: number, r0: number, r1: number, a0: number, a1: number): string {
   // A whole ring is drawn as two halves (an arc can't start and end at the same point).
   if (a1 - a0 >= TAU - 1e-6) {
     const mid = a0 + Math.PI

@@ -6,7 +6,7 @@ import type { ObjectSummary, RelatedEntry } from '@/api/types'
 import { EmptyLine, EntryHeader } from './BacklinksTab'
 import { REFERENCES_TEXT } from './referencesUi'
 
-export interface RelatedTabProps {
+interface RelatedTabProps {
   entries: RelatedEntry[]
   summaries: Record<string, ObjectSummary>
   /** The limit the entries were asked with: a full page may have more. */

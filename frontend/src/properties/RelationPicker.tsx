@@ -14,7 +14,7 @@ import { tagStyle, themeColor } from '@/theme/palette'
 
 const LIMIT = 50
 
-export interface RelationPickerProps {
+interface RelationPickerProps {
   def: PropertyDef
   value: EntityRef[]
   onChange(next: EntityRef[]): void
@@ -24,7 +24,7 @@ export interface RelationPickerProps {
   onOpenSettings?(): void
 }
 
-export const RELATION_PICKER_TEXT = {
+const RELATION_PICKER_TEXT = {
   search: 'Search for notes',
   // searchOrCreate: a relation to the Tag type (catalog section 5)
   searchOrCreate: 'Search or Create',
@@ -41,7 +41,7 @@ function folderOf(path: string): string {
 }
 
 /** The objects a relation property may link to: its allowed types, restricted to its fixed set. */
-export function relationCandidates(def: PropertyDef, objects: ObjectSummary[]): ObjectSummary[] {
+function relationCandidates(def: PropertyDef, objects: ObjectSummary[]): ObjectSummary[] {
   const allowed = def.options.allowedTypes ?? []
   const fixed = def.options.hasFixedSet ? new Set(def.options.fixedSet ?? []) : null
   return objects.filter(

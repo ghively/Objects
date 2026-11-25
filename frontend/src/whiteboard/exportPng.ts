@@ -30,7 +30,7 @@ const CHROME_SELECTORS = [
   '[data-whiteboard-export-skip]',
 ]
 
-export interface ExportFrame {
+interface ExportFrame {
   /** Image size in CSS pixels (the PNG is `EXPORT_PIXEL_RATIO` times larger). */
   width: number
   height: number
@@ -95,7 +95,7 @@ export function isSameOrigin(url: string, base: string = typeof location !== 'un
   }
 }
 
-export interface ExportPngOptions {
+interface ExportPngOptions {
   /** React Flow's `.react-flow__viewport` element. */
   viewport: HTMLElement
   /** The content to frame (the whole board or the selection), in board coordinates. */

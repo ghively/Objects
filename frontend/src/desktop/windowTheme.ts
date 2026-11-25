@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react'
 import { useThemeName } from '@/theme/applyTheme'
 import { desktop } from './bridge'
 
-export interface WindowTheme {
+interface WindowTheme {
   mode: 'light' | 'dark'
   background: string
   foreground: string

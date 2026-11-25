@@ -34,7 +34,7 @@ export const LINK_VIEWS: readonly { value: Exclude<LinkView, 'page'>; name: stri
 ]
 
 /** A type's "Default link view" choices: the four, then (M31, spec §3) "Page" (our name). */
-export const TYPE_LINK_VIEWS: readonly { value: LinkView; name: string }[] = [...LINK_VIEWS, { value: 'page', name: 'Page' }]
+const TYPE_LINK_VIEWS: readonly { value: LinkView; name: string }[] = [...LINK_VIEWS, { value: 'page', name: 'Page' }]
 
 function PropRow({ id, name, disabled, onRemove }: { id: string; name: string; disabled: boolean; onRemove(): void }) {
   const s = useSortable({ id, disabled })

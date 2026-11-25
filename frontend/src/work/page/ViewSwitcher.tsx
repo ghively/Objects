@@ -12,8 +12,8 @@ import type { WorkViewDef } from '../views/registry'
 
 /** The switcher's name (ours). */
 const VIEWS_LABEL = 'Work views'
-export const MORE_VIEWS = 'More views'
-export const FEWER_VIEWS = 'Fewer views'
+const MORE_VIEWS = 'More views'
+const FEWER_VIEWS = 'Fewer views'
 
 function ViewButton({ v, on, data, now }: { v: WorkViewDef; on: boolean; data: WorkDataState; now: Date }): JSX.Element {
   const n = v.count(data, now)

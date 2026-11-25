@@ -10,7 +10,7 @@ import { dayOfInstant } from '../../dates'
 import { findDef, rowValue } from '../../filter'
 import { propertyChoices, type PropChoice } from '../../properties'
 
-export const DEFAULT_TIMELINE: TimelineViewConfig = {
+const DEFAULT_TIMELINE: TimelineViewConfig = {
   startProperty: null,
   endProperty: null,
   zoom: 'week',
@@ -36,7 +36,7 @@ export function timelineConfig(def: DataViewDefinition): TimelineViewConfig {
 
 export const DATE_KINDS: ReadonlySet<PropertyType> = new Set<PropertyType>(['datetime', 'datetimeSimple', 'entity_createdAt', 'entity_lastUpdated'])
 /** Date kinds a drag can write (Created and Last modified are the app's). */
-export const WRITABLE_DATE_KINDS: ReadonlySet<PropertyType> = new Set<PropertyType>(['datetime', 'datetimeSimple'])
+const WRITABLE_DATE_KINDS: ReadonlySet<PropertyType> = new Set<PropertyType>(['datetime', 'datetimeSimple'])
 
 /** The view's date properties (its own first, then Created and Last modified). */
 export function dateChoices(types: TypeDef[]): PropChoice[] {
@@ -122,7 +122,7 @@ export const DAY_PX: Record<TimelineZoom, number> = { day: 44, week: 18, month: 
 type Unit = 'day' | 'week' | 'month' | 'quarter' | 'year'
 
 /** The header's two rows at each zoom: [top, bottom] (our choice). */
-export const HEADER_UNITS: Record<TimelineZoom, [Unit, Unit]> = {
+const HEADER_UNITS: Record<TimelineZoom, [Unit, Unit]> = {
   day: ['month', 'day'],
   week: ['month', 'week'],
   month: ['year', 'month'],

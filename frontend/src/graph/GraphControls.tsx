@@ -23,7 +23,7 @@ import { TOOLBAR_TEXT } from './GraphToolbar'
 export const ZOOM_STEPS = [5, 10, 25, 50, 75, 100, 150, 200, 300] as const
 
 /** Objects listed in "Open as list" at most (the rest are counted). */
-export const LIST_LIMIT = 500
+const LIST_LIMIT = 500
 /** Recent objects listed at most. */
 export const RECENT_LIMIT = 10
 
@@ -98,7 +98,7 @@ function ItemList({
   )
 }
 
-export interface GraphTopControlsProps {
+interface GraphTopControlsProps {
   /** The objects shown (after the filters), in graph order. */
   items: GraphItem[]
   /** Recently opened paths, newest first. */
@@ -179,7 +179,7 @@ export function GraphTopControls({ items, recent, onOpen, onFind }: GraphTopCont
   )
 }
 
-export interface GraphZoomControlsProps {
+interface GraphZoomControlsProps {
   /** The zoom now, in percent (from the camera). */
   percent: number
   /** Zoom to a step (percent), or `'fit'` for Page Fit. */

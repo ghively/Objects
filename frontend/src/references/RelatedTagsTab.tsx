@@ -11,7 +11,7 @@ import { tagStyle } from '@/theme/palette'
 import { EmptyLine } from './BacklinksTab'
 import { REFERENCES_TEXT } from './referencesUi'
 
-export interface RelatedTagsTabProps {
+interface RelatedTagsTabProps {
   entries: RelatedTagEntry[]
   summaries: Record<string, ObjectSummary>
 }

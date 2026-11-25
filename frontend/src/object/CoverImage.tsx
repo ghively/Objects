@@ -30,9 +30,9 @@ export const COVER_TEXT = {
 } as const
 
 /** The default cover offset (centred). */
-export const DEFAULT_COVER_OFFSET = 50
+const DEFAULT_COVER_OFFSET = 50
 
-export function clampOffset(n: number): number {
+function clampOffset(n: number): number {
   return Math.min(100, Math.max(0, n))
 }
 

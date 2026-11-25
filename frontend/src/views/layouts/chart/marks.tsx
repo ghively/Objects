@@ -19,14 +19,14 @@ export interface ChartDrawProps {
 }
 
 export const TEXT_STYLE = { fill: 'var(--color-fg-muted)', fontSize: 11 } as const
-export const GRID_STYLE = { stroke: 'var(--color-line)', strokeWidth: 1 } as const
+const GRID_STYLE = { stroke: 'var(--color-line)', strokeWidth: 1 } as const
 export const VALUE_STYLE = { fill: 'var(--color-fg)', fontSize: 11 } as const
 /** About how wide one character of an 11 px label is (for fitting labels; our estimate). */
 export const CHAR_W = 6.4
 
-export const sameHit = (a: ChartHit | null, b: ChartHit) => !!a && a.category === b.category && a.series === b.series
+const sameHit = (a: ChartHit | null, b: ChartHit) => !!a && a.category === b.category && a.series === b.series
 
-export interface MarkProps {
+interface MarkProps {
   role: 'button'
   tabIndex: number
   'aria-label': string
@@ -115,7 +115,7 @@ export function ValueGrid({
 }
 
 /** Every k-th category label so that labels about `minGap` px apart don't collide. */
-export function labelStep(count: number, extent: number, minGap: number): number {
+function labelStep(count: number, extent: number, minGap: number): number {
   if (count <= 0 || extent <= 0) return 1
   return Math.max(1, Math.ceil((count * minGap) / extent))
 }

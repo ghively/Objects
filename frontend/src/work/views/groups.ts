@@ -4,16 +4,16 @@
 import type { WorkViewId } from '@/api/types'
 import type { WorkViewDef } from './registry'
 
-export type ViewGroupId = 'drive' | 'plan' | 'manage' | 'review'
+type ViewGroupId = 'drive' | 'plan' | 'manage' | 'review'
 
-export interface ViewGroup {
+interface ViewGroup {
   id: ViewGroupId
   label: string
   /** The group's views, in order. */
   ids: readonly WorkViewId[]
 }
 
-export const VIEW_GROUPS: readonly ViewGroup[] = [
+const VIEW_GROUPS: readonly ViewGroup[] = [
   { id: 'drive', label: 'Drive', ids: ['now', 'list-inbox', 'today', 'queues', 'agent', 'captures'] },
   { id: 'plan', label: 'Plan', ids: ['list-scheduled', 'flow', 'projects', 'floor'] },
   {

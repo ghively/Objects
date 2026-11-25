@@ -36,10 +36,10 @@ import {
 } from './tableConfig'
 
 /** Rows are at least this tall in a table, in px. */
-export const TABLE_ROW_HEIGHT = 36
+const TABLE_ROW_HEIGHT = 36
 const REM_PX = 16
 
-export type TableLayoutProps = LayoutProps
+type TableLayoutProps = LayoutProps
 
 /** A row's value for a property: the decoded `values`, with the summary as a fallback for system kinds. */
 function valueFor(def: PropertyDef, row: Row): unknown {
@@ -122,7 +122,7 @@ function HeaderCell({
 }
 
 /** Our string: each row's title input is named by its row ("Title of Alpha"). */
-export const titleLabel = (title: string) => `Title of ${title || 'Untitled'}`
+const titleLabel = (title: string) => `Title of ${title || 'Untitled'}`
 
 function TitleCell({
   row,
@@ -187,7 +187,7 @@ function TitleCell({
 const openObject = (path: string) => useTabs.getState().open({ kind: 'object', path })
 
 /** M13: one nesting level's indent, in rem (our choice). */
-export const NEST_INDENT = 1.25
+const NEST_INDENT = 1.25
 
 /** M13: the indent and, on a parent, the open/close toggle before a nested table row's title. */
 function NestToggle({ row, depth, open, onToggle }: { row: Row; depth: number; open: boolean | null; onToggle(path: string): void }) {
@@ -211,10 +211,10 @@ function NestToggle({ row, depth, open, onToggle }: { row: Row; depth: number; o
 }
 
 /** The row-number column at the left, in rem (our choice). */
-export const ROW_NUMBER_WIDTH = 2.5
+const ROW_NUMBER_WIDTH = 2.5
 
 /** "N words" (singular and plural). */
-export const wordsLabel = (n: number) => `${n.toLocaleString()} ${n === 1 ? TEXT_STATS_TEXT.word[0] : TEXT_STATS_TEXT.word[1]}`
+const wordsLabel = (n: number) => `${n.toLocaleString()} ${n === 1 ? TEXT_STATS_TEXT.word[0] : TEXT_STATS_TEXT.word[1]}`
 
 /**
  * A content (`blocks`) column: an "N words" chip and an expand icon that opens the object. The type's first content property is the body.

@@ -1,6 +1,6 @@
 // M26: the sensitive-content scan route (`POST /api/import/scan`); reads only. Kept here so the
 // shared API client stays untouched while the import files are being changed elsewhere.
-export interface ScanFinding {
+interface ScanFinding {
   kind: string
   line: number
 }

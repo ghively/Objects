@@ -2,7 +2,7 @@
 // The list is the paths the current view shows, in order; the selection follows its path.
 import { create } from 'zustand'
 
-export interface WorkSelectionState {
+interface WorkSelectionState {
   list: string[]
   /** -1: nothing selected (an empty list). */
   index: number

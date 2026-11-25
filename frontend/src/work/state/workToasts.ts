@@ -8,9 +8,9 @@ import { isWorkOn } from '../useWorkOn'
 /** How long an Undo toast stays (Global Constraints: 5 s). */
 export const UNDO_MS = 5000
 /** How long a problem toast stays (ours). */
-export const PROBLEM_MS = 6000
+const PROBLEM_MS = 6000
 
-export interface WorkToastEntry {
+interface WorkToastEntry {
   id: number
   text: string
   /** Present on an Undo toast. */
@@ -40,7 +40,7 @@ function push(text: string, undo: (() => Promise<unknown>) | null, ms: number): 
 }
 
 /** Remove one toast (its timer ran out, or its Undo was pressed). */
-export function dismissWorkToast(id: number): void {
+function dismissWorkToast(id: number): void {
   const t = timers.get(id)
   if (t !== undefined) clearTimeout(t)
   timers.delete(id)

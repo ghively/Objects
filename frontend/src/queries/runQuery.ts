@@ -74,7 +74,7 @@ const tagFilter = (id: string, option: 'contains' | 'notContains'): Filter => ({
   referenceValue: [id],
 })
 
-export interface QueryResult {
+interface QueryResult {
   rows: Row[]
   groups: Group[]
   hidden?: Group[]

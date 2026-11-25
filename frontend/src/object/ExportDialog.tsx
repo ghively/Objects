@@ -67,7 +67,7 @@ export const EXPORT_TEXT = {
   success: 'Export done. Your download is starting.',
 } as const
 
-export type ExportFormat = 'pdf' | 'md' | 'docx' | 'latex'
+type ExportFormat = 'pdf' | 'md' | 'docx' | 'latex'
 type PdfStyle = 'notes' | 'essay' | 'academic'
 
 const FORMATS: { id: ExportFormat; label: string }[] = [
@@ -83,7 +83,7 @@ const STYLES: { id: PdfStyle; label: string; description: string }[] = [
   { id: 'academic', label: EXPORT_TEXT.academic, description: EXPORT_TEXT.academicDescription },
 ]
 
-export interface ExportDialogProps {
+interface ExportDialogProps {
   open: boolean
   onOpenChange(open: boolean): void
   path: string
@@ -101,7 +101,7 @@ export function exportFileName(path: string, media: boolean, format: ExportForma
 }
 
 /** Print a same-origin page from a hidden frame (the PDF: "Save as PDF" in the print dialog). */
-export function printUrl(url: string): void {
+function printUrl(url: string): void {
   const frame = document.createElement('iframe')
   frame.setAttribute('aria-hidden', 'true')
   frame.tabIndex = -1

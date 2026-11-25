@@ -19,7 +19,7 @@ export interface ReferencesUi {
 export const DEFAULT_REFERENCES_UI: ReferencesUi = { tab: 'all', closed: false }
 
 /** The tab ids in `ReferencesSectionTab` order. */
-export const REFERENCES_TABS: readonly ReferencesTab[] = ['all', 'backlinks', 'related', 'mentions', 'relatedTags']
+const REFERENCES_TABS: readonly ReferencesTab[] = ['all', 'backlinks', 'related', 'mentions', 'relatedTags']
 
 /** The section's strings. */
 export const REFERENCES_TEXT = {
@@ -124,11 +124,11 @@ export function saveReferencesUi(idOrPath: string, ui: ReferencesUi): void {
 // -- M8: the references settings ------------------------------------------------
 
 /** `DeviceSettings.backlinkSectionsDefault` values: open, closed or hidden. */
-export type SectionDefault = 'open' | 'closed' | 'hidden'
+type SectionDefault = 'open' | 'closed' | 'hidden'
 export type BacklinkContentView = 'inline' | 'smallCard' | 'wideCard' | 'embed'
 export type NestedBacklinkView = 'showBlockContainingBacklink' | 'showFullPathAbove'
 
-export interface SectionDefaults {
+interface SectionDefaults {
   backlinks: SectionDefault
   relatedContent: SectionDefault
   unlinkedMentions: SectionDefault
@@ -142,7 +142,7 @@ export interface ReferencesSettings {
   nestedBacklinkView: NestedBacklinkView
 }
 
-export const REFERENCES_SETTINGS_DEFAULTS: ReferencesSettings = Object.freeze({
+const REFERENCES_SETTINGS_DEFAULTS: ReferencesSettings = Object.freeze({
   backlinkSectionsDefault: Object.freeze({ backlinks: 'open', relatedContent: 'open', unlinkedMentions: 'open' }),
   // "Embed is the default when no option is selected."
   backlinkContentView: 'embed',
@@ -190,7 +190,7 @@ export function referencesSettings(settings: unknown): ReferencesSettings {
 }
 
 /** Which setting a tab's section follows (All and Related tags follow none). */
-export const SECTION_OF: Partial<Record<ReferencesTab, keyof SectionDefaults>> = {
+const SECTION_OF: Partial<Record<ReferencesTab, keyof SectionDefaults>> = {
   backlinks: 'backlinks',
   related: 'relatedContent',
   mentions: 'unlinkedMentions',
@@ -233,7 +233,7 @@ export function defaultReferencesUi(tabs: ReferencesTab[], settings: ReferencesS
 }
 
 /** A backlink context with M8's `ancestors` (the parent blocks' first lines, outermost first). */
-export type NestedBodyContext = BodyContext & { ancestors?: string[] }
+type NestedBodyContext = BodyContext & { ancestors?: string[] }
 
 export function ancestorsOf(c: BodyContext): string[] {
   const a = (c as NestedBodyContext).ancestors

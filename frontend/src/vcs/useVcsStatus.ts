@@ -4,7 +4,7 @@
 import { create } from 'zustand'
 import { vcsApi, type VcsStatus } from '@/api/vcsClient'
 
-export interface VcsStatusState {
+interface VcsStatusState {
   space: VcsStatus | null
   refresh(): Promise<VcsStatus | null>
   set(status: VcsStatus): void

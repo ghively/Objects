@@ -26,7 +26,7 @@ import { isOpen } from './statusCategory'
 import { DEFAULT_TASK_API, dateRemovalOf, setDateProperty, type TaskApi, type TaskDateKey, type TaskOutcome } from './taskActions'
 import { coveredDays } from './taskSections'
 
-export const TASK_DATE_TEXT = {
+const TASK_DATE_TEXT = {
   /** The chip's name ("Date: Nov 13, 2026"); the Task type's own word for the property. */
   label: 'Date',
   today: 'Today',
@@ -89,14 +89,14 @@ export function dateOnDay(current: DateValue | null | undefined, day: string): D
 }
 
 /** An open task whose date ended before `today` (`YYYY-MM-DD`; default: today in the Time zone setting). */
-export function isOverdue(row: Row, type: TypeDef | undefined, today: string = zonedToday()): boolean {
+function isOverdue(row: Row, type: TypeDef | undefined, today: string = zonedToday()): boolean {
   const date = asDate(row.values.date)
   const span = date ? coveredDays(date) : null
   return !!span && span.last < today && isOpen(row, type)
 }
 
 /** M33: an open task whose deadline's day was before `today` (`YYYY-MM-DD`; default: today in the Time zone setting). */
-export function isDeadlinePassed(row: Row, type: TypeDef | undefined, today: string = zonedToday()): boolean {
+function isDeadlinePassed(row: Row, type: TypeDef | undefined, today: string = zonedToday()): boolean {
   const deadline = asDate(row.values.deadline)
   const day = deadline ? coveredDays(deadline)?.first : null
   return !!day && day < today && isOpen(row, type)

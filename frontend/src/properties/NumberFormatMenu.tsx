@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { CURRENCIES } from './currencies'
 import type { NumberFormatChoice } from './typeEdits'
 
-export interface NumberFormatMenuProps {
+interface NumberFormatMenuProps {
   value: NumberFormat | undefined
   onChange(next: NumberFormatChoice): void
 }

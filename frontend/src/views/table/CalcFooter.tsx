@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CALC_KINDS, CALC_LABELS, calculate, type CalcResult } from '../calc'
 import type { FilterCtx } from '../filter'
 
-export interface CalcFooterProps {
+interface CalcFooterProps {
   columns: TableColumn[]
   defs: Record<string, PropertyDef>
   rows: Row[]

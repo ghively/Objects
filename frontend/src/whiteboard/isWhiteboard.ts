@@ -13,7 +13,7 @@ export function isWhiteboardType(t: Pick<TypeDef, 'name' | 'basic'> | null | und
 }
 
 /** True when `path` is a known object of the Whiteboard type. */
-export function isWhiteboardPath(path: string): boolean {
+function isWhiteboardPath(path: string): boolean {
   return isWhiteboardType(typeOf(summaryOf(path)?.type))
 }
 

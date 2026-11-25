@@ -15,7 +15,7 @@ import { currencySymbol } from './currencies'
 const LOCALE = 'en-US'
 
 /** The BCP 47 locale of each `DeviceSettings.language` (our mapping). */
-export const LANGUAGE_LOCALES: Record<SettingsLanguage, string> = {
+const LANGUAGE_LOCALES: Record<SettingsLanguage, string> = {
   en: 'en-US',
   'en-gb': 'en-GB',
   de: 'de-DE',

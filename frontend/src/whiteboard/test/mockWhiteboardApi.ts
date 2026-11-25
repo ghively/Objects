@@ -15,4 +15,3 @@ export function mockWhiteboardApi(board: WhiteboardData = emptyBoard(), revision
   } satisfies WhiteboardApi
 }
 
-export type MockWhiteboardApi = ReturnType<typeof mockWhiteboardApi>

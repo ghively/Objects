@@ -12,7 +12,7 @@ import { TypeChip } from '@/shell/Sidebar'
 import { saveCalendarDaily, useCalendarDaily } from './calendarUi'
 import type { Day } from './dates'
 
-export const CHIPS_TEXT = {
+const CHIPS_TEXT = {
   create: (typeName: string) => `Create ${typeName} linked to this day.`,
   createObjects:
     "Makes a note dated this day. To take a type off this list, change that type's settings.",
@@ -23,12 +23,12 @@ export const CHIPS_TEXT = {
 const DATE_KINDS = new Set(['datetime', 'datetimeSimple'])
 
 /** The type's first date property (the one a chip sets), or undefined. */
-export function firstDateProperty(type: TypeDef): PropertyDef | undefined {
+function firstDateProperty(type: TypeDef): PropertyDef | undefined {
   return type.propertyDefinitions.find((d) => DATE_KINDS.has(d.type))
 }
 
 /** The types that get a chip on `day` (the rule in the M4 plan's Global Constraints). */
-export function chipTypes(
+function chipTypes(
   types: TypeDef[],
   calendarDay: CalendarDay | null,
   summaries: Record<string, ObjectSummary>,

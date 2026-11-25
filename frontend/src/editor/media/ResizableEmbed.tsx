@@ -17,27 +17,27 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Resizer } from '@/shell/Resizer'
 import type { Option } from '../annotations'
 
-export type EmbedAlign = 'left' | 'center' | 'right'
+type EmbedAlign = 'left' | 'center' | 'right'
 
 /** The smallest width or height a drag can leave (our value). */
-export const MIN_EMBED_SIZE = 48
+const MIN_EMBED_SIZE = 48
 
 export function optionOf(options: readonly Option[] | null | undefined, key: string): string | true | undefined {
   return (options ?? []).find((o) => o.key === key)?.value
 }
 
 /** M32: a frame narrower than this has its hover toolbar beside it (over it, the toolbar would cover a small picture). */
-export const NARROW_EMBED_WIDTH = 180
+const NARROW_EMBED_WIDTH = 180
 
 /** A positive integer option (`width`, `height`), or undefined. */
-export function sizeOption(options: readonly Option[] | null | undefined, key: string): number | undefined {
+function sizeOption(options: readonly Option[] | null | undefined, key: string): number | undefined {
   const v = optionOf(options, key)
   if (typeof v !== 'string' || !/^\d+$/.test(v)) return undefined
   const n = Number(v)
   return n > 0 ? n : undefined
 }
 
-export function alignOption(options: readonly Option[] | null | undefined): EmbedAlign {
+function alignOption(options: readonly Option[] | null | undefined): EmbedAlign {
   const v = optionOf(options, 'align')
   return v === 'center' || v === 'right' ? v : 'left'
 }

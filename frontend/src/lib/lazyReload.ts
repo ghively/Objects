@@ -15,9 +15,9 @@ import { flushAll } from './flush'
 
 export const CHUNK_RELOAD_MARK = 'object:chunk-reload'
 /** At most one automatic reload per this many milliseconds. */
-export const CHUNK_RELOAD_WINDOW_MS = 60_000
+const CHUNK_RELOAD_WINDOW_MS = 60_000
 export const OBJECT_UPDATED_TEXT = 'Object was updated. Reload to continue.'
-export const RELOAD_LABEL = 'Reload'
+const RELOAD_LABEL = 'Reload'
 /** Shown when the Reload button's flush failed again; the next click reloads regardless. */
 export const UNSAVED_MAY_BE_LOST_TEXT = 'Some changes could not be saved. Reloading now may lose them.'
 /** How long a flush may take before the automatic reload gives way to the toast. */
@@ -53,7 +53,7 @@ const CHUNK_ERROR =
   /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS|ChunkLoadError|Loading (CSS )?chunk \S+ failed/i
 
 /** Whether `err` is a failed chunk load (as opposed to an error thrown by the module itself). */
-export function isChunkLoadError(err: unknown): boolean {
+function isChunkLoadError(err: unknown): boolean {
   if (!err) return false
   const text = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
   return CHUNK_ERROR.test(text)
@@ -134,7 +134,7 @@ function showUpdatedToast(): void {
 }
 
 /** React to one failed chunk load: flush and reload once, or show the toast if a reload just happened. */
-export async function handleChunkLoadError(): Promise<void> {
+async function handleChunkLoadError(): Promise<void> {
   if (handled) return
   handled = true
   const now = chunkReloadDeps.now()

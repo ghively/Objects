@@ -14,7 +14,7 @@ import { MentionsTab } from './MentionsTab'
 import { REFERENCES_TEXT, referencesSettings, RELATED_STEP, TAB_META } from './referencesUi'
 import { useReferences } from './useReferences'
 
-export interface BacklinksPanelProps {
+interface BacklinksPanelProps {
   /** The main view's object, or null when the main view shows no object. */
   path: string | null
 }

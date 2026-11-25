@@ -40,7 +40,7 @@ const OPAQUE = '￼'
  */
 const TAG_RE = /(?:(?<=[\s(,])|^)#([^\s#!"$%&'()*+,.:;<=>?@[\]^`{|}~\\￼]+)/gu
 
-export interface InlineTagMatch {
+interface InlineTagMatch {
   /** Offsets in the text: the `#` and the end of the name. */
   from: number
   to: number
@@ -153,7 +153,7 @@ const visit: DecorationVisitor = (node, pos, decos) => {
   return !node.isLeaf
 }
 
-export const inlineTagKey = new PluginKey<DecorationSet>('inlineTag')
+const inlineTagKey = new PluginKey<DecorationSet>('inlineTag')
 
 /** The chips the editor shows now (tests). */
 export function inlineTagDecorations(state: EditorState): DecorationSet {

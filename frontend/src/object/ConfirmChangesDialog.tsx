@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-export interface ConfirmChangesDialogProps {
+interface ConfirmChangesDialogProps {
   open: boolean
   detail: string
   affected: number

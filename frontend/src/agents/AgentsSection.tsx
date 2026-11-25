@@ -38,7 +38,7 @@ import { NewAgentDialog } from './NewAgentDialog'
 import { RemoteMark } from './RemoteMark'
 import { useAgents } from './useAgents'
 
-export interface AgentsSectionProps {
+interface AgentsSectionProps {
   /** The sidebar's opener (`SidebarProps['onOpenTarget']`); the tabs store's `open` when absent. */
   onOpenTarget?: (target: Target, opts: { newTab?: boolean }) => void
 }

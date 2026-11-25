@@ -42,7 +42,7 @@ export interface KeyLike {
   target?: EventTarget | null
 }
 
-export interface ShortcutContext {
+interface ShortcutContext {
   /** Something is selected (nudge, order, flip, duplicate, wrap and delete need it). */
   hasSelection?: boolean
   /** Snap to grid is on: nudge and resize take the large step. */
@@ -50,16 +50,16 @@ export interface ShortcutContext {
 }
 
 /** Nudge distances: 1 px, and 30 px (one grid cell) with Shift or while snap to grid is on. */
-export const NUDGE = 1
-export const NUDGE_FAR = GRID
+const NUDGE = 1
+const NUDGE_FAR = GRID
 
 /**
  * Keyboard resize (M8, `whiteboardResize` / `whiteboardResizeLarge`, Mod-Arrow and
  * Mod-Shift-Arrow): the nudge steps. Right and Down grow, Left and Up shrink ("Grows or shrinks
  * from the right or bottom edge").
  */
-export const RESIZE = NUDGE
-export const RESIZE_FAR = NUDGE_FAR
+const RESIZE = NUDGE
+const RESIZE_FAR = NUDGE_FAR
 
 /** Whether keys typed at `target` belong to an editor or input rather than the canvas. */
 export function isEditableTarget(target: EventTarget | null | undefined): boolean {

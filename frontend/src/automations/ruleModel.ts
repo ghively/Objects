@@ -82,7 +82,7 @@ export const ACTION_KINDS: readonly AutomationActionKind[] = [
   'notify',
 ]
 
-export const isObjectAction = (kind: AutomationActionKind): boolean => OBJECT_ACTION_KINDS.includes(kind)
+const isObjectAction = (kind: AutomationActionKind): boolean => OBJECT_ACTION_KINDS.includes(kind)
 
 /** The action kinds a trigger offers: no object edits on a schedule. */
 export function actionKindsFor(trigger: AutomationTriggerKind): AutomationActionKind[] {
@@ -113,7 +113,7 @@ export function scopeTypes(scope: AutomationScope | null, types: readonly TypeDe
 }
 
 /** The name of a scope ("Task", "Reading list"), or its id when it no longer exists. */
-export function scopeName(scope: AutomationScope, types: readonly TypeDef[], collections: readonly Collection[]): string {
+function scopeName(scope: AutomationScope, types: readonly TypeDef[], collections: readonly Collection[]): string {
   if (scope.kind === 'type') return typeLabel(types.find((t) => t.id === scope.id), scope.id)
   return collections.find((c) => c.id === scope.id)?.name ?? scope.id
 }
@@ -338,7 +338,7 @@ function toText(filter: Filter, choice: PropChoice | undefined, types: readonly 
   return words ? `to ${words}` : ''
 }
 
-export interface SummaryContext {
+interface SummaryContext {
   types: readonly TypeDef[]
   collections: readonly Collection[]
   twentyFourHour: boolean
@@ -381,7 +381,7 @@ export function ago(at: string, now: Date): string {
 }
 
 /** The first failure a run reports (its own error, else an action's detail). */
-export function runFailure(run: AutomationRun): string | null {
+function runFailure(run: AutomationRun): string | null {
   if (run.error) return run.error
   return run.actions.find((a) => a.status === 'failed' && a.detail)?.detail ?? null
 }

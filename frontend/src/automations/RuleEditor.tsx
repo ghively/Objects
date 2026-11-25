@@ -58,7 +58,7 @@ import {
   writableDefs,
 } from './ruleModel'
 
-export const RULE_EDITOR_TEXT = {
+const RULE_EDITOR_TEXT = {
   newTitle: 'New automation',
   editTitle: 'Edit automation',
   description: 'Choose when it runs, which notes it applies to and what it does.',
@@ -111,7 +111,7 @@ const T = RULE_EDITOR_TEXT
 const FIELD =
   'h-7 rounded-md border border-line bg-raised px-2 text-[13px] text-fg outline-none placeholder:text-fg-muted focus-visible:ring-1 focus-visible:ring-line'
 
-export interface RuleEditorDialogProps {
+interface RuleEditorDialogProps {
   open: boolean
   /** The rule to edit; null makes a new one. */
   rule: AutomationRule | null

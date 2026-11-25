@@ -104,7 +104,7 @@ const GOES_WITH_DATE = ['repeat', 'remind', 'occurrenceLog'] as const
 
 const isSet = (v: unknown): boolean => v !== undefined && v !== null
 
-export interface DateRemoval {
+interface DateRemoval {
   /** `{ date: null }` when the task has a date, else nothing. */
   updates: Record<string, unknown>
   /** The keys that go with the date: those of `repeat`, `remind` and `occurrenceLog` the task has. */
@@ -209,7 +209,7 @@ function zonedDayOf(start: string): string | null {
 const DAY_ONLY = /^\d{4}-\d{2}-\d{2}$/
 
 /** A date value as a short day (`2026-10-28`; a time date adds its local `HH:mm`). */
-export function shortDate(v: DateValue | null | undefined): string {
+function shortDate(v: DateValue | null | undefined): string {
   if (!v?.start) return ''
   if (v.resolution === 'day' || /^\d{4}-\d{2}-\d{2}$/.test(v.start)) return v.start.slice(0, 10)
   const d = new Date(v.start)

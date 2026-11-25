@@ -48,7 +48,7 @@ export const DATA_VIEW_EMBED_TEXT = {
 }
 
 /** Whether the block's options turn "Show details" on. */
-export function detailsShown(options: readonly Option[] | null | undefined): boolean {
+function detailsShown(options: readonly Option[] | null | undefined): boolean {
   return (options ?? []).some((o) => o.key === 'details' && o.value === true)
 }
 
@@ -64,13 +64,13 @@ function fitLayout(state: ViewState, multiType: boolean): { state: ViewState; la
 }
 
 /** How long after a view change in the embed its `localDataViewInfo` is written (our choice). */
-export const EMBED_VIEW_SAVE_MS = 300
+const EMBED_VIEW_SAVE_MS = 300
 
 /** The view parts `localDataViewInfo` holds (`LocalDataViewInfo`). */
 type LocalViewInfo = Pick<ViewState, 'viewDefinition' | 'filterGroup' | 'sorts' | 'groupBy'>
 
 /** The block's `localDataViewInfo` text, or null when it has none. */
-export function localViewText(options: readonly Option[] | null | undefined): string | null {
+function localViewText(options: readonly Option[] | null | undefined): string | null {
   const value = (options ?? []).find((o) => o.key === 'localDataViewInfo')?.value
   return typeof value === 'string' ? value : null
 }
@@ -90,7 +90,7 @@ export function parseLocalView(text: string | null): Partial<LocalViewInfo> | nu
 }
 
 /** The JSON written for `state`: its layout, filters, sorts and group, not "Show details". */
-export function localViewJson(state: ViewState): string {
+function localViewJson(state: ViewState): string {
   const info: LocalViewInfo = {
     viewDefinition: state.viewDefinition,
     filterGroup: state.filterGroup,

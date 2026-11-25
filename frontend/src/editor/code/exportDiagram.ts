@@ -14,8 +14,8 @@
  */
 
 export const PNG_SCALE = 2
-export const SVG_FILE = 'diagram.svg'
-export const PNG_FILE = 'diagram.png'
+const SVG_FILE = 'diagram.svg'
+const PNG_FILE = 'diagram.png'
 
 let exportSeq = 0
 
@@ -34,7 +34,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 /** The SVG text as a downloadable blob (an XML prolog is added when missing). */
-export function svgBlob(svg: string): Blob {
+function svgBlob(svg: string): Blob {
   const text = svg.trimStart().startsWith('<?xml') ? svg : `<?xml version="1.0" encoding="UTF-8"?>\n${svg}`
   return new Blob([text], { type: 'image/svg+xml;charset=utf-8' })
 }
@@ -108,7 +108,7 @@ export async function svgToPng(svg: string, scale = PNG_SCALE): Promise<Blob> {
  * theme and `htmlLabels: false`. Mermaid's global config is put back to the
  * preview's afterwards.
  */
-export async function renderForExport(text: string, dark: boolean): Promise<string> {
+async function renderForExport(text: string, dark: boolean): Promise<string> {
   const mermaid = (await import('mermaid')).default
   const theme = dark ? 'dark' : 'default'
   const id = `mermaid-export-${++exportSeq}`

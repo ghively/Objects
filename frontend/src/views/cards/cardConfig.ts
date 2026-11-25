@@ -35,7 +35,7 @@ export function setCardProperties(type: TypeDef, view: DataViewDefinition, prope
   }
 }
 
-export interface CardPropertyChoice extends CardProperty {
+interface CardPropertyChoice extends CardProperty {
   name: string
 }
 

@@ -38,7 +38,7 @@ export const TOOLBOX_TEXT = {
 }
 
 /** The media tools' icons (Phosphor; our choice). */
-export const MEDIA_ICON: Record<WhiteboardMediaTool, string> = {
+const MEDIA_ICON: Record<WhiteboardMediaTool, string> = {
   image: 'ph-image',
   pdf: 'ph-file-pdf',
   audio: 'ph-speaker-high',

@@ -20,7 +20,7 @@ export interface BoardDoc {
   strokes: unknown[]
 }
 
-export const FLOW_NODE_TYPES = {
+const FLOW_NODE_TYPES = {
   block: 'boardBlock',
   shape: 'boardShape',
   frame: 'boardFrame',
@@ -43,7 +43,7 @@ export interface FlowEdgeData extends Record<string, unknown> {
 export type FlowNode = Node<FlowNodeData, FlowNodeType>
 export type FlowEdge = Edge<FlowEdgeData, typeof FLOW_EDGE_TYPE>
 
-export function flowNodeType(kind: WhiteboardNodeKind | string): FlowNodeType {
+function flowNodeType(kind: WhiteboardNodeKind | string): FlowNodeType {
   return (FLOW_NODE_TYPES as Record<string, FlowNodeType>)[kind] ?? FLOW_NODE_TYPES.block
 }
 
@@ -65,7 +65,7 @@ export function toFlowNode(n: WhiteboardNode, blocks: WhiteboardData['blocks'], 
   return out
 }
 
-export function toFlowEdge(e: WhiteboardEdge, blocks: WhiteboardData['blocks'], selected?: boolean): FlowEdge {
+function toFlowEdge(e: WhiteboardEdge, blocks: WhiteboardData['blocks'], selected?: boolean): FlowEdge {
   const out: FlowEdge = {
     id: e.id,
     source: e.source,
@@ -93,7 +93,7 @@ export function toFlow(
 }
 
 /** A node's rendered size (React Flow's measuring), given back so hidden nodes keep theirs. */
-export type MeasuredSize = { width: number; height: number }
+type MeasuredSize = { width: number; height: number }
 
 interface NodeEntry {
   node: WhiteboardNode

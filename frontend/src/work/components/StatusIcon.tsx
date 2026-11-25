@@ -7,7 +7,7 @@ import { TONE_TEXT, type ChipTone } from './Chip'
 
 /** T7's `StationState` (logic/stations.ts), restated so this file stands on its own. */
 type StationState = 'done' | 'doing' | 'waiting' | 'notStarted'
-export type StatusIconState = StationState | 'you' | 'agent' | 'approval'
+type StatusIconState = StationState | 'you' | 'agent' | 'approval'
 
 const ICON: Record<StatusIconState, string> = {
   done: WORK_ICONS.done,

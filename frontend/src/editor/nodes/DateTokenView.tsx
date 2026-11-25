@@ -19,13 +19,13 @@ import { useSettings } from '@/settings/useSettings'
 import { ISO_DAY } from './dateToken'
 
 /** The chip's text: the day in the user's date format (the raw text for a day it cannot read). */
-export function dateTokenLabel(date: string): string {
+function dateTokenLabel(date: string): string {
   if (!ISO_DAY.test(date)) return date
   return formatDate({ start: date, resolution: 'day' })
 }
 
 /** The path of the daily note for `day`, creating the note when there is none. */
-export async function dailyNotePath(day: string): Promise<string | null> {
+async function dailyNotePath(day: string): Promise<string | null> {
   const found = await resolveLink(day)
   if (found) return found
   try {
@@ -39,7 +39,7 @@ export async function dailyNotePath(day: string): Promise<string | null> {
 }
 
 /** Open the daily note for `day` (a new tab with `newTab`). */
-export async function openDateToken(day: string, newTab = false): Promise<void> {
+async function openDateToken(day: string, newTab = false): Promise<void> {
   if (!ISO_DAY.test(day)) return
   const path = await dailyNotePath(day)
   if (!path) return

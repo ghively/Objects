@@ -7,7 +7,7 @@ import type { ObjectSummary } from '@/api/types'
 import { TextStatsRows } from './PageInspector'
 import { plainText, statRows, TEXT_STATS_TEXT, textStats } from './textStats'
 
-export interface TextStatsMenuProps {
+interface TextStatsMenuProps {
   getMarkdown(): string
   summary: ObjectSummary
   dailyNote: boolean

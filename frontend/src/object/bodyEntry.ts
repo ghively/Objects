@@ -38,7 +38,7 @@ const frameOf = (root: HTMLElement) => root.closest('[role="dialog"]')
  * main panel, with no layer and no peek open. The peek: its own frame is open and nothing is open
  * over it (a layer inside it, or one that came after it; a collection's peek under it is not).
  */
-export function viewInFront(root: HTMLElement | null, mode: 'page' | 'peek'): boolean {
+function viewInFront(root: HTMLElement | null, mode: 'page' | 'peek'): boolean {
   if (!root || !root.isConnected) return false
   const layers = [...document.querySelectorAll(LAYER)].filter((l) => !isClosing(l))
   if (mode === 'peek') {

@@ -34,7 +34,7 @@ const SPAN_RE = new RegExp(`^<span data-color="text-(${COLORS})">((?:(?!</?span[
 const MARK_RE = new RegExp(`^<mark(?: data-color="bg-(${COLORS})")?>((?:(?!</?mark[\\s>])[\\s\\S])*?)</mark>`)
 
 /** A theme colour from `red`, `text-red` or `bg-red`; `null` for anything else. */
-export function themeColorOf(value: string | null | undefined): ThemeColor | null {
+function themeColorOf(value: string | null | undefined): ThemeColor | null {
   if (!value) return null
   const c = value.replace(/^(?:text|bg)-/, '')
   return KNOWN.has(c) ? (c as ThemeColor) : null
@@ -46,16 +46,16 @@ function colorAttr(el: HTMLElement, prefix: 'text-' | 'bg-'): string | null {
   return v && v.startsWith(prefix) ? v : null
 }
 
-export function textColorOpen(color: string): string {
+function textColorOpen(color: string): string {
   return `<span data-color="text-${color}">`
 }
 
 /** `FALLBACK_HIGHLIGHT_COLOR`: a bare `<mark>`, and the highlight shortcut's first colour. */
 export const FALLBACK_HIGHLIGHT_COLOR = 'bg-amber'
 /** The theme colour name of `FALLBACK_HIGHLIGHT_COLOR`. */
-export const FALLBACK_HIGHLIGHT = 'amber'
+const FALLBACK_HIGHLIGHT = 'amber'
 
-export function highlightOpen(color: string, bare: boolean): string {
+function highlightOpen(color: string, bare: boolean): string {
   return bare && color === FALLBACK_HIGHLIGHT ? '<mark>' : `<mark data-color="bg-${color}">`
 }
 
@@ -72,7 +72,7 @@ function validColor(value: string | null | undefined): string | null {
 }
 
 /** The last colour chosen for selected text (`text-<c>` or `bg-<c>`), or `bg-amber`. */
-export function lastUsedHighlightColor(): string {
+function lastUsedHighlightColor(): string {
   if (lastUsed === null) {
     try {
       lastUsed = validColor(globalThis.localStorage?.getItem(LAST_USED_KEY))
@@ -108,7 +108,7 @@ export function setHighlightTextHandler(fn: HighlightHandler | null): void {
  * with a text colour or a highlight loses both; otherwise it gets the
  * last-used colour.
  */
-export function toggleLastUsedHighlight(editor: Editor): boolean {
+function toggleLastUsedHighlight(editor: Editor): boolean {
   if (editor.state.selection.empty) return false
   if (editor.isActive('highlight') || editor.isActive('textColor')) {
     return editor.chain().unsetHighlight().setTextColor(null).run()

@@ -138,7 +138,7 @@ export function barCentre(centre: number, width: number, viewport: number): numb
  * Run `fn` on the selected blocks, then select the blocks it left (a range command such as a mark
  * or a list ends the block selection; the bar keeps it, so another button can follow).
  */
-export function keepBlockSelection(editor: Editor, fn: () => boolean): boolean {
+function keepBlockSelection(editor: Editor, fn: () => boolean): boolean {
   const range = blockSelectionRange(editor.state)
   const ok = fn()
   if (!range || editor.isDestroyed || getBlockSelection(editor.state)) return ok

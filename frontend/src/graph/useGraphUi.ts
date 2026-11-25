@@ -12,7 +12,7 @@ import { enqueueUiSave, loadUi, reloadUi, useUiStore } from '@/shell/usePinned'
 
 export const SAVE_DELAY_MS = 400
 /** The toast after a `ui.json` save of the graph settings failed ("Could not save …" form). */
-export const GRAPH_SAVE_FAILED = 'Could not save the graph settings'
+const GRAPH_SAVE_FAILED = 'Could not save the graph settings'
 
 const EMPTY: GraphCustomization = {}
 

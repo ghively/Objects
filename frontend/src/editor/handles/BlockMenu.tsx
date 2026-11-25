@@ -59,7 +59,7 @@ import { LINK_CARD_TEXT, linkToCard, soleLinkBlock } from '../linkCard'
 import { SUGGEST_TEXT } from '@/create/typeSuggest'
 import { hasTodoAt, suggestedTurnType, turnIntoObject, turnIntoWhiteboard, turnTitleAt, turnTodoIntoTask } from '../turnInto'
 
-export const BLOCK_MENU_TEXT = {
+const BLOCK_MENU_TEXT = {
   insertAbove: 'Insert block above',
   insertBelow: 'Insert block below',
   turnInto: 'Turn into...',
@@ -100,7 +100,7 @@ export const TURN_INTO_ITEMS: readonly { kind: TurnIntoKind; name: string; short
 ]
 
 /** The registry's first key for `id`, formatted for display (empty when it has none). */
-export function shortcutHint(id: string | undefined): string {
+function shortcutHint(id: string | undefined): string {
   if (!id) return ''
   const keys = keysFor(id)
   return keys.length ? formatKeys(keys[0]) : ''
@@ -129,7 +129,7 @@ function Row({
   )
 }
 
-export interface BlockMenuProps {
+interface BlockMenuProps {
   editor: Editor
   open: boolean
   onOpenChange: (open: boolean) => void

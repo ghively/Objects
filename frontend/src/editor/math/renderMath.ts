@@ -16,7 +16,7 @@ import type katexType from 'katex'
 
 type Katex = typeof katexType
 
-export type RenderMathOptions = { display: boolean }
+type RenderMathOptions = { display: boolean }
 
 let katex: Katex | null = null
 let loading: Promise<void> | null = null

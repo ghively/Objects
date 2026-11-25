@@ -79,7 +79,7 @@ export const T = {
   alignment: 'Alignment',
 }
 
-export type BlockAlign = 'left' | 'center' | 'right'
+type BlockAlign = 'left' | 'center' | 'right'
 
 /** The alignment items (icons `ph-text-align-*-bold`); left is the default, never written. */
 export const ALIGN_ITEMS: readonly { align: BlockAlign; name: string; icon: string }[] = [
@@ -89,7 +89,7 @@ export const ALIGN_ITEMS: readonly { align: BlockAlign; name: string; icon: stri
 ]
 
 /** Whether the menu acts on one list item: the caret is in an item and there is no block selection. */
-export function inListItem(editor: Editor): boolean {
+function inListItem(editor: Editor): boolean {
   if (blockSelectionRange(editor.state)) return false
   return listItemAt(editor.state.tr) !== null
 }
@@ -118,12 +118,12 @@ export const LIST_ITEMS: readonly { type: ListType | null; name: string; icon: s
 ]
 
 /** "Hierarchy (Standard)": the title with the current block's level. */
-export function hierarchyLabel(level: Hierarchy | null): string {
+function hierarchyLabel(level: Hierarchy | null): string {
   const name = HIERARCHY_ITEMS.find((h) => h.level === (level ?? 'Base'))?.name ?? 'Standard'
   return `${T.hierarchy} (${name})`
 }
 
-export interface BlockStyle {
+interface BlockStyle {
   hierarchy: Hierarchy | null
   list: ListType | 'none' | null
   toggle: boolean
@@ -200,7 +200,7 @@ export function setQuote(editor: Editor, on: boolean): boolean {
 }
 
 /** Turn the standout layout on or off (making each target block a quote first when it is not one). */
-export function setStandout(editor: Editor, on: boolean): boolean {
+function setStandout(editor: Editor, on: boolean): boolean {
   editor.commands.focus()
   return forEachTargetBlock(editor, (e) => {
     if (!currentBlockStyle(e).quote) {
@@ -271,7 +271,7 @@ export function setBlocksIcon(editor: Editor, icon: string | null): boolean {
  * The alignment the block menu offers for the target blocks: the first target block's
  * (or the list item's) current alignment, or null when no target block takes `align`.
  */
-export function currentAlignment(editor: Editor): BlockAlign | null {
+function currentAlignment(editor: Editor): BlockAlign | null {
   const value = (v: string | true | undefined): BlockAlign => (v === 'center' || v === 'right' ? v : 'left')
   if (inListItem(editor)) return value(itemOption(editor, 'align'))
   const blocks = targetRange(editor.state)?.blocks ?? []
@@ -280,7 +280,7 @@ export function currentAlignment(editor: Editor): BlockAlign | null {
 }
 
 /** Align the target blocks that take `align` (a list item at the caret: that item); left removes the option. */
-export function setBlocksAlignment(editor: Editor, align: BlockAlign): boolean {
+function setBlocksAlignment(editor: Editor, align: BlockAlign): boolean {
   const value = align === 'left' ? null : align
   editor.commands.focus()
   if (inListItem(editor)) return editor.commands.setListItemOptions({ align: value })
@@ -310,7 +310,7 @@ const LIST_NODES = new Set(['bulletList', 'orderedList', 'taskList'])
  * - Any other block nests under the block before it, or moves out of its
  *   indent container.
  */
-export function indentRow(editor: Editor, dir: 1 | -1): boolean {
+function indentRow(editor: Editor, dir: 1 | -1): boolean {
   const range = blockSelectionRange(editor.state)
   if (range) {
     if (range.blocks.some((b) => LIST_NODES.has(b.node.type.name))) return indentBlocks(editor, dir)
@@ -417,7 +417,7 @@ function ColorSub({ editor, current }: { editor: Editor; current: string | null 
   )
 }
 
-export interface BlockStyleMenuProps {
+interface BlockStyleMenuProps {
   editor: Editor
   /** Called after an icon is picked or removed (the picker is not a menu item, so the menu stays open). */
   onDone?: () => void

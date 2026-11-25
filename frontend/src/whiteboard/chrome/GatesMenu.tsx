@@ -7,10 +7,10 @@ import { CIRCUIT_IO, CIRCUIT_LABELS, CIRCUIT_TEXT } from '../model'
 import { WB } from '../strings'
 import { MenuHeading, MenuRow, MenuSeparator, toolLabel } from './controls'
 
-export const IO_TOOLS = CIRCUIT_IO
-export const GATE_TOOLS = CIRCUIT_LABELS.filter((g) => !IO_TOOLS.includes(g))
+const IO_TOOLS = CIRCUIT_IO
+const GATE_TOOLS = CIRCUIT_LABELS.filter((g) => !IO_TOOLS.includes(g))
 
-export interface GatesMenuProps {
+interface GatesMenuProps {
   value?: WhiteboardTool
   onPick(tool: WhiteboardCircuitLabel): void
   disabled?: boolean

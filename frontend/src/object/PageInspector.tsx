@@ -16,7 +16,7 @@ import { Icon } from '@/components/Icon'
 import { cn } from '@/lib/utils'
 import { plainText, statRows, textStats, type StatRow } from './textStats'
 
-export type PageInspectorTab = 'outline' | 'stats'
+type PageInspectorTab = 'outline' | 'stats'
 
 /** The inspector's strings, plus our toggle's name. */
 export const PAGE_INSPECTOR_TEXT = {
@@ -89,7 +89,7 @@ function useBodyRevision(ref: RefObject<HTMLElement | null>): number {
   return rev
 }
 
-export interface PageInspectorProps {
+interface PageInspectorProps {
   /** The element holding the page body; its headings make the Outline. */
   bodyRef: RefObject<HTMLElement | null>
   /** The page's current Markdown body (the editor's, with unsaved edits). */

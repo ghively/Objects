@@ -18,7 +18,7 @@ import { bestMatch, DEFAULT_HOPS, filterGraph, MAX_HOPS, MIN_HOPS } from './filt
 import { useGraphData } from './useGraphData'
 import { useGraphUi } from './useGraphUi'
 
-export const LOCAL_GRAPH_TEXT = {
+const LOCAL_GRAPH_TEXT = {
   heading: 'Graph View',
   maxDistance: 'Maximum distance',
   showMore: 'Show more',
@@ -45,7 +45,7 @@ function writeHops(hops: number): void {
   }
 }
 
-export interface LocalGraphPanelProps {
+interface LocalGraphPanelProps {
   path: string
 }
 

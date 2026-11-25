@@ -1,7 +1,7 @@
 import { colorName, lineColor, THEME_COLORS, themeColor, type ThemeColor } from '@/theme/palette'
 import { cn } from '@/lib/utils'
 
-export interface ColorPickerProps {
+interface ColorPickerProps {
   /** The current colour (`teal`, or a tag's `bg-teal`); null or unknown selects nothing. */
   value: string | null | undefined
   onChange(next: ThemeColor): void

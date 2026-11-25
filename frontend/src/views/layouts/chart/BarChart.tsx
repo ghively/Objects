@@ -35,7 +35,7 @@ const colorOf = (data: ChartData, category: number, series: number) =>
   data.split ? data.series[series].color : data.colorByCategory ? data.categories[category].color : data.series[0].color
 
 /** Pixel height per horizontal bar row (our choice); the chart grows to fit. */
-export const ROW_H = 26
+const ROW_H = 26
 
 export function BarChart(props: ChartDrawProps & { horizontal?: boolean }) {
   return props.horizontal ? <HorizontalBars {...props} /> : <VerticalBars {...props} />

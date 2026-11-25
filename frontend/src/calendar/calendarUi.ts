@@ -10,7 +10,7 @@ import { enqueueUiSave, pendingUiSaves, reloadUi, useUiStore } from '@/shell/use
 export type CalendarDaily = CalendarUi['daily']
 
 /** The toast after a `ui.json` save of the calendar settings failed ("Could not save …"). */
-export const CALENDAR_SAVE_FAILED = 'Could not save the calendar settings'
+const CALENDAR_SAVE_FAILED = 'Could not save the calendar settings'
 
 const EMPTY_DAILY: CalendarDaily = {}
 

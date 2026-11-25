@@ -23,7 +23,7 @@ export interface WhiteboardSettingsState {
   set(key: SettingKey, value: boolean): Promise<void>
 }
 
-export function resolveSettings(stored: WhiteboardSettings): ResolvedSettings {
+function resolveSettings(stored: WhiteboardSettings): ResolvedSettings {
   return { ...DEFAULT_SETTINGS, ...stored }
 }
 

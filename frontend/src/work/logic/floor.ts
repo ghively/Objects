@@ -13,7 +13,7 @@ export interface FloorRow {
   owner: WorkBoardItem | null
 }
 
-export const COLLECTED_SHOWN = 25
+const COLLECTED_SHOWN = 25
 
 /** The place without parenthesised parts, spaces collapsed; `Anywhere` when empty (ported). */
 export function placeOf(place: string | null | undefined): string {

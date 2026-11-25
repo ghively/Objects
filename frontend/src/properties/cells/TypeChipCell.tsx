@@ -4,7 +4,7 @@ import { typeOf, useLinkIndex } from '@/links/linkIndex'
 import { chipStyle } from '@/theme/palette'
 import type { CellProps } from './types'
 
-export interface TypeChipCellProps extends CellProps<string | null> {
+interface TypeChipCellProps extends CellProps<string | null> {
   /** Opens "Change type" (Task 19); without it the chip is inert. */
   onChangeType?(): void
 }

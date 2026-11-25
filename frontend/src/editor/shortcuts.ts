@@ -36,7 +36,7 @@ export const M8_EDITOR_SHORTCUT_IDS: string[] = M8_EDITOR_SHORTCUTS.map((d) => d
 
 let registered = false
 /** Register the editor shortcuts with the registry (once; an id it already has keeps its entry). */
-export function registerEditorShortcuts(): void {
+function registerEditorShortcuts(): void {
   if (registered) return
   registered = true
   const known = new Set(allShortcuts().map((d) => d.id))
@@ -58,7 +58,7 @@ export function proseMirrorKey(spec: string, mac = isMacPlatform()): string {
  * (the catalog's Ctrl+Plus is Ctrl+Shift+= on most layouts, where the key reads "+", or the
  * numpad's own +).
  */
-export function proseMirrorKeys(spec: string, mac = isMacPlatform()): string[] {
+function proseMirrorKeys(spec: string, mac = isMacPlatform()): string[] {
   const key = proseMirrorKey(spec, mac)
   return key.endsWith('-=') ? [key, `${key.slice(0, -1)}+`] : [key]
 }
@@ -107,7 +107,7 @@ function tabOwnedElsewhere(editor: Editor): boolean {
  * M7's behaviour) and leaves tables and code blocks alone. The key is consumed
  * in any other block so focus stays in the editor.
  */
-export function indentAtCursor(editor: Editor, dir: 1 | -1): boolean {
+function indentAtCursor(editor: Editor, dir: 1 | -1): boolean {
   if (!editor.isEditable || tabOwnedElsewhere(editor)) return false
   if (dir === 1) editor.commands.indentBlock()
   else editor.commands.unindentBlock()

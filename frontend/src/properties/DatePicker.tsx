@@ -216,7 +216,7 @@ export interface TaskDateChange {
   remind: string | null
 }
 
-export interface DatePickerProps {
+interface DatePickerProps {
   value: DateValue | null
   constraints?: DateConstraints | null
   onChange(next: DateValue | null): void

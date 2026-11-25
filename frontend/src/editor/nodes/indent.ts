@@ -90,7 +90,7 @@ function restoreCursor(tr: Transaction, blockPos: number, offset: number) {
   tr.setSelection(TextSelection.near(tr.doc.resolve(pos)))
 }
 
-export function indentBlockIn(tr: Transaction): boolean {
+function indentBlockIn(tr: Transaction): boolean {
   const found = cursorBlock(tr)
   if (!found || found.index === 0) return false
   const { node, pos, parent, index } = found
@@ -122,7 +122,7 @@ export function indentBlockIn(tr: Transaction): boolean {
   return true
 }
 
-export function unindentBlockIn(tr: Transaction): boolean {
+function unindentBlockIn(tr: Transaction): boolean {
   const found = cursorBlock(tr)
   if (!found || found.parent.type.name !== 'indent' || found.index === 0) return false
   const { node, pos, parent: container, index, parentPos } = found

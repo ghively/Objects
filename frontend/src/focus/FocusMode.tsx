@@ -19,7 +19,7 @@ import { FOCUS_TEXT, useFocusMode } from './useFocusMode'
 export const FOCUS_ATTR = 'data-focus-mode'
 
 /** The chrome hidden in focus mode. */
-export const FOCUS_HIDDEN_SELECTORS = [
+const FOCUS_HIDDEN_SELECTORS = [
   'aside[aria-label="Sidebar"]',
   '[data-slot="tab-strip"]',
   'aside[aria-label="Side panel"]',
@@ -27,7 +27,7 @@ export const FOCUS_HIDDEN_SELECTORS = [
   '[data-main-column] [data-properties-inline]',
 ] as const
 
-export const FOCUS_CSS = `${FOCUS_HIDDEN_SELECTORS.map((s) => `html[${FOCUS_ATTR}] ${s}`).join(',\n')} { display: none !important; }`
+const FOCUS_CSS = `${FOCUS_HIDDEN_SELECTORS.map((s) => `html[${FOCUS_ATTR}] ${s}`).join(',\n')} { display: none !important; }`
 
 const NOTICE_MS = 3000
 

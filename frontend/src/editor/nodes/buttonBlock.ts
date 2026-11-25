@@ -28,7 +28,7 @@ declare module '@tiptap/core' {
   }
 }
 
-export const BUTTON_BLOCK_TEXT = {
+const BUTTON_BLOCK_TEXT = {
   /** The label a new button gets (our string). */
   defaultLabel: 'Run automation',
 } as const
@@ -73,7 +73,7 @@ export function buttonRuleOf(options: readonly Option[] | null | undefined): str
 }
 
 /** The options a new button block carries: `button`, and `rule` once one is chosen. */
-export function buttonBlockOptions(ruleId: string | null): Option[] {
+function buttonBlockOptions(ruleId: string | null): Option[] {
   return ruleId ? [makeOption('button', true), makeOption('rule', ruleId)] : [makeOption('button', true)]
 }
 

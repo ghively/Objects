@@ -3,7 +3,7 @@ import type { Query, QueryDefinition, TypeDef } from '@/api/types'
 import { typePlural } from '@/lib/typeLabel'
 import { searchTermsOf } from './runQuery'
 
-export const ALL_NOTES_TITLE = 'All notes'
+const ALL_NOTES_TITLE = 'All notes'
 
 export interface TitleCtx {
   /** With `name` (and `basic`) given, the built-in Page and DailyNote read "Notes" and "Daily notes" (M32). */

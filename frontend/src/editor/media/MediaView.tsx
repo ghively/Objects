@@ -37,7 +37,7 @@ export const IMAGE_ERROR = "The image didn't load. Try again, or delete it."
 /** Our string. */
 export const FILE_NOT_FOUND = 'File not found.'
 /** Default PDF height in px (our value). */
-export const PDF_DEFAULT_HEIGHT = 600
+const PDF_DEFAULT_HEIGHT = 600
 
 /** The word for a kind in "Open {type} on system" / "Download {mediaType}" (our wording). */
 const KIND_WORD: Record<AttachmentKind, string> = {
@@ -294,7 +294,7 @@ async function openOnSystem(path: string): Promise<void> {
 }
 
 /** The host name of a URL, without `www.` (empty for something that is not a URL). */
-export function domainOf(href: string): string {
+function domainOf(href: string): string {
   try {
     return new URL(href).hostname.replace(/^www\./, '')
   } catch {

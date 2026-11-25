@@ -27,7 +27,7 @@ const CANT_MOVE = "This card can't be moved here."
 const LONG_TEXT_STAYS = "This card has more than one paragraph, so it can't be moved to another column."
 
 /** The grouping a kanban uses: the view's own, else the first label property of its types. */
-export function kanbanGroupBy(groupBy: GroupBy | null, props: Pick<LayoutProps, 'viewTypes'>): GroupBy | null {
+function kanbanGroupBy(groupBy: GroupBy | null, props: Pick<LayoutProps, 'viewTypes'>): GroupBy | null {
   if (groupBy?.groups?.length) return groupBy
   const choices = propertyChoices(props.viewTypes)
   const label = choices.find((c) => c.kind === 'label')

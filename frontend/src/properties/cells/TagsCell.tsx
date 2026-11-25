@@ -6,7 +6,7 @@ import { placeholderFor } from '../format'
 import { TagPicker, tagColor, useTagObjects } from '../TagPicker'
 import type { CellProps } from './types'
 
-export interface TagsCellProps extends CellProps<string[] | null> {
+interface TagsCellProps extends CellProps<string[] | null> {
   onOpenTag?(name: string): void
 }
 

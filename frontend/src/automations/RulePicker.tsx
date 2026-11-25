@@ -12,7 +12,7 @@ export const RULE_PICKER_TEXT = {
   off: 'Off', // our string
 } as const
 
-export interface RulePickerProps {
+interface RulePickerProps {
   rules: readonly AutomationRule[]
   value: string | null
   onChange(ruleId: string): void

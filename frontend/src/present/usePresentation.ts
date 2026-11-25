@@ -6,7 +6,7 @@
  */
 import { create } from 'zustand'
 
-export interface PresentationState {
+interface PresentationState {
   /** The object being presented; null when not presenting. */
   path: string | null
   /** The slide shown (0 = the title slide). */

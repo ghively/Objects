@@ -9,7 +9,7 @@ import { cpToUtf16 } from '@/lib/codepoints'
 const START = '\u0002'
 const END = '\u0003'
 
-export interface HighlightPart {
+interface HighlightPart {
   text: string
   hit: boolean
 }

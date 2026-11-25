@@ -14,10 +14,10 @@ import { Plugin, PluginKey, Selection } from '@tiptap/pm/state'
 import { attachmentKind } from '../annotations'
 import { showToast, uploadFile } from '../media/upload'
 
-export const fileDropKey = new PluginKey('fileDrop')
+const fileDropKey = new PluginKey('fileDrop')
 
 /** `pasteInput.image_from_file` / `pasteInput.file`, verbatim. */
-export function uploadToastFor(name: string): string {
+function uploadToastFor(name: string): string {
   return attachmentKind(name) === 'image' ? 'Insert image' : 'Insert file'
 }
 

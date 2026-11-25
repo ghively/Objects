@@ -49,7 +49,7 @@ export type OptionTarget =
   /** M14: a one-line paragraph that is a button running an automation (its label). */
   | 'button'
 
-export type KnownOption = {
+type KnownOption = {
   key: string
   /** `'flag'` for a bare key; otherwise the pattern a known value matches. */
   value: 'flag' | RegExp
@@ -234,7 +234,7 @@ export function makeOption(key: string, value: string | true): Option {
 }
 
 /** Known options in the table's order (stable), then unknown ones in their original order. */
-export function canonicalOrder(options: readonly Option[]): Option[] {
+function canonicalOrder(options: readonly Option[]): Option[] {
   const known = options.filter((o) => KNOWN_BY_KEY.has(o.key))
   const unknown = options.filter((o) => !KNOWN_BY_KEY.has(o.key))
   known.sort((a, b) => KNOWN_BY_KEY.get(a.key)!.order - KNOWN_BY_KEY.get(b.key)!.order)
@@ -341,7 +341,7 @@ export function attachmentKind(name: string): AttachmentKind {
   return KIND_BY_EXT[ext] ?? 'file'
 }
 
-export type EmbedLine =
+type EmbedLine =
   | { kind: 'image'; alt: string; src: string }
   | { kind: 'media'; mediaKind: AttachmentKind; target: string; label: string | null }
   | { kind: 'objectEmbed'; target: string; label: string | null }
@@ -352,7 +352,7 @@ export type EmbedLine =
 export type DataViewKind = 'collection' | 'query'
 
 /** A block id (M8): six characters `[a-z0-9]`, the Obsidian convention. */
-export const BLOCK_ID_PATTERN = '[a-z0-9]{6}'
+const BLOCK_ID_PATTERN = '[a-z0-9]{6}'
 const BLOCK_REF_TARGET = new RegExp(`^(.+?)#\\^(${BLOCK_ID_PATTERN})$`)
 const DATA_VIEW_TARGET = /^(collection|query):([^\s\]|#]+)$/
 

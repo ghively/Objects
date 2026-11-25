@@ -64,7 +64,7 @@ function useDropToSwap(): void {
   }, [])
 }
 
-export interface SidePanelProps {
+interface SidePanelProps {
   space: SpaceInfo | null
   renderTarget: RenderSidepanelTarget
 }

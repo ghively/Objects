@@ -22,7 +22,7 @@ export interface ReloadOptions {
   absorb?: string
 }
 
-export interface UseReferences {
+interface UseReferences {
   data: References | null
   loading: boolean
   reload(opts?: ReloadOptions): void

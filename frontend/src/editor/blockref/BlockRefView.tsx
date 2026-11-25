@@ -27,7 +27,7 @@ export const BLOCK_REF_TEXT = {
 const noop = () => {}
 
 /** The key a rendered reference marks its DOM with, for the self-reference check. */
-export const blockRefKey = (path: string, id: string) => `${path}#^${id}`
+const blockRefKey = (path: string, id: string) => `${path}#^${id}`
 
 /** `markdown` without the ` ^id` that ends the block. */
 export function withoutBlockId(markdown: string, id: string): string {
@@ -35,7 +35,7 @@ export function withoutBlockId(markdown: string, id: string): string {
 }
 
 /** True when `el` sits inside the rendering of the reference `key` (a reference chain that loops). */
-export function insideRendering(el: Element | null, key: string): boolean {
+function insideRendering(el: Element | null, key: string): boolean {
   for (let n = el?.parentElement ?? null; n; n = n.parentElement) {
     if (n.getAttribute('data-block-ref-key') === key) return true
   }
@@ -46,7 +46,7 @@ export function insideRendering(el: Element | null, key: string): boolean {
  * Scroll the open object's editor to the block with `id` (polls briefly while the tab opens).
  * Resolves true when it found the block.
  */
-export function scrollToBlock(path: string, id: string, tries = 40): Promise<boolean> {
+function scrollToBlock(path: string, id: string, tries = 40): Promise<boolean> {
   return new Promise((resolve) => {
     let n = 0
     const step = () => {

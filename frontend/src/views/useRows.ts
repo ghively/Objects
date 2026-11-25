@@ -20,7 +20,7 @@ import { typeOf } from '@/links/linkIndex'
 const WINDOW_MS = 150
 const RELOAD_KINDS = new Set(['created', 'deleted', 'renamed', 'types', 'collections'])
 
-export interface UseRows {
+interface UseRows {
   rows: Row[]
   loading: boolean
   reload(): Promise<void>
@@ -37,7 +37,7 @@ function anyRollup(scope: RowsScope, rows: Row[]): boolean {
 }
 
 /** Whether a change to `changed` may alter a rollup shown in `rows` (beyond those rows' own refetch). */
-export function rollupsMayChange(scope: RowsScope, rows: Row[], changed: string[]): boolean {
+function rollupsMayChange(scope: RowsScope, rows: Row[], changed: string[]): boolean {
   const rolled = new Set<string>()
   for (const t of scope.typeIds ?? []) if (hasRollup(t)) rolled.add(t)
   for (const r of rows) if (hasRollup(r.summary.type)) rolled.add(r.summary.type)
@@ -46,7 +46,7 @@ export function rollupsMayChange(scope: RowsScope, rows: Row[], changed: string[
   return changed.some((p) => !rollupRows.has(p))
 }
 
-export interface UseRowsOptions {
+interface UseRowsOptions {
   /**
    * The rows' backlinks matter (the Tasks dashboard's Context grouping; fix pass H, M5#5): a
    * change to an object that isn't one of the rows may have added or removed a link to one. The

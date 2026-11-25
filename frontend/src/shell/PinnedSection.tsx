@@ -23,7 +23,7 @@ import { usePinned } from './usePinned'
 import { dropObjectAt, setObjectDragData } from './objectDrag'
 import { COLLECTION_ICON, QUERY_ICON } from '@/lib/defIcons'
 
-export const pinKey = (r: PinRef) => `${r.kind}:${r.id}`
+const pinKey = (r: PinRef) => `${r.kind}:${r.id}`
 
 export type OpenTarget = (target: Target, opts: { newTab?: boolean }) => void
 

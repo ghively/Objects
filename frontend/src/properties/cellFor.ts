@@ -79,7 +79,7 @@ export interface CellExtras {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each cell takes its own value type
-export type CellComponent = ComponentType<CellProps<any> & CellExtras>
+type CellComponent = ComponentType<CellProps<any> & CellExtras>
 
 const CELLS: Readonly<Record<PropertyType, CellComponent | null>> = {
   text: TextCell,
@@ -127,7 +127,7 @@ export function cellFor(type: PropertyType): CellComponent | null {
 }
 
 /** The basic media fields: system definitions (id equals key) shown read-only. */
-export const MEDIA_FIELD_KEYS: ReadonlySet<string> = new Set([
+const MEDIA_FIELD_KEYS: ReadonlySet<string> = new Set([
   'url',
   'domain',
   'iframeUrl',

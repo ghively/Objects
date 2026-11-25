@@ -2,7 +2,7 @@
 // page (the Memory tab's and the Skills tab's History lists). The line sets it, then opens the tab.
 import { create } from 'zustand'
 
-export interface LearningFocusState {
+interface LearningFocusState {
   agentId: string | null
   entryIds: string[]
   set(agentId: string, entryIds: string[]): void

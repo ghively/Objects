@@ -6,7 +6,7 @@
 import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
 import { cn } from '@/lib/utils'
 
-export interface ResizerProps {
+interface ResizerProps {
   direction: 'x' | 'y'
   label: string
   /** Distance in px from where the drag started (right/down positive). */

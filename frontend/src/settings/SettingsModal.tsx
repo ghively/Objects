@@ -40,7 +40,7 @@ export const SETTINGS_TEXT = {
   reload: 'Reload',
 } as const
 
-export interface SettingsSectionDef {
+interface SettingsSectionDef {
   id: SettingsSectionId
   group: 'general' | 'space'
   label: string

@@ -6,7 +6,7 @@ import { create } from 'zustand'
 import { api } from '@/api/client'
 import type { ChangeKind, GraphData } from '@/api/types'
 
-export interface GraphDataState {
+interface GraphDataState {
   data: GraphData | null
   loading: boolean
   reload(): Promise<void>

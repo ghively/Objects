@@ -22,7 +22,7 @@ export function SystemFieldCell({ value }: CellProps<unknown>) {
   return <p className="truncate py-0.5 text-[15px] text-fg-muted">{show(value)}</p>
 }
 
-export interface CollectionsCellProps extends CellProps<string[] | null> {
+interface CollectionsCellProps extends CellProps<string[] | null> {
   /** The row's object type: the picker offers only collections that hold it. */
   typeId?: string
 }

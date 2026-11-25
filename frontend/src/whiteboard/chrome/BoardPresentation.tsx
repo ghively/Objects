@@ -11,7 +11,7 @@ import { Icon } from '@/components/Icon'
 import type { Slide } from '../readingOrder'
 import { WB } from '../strings'
 
-export interface BoardPresentationProps {
+interface BoardPresentationProps {
   slides: Slide[]
   /** Fit the canvas to a slide. */
   onShow(slide: Slide, index: number): void

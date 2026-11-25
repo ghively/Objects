@@ -28,7 +28,7 @@ import { Divider, MAX_COLUMNS, evenWidths, parseWidths } from './Divider'
 export const COLUMN_GAP = 24
 
 /** `color: var(--x); background-color: var(--y);` -> a React style object. */
-export function styleObject(css: string | undefined): CSSProperties {
+function styleObject(css: string | undefined): CSSProperties {
   const out: Record<string, string> = {}
   for (const part of (css ?? '').split(';')) {
     const at = part.indexOf(':')

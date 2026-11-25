@@ -18,7 +18,7 @@ import { LEARNING_TEXT as T, learningDate } from './learningText'
 /** Rows per page (our number). */
 export const LEDGER_PAGE = 20
 
-export interface LedgerListProps {
+interface LedgerListProps {
   agentId: string
   query: { target?: string; skill?: string; run?: string }
   highlight?: string[]

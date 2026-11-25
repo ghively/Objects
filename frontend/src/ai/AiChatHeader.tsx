@@ -7,7 +7,7 @@ import { AI_CHAT_TEXT as T } from './aiText'
 import { ModelPicker } from './ModelPicker'
 import { modelLabel, useAiModels } from './models'
 
-export interface AiChatHeaderProps {
+interface AiChatHeaderProps {
   leading?: ReactNode
   /** This chat's pick (null: Default). */
   model: string | null

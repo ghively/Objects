@@ -27,7 +27,7 @@ export function isWorkType(t: TypeDef | null | undefined): boolean {
   return !!t?.propertyDefinitions.some((d) => d.key === 'steps' && d.type === 'steps')
 }
 
-export interface WorkFieldsSectionProps {
+interface WorkFieldsSectionProps {
   type: TypeDef
   /** The type the server saved with the work fields. */
   onSaved?(type: TypeDef): void

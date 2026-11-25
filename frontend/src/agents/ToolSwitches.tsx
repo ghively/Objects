@@ -26,7 +26,7 @@ import { MCP_TEXT } from '@/mcp/mcpText'
 import { ServerGroupStatus, serverSwitchesDisabled } from '@/mcp/ServerGroupStatus'
 import { AGENT_TEXT } from './agentText'
 
-export interface ToolSwitchesProps {
+interface ToolSwitchesProps {
   groups: ToolGroup[]
   off: string[]
   onChange(off: string[]): void

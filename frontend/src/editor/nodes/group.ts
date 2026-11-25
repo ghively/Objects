@@ -23,7 +23,7 @@ import { GroupView } from '../layout/GroupView'
 import { ancestorOfType, containerSourceAttributes, unwrapAt, wrapBlocks } from './containers'
 import './group.css'
 
-export const GROUP_PLACEHOLDER = 'Box heading...'
+const GROUP_PLACEHOLDER = 'Box heading...'
 
 /**
  * Replace the group at `pos` by its blocks; `unwrapAt` keeps the blank line

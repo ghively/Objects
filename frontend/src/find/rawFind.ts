@@ -18,7 +18,7 @@ export { isRawFindControl } from './findControl'
 const MATCH_CLASS = 'find-match'
 const CURRENT_CLASS = 'find-match-current'
 
-export interface RawFindState extends FindOptions {
+interface RawFindState extends FindOptions {
   query: string
   /** The current match, or -1 when there is none. */
   index: number
@@ -41,7 +41,7 @@ function decorate(matches: TextMatch[], index: number): DecorationSet {
   return b.finish()
 }
 
-export const rawFindField = StateField.define<RawFindState>({
+const rawFindField = StateField.define<RawFindState>({
   create: () => EMPTY,
   update(prev, tr) {
     let next = prev
@@ -70,12 +70,12 @@ export const rawFindField = StateField.define<RawFindState>({
   provide: (f) => EditorView.decorations.from(f, (s) => s.decorations),
 })
 
-export function getRawFindState(state: EditorState): RawFindState {
+function getRawFindState(state: EditorState): RawFindState {
   return state.field(rawFindField, false) ?? EMPTY
 }
 
 
-export interface RawFind {
+interface RawFind {
   /** Add to the view's state (again after every `setState`, then call `reapply`). */
   extension: Extension
   /** What `BodyEditorHandle.find` returns in raw mode. */

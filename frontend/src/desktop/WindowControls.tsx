@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { desktop } from './bridge'
 import { useChrome } from './useWindowChrome'
 
-export const WINDOW_CONTROLS_TEXT = {
+const WINDOW_CONTROLS_TEXT = {
   group: 'Window',
   minimize: 'Minimize',
   maximize: 'Maximize',

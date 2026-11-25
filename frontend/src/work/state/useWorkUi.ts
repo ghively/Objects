@@ -7,7 +7,7 @@ import { zonedToday } from '@/lib/zonedTime'
 import { useSpaceInfo } from '@/settings/useSpaceInfo'
 
 /** Everything's sort keys (T7's `EverythingKey`). */
-export type WorkSortKey = 'type' | 'ticketId' | 'title' | 'area' | 'stage' | 'turn' | 'priority' | 'quietDays' | 'score'
+type WorkSortKey = 'type' | 'ticketId' | 'title' | 'area' | 'stage' | 'turn' | 'priority' | 'quietDays' | 'score'
 
 export interface WorkUiValues {
   energy: Energy | null
@@ -21,7 +21,7 @@ export interface WorkUiValues {
   everythingSort: { key: WorkSortKey; dir: 1 | -1 }
 }
 
-export interface WorkUiState extends WorkUiValues {
+interface WorkUiState extends WorkUiValues {
   setEnergy(energy: Energy | null): void
   setCalm(calm: boolean): void
   setView(view: WorkViewId): void

@@ -11,7 +11,7 @@ import { InlineToken } from '../../cards/InlineToken'
 import { displayTitle } from '../../filter'
 import { CALENDAR_TEXT } from './calendarModel'
 
-export interface ChipProps {
+interface ChipProps {
   row: Row
   day: Day
   type?: TypeDef
@@ -131,7 +131,7 @@ export function RowsPopover({
   )
 }
 
-export interface DayCellProps {
+interface DayCellProps {
   day: Day
   /** Outside the shown month (muted). */
   outside: boolean

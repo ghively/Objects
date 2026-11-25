@@ -13,7 +13,7 @@ import { api } from '@/api/client'
 import type { ObjectSummary, TypeDef } from '@/api/types'
 import { fetchSpace } from '@/settings/useSpaceInfo'
 
-export interface LinkIndexState {
+interface LinkIndexState {
   types: TypeDef[]
   objects: ObjectSummary[]
   /** Bumped whenever the index or the resolution cache changes. */

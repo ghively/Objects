@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import type { ViewDesign } from '@/api/types'
 import { cn } from '@/lib/utils'
 
-export interface PageLayoutCardsProps {
+interface PageLayoutCardsProps {
   value: ViewDesign | null
   onChange(next: ViewDesign | null): void
   disabled?: boolean
@@ -15,7 +15,7 @@ export interface PageLayoutCardsProps {
 /** What the group of cards is called (its accessible name). */
 export const PAGE_LAYOUTS_LABEL = 'Layout'
 
-export const PAGE_LAYOUTS: readonly { value: ViewDesign | null; name: string; description: string }[] = [
+const PAGE_LAYOUTS: readonly { value: ViewDesign | null; name: string; description: string }[] = [
   { value: null, name: 'Standard', description: 'A plain, all-purpose layout.' },
   { value: 'indexCard', name: 'Index card', description: 'A small layout for short notes and drafts.' },
   {

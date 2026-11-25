@@ -55,7 +55,7 @@ export type SearchOption =
   | { kind: 'tag'; tag: string; rest: string; label: string }
 
 /** Tag options shown at most (a space can hold hundreds of tags). */
-export const MAX_TAG_OPTIONS = 5
+const MAX_TAG_OPTIONS = 5
 
 function words(s: string): string[] {
   return s.toLowerCase().split(/[\s\-_/.]+/).filter(Boolean)

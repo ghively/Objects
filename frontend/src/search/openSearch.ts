@@ -5,7 +5,7 @@
  */
 import { useTabs } from '@/nav/tabs'
 
-export interface SearchTarget {
+interface SearchTarget {
   kind: 'search'
   q?: string
   textOnly?: boolean

@@ -22,13 +22,13 @@ export interface FocusTimer {
 }
 
 /** A finished session, shown as "Focus time completed". */
-export interface FocusCompleted {
+interface FocusCompleted {
   /** Whole minutes focused; null when under a minute (then `seconds`). */
   minutes: number | null
   seconds: number
 }
 
-export interface FocusModeState {
+interface FocusModeState {
   on: boolean
   toggle(): void
   enter(): void

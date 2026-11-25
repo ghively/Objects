@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 
-export interface EdgeLabelProps {
+interface EdgeLabelProps {
   edgeId: string
   x: number
   y: number

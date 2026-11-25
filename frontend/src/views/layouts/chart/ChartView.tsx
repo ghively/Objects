@@ -23,7 +23,7 @@ import { LineChart } from './LineChart'
 import type { ChartHit } from './marks'
 
 /** The chart's height in px (our choice; horizontal bars grow to fit their rows). */
-export const CHART_HEIGHT = 300
+const CHART_HEIGHT = 300
 /** Width used before the frame is measured (and in tests). */
 const FALLBACK_WIDTH = 640
 /** The picked group lists this many rows, then "Show all" (our choice). */
@@ -32,7 +32,7 @@ export const DRILL_PAGE = 100
 /** Our strings. */
 export const SHOW_AS_TABLE = 'Show as table'
 export const NOT_A_FILTER = 'This group can’t be expressed as a filter, so it can’t be shown as a table.'
-export const NOTHING_TO_CHART = 'Nothing to chart.'
+const NOTHING_TO_CHART = 'Nothing to chart.'
 
 interface Picked {
   categoryId: string

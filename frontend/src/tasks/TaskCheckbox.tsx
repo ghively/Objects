@@ -35,7 +35,7 @@ import './tasks.css'
 const SHORTCUT_HINT = 'Click to toggle between "Open" and "Done".\n\nCtrl-click to open menu for all status options.'
 
 /** Skip and Excuse with their tooltips ("Excuse for {date}" is the overdue dialog's button). */
-export const RECURRENCE_MENU_TEXT = {
+const RECURRENCE_MENU_TEXT = {
   skip: 'Skip',
   skipTooltip: 'Jump to the next date without completing this one. Breaks your streak and counts as a skip.',
   excuse: 'Excuse',

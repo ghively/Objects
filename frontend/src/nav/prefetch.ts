@@ -4,7 +4,7 @@
  * open 0.7 s slower on a small space). The loads run off the startup path and never
  * block it; a loader that fails is left to its `React.lazy` boundary to retry.
  */
-export type Loader = () => Promise<unknown>
+type Loader = () => Promise<unknown>
 
 type IdleWindow = Window & {
   requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number

@@ -43,7 +43,7 @@ const inputClass =
   'h-8 min-w-0 rounded-md border border-line bg-transparent px-2 text-[13px] font-normal outline-none focus:border-fg-muted disabled:opacity-50'
 const selectClass = 'h-8 min-w-0 rounded-md border border-line bg-raised px-2 text-[13px] font-normal disabled:opacity-50'
 
-export interface MappingEditorProps {
+interface MappingEditorProps {
   preview: ImportPreview
   mapping: ImportMapping
   onChange(next: ImportMapping): void

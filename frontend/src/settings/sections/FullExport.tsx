@@ -70,7 +70,7 @@ export const FULL_EXPORT_SEARCH: string[] = [
 export const JOB_POLL_MS = 400
 
 /** Longest folder path the server accepts (`settings.WORK_ALERT_FOLDER_MAX`, shared). */
-export const MAX_EXPORT_FOLDER = 500
+const MAX_EXPORT_FOLDER = 500
 
 const INPUT =
   'h-9 w-full max-w-[420px] rounded-md border border-line bg-raised px-2 text-[15px] text-fg outline-none focus:border-fg-muted'

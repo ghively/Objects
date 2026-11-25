@@ -53,7 +53,7 @@ export function mentionRows(occurrences: readonly Occurrence[]): MentionRow[] {
   return rows.map(({ occurrences: o, context, contextStart }) => ({ occurrences: o, context, contextStart }))
 }
 
-export interface MentionDisplay {
+interface MentionDisplay {
   /** What the row shows. */
   text: string
   /** The matches in `text`, as `[start, end)` offsets of the string. */

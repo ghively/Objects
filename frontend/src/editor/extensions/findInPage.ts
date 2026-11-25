@@ -16,13 +16,13 @@ import { findRegExp, NO_FIND_OPTIONS, type FindOptions } from '@/find/findText'
 export type { FindOptions } from '@/find/findText'
 
 /** A match in document positions. `atom` is set when it covers (part of) a non-text node. */
-export interface DocMatch {
+interface DocMatch {
   from: number
   to: number
   atom: boolean
 }
 
-export interface FindPluginState extends FindOptions {
+interface FindPluginState extends FindOptions {
   query: string
   /** The current match, or -1 when there is none. */
   index: number
@@ -36,10 +36,10 @@ type FindMeta =
   | { type: 'set'; query: string; matchCase: boolean; wholeWord: boolean }
   | { type: 'move'; delta: 1 | -1 }
 
-export const findInPageKey = new PluginKey<FindPluginState>('findInPage')
+const findInPageKey = new PluginKey<FindPluginState>('findInPage')
 
-export const FIND_MATCH_CLASS = 'find-match'
-export const FIND_MATCH_CURRENT_CLASS = 'find-match-current'
+const FIND_MATCH_CLASS = 'find-match'
+const FIND_MATCH_CURRENT_CLASS = 'find-match-current'
 
 /** One run of a textblock's inline content, in the searchable text and in the document. */
 interface Segment {
@@ -59,7 +59,7 @@ function inlineLabel(node: PMNode): string {
 }
 
 /** Every match of the query in `doc`, in document order. */
-export function findDocMatches(doc: PMNode, query: string, opts: FindOptions = NO_FIND_OPTIONS): DocMatch[] {
+function findDocMatches(doc: PMNode, query: string, opts: FindOptions = NO_FIND_OPTIONS): DocMatch[] {
   const re = findRegExp(query, opts)
   if (!re) return []
   const out: DocMatch[] = []
@@ -121,7 +121,7 @@ const EMPTY: FindPluginState = {
   scroll: 0,
 }
 
-export function getFindState(state: EditorState): FindPluginState {
+function getFindState(state: EditorState): FindPluginState {
   return findInPageKey.getState(state) ?? EMPTY
 }
 

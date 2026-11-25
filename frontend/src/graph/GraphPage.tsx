@@ -18,14 +18,14 @@ import { bestMatch, filterGraph } from './filterGraph'
 import { useGraphData } from './useGraphData'
 import { useGraphUi } from './useGraphUi'
 
-export const GRAPH_TEXT = {
+const GRAPH_TEXT = {
   heading: 'Graph',
   emptyTitle: 'Nothing to show',
   emptyDescription: 'This graph has no nodes yet.',
   emptyFiltered: 'Your filters hide every node in this graph.',
 }
 
-export interface GraphPageProps {
+interface GraphPageProps {
   onOpenTarget: (target: Target, opts?: OpenOptions) => void
 }
 

@@ -46,7 +46,7 @@ export async function concernsRange(path: string, from: string, to: string): Pro
  * timeline and warnings. `summaries` holds only some of them (the server leaves out the created,
  * updated, backlinks, references and timeline paths), so membership is read from the days.
  */
-export function rangePathSet(res: CalendarRange): Set<string> {
+function rangePathSet(res: CalendarRange): Set<string> {
   const out = new Set<string>(Object.keys(res.summaries ?? {}))
   for (const cd of Object.values(res.days ?? {})) {
     if (!cd) continue
@@ -64,7 +64,7 @@ export function rangePathSet(res: CalendarRange): Set<string> {
   return out
 }
 
-export interface CalendarRangeState {
+interface CalendarRangeState {
   data: CalendarRange | null
   loading: boolean
   reload(): void

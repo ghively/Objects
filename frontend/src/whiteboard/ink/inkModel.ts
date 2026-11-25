@@ -47,7 +47,7 @@ export const INK_COLORS: readonly { name: ThemeColor; hex: string }[] = THEME_CO
 export const DEFAULT_INK: InkToolState = { tool: 'pen', color: LINE_HEX.gray, width: 4 }
 
 /** The theme colour name for a stored hex, if it is one of ours. */
-export function inkColorName(hex: string): ThemeColor | undefined {
+function inkColorName(hex: string): ThemeColor | undefined {
   const h = hex.toLowerCase()
   return INK_COLORS.find((c) => c.hex === h)?.name
 }
@@ -228,7 +228,7 @@ export function strokeBounds(stroke: Pick<InkStroke, 'points'>): Bounds {
   return { minX, minY, maxX, maxY }
 }
 
-export function pointSegDist2(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+function pointSegDist2(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax
   const dy = by - ay
   const len2 = dx * dx + dy * dy

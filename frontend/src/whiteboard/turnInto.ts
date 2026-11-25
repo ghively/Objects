@@ -40,7 +40,7 @@ export function embeddedLink(markdown: string): string | null {
  * The height a text node is laid out with before it is measured: one grid cell per line, at
  * least two (our estimate; the node sizes itself to its text once shown).
  */
-export function estimatedTextHeight(markdown: string): number {
+function estimatedTextHeight(markdown: string): number {
   const lines = markdown.replace(/\r\n?/g, '\n').split('\n').length
   return Math.max(GRID * 2, lines * GRID)
 }

@@ -5,7 +5,7 @@
 import { ApiError } from './client'
 
 /** Bytes and files of one part. */
-export interface StoragePart {
+interface StoragePart {
   bytes: number
   files: number
 }
@@ -23,7 +23,7 @@ export interface StorageEstimate {
 }
 
 /** POST /api/storage/clear-media-cache: what was freed. */
-export interface ClearedMediaCache {
+interface ClearedMediaCache {
   files: number
   bytes: number
 }

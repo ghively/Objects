@@ -25,9 +25,9 @@ export const DEFAULT_COL_WIDTH: Partial<Record<PropertyType, number>> = {
   textList: 16,
   floorItems: 12,
 }
-export const FALLBACK_COL_WIDTH = 12
-export const MIN_COL_WIDTH = 2
-export const MAX_COL_WIDTH = 50
+const FALLBACK_COL_WIDTH = 12
+const MIN_COL_WIDTH = 2
+const MAX_COL_WIDTH = 50
 
 export const clampWidth = (rem: number): number => Math.min(MAX_COL_WIDTH, Math.max(MIN_COL_WIDTH, rem))
 

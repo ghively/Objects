@@ -22,19 +22,19 @@ import { placeObjectOnBoard, TURN_INTO_FAILED } from './turnInto'
 export const ADD_TO_WHITEBOARD = 'Add to whiteboard'
 export const NEW_WHITEBOARD = 'New whiteboard'
 /** Our strings. */
-export const SEARCH_WHITEBOARDS = 'Search whiteboards'
-export const NO_WHITEBOARDS = 'No whiteboards found'
-export function addedTo(title: string): string {
+const SEARCH_WHITEBOARDS = 'Search whiteboards'
+const NO_WHITEBOARDS = 'No whiteboards found'
+function addedTo(title: string): string {
   return `Added to ${title}`
 }
 
 /** The dialog's outcome for a caller that waits (`addObjectToWhiteboard`). */
-export interface AddToWhiteboardPending {
+interface AddToWhiteboardPending {
   resolve(boardPath: string): void
   reject(reason: unknown): void
 }
 
-export interface AddToWhiteboardState {
+interface AddToWhiteboardState {
   /** The object to add; null when closed. */
   objectPath: string | null
   pending: AddToWhiteboardPending | null
@@ -70,7 +70,7 @@ function finish(boardPath: string) {
   pending?.resolve(boardPath)
 }
 
-export interface AddToWhiteboardDialogProps {
+interface AddToWhiteboardDialogProps {
   /** Tests inject the whiteboard routes. */
   client?: Pick<WhiteboardApi, 'board' | 'saveBoard' | 'createWhiteboard'>
 }

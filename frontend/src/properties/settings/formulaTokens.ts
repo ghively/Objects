@@ -14,7 +14,7 @@ export type FormulaTokenKind =
   | 'space'
   | 'other'
 
-export interface FormulaToken {
+interface FormulaToken {
   kind: FormulaTokenKind
   text: string
 }

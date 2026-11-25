@@ -24,7 +24,7 @@ export const COUNTERPART_TEXT = {
 
 const COUNTERPART_ICON = 'ph-arrows-left-right'
 
-export interface CounterpartRowsProps {
+interface CounterpartRowsProps {
   /** `ObjectDetail.counterparts`: one per source type and key. */
   rows: CounterpartRow[]
   /** The type's virtual counterpart definitions (`TypeDef.counterparts`). */
@@ -44,7 +44,7 @@ export interface CounterpartRowsProps {
 }
 
 /** One row on the page: the rows with one key, merged, under one definition. */
-export interface MergedCounterpart {
+interface MergedCounterpart {
   key: string
   def: PropertyDef
   /** The `CounterpartRow`s merged here (one per source type). */

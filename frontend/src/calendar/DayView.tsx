@@ -22,7 +22,7 @@ import { useWeekStart } from './useCalendar'
  * "Open Work" and opens the Work page's Today, as before. Both are the `work` target on `today`: with
  * Work off the app shows the Tasks page's Today list for it. Not shown while the space hides Tasks.
  */
-export const TODAYS_TASKS_LINK = { tasks: `Open ${TASKS}`, work: `Open ${WORK}` } as const
+const TODAYS_TASKS_LINK = { tasks: `Open ${TASKS}`, work: `Open ${WORK}` } as const
 
 /** Today's task list (Ctrl/Cmd+click: in a new tab). */
 function TodaysTasksLink() {
@@ -41,7 +41,7 @@ function TodaysTasksLink() {
   )
 }
 
-export interface DayViewProps {
+interface DayViewProps {
   day: Day
   onOpenTarget?: (t: Target) => void
 }

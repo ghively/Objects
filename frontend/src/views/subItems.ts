@@ -7,7 +7,7 @@
 // top-level rows, keep the input's order, so the view's sort applies among siblings.
 import type { Row } from '@/api/types'
 
-export interface RowTree {
+interface RowTree {
   /** Top-level rows, in input order. */
   roots: Row[]
   /** Path -> its child rows, in input order (only parents that have some). */

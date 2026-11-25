@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { WB } from '../strings'
 
-export interface ClearBoardDialogProps {
+interface ClearBoardDialogProps {
   open: boolean
   onOpenChange(open: boolean): void
   onConfirm(): void

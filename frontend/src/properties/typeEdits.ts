@@ -133,7 +133,7 @@ function defaultOptions(kind: PropertyType): PropertyOptions {
   }
 }
 
-export interface NewProperty {
+interface NewProperty {
   name: string
   icon?: Icon | null
   description?: string

@@ -22,7 +22,7 @@ export function canDeleteProperty(type: TypeDef, def: PropertyDef): boolean {
   return !type.basic && def.type !== 'entity_title'
 }
 
-export interface PropertyMenuProps {
+interface PropertyMenuProps {
   type: TypeDef
   def: PropertyDef
   /** Save the edited type. */

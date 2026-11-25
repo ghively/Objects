@@ -28,7 +28,7 @@ export const SELECTED_EDGE_COLOR = 'var(--color-border-block-selection)'
 /** Width of the invisible hit stroke around a connector (our choice). */
 export const EDGE_HIT_WIDTH = 20
 
-export interface EdgeGeometry {
+interface EdgeGeometry {
   sourceX: number
   sourceY: number
   targetX: number
@@ -37,7 +37,7 @@ export interface EdgeGeometry {
   targetPosition?: Position
 }
 
-export interface EdgePath {
+interface EdgePath {
   path: string
   labelX: number
   labelY: number
@@ -62,13 +62,13 @@ export function pathFor(connection: WhiteboardEdgeConnection | undefined, g: Edg
 }
 
 /** Which colour key a connector's markers use: its theme colour, `default`, or `selected`. */
-export type MarkerColorKey = WhiteboardThemeColor | 'default' | 'selected'
+type MarkerColorKey = WhiteboardThemeColor | 'default' | 'selected'
 
 function themeOf(color: string | undefined): WhiteboardThemeColor | null {
   return color && Object.prototype.hasOwnProperty.call(COLOR_VALUES, color) ? (color as WhiteboardThemeColor) : null
 }
 
-export function markerColorKey(edge: Pick<WhiteboardEdge, 'color'>, selected = false): MarkerColorKey {
+function markerColorKey(edge: Pick<WhiteboardEdge, 'color'>, selected = false): MarkerColorKey {
   if (selected) return 'selected'
   return themeOf(edge.color) ?? 'default'
 }
@@ -103,7 +103,7 @@ export function strokeFor(
 }
 
 /** The tip kinds a marker definition exists for. */
-export type TipKind = Exclude<WhiteboardPickerMarker, 'none'>
+type TipKind = Exclude<WhiteboardPickerMarker, 'none'>
 
 /** The id of the `<marker>` for one tip kind in one colour (`orient="auto-start-reverse"` serves both ends). */
 export function markerId(kind: TipKind, color: MarkerColorKey): string {

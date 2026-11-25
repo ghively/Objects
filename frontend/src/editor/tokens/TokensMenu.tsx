@@ -96,7 +96,7 @@ export const TOKENS_MENU_ITEMS: readonly string[] = [
   TOKENS_MENU_TEXT.ai, // M10, while AI features are not hidden
 ]
 
-export type TokensMenuProps = { editor: Editor | null; path: string }
+type TokensMenuProps = { editor: Editor | null; path: string }
 
 type Panel = 'color' | 'create' | 'reuse' | 'link' | null
 
@@ -114,7 +114,7 @@ export function selectionText(editor: Editor): string | null {
 }
 
 /** A title from the selected words: one line, without the characters a `[[link]]` cannot hold (our choice). */
-export function titleFromSelection(text: string): string {
+function titleFromSelection(text: string): string {
   return text
     .replace(/[[\]|#^]/g, ' ')
     .replace(/\s+/g, ' ')
@@ -122,7 +122,7 @@ export function titleFromSelection(text: string): string {
 }
 
 /** Replace the selection with a link to `title` (`label` when the words differ). */
-export function linkSelectionTo(editor: Editor, title: string, label?: string | null): boolean {
+function linkSelectionTo(editor: Editor, title: string, label?: string | null): boolean {
   const { from, to } = editor.state.selection
   const text = label ?? null
   return editor
@@ -133,7 +133,7 @@ export function linkSelectionTo(editor: Editor, title: string, label?: string | 
 }
 
 /** "Make a new note out of the selected text.": the selection becomes `[[Title]]` and a new object of `typeId` gets that title. */
-export async function createObjectFromSelection(editor: Editor, typeId: string, mods: OpenMods = {}): Promise<boolean> {
+async function createObjectFromSelection(editor: Editor, typeId: string, mods: OpenMods = {}): Promise<boolean> {
   const text = selectionText(editor)
   if (text === null) return false
   const title = titleFromSelection(text)
@@ -145,20 +145,20 @@ export async function createObjectFromSelection(editor: Editor, typeId: string, 
 }
 
 /** "Point the selected text at a note you already have.": the selection becomes a link to `object` (by path when its title cannot be a target). */
-export function linkSelectionToObject(editor: Editor, object: Pick<ObjectSummary, 'title' | 'path'>): boolean {
+function linkSelectionToObject(editor: Editor, object: Pick<ObjectSummary, 'title' | 'path'>): boolean {
   const text = selectionText(editor)
   if (text === null) return false
   return linkSelectionTo(editor, wikilinkTargetFor(object), text.trim())
 }
 
 /** The list buttons: the block becomes a `kind` list, or text again when it is one already. */
-export function toggleListFromSelection(editor: Editor, kind: 'bullet' | 'todo'): boolean {
+function toggleListFromSelection(editor: Editor, kind: 'bullet' | 'todo'): boolean {
   const active = editor.isActive(kind === 'bullet' ? 'bulletList' : 'taskList')
   return turnInto(editor, active ? 'text' : kind)
 }
 
 /** "Formula": the selected text becomes an inline formula. */
-export function selectionToFormula(editor: Editor): boolean {
+function selectionToFormula(editor: Editor): boolean {
   const text = selectionText(editor)
   if (text === null) return false
   const { from, to } = editor.state.selection

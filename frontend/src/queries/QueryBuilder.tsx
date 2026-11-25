@@ -58,7 +58,7 @@ export function isSingleTypeQuery(def: QueryDefinition, typeId: string): boolean
 }
 
 /** The lock of a constrained query: its type, and what "release" does (the type page's). */
-export interface QueryConstraint {
+interface QueryConstraint {
   type: TypeDef
   onRelease(): void
 }
@@ -127,7 +127,7 @@ function Chip({ children, onRemove, label }: { children: ReactNode; onRemove?():
 type TypeEntry = QueryDefinition['types'][number]
 
 /** The collection filter of one type entry, as the label the chip shows. */
-export function collectionFilterLabel(s: TypeEntry): string {
+function collectionFilterLabel(s: TypeEntry): string {
   if (s.inNoCollection) return BUILDER_TEXT.inNoCollection
   if (s.inAnyCollection) return BUILDER_TEXT.inAnyCollection
   if (s.collectionIds?.length) return BUILDER_TEXT.collectionsSelected(s.collectionIds.length)
@@ -488,7 +488,7 @@ function SearchSection({ def, onChange }: { def: QueryDefinition; onChange(e: Ed
 
 // ---- Limit ----
 
-export function limitLabel(limit: QueryDefinition['limit']): string {
+function limitLabel(limit: QueryDefinition['limit']): string {
   if (!limit) return BUILDER_TEXT.noLimit
   return `${limit.random ? 'random' : 'first'} ${limit.size}`
 }
@@ -532,7 +532,7 @@ function LimitSection({ def, onChange }: { def: QueryDefinition; onChange(e: Edi
   )
 }
 
-export interface QueryBuilderProps {
+interface QueryBuilderProps {
   query: Query
   types: TypeDef[]
   collections: Collection[]

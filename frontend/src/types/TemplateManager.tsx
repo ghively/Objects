@@ -77,7 +77,7 @@ function templateName(t: ObjectSummary): string {
   return t.template || t.title
 }
 
-export interface TemplateManagerProps {
+interface TemplateManagerProps {
   typeId: string
   /** "Edit Template": open the template object. */
   onOpenTemplate?(path: string): void

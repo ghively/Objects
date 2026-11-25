@@ -19,7 +19,7 @@ import { AGENT_TEXT as T } from './agentText'
 import { ToolSwitches } from './ToolSwitches'
 import { useAgents } from './useAgents'
 
-export interface NewAgentDialogProps {
+interface NewAgentDialogProps {
   open: boolean
   onOpenChange(o: boolean): void
   /** Opened from a row's "Duplicate": start from a duplicate of this agent. */
@@ -40,7 +40,7 @@ export function iconValue(icon: string | null): IconValue | null {
 }
 
 /** The switched-off ids of a served catalogue (its default states). */
-export function offOf(groups: ToolGroup[]): string[] {
+function offOf(groups: ToolGroup[]): string[] {
   return groups.flatMap((g) => g.tools.filter((t) => !t.on).map((t) => t.id))
 }
 

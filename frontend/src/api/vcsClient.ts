@@ -5,16 +5,16 @@ import { ApiError, CLIENT_ID, ConflictError } from './client'
 
 const BASE = '/api/vcs'
 
-export type VcsTarget = 'space' | 'state'
+type VcsTarget = 'space' | 'state'
 
-export interface VcsCommitInfo {
+interface VcsCommitInfo {
   sha: string
   short: string
   at: string
   message: string
 }
 
-export interface VcsRemoteStatus {
+interface VcsRemoteStatus {
   name: string
   url: string | null
   branch: string
@@ -49,12 +49,12 @@ export interface VcsStatus {
   settings?: VcsSettings
 }
 
-export interface VcsSettings {
+interface VcsSettings {
   commitDelaySeconds: number
   pushDelaySeconds: number
 }
 
-export interface VcsFileChange {
+interface VcsFileChange {
   status: string
   path: string
   oldPath?: string
@@ -81,7 +81,7 @@ export interface VcsFileVersion extends VcsCommitInfo {
   status: string
 }
 
-export interface EnableAllResult {
+interface EnableAllResult {
   path: string
   name: string
   ok: boolean

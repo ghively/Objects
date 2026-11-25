@@ -15,10 +15,10 @@ import type { ObjectPickerProps } from '../canvasTypes'
 import { WB } from '../strings'
 
 /** How many objects the list shows at once. */
-export const PICKER_LIMIT = 50
+const PICKER_LIMIT = 50
 
 /** Our string. */
-export const NOTHING_FOUND = 'Nothing found'
+const NOTHING_FOUND = 'Nothing found'
 
 const byPluralName = (a: TypeDef, b: TypeDef) => typePlural(a).localeCompare(typePlural(b), undefined, { sensitivity: 'base' })
 

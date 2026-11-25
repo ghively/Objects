@@ -7,7 +7,7 @@ function filters(group: FilterGroup): Filter[] {
   return group.elements.flatMap((e) => (e.type === 'filter' ? [e] : filters(e)))
 }
 
-export function viewSummaryParts(state: ViewState, choices: PropChoice[]): string[] {
+function viewSummaryParts(state: ViewState, choices: PropChoice[]): string[] {
   const name = (key: string) => choices.find((c) => c.key === key)?.name ?? key
   const parts: string[] = []
   const fs = filters(state.filterGroup)

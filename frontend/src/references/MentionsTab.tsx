@@ -22,7 +22,7 @@ import { EmptyLine, EntryHeader, openReference } from './BacklinksTab'
 import { mentionRows, rowDisplay, type MentionRow } from './mentionRows'
 import { REFERENCES_TEXT } from './referencesUi'
 
-export interface MentionsTabProps {
+interface MentionsTabProps {
   /** The mentioned object: the one the references section belongs to. */
   target: string
   entries: MentionEntry[]

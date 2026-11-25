@@ -9,7 +9,7 @@ import type { ReferencesTab } from '@/api/types'
 export type CountedTab = Extract<ReferencesTab, 'backlinks' | 'mentions'>
 
 /** The numbers of one note's section; a tab the section does not show (hidden in Settings) is 0. */
-export interface ReferenceCountsOf {
+interface ReferenceCountsOf {
   backlinks: number
   mentions: number
 }

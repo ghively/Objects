@@ -56,7 +56,7 @@ export const FORMULA_CONSTANTS = new Set(['E', 'PHI', 'PI', 'RAND', 'TAU'])
 export const FORMULA_PLACEHOLDER = 'Formula'
 export const FORMULA_NO_OPTIONS = 'No options found'
 
-export type FormulaErrorKind = 'circular' | 'expression' | 'reference' | 'value'
+type FormulaErrorKind = 'circular' | 'expression' | 'reference' | 'value'
 
 export const FORMULA_ERROR_TITLES: Record<FormulaErrorKind, string> = {
   circular: 'Circular',
@@ -77,13 +77,13 @@ export const FORMULA_ERROR_MESSAGES = {
   invalidExpression: 'The formula expression is invalid.',
 } as const
 
-export type FormulaMessage = keyof typeof FORMULA_ERROR_MESSAGES
+type FormulaMessage = keyof typeof FORMULA_ERROR_MESSAGES
 
 export type FormulaError = { kind: FormulaErrorKind; title: string; message: string }
 
 export type FormulaResult = { ok: true; value: number } | { ok: false; error: FormulaError }
 
-export type CellAt = { row: number; col: number }
+type CellAt = { row: number; col: number }
 
 function fail(kind: FormulaErrorKind, message: FormulaMessage): FormulaResult {
   return { ok: false, error: { kind, title: FORMULA_ERROR_TITLES[kind], message: FORMULA_ERROR_MESSAGES[message] } }
@@ -203,7 +203,7 @@ function tokenize(src: string): Token[] {
 /** A value inside an expression: a number, or the numbers of a range (function arguments only). */
 type Value = number | { range: number[] }
 
-export type FormulaGrid = ReadonlyArray<ReadonlyArray<string>>
+type FormulaGrid = ReadonlyArray<ReadonlyArray<string>>
 
 type Context = {
   grid: FormulaGrid
@@ -495,7 +495,7 @@ function evaluateExpression(ctx: Context, expr: string): FormulaResult {
   }
 }
 
-export type EvaluateOptions = { random?: () => number }
+type EvaluateOptions = { random?: () => number }
 
 /**
  * Evaluate the formula `text` (with or without its `=`) against `grid` (each

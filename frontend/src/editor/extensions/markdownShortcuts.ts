@@ -44,7 +44,7 @@ type Parsed = { heading?: number; list?: ListType; quote?: boolean; toggle?: boo
 const TOKEN = /\||>|\(\)|\[\]|[*-]|\d+\.|a\)|i\)|#{1,4}/y
 
 /** What the `>` mark makes (the device setting `greaterThanMakes`). */
-export type GreaterThanMakes = 'toggle' | 'quote'
+type GreaterThanMakes = 'toggle' | 'quote'
 
 /**
  * The marks in `run`, or null when it is not a run of marks (or repeats a kind). `greaterThan`:
@@ -84,7 +84,7 @@ function builtIn(run: string): boolean {
   return /^(?:[*-]|\d+\.|#{1,4})$/.test(run)
 }
 
-export type MarkdownShortcutsOptions = {
+type MarkdownShortcutsOptions = {
   /** `false` when numbered-list detection is off (`1.` is then no mark, alone or combined). */
   numbered: boolean
   /**

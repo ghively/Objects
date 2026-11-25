@@ -5,7 +5,7 @@ import { InlineToken } from '../cards/InlineToken'
 import { MIN_ROW_HEIGHT } from '../model'
 import { cn } from '@/lib/utils'
 
-export interface ListLayoutProps {
+interface ListLayoutProps {
   rows: Row[]
   typesById: Record<string, TypeDef>
   /** The view spans several types: rows show a type chip. */

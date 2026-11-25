@@ -10,7 +10,7 @@ import { followStorage, switchStoreSpace } from './spaceStorage'
 
 export const RECENT_LIMIT = 50
 
-export interface RecentState {
+interface RecentState {
   paths: string[]
   /** When each path in `paths` was last opened (epoch ms); missing for older entries. */
   openedAt: Record<string, number>

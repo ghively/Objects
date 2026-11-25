@@ -4,7 +4,7 @@
  */
 import { create } from 'zustand'
 
-export interface VersionHistoryState {
+interface VersionHistoryState {
   /** The object (or board) whose history is shown; null when closed. */
   path: string | null
   open(path: string): void

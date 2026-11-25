@@ -36,12 +36,12 @@ import {
 import { BLOCK_ID_SUFFIX } from '../blocks'
 import { colorStyle } from '../menus/colors'
 
-export const LIST_ITEM_TYPES = new Set(['listItem', 'taskItem'])
+const LIST_ITEM_TYPES = new Set(['listItem', 'taskItem'])
 
-export type ItemOptionsPatch = Partial<Record<'small' | 'color' | 'align' | 'icon', string | true | null>>
+type ItemOptionsPatch = Partial<Record<'small' | 'color' | 'align' | 'icon', string | true | null>>
 
 /** The comment the atom writes: as read while its options are unchanged, else canonical. */
-export function itemCommentMarkdown(options: readonly Option[] | null | undefined, raw: string | null | undefined): string {
+function itemCommentMarkdown(options: readonly Option[] | null | undefined, raw: string | null | undefined): string {
   const opts = options ?? []
   if (raw) {
     const parsed = parseItemComment(raw)
@@ -61,7 +61,7 @@ export function listItemAt(tr: Transaction): { node: PMNode; pos: number } | nul
 }
 
 /** The options atom in a list item's first text block, with its position. */
-export function itemOptionsNode(item: PMNode, itemPos: number): { node: PMNode; pos: number } | null {
+function itemOptionsNode(item: PMNode, itemPos: number): { node: PMNode; pos: number } | null {
   const first = item.firstChild
   if (!first || !first.isTextblock) return null
   let found: { node: PMNode; pos: number } | null = null
@@ -140,7 +140,7 @@ declare module '@tiptap/core' {
 }
 
 /** The DOM attributes an item's options give its `<li>`. */
-export function itemOptionAttrs(options: readonly Option[]): Record<string, string> {
+function itemOptionAttrs(options: readonly Option[]): Record<string, string> {
   const out: Record<string, string> = {}
   for (const o of options) {
     if (!isKnownValue(o)) continue

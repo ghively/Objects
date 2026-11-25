@@ -42,7 +42,7 @@ import {
 import { clearReferenceCounts, publishReferenceCounts, useReferencesTabAsk } from './referenceCounts'
 import { useReferences, type ReloadOptions } from './useReferences'
 
-export interface ReferencesSectionProps {
+interface ReferencesSectionProps {
   path: string
   summary: ObjectSummary
   type?: TypeDef

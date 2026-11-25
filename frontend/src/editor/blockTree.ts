@@ -25,9 +25,9 @@ export const MAX_DEPTH = 8
 /** A columns block holds at most this many columns (Task 7's `column{1,6}`); more stays plain. */
 export const MAX_COLUMNS = 6
 
-export type AnnotationLine = { raw: string /* the line with its EOL */; parsed: Annotation }
+type AnnotationLine = { raw: string /* the line with its EOL */; parsed: Annotation }
 
-export type LeafNode = { kind: 'leaf'; block: SourceBlock; annotation?: AnnotationLine }
+type LeafNode = { kind: 'leaf'; block: SourceBlock; annotation?: AnnotationLine }
 export type ContainerNode = {
   kind: 'container'
   name: ContainerName
@@ -79,7 +79,7 @@ export function blockTargets(block: SourceBlock): OptionTarget[] {
 }
 
 /** A leaf annotation applies when every known option applies to the block (unknown keys are neutral). */
-export function annotationApplies(a: Annotation, block: SourceBlock): boolean {
+function annotationApplies(a: Annotation, block: SourceBlock): boolean {
   if (a.type !== 'leaf') return false
   const targets = blockTargets(block)
   if (targets.length === 0) return false

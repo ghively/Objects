@@ -9,7 +9,7 @@ import { api, ConflictError } from '@/api/client'
 import type { DataViewDefinition, RelationPairKind, RelationPairResult, TypeDef, ViewState } from '@/api/types'
 import { Icon } from '@/components/Icon'
 
-export interface RelationPairsPageProps {
+interface RelationPairsPageProps {
   /** The view's one type (the page is offered only on single-type views). */
   type: TypeDef
   state: ViewState
@@ -17,7 +17,7 @@ export interface RelationPairsPageProps {
 }
 
 /** Our strings. */
-export const RELATION_PAIRS_TEXT = {
+const RELATION_PAIRS_TEXT = {
   subItems: { title: 'Sub-items', hint: 'Nest items under their parent item.', on: 'Turn on sub-items' },
   dependencies: { title: 'Dependencies', hint: 'Mark items as blocked by other items.', on: 'Turn on dependencies' },
   isOn: 'On',
@@ -31,7 +31,7 @@ export const RELATION_PAIRS_TEXT = {
 const CONFIG_KEY = { subItems: 'subItemsConfig', dependencies: 'dependenciesConfig' } as const
 
 /** The view definition with the pair's property keys stored (from the server's answer); null if they're missing. */
-export function withPair(def: DataViewDefinition, kind: RelationPairKind, res: RelationPairResult): DataViewDefinition | null {
+function withPair(def: DataViewDefinition, kind: RelationPairKind, res: RelationPairResult): DataViewDefinition | null {
   const key = (id: string) => res.type.propertyDefinitions.find((p) => p.id === id)?.key
   const first = key(res.firstId)
   const second = key(res.secondId)
@@ -42,7 +42,7 @@ export function withPair(def: DataViewDefinition, kind: RelationPairKind, res: R
 }
 
 /** Whether the view's stored pair still names two properties of the type. */
-export function pairIsOn(type: TypeDef, def: DataViewDefinition, kind: RelationPairKind): boolean {
+function pairIsOn(type: TypeDef, def: DataViewDefinition, kind: RelationPairKind): boolean {
   const keys =
     kind === 'subItems'
       ? [def.subItemsConfig?.parentPropertyId, def.subItemsConfig?.childrenPropertyId]

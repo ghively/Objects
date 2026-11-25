@@ -41,7 +41,7 @@ export const TASKS_PAGE_TABS: readonly { key: TasksTabKey; label: string; sectio
 export const TASKS_MORE_LISTS: readonly TaskSectionKey[] = ['status', 'deadline', 'recurring', 'reminders', 'tags', 'source']
 
 /** How many days after today Upcoming lists day by day. */
-export const UPCOMING_DAYS = 14
+const UPCOMING_DAYS = 14
 
 export const TASK_TABS_TEXT = {
   overdue: 'Overdue',
@@ -97,7 +97,7 @@ export function deadlineDayOf(row: Row): string | null {
   return spanOf(row) ? null : dueDayOf(row)
 }
 
-export interface TaskPlace {
+interface TaskPlace {
   /** The one list of Today, Upcoming and Inbox the task is on. */
   list: 'today' | 'upcoming' | 'inbox'
   /** On Today, under "Overdue": not done, and its date ended (or, with no date, its deadline was) before today. */

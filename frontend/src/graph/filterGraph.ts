@@ -24,7 +24,7 @@ export const MIN_HOPS = 1
 export const MAX_HOPS = 5
 export const DEFAULT_HOPS = 1
 
-export type GraphScope = { kind: 'global' } | { kind: 'local'; center: number; hops: number }
+type GraphScope = { kind: 'global' } | { kind: 'local'; center: number; hops: number }
 
 export interface VisibleGraph {
   /** Shown node indexes, ascending (reduced nodes included). */
@@ -95,7 +95,7 @@ export function linkDir(data: GraphData, k: number): number {
   return data.linkDirs?.[k] || 3
 }
 
-export interface LinkStats {
+interface LinkStats {
   /** A node's weight: its links plus its backlinks (a tag's tagged objects count as backlinks). */
   weight: Int32Array
   /** Distinct backlinks: objects linking to the node, and for a tag the objects carrying it. */
@@ -167,7 +167,7 @@ export function excludedEntirely(data: GraphData, custom: GraphCustomization, i:
 }
 
 /** True when a filter reduces node `i` (type filter, exclude, "Hide dates"). */
-export function reducedByFilters(data: GraphData, custom: GraphCustomization, i: number): boolean {
+function reducedByFilters(data: GraphData, custom: GraphCustomization, i: number): boolean {
   const node = data.nodes[i]
   const filter = custom.filterTypeIds ?? []
   const exclude = custom.excludeTypeIds ?? []

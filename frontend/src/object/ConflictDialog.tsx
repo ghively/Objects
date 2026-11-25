@@ -6,7 +6,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { stemOf } from '@/links/linkIndex'
 
-export interface ConflictDialogProps {
+interface ConflictDialogProps {
   open: boolean
   path: string
   /** The editor's current body (with the unsaved edits). */

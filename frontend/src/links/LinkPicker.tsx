@@ -44,7 +44,7 @@ import { isWhiteboardType } from '@/whiteboard/isWhiteboard'
 import { ensureLinkIndex, invalidateLinkIndex, typeOf, useLinkIndex } from './linkIndex'
 
 /** M29, our string: the row that lists the other types a new object can be made of. */
-export const LINK_PICKER_TEXT = { otherTypes: 'Other types' }
+const LINK_PICKER_TEXT = { otherTypes: 'Other types' }
 
 /**
  * M29: the types a create row may make an object of: not read-only and not DailyNote (a daily
@@ -68,10 +68,10 @@ export async function createTitled(t: TypeDef, title: string): Promise<{ path: s
   return res
 }
 
-export type LinkPickerMode = 'link' | 'embed'
+type LinkPickerMode = 'link' | 'embed'
 
 /** True when choosing should make an object block: the trigger is all an otherwise empty paragraph holds. */
-export function blockLinkAt(editor: Editor, range: { from: number; to: number }): boolean {
+function blockLinkAt(editor: Editor, range: { from: number; to: number }): boolean {
   if (useSettings.getState().settings.alwaysCreateInlineLinks) return false
   const text = editor.state.doc.textBetween(range.from, range.to, '\0', '\0')
   if (!isOpener(text)) return false

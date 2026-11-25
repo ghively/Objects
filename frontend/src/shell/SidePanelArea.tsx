@@ -45,7 +45,7 @@ import { EXPLORE_TEXT, ExplorePanel } from './ExplorePanel'
 /** The drag data of a side-panel entry dragged by its title (its id). */
 export const SIDEPANEL_ENTRY_MIME = 'application/x-object-sidepanel-entry'
 
-export const SIDEPANEL_TEXT = {
+const SIDEPANEL_TEXT = {
   tabList: 'Browse sidepanel tabs',
   newEntry: 'New Sidepanel Tab',
   swap: 'Swap',
@@ -109,7 +109,7 @@ function HeaderButton({
   )
 }
 
-export function EntryLabel({ entry, space }: { entry: SidepanelEntry; space: SpaceInfo | null }) {
+function EntryLabel({ entry, space }: { entry: SidepanelEntry; space: SpaceInfo | null }) {
   if (isAiChatTarget(entry.target)) {
     return (
       <>
@@ -137,7 +137,7 @@ export function EntryLabel({ entry, space }: { entry: SidepanelEntry; space: Spa
   return <TargetLabel target={entry.target as Target | null} space={space} emptyTitle={EMPTY_ENTRY_TITLE} />
 }
 
-export interface SidePanelAreaProps {
+interface SidePanelAreaProps {
   area: PanelArea
   /** The entries of this area, in order; one of them is open. */
   entries: SidepanelEntry[]

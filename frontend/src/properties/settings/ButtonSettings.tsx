@@ -9,7 +9,7 @@ import { RuleEditorDialog } from '@/automations/RuleEditor'
 import { RULE_PICKER_TEXT, RulePicker } from '@/automations/RulePicker'
 import { BUTTON_TEXT, reloadAutomations, useAutomations } from '@/automations/useAutomations'
 
-export const BUTTON_SETTINGS_TEXT = {
+const BUTTON_SETTINGS_TEXT = {
   title: RULE_PICKER_TEXT.label,
   description: 'The automation the button runs on its note.',
   choose: 'Choose an automation',

@@ -17,7 +17,7 @@ import type { MultiDayViewProps } from './ThreeDaysView'
 import { useCalendar } from './useCalendar'
 import { useCalendarRange } from './useCalendarRange'
 
-export const MONTH_TEXT = {
+const MONTH_TEXT = {
   empty: 'This month has no daily notes yet.',
   /** Shown under the month's empty line. */
   emptyHint: 'Create a note to see it here.',
@@ -31,7 +31,7 @@ export const MONTH_TEXT = {
  * The day "+ New object" creates (or opens, when it exists) a daily note for: today when the shown
  * month is this month, else the month's first day (our choice).
  */
-export function newObjectDay(monthFrom: Day, today: Day): Day {
+function newObjectDay(monthFrom: Day, today: Day): Day {
   return today.slice(0, 7) === monthFrom.slice(0, 7) ? today : monthFrom
 }
 

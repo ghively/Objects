@@ -19,7 +19,7 @@ import type { TaskOutcome } from './taskActions'
 
 export type TaskBadge = 'date' | 'deadline' | 'occurrence' | 'overdue'
 
-export interface TaskRowExtrasOptions {
+interface TaskRowExtrasOptions {
   /**
    * Calendar entry kinds this row stands for (Task 13's day sections): `deadline` shows a
    * "Deadline" badge, `occurrence` a repeat icon; `date` and `overdue` need none (the section says it).

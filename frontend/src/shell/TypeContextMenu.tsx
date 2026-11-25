@@ -70,7 +70,7 @@ function TemplateItems({ type }: { type: TypeDef }) {
   )
 }
 
-export interface TypeContextMenuProps {
+interface TypeContextMenuProps {
   type: TypeDef
   onOpenTarget?: (target: Target, opts: { newTab?: boolean }) => void
   onOpenTypeSettings?: (type: TypeDef) => void

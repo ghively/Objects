@@ -22,9 +22,9 @@ import { TokensMenu } from './tokens/TokensMenu'
 import './editor.css'
 import './handles/handles.css'
 
-export const STRING_SAVE_DEBOUNCE_MS = 600
+const STRING_SAVE_DEBOUNCE_MS = 600
 
-export interface StringEditorProps {
+interface StringEditorProps {
   /** The Markdown to edit; read at mount, and again when it changes while the editor is not focused. */
   value: string
   /** The edited Markdown (one trailing newline stripped); never called without an edit. */
@@ -55,7 +55,7 @@ export function stripFinalNewline(s: string): string {
  * empty ones skipped, joined with a space, and line breaks as spaces. Marks and inline nodes
  * are kept; block nodes without text (an image, a divider) are dropped.
  */
-export function oneParagraph(slice: Slice): Slice {
+function oneParagraph(slice: Slice): Slice {
   const first = slice.content.firstChild
   if (!first || first.isInline) return slice
   const schema = first.type.schema

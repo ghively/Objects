@@ -19,7 +19,7 @@ import { computedOperand, filterIsValid, filterOptionsFor, withOperator } from '
 import { MenuSelect, propertyOptions } from './MenuSelect'
 import { choiceFor, type PropChoice } from './properties'
 
-export interface FilterEditorProps {
+interface FilterEditorProps {
   group: FilterGroup
   onChange(next: FilterGroup): void
   choices: PropChoice[]
@@ -28,7 +28,7 @@ export interface FilterEditorProps {
 }
 
 /** The filter editor's strings; "Select…" is ours (for an empty picker). */
-export const FILTER_TEXT = {
+const FILTER_TEXT = {
   selectDate: 'Select date',
   oneSelected: '1 selected',
   elementsSelected: (count: number) => `${count} selected`,

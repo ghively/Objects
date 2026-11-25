@@ -17,7 +17,7 @@ import {
 import { formatDate } from '@/properties/format'
 import { localDayOf, nextDay, type WeekStart } from './repeat'
 
-export const OVERDUE_TEXT = {
+const OVERDUE_TEXT = {
   title: {
     complete: 'Complete a repeating task',
     skip: 'Skip recurring task',
@@ -55,7 +55,7 @@ function showPoint(point: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(point) ? formatDate({ start: point, resolution: 'day' }) : formatDate({ start: point, resolution: 'time' })
 }
 
-export interface OverdueChoice {
+interface OverdueChoice {
   catchUp: CatchUp
   label: string
   hint: string
@@ -85,10 +85,10 @@ export function overdueChoices(action: OccurrenceAction, info: OverdueInfo, rule
 }
 
 /** The count as the description shows it: "{count}+" when the server capped it. */
-export const overdueCount = (info: OverdueInfo): string =>
+const overdueCount = (info: OverdueInfo): string =>
   info.capped ? fill(OVERDUE_TEXT.capped, { count: String(info.count) }) : String(info.count)
 
-export interface RecurringOverdueDialogProps {
+interface RecurringOverdueDialogProps {
   open: boolean
   action: OccurrenceAction
   /** The task's title. */

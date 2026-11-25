@@ -3,7 +3,7 @@
 import { vi } from 'vitest'
 import type { DesktopControls, DesktopPlatform, ObjectDesktop, WindowButtons } from './bridge'
 
-export interface FakeDesktop {
+interface FakeDesktop {
   bridge: ObjectDesktop
   /** The shell says the window was maximised, restored, or went in or out of full screen. */
   emitWindowState(s: { maximized: boolean; fullScreen: boolean }): void

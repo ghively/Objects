@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-export interface BoardHeaderProps {
+interface BoardHeaderProps {
   title: string
   /** Renaming is off (deleted, or the title isn't loaded yet). */
   readOnly?: boolean

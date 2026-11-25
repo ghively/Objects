@@ -25,11 +25,11 @@ export const LAZY_TABLE_ROWS = 20
 /** Rows the preview shows (the header row included). */
 export const PREVIEW_ROWS = 6
 
-export const lazyTableKey = new PluginKey<DecorationSet>('lazyTable')
+const lazyTableKey = new PluginKey<DecorationSet>('lazyTable')
 
 type Meta = { expand: number }
 
-export function isLazyTable(node: PMNode): boolean {
+function isLazyTable(node: PMNode): boolean {
   return node.type.name === 'table' && node.childCount > LAZY_TABLE_ROWS
 }
 

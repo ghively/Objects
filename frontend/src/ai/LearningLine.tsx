@@ -27,7 +27,7 @@ export function memoryOnly(review: ReviewStatus): boolean {
 }
 
 /** Highlight the review's entries and open the agent page on the tab that shows them. */
-export function openReviewChange(review: ReviewStatus, agentId: string): void {
+function openReviewChange(review: ReviewStatus, agentId: string): void {
   useLearningFocus.getState().set(agentId, review.entryIds)
   openAgentTab(agentId, memoryOnly(review) ? 'memory' : 'skills')
 }

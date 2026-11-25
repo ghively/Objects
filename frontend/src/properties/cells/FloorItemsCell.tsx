@@ -14,10 +14,10 @@ import type { CellExtras } from '../cellFor'
 import { placeholderFor } from '../format'
 import { CELL_TEXT, type CellProps } from './types'
 
-export const MAX_FLOOR_ITEMS = 50
+const MAX_FLOOR_ITEMS = 50
 
 /** "place | what" (either alone when the other is empty). */
-export const floorLabel = (f: Pick<FloorItemValue, 'place' | 'what'>) => [f.place, f.what].filter(Boolean).join(' | ')
+const floorLabel = (f: Pick<FloorItemValue, 'place' | 'what'>) => [f.place, f.what].filter(Boolean).join(' | ')
 
 /** The table form: "{collected}/{N} collected" ('' when there are none). */
 export function floorSummary(items: readonly FloorItemValue[]): string {

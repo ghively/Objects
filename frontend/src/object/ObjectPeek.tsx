@@ -13,7 +13,7 @@ import { isDailyNoteType } from './ObjectHeader'
 import { ObjectView } from './ObjectView'
 import { WhiteboardPageLazy } from './WhiteboardLazy'
 
-export const PEEK_TEXT = {
+const PEEK_TEXT = {
   /** Catalog section 5: a daily note's peek adds a "Calendar" button (jump to that day). */
   calendar: 'Calendar',
 }

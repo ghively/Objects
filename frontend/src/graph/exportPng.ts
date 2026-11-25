@@ -41,7 +41,7 @@ export function composeGraphCanvas(renderer: GraphRenderer, background: string =
 }
 
 /** The composed view as a PNG blob. */
-export function graphPngBlob(renderer: GraphRenderer, background?: string): Promise<Blob> {
+function graphPngBlob(renderer: GraphRenderer, background?: string): Promise<Blob> {
   const canvas = composeGraphCanvas(renderer, background)
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Could not encode the PNG.'))), 'image/png')

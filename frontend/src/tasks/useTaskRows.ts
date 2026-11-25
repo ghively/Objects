@@ -8,7 +8,7 @@ import type { Row, TypeDef } from '@/api/types'
 import { useLinkIndex } from '@/links/linkIndex'
 import { useRows } from '@/views/useRows'
 
-export interface TaskRowsState {
+interface TaskRowsState {
   rows: Row[]
   loading: boolean
   taskType: TypeDef | undefined

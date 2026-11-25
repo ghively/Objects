@@ -49,7 +49,7 @@ export type { RowMenuItem } from './rowMenu'
  */
 export const ToolbarSlot = createContext<HTMLElement | null>(null)
 
-export interface PipelineResult {
+interface PipelineResult {
   /** Every row that survives, in view order. */
   rows: Row[]
   groups: Group[]
@@ -113,7 +113,7 @@ export interface RowExtras {
   trailing?: ReactNode
 }
 
-export interface DataViewProps {
+interface DataViewProps {
   rows: Row[]
   types: TypeDef[]
   collections?: Collection[]
@@ -172,7 +172,7 @@ function overlayOpen(target: EventTarget | null): boolean {
 }
 
 /** Our string: a bulk delete where some rows failed (they stay selected). */
-export function bulkDeleteFailed(failed: number, total: number, reason: string): string {
+function bulkDeleteFailed(failed: number, total: number, reason: string): string {
   const head = `${failed} of ${total} ${total === 1 ? 'note' : 'notes'} could not be deleted.`
   return reason ? `${head} ${reason}` : head
 }

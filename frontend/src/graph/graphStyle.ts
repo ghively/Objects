@@ -5,7 +5,7 @@
 import type { GraphNode, TypeDef } from '@/api/types'
 import { themeColor, type ThemeColor } from '@/theme/palette'
 
-export const NODE_MIN_SIZE = 3
+const NODE_MIN_SIZE = 3
 export const NODE_MAX_SIZE = 18
 
 /** Radius in px: `3 + 2·sqrt(degree)`, capped at 18. */

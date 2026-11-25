@@ -24,7 +24,7 @@ import { NodeChrome } from './NodeChrome'
 /** "Open {type} on system", with M7's words for the kinds. */
 const KIND_WORD = { image: 'image', pdf: 'PDF', audio: 'audio', video: 'video', file: 'file' } as const
 
-export function mediaOpenLabel(path: string): string {
+function mediaOpenLabel(path: string): string {
   return `Open ${KIND_WORD[mediaKindOf(path)]} on system`
 }
 

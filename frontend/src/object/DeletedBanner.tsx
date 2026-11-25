@@ -3,14 +3,14 @@ import { Button } from '@/components/ui/button'
 import { Icon } from '@/components/Icon'
 import { NOTE_LOWER } from '@/lib/words'
 
-export const DELETED_TEXT = {
+const DELETED_TEXT = {
   heading: 'Deleted content',
   hint: `This ${NOTE_LOWER} is in the Trash.`,
   back: 'Go back',
   undo: 'Undo Delete',
 }
 
-export interface DeletedBannerProps {
+interface DeletedBannerProps {
   onBack?(): void
   onUndo?(): void
   busy?: boolean

@@ -20,7 +20,7 @@ import { MEDIA_TEXT, useMediaOnRequest, useMediaToken, withMediaToken } from '@/
 
 const stop = (e: SyntheticEvent) => e.stopPropagation()
 
-export interface MediaPlaceholderProps {
+interface MediaPlaceholderProps {
   /** The file's name (the full placeholder's first line). */
   name: string
   /** The kind's icon (full placeholder). */
@@ -80,7 +80,7 @@ export function MediaPlaceholder({ name, icon = 'ph-image', onLoad, compact, cla
 }
 
 /** A space file's URL (`api.fileUrl`) with the current media token, re-rendering when it changes. */
-export function useFileUrl(path: string): string {
+function useFileUrl(path: string): string {
   const token = useMediaToken()
   return withMediaToken(api.fileUrl(path), token)
 }
@@ -89,7 +89,7 @@ function baseName(path: string): string {
   return path.split('/').pop() ?? path
 }
 
-export interface SpaceImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {
+interface SpaceImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   /** The image's space-relative path. */
   path: string
   /** "Required only": the compact placeholder (small pictures). */

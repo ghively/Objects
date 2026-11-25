@@ -15,7 +15,7 @@ import { useAutomations } from '@/automations/useAutomations'
 import type { TypeEditor } from './useTypeEditor'
 import { NOTE_LOWER, NOTES_LOWER } from '@/lib/words'
 
-export const TEMPLATE_MARKER_TEXT = {
+const TEMPLATE_MARKER_TEXT = {
   label: 'Template',
   namePlaceholder: 'Template Name',
   hint: `A template fills in new ${NOTES_LOWER} for you.`,
@@ -25,7 +25,7 @@ export const TEMPLATE_MARKER_TEXT = {
   manage: 'Manage',
 }
 
-export interface TemplateMarkerProps {
+interface TemplateMarkerProps {
   summary: ObjectSummary
   type: TypeDef | undefined
   editor: TypeEditor

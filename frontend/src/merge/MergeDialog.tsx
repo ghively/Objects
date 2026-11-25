@@ -25,7 +25,7 @@ import { useMerge } from './useMerge'
 /** A merge can move at most this many references (the server's `MERGE_LIMIT`, our value). */
 export const MERGE_LIMIT = 5000
 
-export interface MergeStrings {
+interface MergeStrings {
   submenuTitle: string
   preparing: string
   nothingFound: string
@@ -71,7 +71,7 @@ export const MERGE_TAG: MergeStrings = {
 }
 
 /** Our string (the cancel button). */
-export const CANCEL = 'Cancel'
+const CANCEL = 'Cancel'
 
 const TAG_TYPE = 'tag'
 

@@ -72,8 +72,8 @@ export function newId(now: number = Date.now()): string {
 // ---- geometry helpers ----
 
 /** Click-placed shape size (our choice: the 90 × 90 shape floor, as a gate). */
-export const DEFAULT_SHAPE_WIDTH = MIN_SHAPE_WIDTH
-export const DEFAULT_SHAPE_HEIGHT = MIN_SHAPE_HEIGHT
+const DEFAULT_SHAPE_WIDTH = MIN_SHAPE_WIDTH
+const DEFAULT_SHAPE_HEIGHT = MIN_SHAPE_HEIGHT
 /** Embedded object default height (our choice: four grid cells under the 360 minimum width). */
 export const DEFAULT_ENTITY_HEIGHT = GRID * 4
 /** A click with the Line or Arrow tool draws this long a horizontal connector (our choice). */
@@ -158,7 +158,7 @@ function idSet(ids: Iterable<string>): Set<string> {
 
 // ---- creating ----
 
-export interface CreateOptions {
+interface CreateOptions {
   /** The id of the created node (the edge for Line and Arrow). */
   id?: string
   /** Snap to the grid (default true; off while Ctrl is held). */
@@ -936,7 +936,7 @@ export interface ConnectorDrop {
  * Connects the dropped connector's node with `newId` (a node already on `board`), from the
  * handle it was dragged from to the new node's side facing it. A point end takes no handle.
  */
-export function connectDrop(
+function connectDrop(
   board: WhiteboardData,
   drop: ConnectorDrop,
   newNodeId: string,

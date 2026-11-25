@@ -10,7 +10,7 @@
 import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Option } from '../annotations'
 
-export const MIN_COLUMN_WIDTH = 10
+const MIN_COLUMN_WIDTH = 10
 
 /** A columns block has 1 to 6 columns (`column{1,6}`). */
 export const MAX_COLUMNS = 6
@@ -49,7 +49,7 @@ export function dragWidths(widths: readonly number[], index: number, delta: numb
   return out
 }
 
-export type DividerProps = {
+type DividerProps = {
   /** The divider sits after column `index` (0-based). */
   index: number
   /** The widths the drag starts from. */

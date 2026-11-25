@@ -33,7 +33,7 @@ import { AI_ICON, AI_TEXT, openBlocksAi } from '../aiEntries'
 
 export type SlashView = 'icon' | 'bookmark' | 'button'
 
-export type SectionId = 'blocks' | 'types' | 'dates' | 'reuse'
+type SectionId = 'blocks' | 'types' | 'dates' | 'reuse'
 
 export interface SlashItem {
   id: string
@@ -51,7 +51,7 @@ export interface SlashItem {
   pinned?: boolean
 }
 
-export interface SlashSection {
+interface SlashSection {
   id: SectionId
   label: string
   items: SlashItem[]
@@ -208,7 +208,7 @@ export const AI_ITEMS: readonly SlashItem[] = [
 ]
 
 /** "Mermaid Diagram" (alias `mmd`), listed only while there is search text: a code block in Mermaid. */
-export const MERMAID_ITEM: SlashItem = block(
+const MERMAID_ITEM: SlashItem = block(
   'mermaid',
   'Mermaid Diagram',
   'A Mermaid diagram in a code block',
@@ -255,7 +255,7 @@ export function dayLabel(day: string): string {
  * The typed-date items (M8): for a query that names a day (`parseDate`), a
  * link to that daily note and a date token. Names are our strings.
  */
-export function typedDateItems(query: string, today: string): SlashItem[] {
+function typedDateItems(query: string, today: string): SlashItem[] {
   const day = parseDate(query, today)
   if (!day) return []
   const label = dayLabel(day)
@@ -364,7 +364,7 @@ export function slashSections(ctx: SlashContext): SlashSection[] {
 }
 
 /** How well `query` matches an item: its name, alias or description, whichever scores highest; null for no match. */
-export function itemScore(query: string, item: SlashItem): number | null {
+function itemScore(query: string, item: SlashItem): number | null {
   const scores = [item.name, item.alias, item.description]
     .map((text) => (text ? fuzzyScore(query, text) : null))
     .filter((x): x is number => x !== null)

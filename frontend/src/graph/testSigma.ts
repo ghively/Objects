@@ -20,7 +20,7 @@ export interface FakeSigma {
 
 export const sigmaInstances: FakeSigma[] = []
 
-export interface FakeCamera {
+interface FakeCamera {
   ratio: number
   animate: Mock<(state: { x?: number; y?: number; ratio?: number }, opts?: unknown) => Promise<void>>
   animatedReset: Mock<(opts?: unknown) => Promise<void>>

@@ -38,7 +38,7 @@ import { addDays, parseYmd, todayYmd, type Day } from './dates'
 import { formatInZone, zonedParts } from '@/lib/zonedTime'
 import { zonedWallToInstant } from '@/lib/zonedShell'
 
-export const SECTIONS_TEXT = {
+const SECTIONS_TEXT = {
   all: 'All',
   dailyNote: 'Daily note',
   tasks: 'Tasks',
@@ -79,21 +79,21 @@ export const SECTIONS_TEXT = {
 }
 
 /** "Created Today" / "Created Yesterday" / "Created on This Day". */
-export function createdLabel(day: Day, today: Day): string {
+function createdLabel(day: Day, today: Day): string {
   if (day === today) return 'Created Today'
   if (day === addDays(today, -1)) return 'Created Yesterday'
   return 'Created on This Day'
 }
 
 /** Our addition, labelled like Created: "Updated Today" / "Updated Yesterday" / "Updated on This Day". */
-export function updatedLabel(day: Day, today: Day): string {
+function updatedLabel(day: Day, today: Day): string {
   if (day === today) return 'Updated Today'
   if (day === addDays(today, -1)) return 'Updated Yesterday'
   return 'Updated on This Day'
 }
 
 /** One Timeline item (M8 contract): `at` a UTC instant; `key` the date property of `dated`. */
-export interface TimelineItem {
+interface TimelineItem {
   path: string
   at: string
   kind: 'created' | 'dated' | 'task'
@@ -122,7 +122,7 @@ export function dayExtras(cd: CalendarDay | null | undefined): {
 }
 
 /** A Timeline item's time of day, in the Time zone setting's zone, honouring the 24-hour setting. */
-export function timelineTime(iso: string): string {
+function timelineTime(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   const h24 = useSettings.getState().settings.twentyFourHourTime
@@ -192,7 +192,7 @@ export function rangePaths(data: CalendarRange | null): string[] {
   return [...out].sort()
 }
 
-export interface CalendarRows {
+interface CalendarRows {
   rows: Row[]
   byPath: Map<string, Row>
   loading: boolean
@@ -340,7 +340,7 @@ function SectionShell({
   )
 }
 
-export interface DaySectionsProps {
+interface DaySectionsProps {
   day: Day
   /** The viewer's local day. */
   today: Day
@@ -510,7 +510,7 @@ function pickRows(byPath: Map<string, Row>, paths: Iterable<string>): Row[] {
   return out
 }
 
-export interface DayTasksSectionProps {
+interface DayTasksSectionProps {
   day: Day
   /** The viewer's local day. */
   today: Day

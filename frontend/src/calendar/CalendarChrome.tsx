@@ -39,7 +39,7 @@ function isEditable(el: EventTarget | null): boolean {
   return !!ce && ce.getAttribute('contenteditable') !== 'false'
 }
 
-export interface CalendarChromeProps {
+interface CalendarChromeProps {
   weekStart: WeekStart
   rightPanelOpen: boolean
   onToggleRightPanel: () => void

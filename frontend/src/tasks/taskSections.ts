@@ -13,7 +13,7 @@ import { isOpen, statusText } from './statusCategory'
 import { parseRemind } from './remind'
 import { parseRepeat } from './repeat'
 
-export interface TaskSection {
+interface TaskSection {
   title: string
   description: string
   icon: string

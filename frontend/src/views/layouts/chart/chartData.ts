@@ -113,7 +113,7 @@ export function resolveY(config: ChartViewConfig, viewTypes: TypeDef[]): PropCho
 }
 
 /** The group-by entry for an axis property: dates by the chosen bucket, the rest by value. */
-export function entryFor(choice: PropChoice, bucket: ChartViewConfig['xDateBucket']): GroupByEntry {
+function entryFor(choice: PropChoice, bucket: ChartViewConfig['xDateBucket']): GroupByEntry {
   const entry: GroupByEntry = { propertyId: choice.key, option: DATE_KINDS.has(choice.kind) ? bucket : 'default' }
   if (choice.typeId) entry.typeId = choice.typeId
   return entry
@@ -122,10 +122,10 @@ export function entryFor(choice: PropChoice, bucket: ChartViewConfig['xDateBucke
 // The palette for groups without a label colour: the theme's line colours, readable in light and
 // dark (each theme defines `--line-*`). Gray is kept for "Other". Our choice of order.
 const PALETTE: ThemeColor[] = ['blue', 'orange', 'teal', 'purple', 'rose', 'lime', 'amber', 'cyan', 'fuchsia', 'emerald', 'indigo', 'red']
-export const paletteColor = (i: number): string => lineColor(PALETTE[((i % PALETTE.length) + PALETTE.length) % PALETTE.length])
-export const OTHER_COLOR = lineColor('gray')
+const paletteColor = (i: number): string => lineColor(PALETTE[((i % PALETTE.length) + PALETTE.length) % PALETTE.length])
+const OTHER_COLOR = lineColor('gray')
 
-export interface ChartSeries {
+interface ChartSeries {
   id: string
   label: string
   color: string
@@ -133,7 +133,7 @@ export interface ChartSeries {
   group?: Group
 }
 
-export interface ChartCategory {
+interface ChartCategory {
   id: string
   label: string
   color: string
@@ -177,7 +177,7 @@ function valueFormatter(calc: CalcKind, y: PropChoice | null): (n: number) => st
 }
 
 /** The Y axis's label (our strings): "Count", or the calculation and its property. */
-export function yLabelOf(calc: CalcKind, y: PropChoice | null): string {
+function yLabelOf(calc: CalcKind, y: PropChoice | null): string {
   if (calc === 'countAll' || !y) return 'Count'
   return `${CALC_LABELS.full[calc] ?? calc} (${y.name})`
 }

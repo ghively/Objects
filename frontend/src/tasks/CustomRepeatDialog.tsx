@@ -33,7 +33,7 @@ const SCHEDULED_TOOLTIP =
   'Each repeat is counted from the due date, no matter when you finish the task.'
 const COMPLETED_TOOLTIP = 'Each repeat is counted from the day you actually finish the task.'
 
-export interface CustomRepeatDialogProps {
+interface CustomRepeatDialogProps {
   /** The current rule, if any (a weekday rule starts the panel at every 1 day). */
   initial: RepeatRule | null
   /** The task's day (`YYYY-MM-DD`): the default end date. */
@@ -60,7 +60,7 @@ export function onLabel(on: RepeatOn): string {
 }
 
 /** The "On" choices for a month or year rule from the task's day `d`. */
-export function onChoices(unit: 'month' | 'year', d: Date): RepeatOn[] {
+function onChoices(unit: 'month' | 'year', d: Date): RepeatOn[] {
   const wd = weekdayOf(d)
   const pos = Math.floor((d.getDate() - 1) / 7) + 1
   const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()

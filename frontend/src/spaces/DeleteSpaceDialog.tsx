@@ -32,7 +32,7 @@ export const DELETE_SPACE_TEXT = {
 
 const T = DELETE_SPACE_TEXT
 
-export interface DeleteSpaceDialogProps {
+interface DeleteSpaceDialogProps {
   /** The space to delete; `null` closes the dialog. */
   entry: Pick<SpaceEntry, 'path' | 'name'> | null
   onClose(): void

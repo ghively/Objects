@@ -59,7 +59,7 @@ export const RECENT_SHOWN = 10
 /** Snippets shown per result. */
 const SNIPPETS_SHOWN = 2
 
-export interface SearchViewProps {
+interface SearchViewProps {
   /** Close the palette (after opening or creating something). */
   onDone(): void
   /** The footer: the keyboard hints. */
@@ -110,7 +110,7 @@ function snippetsOf(r: SearchResult): string[] {
 }
 
 /** Whether `ms` falls on today's local date. */
-export function openedToday(ms: number | undefined, now: Date = new Date()): boolean {
+function openedToday(ms: number | undefined, now: Date = new Date()): boolean {
   if (ms === undefined) return false
   const d = new Date(ms)
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()

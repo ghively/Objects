@@ -250,7 +250,7 @@ export function cellValue(
 
 // -- panel ---------------------------------------------------------------------------------
 
-export interface PropertyPanelProps {
+interface PropertyPanelProps {
   type?: TypeDef
   frontmatter: Record<string, unknown>
   /** Each entity value resolved from this file (`GET /api/object`'s `links`). */

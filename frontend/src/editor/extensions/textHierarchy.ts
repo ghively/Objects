@@ -14,10 +14,10 @@ import { withOption, type Hierarchy } from '../nodes/blockOptions'
 import { getBlockSelection, setBlockSelectionIn, targetRange } from './blockSelection'
 
 /** The text hierarchy from the bottom up. */
-export const HIERARCHY_LADDER: readonly Hierarchy[] = ['S', 'Base', 'H4', 'H3', 'H2', 'H1']
+const HIERARCHY_LADDER: readonly Hierarchy[] = ['S', 'Base', 'H4', 'H3', 'H2', 'H1']
 
 /** The hierarchy of a text block (a paragraph, small or not, or a heading); null for any other block. */
-export function hierarchyOf(node: PMNode): Hierarchy | null {
+function hierarchyOf(node: PMNode): Hierarchy | null {
   if (node.type.name === 'heading') return `H${node.attrs.level}` as Hierarchy
   if (node.type.name !== 'paragraph') return null
   const options = (node.attrs.blockOptions as Option[] | null) ?? []

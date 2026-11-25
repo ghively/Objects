@@ -12,12 +12,12 @@ import type { Box } from './model'
 import { WB } from './strings'
 
 /** Top-to-bottom, then left-to-right (ties by id, so the order is stable). */
-export function geometricCompare(a: WhiteboardNode, b: WhiteboardNode): number {
+function geometricCompare(a: WhiteboardNode, b: WhiteboardNode): number {
   return a.position.y - b.position.y || a.position.x - b.position.x || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 }
 
 /** Nodes in reading order: the `readingOrder` ids that exist first, then the rest geometrically. */
-export function orderedNodes(board: WhiteboardData, keep: (n: WhiteboardNode) => boolean = () => true): WhiteboardNode[] {
+function orderedNodes(board: WhiteboardData, keep: (n: WhiteboardNode) => boolean = () => true): WhiteboardNode[] {
   const out: WhiteboardNode[] = []
   const seen = new Set<string>()
   const explicit = Array.isArray(board.readingOrder) ? board.readingOrder : []
@@ -68,7 +68,7 @@ export function move<T>(list: readonly T[], from: number, to: number): T[] {
 
 // ---- outline ----
 
-export interface OutlineHeading {
+interface OutlineHeading {
   /** The node whose text block holds the heading (click zooms to it). */
   nodeId: string
   level: number

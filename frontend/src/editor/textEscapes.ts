@@ -89,7 +89,7 @@ export function escapeLineStarts(md: string): string {
 }
 
 /** A heading's trailing `#` run reads as a closing sequence: escape its first `#`. */
-export function escapeHeadingEnd(md: string): string {
+function escapeHeadingEnd(md: string): string {
   return md.replace(/(^|[ \t])(#+[ \t]*)$/, '$1\\$2')
 }
 

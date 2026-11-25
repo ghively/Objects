@@ -7,7 +7,7 @@ import { createRawFind } from '@/find/rawFind'
 import { clearSaveState, setSaveState } from './saveStateStore'
 import { useAutosave, type BodyEditorHandle } from './useAutosave'
 
-export type RawModeProps = {
+type RawModeProps = {
   path: string
   /** The object's body text, edited verbatim (line endings included). */
   text: string
