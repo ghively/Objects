@@ -28,6 +28,7 @@ from pydantic import BaseModel
 
 from .apictx import ApiContext
 from .appstate import state_dir
+from .errors import error_response as _error
 from .fullexport import (
     SCOPES,
     AutoFullExport,
@@ -49,10 +50,6 @@ class FullExportRequest(BaseModel):
     media: bool | None = None
     wikilinks: bool | None = None
     titleHeading: bool | None = None
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 def _settings() -> dict[str, Any]:

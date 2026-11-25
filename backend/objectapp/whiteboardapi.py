@@ -30,6 +30,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from .errors import error_response as _error
 from .propvalues import InvalidValue
 from .watcher import ChangeEvent
 from .whiteboardstore import (
@@ -74,10 +75,6 @@ class SaveInkRequest(BaseModel):
 class CreateWhiteboardRequest(BaseModel):
     title: str | None = None
     clientId: str | None = None
-
-
-def _error(status: int, message: str) -> JSONResponse:
-    return JSONResponse({"detail": message}, status_code=status)
 
 
 def _failure(exc: Exception, path: str) -> JSONResponse:

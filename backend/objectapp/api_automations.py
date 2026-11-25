@@ -29,6 +29,7 @@ from pydantic import BaseModel
 
 from .apictx import ApiContext
 from .automations import AutomationEngine, LoadedRule, RuleRefused, rule_api
+from .errors import error_response as _error
 from .propvalues import InvalidValue
 from .space import ReadOnly
 from .typemodel import RevisionConflict
@@ -57,10 +58,6 @@ class CatchUpRequest(BaseModel):
     ruleId: str
     choice: Literal["all", "latest", "skip"]
     clientId: str | None = None
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 def _locked(reason: str) -> JSONResponse:

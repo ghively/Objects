@@ -35,6 +35,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .propvalues import InvalidValue
 from .space import BASIC_LOCKED, ConfirmRequired, Conflict, ReadOnly
 from .typemodel import RevisionConflict, TypeReadOnly
@@ -59,10 +60,6 @@ if TYPE_CHECKING:
     from .workservice import WorkService
 
 __all__ = ["router"]
-
-
-def _error(status: int, message: str) -> JSONResponse:
-    return JSONResponse({"detail": message}, status_code=status)
 
 
 def _safe(value: Any) -> Any:

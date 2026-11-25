@@ -39,10 +39,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
 
 from .apictx import ApiContext
 from .appstate import state_dir
+from .errors import error_response as _error
 from .importers import agentwire, batches, proposal, provenance, sources
 from .importers.detect import read_source
 from .importers.jobs import Busy, JobHandle, Jobs
@@ -69,10 +69,6 @@ _log = logging.getLogger(__name__)
 READ_TTL = 30 * 60.0
 MAX_READS = 3
 """Source reads kept for re-planning and starting (least recently used dropped first)."""
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 @dataclass

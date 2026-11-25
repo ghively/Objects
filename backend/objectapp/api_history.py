@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .history import HistoryStore, VersionNotFound
 from .space import Conflict, ReadOnly
 from .watcher import ChangeEvent
@@ -36,10 +37,6 @@ class RestoreRequest(BaseModel):
     id: str
     baseVersion: str
     clientId: str | None = None
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 def router(ctx: ApiContext) -> APIRouter:

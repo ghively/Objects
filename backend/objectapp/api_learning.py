@@ -50,6 +50,7 @@ from .agents import REMOTE_HAS_NO, AgentRecord, AgentRegistry
 from .api_agents import _fail
 from .api_agents import _settings as _device_settings
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .learningmodel import LEARNING_DEFAULTS, LearningInvalid, clean_learning, effective_learning
 from .watcher import ChangeEvent
 
@@ -104,10 +105,6 @@ class LearningRequest(BaseModel):
     learning: dict[str, Any]
     baseRevision: str | None = None
     clientId: str | None = None
-
-
-def _error(status: int, detail: str, **extra: Any) -> JSONResponse:
-    return JSONResponse({"detail": detail, **extra}, status_code=status)
 
 
 def _skill_fail(exc: agentskills.SkillError, *, revision: bool = False) -> JSONResponse:

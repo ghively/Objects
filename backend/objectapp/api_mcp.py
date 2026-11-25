@@ -36,6 +36,7 @@ from . import agentfiles, mcpprobe
 from .agents import AgentError, AgentRecord, AgentRegistry
 from .api_agents import agent_tool_groups
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .mcpgateway import TOOL_CACHE, gateway_key, probe_targets
 from .mcpmodel import MAX_SECRET_CHARS, McpServerInput
 from .mcpstore import McpConflict, McpError, McpStore, MissingSecret, cli_entry
@@ -78,10 +79,6 @@ def _parse(model: type[BaseModel], body: Any) -> Any:
         return model.model_validate(body)
     except ValidationError:
         return None
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 def _fail(exc: McpError) -> JSONResponse:

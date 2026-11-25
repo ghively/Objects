@@ -47,6 +47,7 @@ from . import agentfiles, toolcatalog, transcripts
 from .agentmodel import AgentInput, clean_input
 from .agents import AgentConflict, AgentError, AgentNotFound, AgentRecord, AgentRegistry
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .settings import RevisionConflict, SettingsProblem
 from .settings import patch as patch_settings
 from .settings import read as read_settings
@@ -104,10 +105,6 @@ def _fail(exc: AgentError) -> JSONResponse:
     if isinstance(exc, AgentConflict):
         body["currentRevision"] = exc.current_revision
     return JSONResponse(body, status_code=exc.status)
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 FULL_PATH_ONLY = "Choose a folder by its full path."

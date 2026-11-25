@@ -24,12 +24,12 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from . import importfiling
 from .api_importscan import NO_SOURCE, scan_root
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .importers import batches, entities, filing, proposal
 from .importers.jobs import Jobs
 from .importscan import scan_tree
@@ -78,10 +78,6 @@ class EntitiesReviewRequest(BaseModel):
     decisions: dict[str, EntityDecision] = Field(default_factory=dict)
     merges: list[list[str]] = Field(default_factory=list)
     splits: list[SplitOp] = Field(default_factory=list)
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 NO_BATCH = "No such import batch."

@@ -20,10 +20,10 @@ import logging
 from typing import Literal
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .importers import batches
 from .importers.jobs import Jobs
 
@@ -39,10 +39,6 @@ class OriginalRequest(BaseModel):
 class ResolveRequest(BaseModel):
     action: Literal["take", "keep"]
     paths: list[str] | None = None
-
-
-def _error(status: int, detail: str) -> JSONResponse:
-    return JSONResponse({"detail": detail}, status_code=status)
 
 
 def router(ctx: ApiContext, jobs: Jobs, announce_resync) -> APIRouter:

@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from .apictx import ApiContext
+from .errors import error_response as _error
 from .propvalues import InvalidValue
 from .references import link_mention, references
 from .space import Conflict, ReadOnly
@@ -37,10 +38,6 @@ class LinkMentionRequest(BaseModel):
     text: str
     baseVersion: str
     clientId: str | None = None
-
-
-def _error(status: int, message: str) -> JSONResponse:
-    return JSONResponse({"detail": message}, status_code=status)
 
 
 def _safe_json(value) -> JSONResponse:

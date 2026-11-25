@@ -75,6 +75,7 @@ from .apiquery import (
     sort_rows,
 )
 from .automation_filter import tag_names
+from .errors import error_response as _error
 from .propvalues import InvalidValue
 from .queryeval import evaluate, row_collection_ids, seeded_rng
 from .recurrence import week_start_of
@@ -89,10 +90,6 @@ __all__ = ["REPO_ROOT", "mcp_config", "router"]
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MAX_ROWS = 500
 MAX_BODY = 2_000_000
-
-
-def _error(status: int, detail: str, **extra: Any) -> JSONResponse:
-    return JSONResponse({"detail": detail, **extra}, status_code=status)
 
 
 def _hidden_ref(value: Any, hidden: set[str]) -> bool:
