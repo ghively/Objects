@@ -18,8 +18,10 @@ __all__ = ["ApiContext"]
 @dataclass
 class ApiContext:
     space: Space
-    announce: Callable[[ChangeEvent], None]
-    """Publish a `ChangeEvent` to every SSE client (callable from a worker thread)."""
+    announce: Callable[[ChangeEvent], ChangeEvent]
+    """Publish a `ChangeEvent` to every SSE client (callable from a worker thread); returns the
+    event as published (an object event carries its ``linked`` paths, which ``api_objects``'s
+    body and property saves hand back to the saving window)."""
     search: SearchIndex
     settings_changed: Callable[[dict[str, Any]], None] = lambda _settings: None
     """Apply merged device settings to the running app (M8: ``timeZone`` sets ``space.tz``).
