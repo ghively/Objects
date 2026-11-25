@@ -525,14 +525,6 @@ class AgentRegistry:
     def _default(self, fence: list[Path] | None = None) -> AgentRecord:
         return self._record(DEFAULT_AGENT_ID, self._default_folder(), default=True, fence=fence)
 
-    def list(self) -> list[AgentRecord]:
-        """The default agent first, then registry order. Never writes."""
-        fence = self._fence_folders()
-        out = [self._default(fence)]
-        for entry in self._load():
-            out.append(self._record(entry["id"], Path(entry["path"]), default=False, kind=_entry_kind(entry), fence=fence))
-        return out
-
     def get(self, agent_id: str) -> AgentRecord:
         if agent_id == DEFAULT_AGENT_ID:
             return self._default()
@@ -1097,6 +1089,14 @@ class AgentRegistry:
             kind: Literal["local", "remote"] = "remote" if data.get("kind") == REMOTE_KIND else "local"
             self._register(agent_id, target, kind)
             return self._record(agent_id, target, default=False, kind=kind)
+
+    def list(self) -> list[AgentRecord]:
+        """The default agent first, then registry order. Never writes."""
+        fence = self._fence_folders()
+        out = [self._default(fence)]
+        for entry in self._load():
+            out.append(self._record(entry["id"], Path(entry["path"]), default=False, kind=_entry_kind(entry), fence=fence))
+        return out
 
 
 def _check_settings(folder: Path) -> None:

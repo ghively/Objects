@@ -354,7 +354,7 @@ def convert(
             return good[:1], bad + good[1:]
         return (good or None), bad
     if kind == "entity":
-        texts: list[str] = []
+        texts = []
         items = value if isinstance(value, list) else [value]
         for item in items:
             text = _scalar_text(item)

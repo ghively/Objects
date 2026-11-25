@@ -89,14 +89,14 @@ def encode_like(original: bytes, new_text: str) -> bytes:
     head = 0
     while head < limit and old_norm[head] == new_lines[head]:
         head += 1
-    tail = 0
-    while tail < limit - head and old_norm[n_old - 1 - tail] == new_lines[n_new - 1 - tail]:
-        tail += 1
+    kept_tail = 0
+    while kept_tail < limit - head and old_norm[n_old - 1 - kept_tail] == new_lines[n_new - 1 - kept_tail]:
+        kept_tail += 1
 
     out: list[bytes] = list(old_raw[:head])
-    if head < n_old - tail or head < n_new - tail:
+    if head < n_old - kept_tail or head < n_new - kept_tail:
         matcher = difflib.SequenceMatcher(
-            None, old_norm[head : n_old - tail], new_lines[head : n_new - tail], autojunk=False
+            None, old_norm[head : n_old - kept_tail], new_lines[head : n_new - kept_tail], autojunk=False
         )
         for op, i1, i2, j1, j2 in matcher.get_opcodes():
             if op == "equal":
@@ -106,7 +106,7 @@ def encode_like(original: bytes, new_text: str) -> bytes:
                     if tf.eol == "\r\n":
                         line = line.replace("\n", "\r\n")
                     out.append(line.encode("utf-8", errors=_ERRORS))
-    out.extend(old_raw[n_old - tail :])
+    out.extend(old_raw[n_old - kept_tail :])
     data = b"".join(out)
     return BOM + data if tf.bom else data
 

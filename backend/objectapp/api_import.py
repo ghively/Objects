@@ -150,7 +150,7 @@ def router(ctx: ApiContext) -> APIRouter:
     lock = threading.Lock()
     reads: OrderedDict[tuple[str, str, str], _Cached] = OrderedDict()  # least recently used first
     jobs = Jobs()
-    r.jobs = jobs  # type: ignore[attr-defined]  (tests reach the job list)
+    r.jobs = jobs  # type: ignore[attr-defined]  # tests reach the job list
 
     def expire() -> None:
         """Drop expired reads (call with ``lock`` held)."""

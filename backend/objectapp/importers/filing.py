@@ -553,7 +553,7 @@ class Filing:
             data = json.loads(self._path(batch).read_text(encoding="utf-8"))
         except (OSError, ValueError):
             data = None
-        base = {"state": "idle", "mode": None, "results": {}, "verdicts": {}, "trialPaths": [], "normalise": [],
+        base: dict[str, Any] = {"state": "idle", "mode": None, "results": {}, "verdicts": {}, "trialPaths": [], "normalise": [],
                 "error": None, "links": [], "linksDone": False, "trialDone": False}
         return {**base, **data} if isinstance(data, dict) else base
 

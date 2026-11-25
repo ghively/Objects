@@ -112,11 +112,11 @@ _RULES: dict[tuple[str, str], tuple[frozenset[str], frozenset[str]]] = {
     ("fail", "approve"): (frozenset({"approved"}), frozenset({"agent"})),
     ("fail", "agent"): (frozenset({"approved"}), frozenset({"agent"})),
 }
-for _kind in STEP_KINDS:
-    _RULES[("reopen", _kind)] = (frozenset({"approved", "declined", "done"}), frozenset({"user"}))
+for _step_kind in STEP_KINDS:
+    _RULES[("reopen", _step_kind)] = (frozenset({"approved", "declined", "done"}), frozenset({"user"}))
 
 _ROLES_FOR_ACTION: dict[str, frozenset[str]] = {}
-for (_action, _kind), (_states, _roles) in _RULES.items():
+for (_action, _rule_kind), (_states, _roles) in _RULES.items():
     _ROLES_FOR_ACTION[_action] = _ROLES_FOR_ACTION.get(_action, frozenset()) | _roles
 
 _FINISHED = frozenset({"done", "declined"})

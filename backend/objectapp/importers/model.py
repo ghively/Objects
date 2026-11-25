@@ -8,7 +8,7 @@ Nothing here reads or writes a file. Field names match the TypeScript side exact
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -379,7 +379,7 @@ class PlanObject:
     typeKey: str
     values: dict[str, object] = field(default_factory=dict)
     """Planned property key -> raw source value (converted by the writer, by the final kind)."""
-    system: dict[str, object] = field(default_factory=dict)
+    system: dict[str, Any] = field(default_factory=dict)
     """SystemKey -> value (tags, aliases, description, createdAt, lastUpdated)."""
     links: list[PlanLink] = field(default_factory=list)
     attachments: list[str] = field(default_factory=list)
