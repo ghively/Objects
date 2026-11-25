@@ -47,6 +47,7 @@ class CreateCollectionRequest(BaseModel):
 class SaveCollectionRequest(BaseModel):
     collection: dict[str, Any]
     baseRevision: str = ""
+    clientId: str | None = None
 
 
 def router(ctx: ApiContext) -> APIRouter:
