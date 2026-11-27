@@ -46,6 +46,25 @@ Every feature is simply available; nothing is gated behind a paid tier.
 
 During implementation the builder takes each feature's **behaviour and options** from this table and the behaviour catalog.
 
+### TODOs in the editor: task objects (Gene, 2026-11-27, via Decide)
+
+Gene chose **task objects** for TODO handling in the editor (closing the item deferred since 2026-10-26; Logseq-style
+markers stay rejected). The rule:
+
+- A **to-do block** stays a plain checkbox line in the note body (`- [ ]` / `- [x]`), as now; it is not a task.
+- **Convert to task** (block menu, and `/task` in the slash menu) turns a to-do block into an ordinary Task object: a new
+  Markdown file in the Task type's folder whose title is the line's text, whose status is the first `not-started`
+  option (or the first `done` option if the box was ticked), with no due date. The block becomes an **inline embed of
+  that object** in the same place, so the note keeps reading the same way.
+- The embedded task's checkbox is the M4 `TaskCheckbox`: it writes the object's status through `updateProperties`
+  (row version, 409 reloads, never retries blindly). The note body never stores the task's state, only the embed.
+- The task's backlinks show the note it was created from; it appears on the Tasks page, the calendar (once dated) and in
+  queries like any other task. Deleting the embed does not delete the task; deleting the task leaves a broken-embed
+  placeholder, as for any embedded object.
+- If the space has no Task type, or the Task type has no `done`-category status option (M4 finding), Convert to task is
+  disabled with a tooltip saying why.
+- Not part of this: parsing `TODO`/`DONE` keywords, auto-converting every checkbox, or bulk conversion.
+
 ## 4. How it's stored (Markdown folder)
 
 A **space** is a folder; the app can hold several spaces and switch between them. The layout is plain Markdown files in type folders, plus an app-data folder:

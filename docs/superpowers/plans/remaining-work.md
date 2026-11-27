@@ -525,7 +525,7 @@ The synthetic fixture spaces are `space-sample`, `space-v1`, `space-calendar`, `
 3. **Check the CPI export for a Task type with no Done-category status option.** Inferred status sets, as in the sample spaces, have none, so those tasks can't be completed until one is added in type settings (M4 finding).
 4. **Fix what the hand-checks find.** One finding per commit, each with a regression test, then the full gate.
 5. **Not in M9 (Gene's call):** the sidebar types block's Sort Alphabetically / Manually (needs a key kept in each type's default collection); bulk Edit property / Edit tags / Export; export to PDF, Word or LaTeX; duplicating whiteboards; the "name contains status" group ordering (Gene: no).
-6. **Deferred by Gene:** TODO handling in the editor. Logseq-style markers were considered and rejected on 2026-10-26.
+6. ~~**Deferred by Gene:** TODO handling in the editor. Logseq-style markers were considered and rejected on 2026-10-26.~~ *(decided 2026-11-27 by Gene via Decide: to-do blocks convert to task objects; design in the spec §3 "TODOs in the editor: task objects". Build is a separate milestone.)*
 7. **Later:**
    - an installer (spec §6: "an installer comes later")
    - the in-app Claude Code agent (spec §2)
